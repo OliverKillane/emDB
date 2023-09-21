@@ -1,0 +1,58 @@
+<mxfile host="65bd71144e">
+    <diagram id="fORUt5TbvQBg_BarqJL8" name="Page-1">
+        <mxGraphModel dx="745" dy="792" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="2" value="" style="endArrow=baseDash;startArrow=baseDash;html=1;startFill=0;endFill=0;endSize=9;startSize=9;" edge="1" parent="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="40" y="240" as="sourcePoint"/>
+                        <mxPoint x="560" y="240" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="3" value="DataFrame&lt;br style=&quot;font-size: 14px;&quot;&gt;Library" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1" vertex="1" parent="1">
+                    <mxGeometry x="40" y="130" width="60" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" value="Embedded Database" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1" vertex="1" parent="1">
+                    <mxGeometry x="500" y="130" width="60" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" value="Language Types" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="180" width="100" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" value="Basic data manipulation" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="200" width="130" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="SQL Types" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="460" y="160" width="100" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="9" value="Language Functions can be applied" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="160" width="200" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" value="SQL Functions" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="460" y="180" width="100" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="12" value="Schemas, Constraints" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="430" y="200" width="130" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="16" value="DuckDB" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;rotation=-90;" vertex="1" parent="1">
+                    <mxGeometry x="510" y="270" width="60" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="17" value="SQLite" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;rotation=-90;" vertex="1" parent="1">
+                    <mxGeometry x="480" y="270" width="60" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="18" value="ArcticDB" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;rotation=-90;" vertex="1" parent="1">
+                    <mxGeometry x="365" y="270" width="60" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="19" value="Apache Derby" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;rotation=-90;" vertex="1" parent="1">
+                    <mxGeometry x="430" y="300" width="110" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="20" value="Pandas" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;rotation=-90;" vertex="1" parent="1">
+                    <mxGeometry x="20" y="270" width="60" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="21" value="Polars" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;rotation=-90;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="270" width="60" height="30" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
