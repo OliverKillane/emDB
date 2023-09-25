@@ -20,6 +20,8 @@ The language design is still early (draft v3) so much is likely to change. Was h
 
 - Also need to avoid over-expanding the language, anything complex should be left to rust.
 
+- Task based concurrency? Rather than deciding between (single thraded queries, many queries Versus multithreaded query, one query), we just use tasks, tokio spreads them across all available kernel & thus hardware threads.
+
 ### Tasks
 
 - [ ] Work out minimum set of high-level operators and constraints required. Specify semantics. Only baked in operators supported, no custom operators.

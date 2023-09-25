@@ -157,6 +157,8 @@ Less database, more schema compiler.
 
 ### [Example Code](./examples/)
 
+### [Plan Analysis](./plan_analysis/)
+
 ### Project Ideas
 
 Basic implementation:
