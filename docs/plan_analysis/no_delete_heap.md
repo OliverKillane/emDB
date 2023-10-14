@@ -4,7 +4,7 @@ We have a basic database of an `id -> description` mapping, where only new descr
 
 ```rust
 database!(
-    name NoDelete;
+    name MyDatabase;
 
     table foos = {
         id: smalltext[20],
@@ -21,7 +21,7 @@ database!(
             |> map(id = id, descr = description, descr_len = len(description))
             |> order_by(descr_len, asc)
             |> limit(10)
-            |> map(id = id, descr = descr)
+            |> map(id = id, descr = descr_len)
             |> return;
     }
 )
