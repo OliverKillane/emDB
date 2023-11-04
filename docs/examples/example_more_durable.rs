@@ -41,7 +41,7 @@ database!(
     }
 );
 
-static db = Special::DB::new()
+static db = Special::DB::new();
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
