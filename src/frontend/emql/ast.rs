@@ -1,3 +1,4 @@
+// TODO: parameterize by span type (want to go to resolved AST spanned by types)
 use proc_macro2::Span;
 use syn;
 
