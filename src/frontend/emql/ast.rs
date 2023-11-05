@@ -6,13 +6,15 @@ pub(super) enum SingleType {
     RsType(syn::Type),
 }
 
-pub(super) enum UnaryOperator {
+pub(super) enum ChainOperator {
     ValBack,
     RefSend,
     ValSend,
 }
 
 pub(super) struct Condition {}
+
+pub(super) struct Constraint {}
 
 pub(super) enum BinaryOperator {
     Cross,
@@ -26,30 +28,38 @@ pub(super) struct Spanned<T> {
     span: Span,
 }
 
-pub(super) enum Stream {
+pub(super) enum SingleExpr {
+    RsExpr(syn::Expr),
+}
+
+pub(super) enum StreamExpr {
     Return,
     Ident(Spanned<String>),
     Let(Spanned<String>),
+    Operator {
+        name: Spanned<String>,
+        args: Vec<()>, //TODO
+    },
     UnaryOperator {
-        op: Spanned<UnaryOperator>,
-        successor: Box<Spanned<Stream>>,
+        op: Spanned<ChainOperator>,
+        successor: Box<Spanned<StreamExpr>>,
     },
     BinaryOperator {
-        left: Box<Spanned<Stream>>,
+        left: Box<Spanned<StreamExpr>>,
         op: Spanned<BinaryOperator>,
-        right: Box<Spanned<Stream>>,
     },
 }
 
 pub(super) struct Table {
-    name: String,
-    a: SingleType,
+    name: Spanned<String>,
+    cols: Vec<(Spanned<String>, Spanned<SingleType>)>,
+    cons: Vec<Spanned<Constraint>>,
 }
 
 pub(super) struct Query {
     name: String,
-    params: Vec<(String, SingleType)>,
-    streams: Vec<Stream>,
+    params: Vec<(String, syn::Type)>,
+    streams: Vec<StreamExpr>,
 }
 
 pub(super) struct AST {
