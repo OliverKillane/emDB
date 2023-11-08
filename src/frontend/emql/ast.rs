@@ -24,10 +24,10 @@ pub(super) enum BinaryOperator {
 }
 
 pub(super) struct Spanned<T> {
-    data: T,
-    span: Span,
+    pub data: T,
+    pub span: Span,
 }
-
+do!()
 pub(super) enum SingleExpr {
     RsExpr(syn::Expr),
 }
@@ -51,19 +51,19 @@ pub(super) enum StreamExpr {
 }
 
 pub(super) struct Table {
-    name: Spanned<String>,
-    cols: Vec<(Spanned<String>, Spanned<SingleType>)>,
-    cons: Vec<Spanned<Constraint>>,
+    pub name: Spanned<String>,
+    pub cols: Vec<(Spanned<String>, Spanned<SingleType>)>,
+    pub cons: Vec<Spanned<Constraint>>,
 }
 
 pub(super) struct Query {
-    name: String,
-    params: Vec<(String, syn::Type)>,
-    streams: Vec<StreamExpr>,
+    pub name: String,
+    pub params: Vec<(String, syn::Type)>,
+    pub streams: Vec<StreamExpr>,
 }
 
 pub(super) struct AST {
-    name: String,
-    tables: Vec<Table>,
-    queries: Vec<Query>,
+    pub name: Spanned<String>,
+    pub tables: Vec<Table>,
+    pub queries: Vec<Query>,
 }

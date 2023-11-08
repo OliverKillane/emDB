@@ -1,5 +1,8 @@
-use crate::{frontend::emql::ast::AST, plan::repr::LogicalPlan};
+use crate::{
+    frontend::{emql::ast::AST, Diagnostics},
+    plan::repr::LogicalPlan,
+};
 
-pub(super) fn translate<'a>(ast: AST) -> LogicalPlan<'a> {
+pub(super) fn translate<'a>(ast: AST, errs: &mut Diagnostics) -> Option<LogicalPlan<'a>> {
     todo!()
 }
