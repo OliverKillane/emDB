@@ -175,6 +175,7 @@ fn parse_database_name(iter: &mut IntoIter, errs: &mut Diagnostics) -> Option<(S
 
     let kw_name = parse_ident(iter, errs, |_| format!("Expected '{NAME}'"), SEMICOLON)?;
     iter.is_empty();
+
     if kw_name.to_string() != NAME {
         errs.add(recover_past(
             Diagnostic::spanned(
