@@ -21,6 +21,11 @@ cd emDB
 
 # On first build the toolchain will be installed automatically
 cargo build
-cargo test
-cargo doc --document-private-items  # include internal documentation
+```
+
+Some useful commands:
+
+```bash
+cargo doc --document-private-items           # Include Internal Documentation
+cargo test module::path::here -- --nocapture # Print from tests
 ```
