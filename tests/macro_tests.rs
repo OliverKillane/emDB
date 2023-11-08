@@ -1,10 +1,10 @@
-use emdb::{bob, database};
+// use emdb::{bob, database};
 
-database! {
-    name my_databa===seaaaaaaaaaa;
+// database! {
+//     name my_databa===seaaaaaaaaaa;
 
-    // query aaa() = {
+//     // query aaa() = {
 
-    // }
+//     // }
 
-}
+// }

@@ -27,7 +27,7 @@ pub(super) struct Spanned<T> {
     pub data: T,
     pub span: Span,
 }
-do!()
+
 pub(super) enum SingleExpr {
     RsExpr(syn::Expr),
 }

@@ -3,6 +3,10 @@
 mod ast;
 mod combs;
 mod parse;
+
+// TODO: replace
+mod parse2;
+
 mod sem;
 mod trans;
 use crate::{frontend::Frontend, plan::repr::LogicalPlan};

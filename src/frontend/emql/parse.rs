@@ -174,7 +174,7 @@ fn parse_database_name(iter: &mut IntoIter, errs: &mut Diagnostics) -> Option<(S
     const SEMICOLON: fn(&TokenTree) -> bool = match_punct::<';'>();
 
     let kw_name = parse_ident(iter, errs, |_| format!("Expected '{NAME}'"), SEMICOLON)?;
-    iter.is_empty();
+    // iter.is_empty(); // TODO: check if this is the end of the input
 
     if kw_name.to_string() != NAME {
         errs.add(recover_past(
@@ -197,7 +197,7 @@ fn parse_database_name(iter: &mut IntoIter, errs: &mut Diagnostics) -> Option<(S
         SEMICOLON,
     )?;
 
-    let end = parse_punct(iter, errs, ';', |_| format!("Expected ';'"), SEMICOLON)?;
+    // let end = parse_punct(iter, errs, ';', |_| format!("Expected ';'"), SEMICOLON)?;
 
     Some((db_name.span(), db_name.to_string()))
 }
@@ -234,13 +234,13 @@ fn parse_table(iter: &mut IntoIter, errs: &mut Diagnostics) -> Option<Table> {
 
     let cols = parse_columns(table_content.stream(), errs);
 
-    match_punct(
-        iter,
-        errs,
-        '@',
-        |_| format!("Expected '@'"),
-        match_punct::<';'>(),
-    );
+    // match_punct(
+    //     iter,
+    //     errs,
+    //     '@',
+    //     |_| format!("Expected '@'"),
+    //     match_punct::<';'>(),
+    // );
 
     todo!()
 }

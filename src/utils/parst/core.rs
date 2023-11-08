@@ -1,4 +1,7 @@
-//! Third attempt at parsing with error recovery, no backtracking
+//! The core parser combinators required to work on any kind of input.
+//! - No constraints on the input type, fully generalised.
+
+// TODO: need to clean up constraints so that all match Seq (constraints on function, versus struct, versus impl)
 
 use std::marker::PhantomData;
 
@@ -74,7 +77,11 @@ impl<I, P: Parser<I>> Parser<I> for ID<I, P> {
     }
 }
 
-struct Seq<I, P1: Parser<I>, P2: Parser<I>> {
+pub struct Seq<I, E, C, P1: Parser<I, E = E, C = C>, P2: Parser<I, E = E, C = C>>
+where
+    P2::C: ConComb<P2::O, P1::C>,
+    P2::E: ErrComb<P2::C>,
+{
     parser1: P1,
     parser2: P2,
     _marker: PhantomData<I>,
@@ -92,7 +99,14 @@ struct Seq<I, P1: Parser<I>, P2: Parser<I>> {
 /// ```
 /// - The error type of `p1` must be convertible into the second
 /// - Continuations are propagated
-fn seq<I, P1: Parser<I>, P2: Parser<I>>(p1: P1, p2: P2) -> Seq<I, P1, P2> {
+pub fn seq<I, E, C, P1: Parser<I, E = E, C = C>, P2: Parser<I, E = E, C = C>>(
+    p1: P1,
+    p2: P2,
+) -> Seq<I, E, C, P1, P2>
+where
+    P2::C: ConComb<P2::O, P1::C>,
+    P2::E: ErrComb<P2::C>,
+{
     Seq {
         parser1: p1,
         parser2: p2,
@@ -100,9 +114,10 @@ fn seq<I, P1: Parser<I>, P2: Parser<I>>(p1: P1, p2: P2) -> Seq<I, P1, P2> {
     }
 }
 
-impl<I, E, C, P1: Parser<I, E = E, C = C>, P2: Parser<I, E = E, C = C>> Parser<I> for Seq<I, P1, P2>
+impl<I, E, C, P1: Parser<I, E = E, C = C>, P2: Parser<I, E = E, C = C>> Parser<I>
+    for Seq<I, E, C, P1, P2>
 where
-    P2::C: ConComb<P1::O, P2::C>,
+    P2::C: ConComb<P2::O, P1::C>,
     P2::E: ErrComb<P2::C>,
 {
     type O = (P1::O, P2::O);
@@ -112,13 +127,13 @@ where
     fn parse(&self, input: I) -> (I, ParseResult<Self::E, Self::C, Self::O>) {
         let (next_input, res) = self.parser1.parse(input);
         match res {
-            ParseResult::Err(e) => (input, e),
+            ParseResult::Err(e) => (next_input, ParseResult::Err(e)),
             ParseResult::Con(c) => {
                 let (final_input, next_res) = self.parser2.parse(next_input);
                 (
                     final_input,
                     match next_res {
-                        ParseResult::Err(e) => ParseResult::Err(e.err_combine(c)),
+                        ParseResult::Err(e) => ParseResult::Err(e.combine_con(c)),
                         ParseResult::Con(c2) => ParseResult::Con(c2.combine_con(c)),
                         ParseResult::Suc(o) => ParseResult::Con(c.combine_out(o)),
                     },
@@ -130,7 +145,7 @@ where
                     final_input,
                     match next_res {
                         ParseResult::Err(e) => ParseResult::Err(e),
-                        ParseResult::Con(c2) => ParseResult::Con(c2.combine_out(o)),
+                        ParseResult::Con(c2) => ParseResult::Con(c2),
                         ParseResult::Suc(o2) => ParseResult::Suc((o, o2)),
                     },
                 )
@@ -139,7 +154,7 @@ where
     }
 }
 
-struct Recov<I, P: Parser<I>, R: Recover<I, P::E>> {
+pub struct Recov<I, P: Parser<I>, R: Recover<I, P::E>> {
     parser: P,
     recov: R,
     _marker: PhantomData<I>,
@@ -154,7 +169,7 @@ pub fn recov<I, P: Parser<I>, R: Recover<I, P::E>>(parser: P, recov: R) -> Recov
     }
 }
 
-impl<I, P: Parser<I>, R: Recover<I, P::E>> Parser<I> for Recov<I, P, R> {
+impl<I, P: Parser<I>, R: Recover<I, P::E, C = P::C>> Parser<I> for Recov<I, P, R> {
     type O = P::O;
     type C = P::C;
     type E = P::E;
@@ -172,7 +187,7 @@ impl<I, P: Parser<I>, R: Recover<I, P::E>> Parser<I> for Recov<I, P, R> {
     }
 }
 
-struct Either<I, P1: Parser<I>, P2: Parser<I>, C: Parser<I>> {
+pub struct Either<I, P1: Parser<I>, P2: Parser<I>, C: Parser<I>> {
     parser1: P1,
     parser2: P2,
     choice: C,
@@ -224,7 +239,7 @@ impl<
     }
 }
 
-struct Many1<I, S: Parser<I>, P: Parser<I>> {
+pub struct Many1<I, S: Parser<I>, P: Parser<I>> {
     sep: S,
     parser: P,
     _marker: PhantomData<I>,
@@ -232,7 +247,7 @@ struct Many1<I, S: Parser<I>, P: Parser<I>> {
 
 /// Parses the pattern (P S P S ... S P S?) with S determining if the parsing should continue until the separator parser ends it.
 /// - the separator returns a boolean for if parsing should stop, it consumes the input (internally decides if it backtracks, consumes)
-fn many1<I, S: Parser<I>, P: Parser<I>>(sep: S, parser: P) -> Many1<I, S, P> {
+pub fn many1<I, S: Parser<I>, P: Parser<I>>(sep: S, parser: P) -> Many1<I, S, P> {
     Many1 {
         sep,
         parser,
@@ -243,7 +258,7 @@ fn many1<I, S: Parser<I>, P: Parser<I>>(sep: S, parser: P) -> Many1<I, S, P> {
 impl<I, EP, CP, S: Parser<I, E = EP, C = CP, O = bool>, P: Parser<I, E = EP, C = CP>> Parser<I>
     for Many1<I, S, P>
 where
-    CP: ConComb<CP, P::O>,
+    CP: ConComb<P::O, CP>,
     EP: ErrComb<CP>,
 {
     type O = Vec<P::O>;
@@ -252,7 +267,7 @@ where
 
     fn parse(&self, input: I) -> (I, ParseResult<Self::E, Self::C, Self::O>) {
         let mut curr_input = input;
-        let mut res = vec![];
+        let mut outs: Vec<P::O> = vec![];
         let mut con = None;
 
         let (next_input, res) = self.parser.parse(curr_input);
@@ -260,7 +275,7 @@ where
         match res {
             ParseResult::Err(e) => return (next_input, ParseResult::Err(e)),
             ParseResult::Con(c) => con = Some(c),
-            ParseResult::Suc(o) => res.push(o),
+            ParseResult::Suc(o) => outs.push(o),
         }
 
         curr_input = next_input;
@@ -292,14 +307,14 @@ where
                             if let Some(c) = con {
                                 ParseResult::Con(c)
                             } else {
-                                ParseResult::Suc(res)
+                                ParseResult::Suc(outs)
                             },
                         );
                     }
                 }
             }
 
-            let (next_next_input, parse_res) = self.parse(input);
+            let (next_next_input, parse_res) = self.parser.parse(next_input);
             match parse_res {
                 ParseResult::Err(e) => {
                     return (
@@ -322,7 +337,7 @@ where
                     if let Some(c) = con {
                         con = Some(c.combine_out(o));
                     } else {
-                        res.push(o);
+                        outs.push(o);
                     }
                 }
             }
@@ -331,7 +346,7 @@ where
     }
 }
 
-struct Many0<I, S: Parser<I>, P: Parser<I>> {
+pub struct Many0<I, S: Parser<I>, P: Parser<I>> {
     sep: S,
     parser: P,
     _marker: PhantomData<I>,
@@ -339,7 +354,7 @@ struct Many0<I, S: Parser<I>, P: Parser<I>> {
 
 /// Parses the pattern (S P ... S P S?) with S determining if the parsing should continue.
 /// - the separator returns a boolean for if parsing should stop, it consumes the input (internally decides if it backtracks, consumes)
-fn many0<I, S: Parser<I>, P: Parser<I>>(sep: S, parser: P) -> Many0<I, S, P> {
+pub fn many0<I, S: Parser<I>, P: Parser<I>>(sep: S, parser: P) -> Many0<I, S, P> {
     Many0 {
         sep,
         parser,
@@ -352,7 +367,7 @@ fn many0<I, S: Parser<I>, P: Parser<I>>(sep: S, parser: P) -> Many0<I, S, P> {
 impl<I, EP, CP, S: Parser<I, E = EP, C = CP, O = bool>, P: Parser<I, E = EP, C = CP>> Parser<I>
     for Many0<I, S, P>
 where
-    CP: ConComb<CP, P::O>,
+    CP: ConComb<P::O, CP>,
     EP: ErrComb<CP>,
 {
     type O = Vec<P::O>;
@@ -398,7 +413,7 @@ where
                 }
             }
 
-            let (next_next_input, parse_res) = self.parse(input);
+            let (next_next_input, parse_res) = self.parser.parse(next_input);
             match parse_res {
                 ParseResult::Err(e) => {
                     return (
@@ -430,7 +445,7 @@ where
     }
 }
 
-struct MapSuc<I, P: Parser<I>, O> {
+pub struct MapSuc<I, P: Parser<I>, O> {
     parser: P,
     func: fn(P::O) -> O,
     _marker: PhantomData<I>,
@@ -455,9 +470,43 @@ impl<I, P: Parser<I>, MO> Parser<I> for MapSuc<I, P, MO> {
         (
             next_input,
             match res {
-                ParseResult::Suc(o) => ParseResult::Suc(self.func(o)),
-                r => r,
+                ParseResult::Suc(o) => ParseResult::Suc((self.func)(o)),
+                ParseResult::Con(c) => ParseResult::Con(c),
+                ParseResult::Err(e) => ParseResult::Err(e),
             },
         )
+    }
+}
+
+pub struct LiftInput<I1, I2, P: Parser<I2>> {
+    parser: P,
+    to: fn(I1) -> I2,
+    from: fn(I2) -> I1,
+    _marker: PhantomData<I1>,
+}
+
+/// Lifts into a diferent input type.
+/// - Useful when you need to use a different type of parser (e.g from non-backtracking to backtracking)
+pub fn lift<I1, I2, P: Parser<I2>>(
+    parser: P,
+    to: fn(I1) -> I2,
+    from: fn(I2) -> I1,
+) -> LiftInput<I1, I2, P> {
+    LiftInput {
+        parser,
+        to,
+        from,
+        _marker: PhantomData,
+    }
+}
+
+impl<I1, I2, P: Parser<I2>> Parser<I1> for LiftInput<I1, I2, P> {
+    type O = P::O;
+    type C = P::C;
+    type E = P::E;
+
+    fn parse(&self, input: I1) -> (I1, ParseResult<Self::E, Self::C, Self::O>) {
+        let (next_input, res) = self.parser.parse((self.to)(input));
+        ((self.from)(next_input), res)
     }
 }
