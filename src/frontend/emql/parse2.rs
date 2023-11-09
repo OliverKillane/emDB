@@ -1,39 +1,27 @@
-use proc_macro2::TokenStream;
+use std::collections::LinkedList;
 
-use crate::{
-    frontend::Diagnostics,
-    utils::parst::{
-        core::seq,
-        tokens::{getident, matchident},
-    },
+use proc_macro2::TokenStream;
+use proc_macro_error::Diagnostic;
+
+use crate::utils::parst::{
+    core::{recover, seq, ParseResult, Parser, Recover},
+    tokens::{getident, matchident, matchpunct, recoverpunct, SpannedCont, TokenIter},
 };
 
 use super::ast::AST;
 
-pub(super) fn parse(ts: TokenStream, errs: &mut Diagnostics) -> Option<AST> {
-    todo!()
-}
+pub(super) fn parse(ts: TokenStream) -> Result<AST, LinkedList<Diagnostic>> {
+    let name_parser = recover(
+        seq(seq(matchident("name"), getident()), matchpunct(';')),
+        recoverpunct(';'),
+    );
 
-#[cfg(test)]
-mod test {
-    use crate::utils::parst::{
-        core::{seq, ParseResult, Parser},
-        tokens::{getident, matchident, matchpunct, TokenIter},
-    };
-    use quote::quote;
+    let parser = name_parser;
 
-    #[test]
-    fn test_parser() {
-        let input = TokenIter::from(quote! {
-            name mydb;
-
-            query name {};
-        });
-
-        let parser = seq(seq(matchident("name"), getident()), matchpunct(';'));
-
-        if let (_, ParseResult::Suc(o)) = parser.parse(input) {
-            println!("{:?}", o)
-        }
+    let (_, res) = parser.parse(TokenIter::from(ts));
+    match res {
+        ParseResult::Suc(o) => Err(LinkedList::new()), // temporary
+        ParseResult::Con(c) => Err(c.to_list()),
+        ParseResult::Err(e) => Err(SpannedCont::from_err(e).to_list()),
     }
 }

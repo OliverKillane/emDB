@@ -19,7 +19,9 @@ use crate::frontend::{Frontend, EMQL};
 pub fn database(tk: TokenStream) -> TokenStream {
     match EMQL::from_tokens(TokenStream2::from(tk)) {
         Err(ds) => {
-            ds.emit();
+            for d in ds {
+                d.emit()
+            }
             TokenStream::new()
         }
         Ok(lp) => proc_macro::TokenStream::from(Volcano::generate_code(lp)),

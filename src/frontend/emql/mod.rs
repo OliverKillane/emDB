@@ -9,22 +9,21 @@ mod parse2;
 
 mod sem;
 mod trans;
+use std::collections::LinkedList;
+
 use crate::{frontend::Frontend, plan::repr::LogicalPlan};
 use proc_macro2::TokenStream;
+use proc_macro_error::Diagnostic;
+
+use self::parse2::parse;
 
 use super::Diagnostics;
 pub struct EMQL;
 
 impl<'a> Frontend<'a> for EMQL {
-    fn from_tokens(input: TokenStream) -> Result<LogicalPlan<'a>, Diagnostics> {
-        let mut errs = Diagnostics::new();
-        if let Some(ast) = parse::parse(input, &mut errs) {
-            if let Some(lp) = trans::translate(ast, &mut errs) {
-                if errs.empty() {
-                    return Ok(lp);
-                }
-            }
-        }
-        Err(errs)
+    fn from_tokens(input: TokenStream) -> Result<LogicalPlan<'a>, LinkedList<Diagnostic>> {
+        let ast = parse2::parse(input)?;
+        let res_ast = trans::translate(ast)?;
+        Ok(res_ast)
     }
 }
