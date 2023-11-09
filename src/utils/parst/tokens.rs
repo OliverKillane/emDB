@@ -101,7 +101,7 @@ pub fn getident() -> GetIdent {
     GetIdent
 }
 
-impl<'a> Parser<'a, TokenIter> for GetIdent {
+impl Parser<TokenIter> for GetIdent {
     type O = Ident;
     type C = SpannedCont;
     type E = SpannedError;
@@ -138,7 +138,7 @@ pub fn terminal() -> Terminal {
     Terminal
 }
 
-impl<'a> Parser<'a, TokenIter> for Terminal {
+impl Parser<TokenIter> for Terminal {
     type O = ();
     type C = SpannedCont;
     type E = SpannedError;
@@ -159,33 +159,27 @@ impl<'a> Parser<'a, TokenIter> for Terminal {
     }
 }
 
-pub struct InGroup<'a, P: Parser<'a, TokenIter, E = SpannedError, C = SpannedCont>> {
+pub struct InGroup<P: Parser<TokenIter, E = SpannedError, C = SpannedCont>> {
     delim: Delimiter,
-    parser: Seq<'a, TokenIter, SpannedError, SpannedCont, P, Terminal>,
+    parser: Seq<TokenIter, SpannedError, SpannedCont, P, Terminal>,
 }
 
-pub fn ingroup<'a, P: Parser<'a, TokenIter, E = SpannedError, C = SpannedCont>>(
+pub fn ingroup<P: Parser<TokenIter, E = SpannedError, C = SpannedCont>>(
     delim: Delimiter,
     p: P,
-) -> InGroup<'a, P> {
+) -> InGroup<P> {
     InGroup {
         delim,
         parser: seq(p, terminal()),
     }
 }
 
-impl<'a, P: Parser<'a, TokenIter, E = SpannedError, C = SpannedCont>> Parser<'a, TokenIter>
-    for InGroup<'a, P>
-{
+impl<P: Parser<TokenIter, E = SpannedError, C = SpannedCont>> Parser<TokenIter> for InGroup<P> {
     type O = P::O;
     type C = P::C;
     type E = SpannedError;
 
-    #[allow(implied_bounds_entailment)]
-    fn parse(
-        &'a self,
-        mut input: TokenIter,
-    ) -> (TokenIter, ParseResult<Self::E, Self::C, Self::O>) {
+    fn parse(&self, mut input: TokenIter) -> (TokenIter, ParseResult<Self::E, Self::C, Self::O>) {
         match input.next() {
             Some(TokenTree::Group(g)) => {
                 if g.delimiter() == self.delim {
@@ -247,7 +241,7 @@ pub fn matchident(text: &'static str) -> MatchIdent {
     MatchIdent { text }
 }
 
-impl<'a> Parser<'a, TokenIter> for MatchIdent {
+impl Parser<TokenIter> for MatchIdent {
     type O = ();
     type C = SpannedCont;
     type E = SpannedError;
@@ -299,7 +293,7 @@ pub fn matchpunct(punct: char) -> MatchPunct {
     MatchPunct { punct }
 }
 
-impl<'a> Parser<'a, TokenIter> for MatchPunct {
+impl Parser<TokenIter> for MatchPunct {
     type O = ();
     type C = SpannedCont;
     type E = SpannedError;
@@ -351,7 +345,7 @@ pub fn punctorend(punct: char) -> PunctOrEnd {
     PunctOrEnd { punct }
 }
 
-impl<'a> Parser<'a, TokenIter> for PunctOrEnd {
+impl Parser<TokenIter> for PunctOrEnd {
     type O = bool;
     type C = SpannedCont;
     type E = SpannedError;
@@ -436,7 +430,7 @@ impl Recover<TokenIter, SpannedError> for RecoverPunct {
 
 #[cfg(test)]
 mod test {
-    use crate::utils::parst::core::{byref, many1, map_suc, recursive};
+    use crate::utils::parst::core::{many1, map_suc, recursive};
 
     use super::*;
     use quote::quote;
@@ -492,6 +486,6 @@ mod test {
 
     #[test]
     fn recursive_test() {
-        let parser = recursive(|f| map_suc(seq(getident(), byref(f)), |_| 3));
+        let parser = recursive(|f| Box::new(map_suc(seq(getident(), f), |_| 3)));
     }
 }
