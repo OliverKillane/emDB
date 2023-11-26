@@ -428,6 +428,52 @@ impl Recover<TokenIter, SpannedError> for RecoverPunct {
     }
 }
 
+pub struct PeekIdent {
+    ident: &'static str,
+}
+
+pub fn peekident(ident: &'static str) -> PeekIdent {
+    PeekIdent { ident }
+}
+
+impl Parser<TokenIter> for PeekIdent {
+    type O = bool;
+    type C = SpannedCont;
+    type E = SpannedError;
+
+    fn parse(&self, input: TokenIter) -> (TokenIter, ParseResult<Self::E, Self::C, Self::O>) {
+        match input.peek_next() {
+            Some(TokenTree::Ident(i)) if i.to_string() == self.ident => {
+                (input, ParseResult::Suc(true))
+            }
+            _ => (input, ParseResult::Suc(false)),
+        }
+    }
+}
+
+pub struct PeekPunct {
+    punct: char,
+}
+
+pub fn peekpunct(punct: char) -> PeekPunct {
+    PeekPunct { punct }
+}
+
+impl Parser<TokenIter> for PeekPunct {
+    type O = bool;
+    type C = SpannedCont;
+    type E = SpannedError;
+
+    fn parse(&self, input: TokenIter) -> (TokenIter, ParseResult<Self::E, Self::C, Self::O>) {
+        match input.peek_next() {
+            Some(TokenTree::Punct(p)) if p.as_char() == self.punct => {
+                (input, ParseResult::Suc(true))
+            }
+            _ => (input, ParseResult::Suc(false)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::utils::parst::core::{many1, map_suc, recursive};
