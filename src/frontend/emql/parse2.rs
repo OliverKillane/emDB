@@ -2,6 +2,7 @@ use std::collections::LinkedList;
 
 use proc_macro2::{Delimiter, TokenStream};
 use proc_macro_error::Diagnostic;
+use syn::token::Token;
 
 use crate::utils::parst::{
     core::{
@@ -9,7 +10,7 @@ use crate::utils::parst::{
     },
     tokens::{
         getident, ingroup, matchident, matchpunct, peekident, peekpunct, recoverpunct, terminal,
-        PeekIdent, SpannedCont, TokenIter,
+        PeekIdent, SpannedCont, SpannedError, TokenIter,
     },
 };
 
@@ -73,6 +74,14 @@ mod tests {
         println!("{:#?}", ts);
     }
 }
+
+// TODO:
+// - add blob parser
+// - add operator parser
+// - fix punct recovery
+// - implement parser below
+// - sort out return types
+// - redo examples
 
 /*
 let nameparser = map_suc(
