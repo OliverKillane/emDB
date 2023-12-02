@@ -1,11 +1,13 @@
 ## A new syntax for emQL
+
 The main issues with the previous syntax were the complexity:
+
 - not always obvious which things are references
 - using closures for map, reduce, not always applicable to references, again very confusing.
 - rust syntax is hidden behind backticks.
 
-
 In order to remedy this two changes are made:
+
 - now references to a row are also values; hence passing references is the same as passing values
 - all operators and constraints just use `()` parentheses
 - attribute/column names can be easily accessed with just the name (automatically unwrapped)
@@ -14,7 +16,7 @@ In order to remedy this two changes are made:
 ```rust
 database! {
     name mydatabase;
-    
+
     // comments are removed at tokenisation
     // all constraints come at the end
     table people {
@@ -30,8 +32,8 @@ database! {
     };
 
     query mothers() {
-        people 
-            |> join(people |> map(p = parent) on if let Some(p) = left.p { p == right.id} else {false}) 
+        people
+            |> join(people |> map( p = parent ) on if let Some(p) = left.p { p == right.id } else {false})
             |> map(id = right.id, name = right.name)
             |> groupby(right.id with it |> right.first)
             |> map(name = right.name)
@@ -45,22 +47,38 @@ database! {
     }
 
     query pass_single(x: i32) {
-        x ~> map(x * 2) ~> 
+        x ~> map(x * 2) ~>
     }
 
     query nested_join() {
-        
+        people |> filter( ... ) |> map( ... ) |> let foos;
+        people |> filter( ... ) |> map( ... ) |> let bars;
+        people |> filter( ... ) |> map( ... ) |> let bings;
+
+
+        people |> join( 
+            foos |> join( 
+                bars |> join(
+                    bings on ...
+                ) on ... 
+            ) on ... 
+        ) |> fold( ..., ... ) ~> return;
     }
 }
 ```
+
 ## Implementing rust code
+
 Given an arbitrary rust expression.
+
 - Need a custom combinator for syn
+
 1. Take a group, tokenstream from within
 2. Get tokenstream for goup, syn parse2 then get result.
 3. Deconstruct error results, on okay pass to semantic analysis
 
 In semantic analysis
+
 - difficulty: we cannot reimplement rusts semantic analysis ourselves
 - solution: pass code onto backend, checked by rust at end and spans still reflect original. [TODO: make prototype]
 
@@ -69,11 +87,13 @@ In order to ensure errors are constrained to the provided code, we wrap in a fun
 ```rust
 query do_something() {
     some_table |> filter(age > 20) |> map(x = name.len(), y = 3 * age) |> first ~> return;
-} 
+}
 ```
+
 ends up awith the map represented as:
+
 ```rust
-struct DOSomethingReturn {x: usize, y: i32}; 
+struct DOSomethingReturn {x: usize, y: i32};
 fn do_something() -> Result<DoSomethingReturn, ()>{
     // note could reduce contamination further by isolating even from Map1/Map2 to tuples, then re-integrating to a struct
     struct Temp1 {name: String, age: i32}
@@ -84,7 +104,7 @@ fn do_something() -> Result<DoSomethingReturn, ()>{
 
         pred(temp1.name, temp1.age)
     }
-    
+
     fn map_2(Temp1{name, age}: Temp1) -> DOSomethingReturn {
         DOSomethingReturn{
             x: name.len(),
@@ -96,11 +116,8 @@ fn do_something() -> Result<DoSomethingReturn, ()>{
 }
 ```
 
-
-
-
-
 ## Inspiration
+
 Flux
 Chaining from Diesel but done more nicely
 |> operator also in elixir, chaining from haskell
@@ -109,7 +126,9 @@ people love chaining / e.g. typed builder
 use rust keywords to piggyback on automatic rust syntax highlighting
 
 ## Remaining
+
 Implicit `it` / `r` when accessing parameter, for example `ref foo |> filter(it.col == 3)`
+
 - it from kotlin
 - want to avoid closure style
 - matters for backend (passing opaque rust code to backend for substitution)
