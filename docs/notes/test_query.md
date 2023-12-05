@@ -21,6 +21,7 @@ I cannot entirely extract a basic query to reason about.
 ## Custom Schema
 ### Schema
 ```rust
+// mocked up in emQL frontend not yet complete
 database! {
     name user_details;
 
@@ -42,8 +43,8 @@ database! {
     //   - Needed for data insert, generation of id only occurs from here,
     //     hence we know the table alone determines id
     //   - Move semantics (taking ownership of data structure from outside the database)
-    query new_user(username: String) {
-        row(name = username, premium = false, credits = 0 ) 
+    query new_user(username: String, prem: bool) {
+        row(name = username, premium = prem, credits = 0 ) 
             |> insert(users) 
             ~> return;
     }
@@ -101,7 +102,7 @@ database! {
     // Description:
     //   Get the total number of credits in the premium table
     // Reasoning:
-    //   Easy IVM case, all updates \& inserts just need to add difference to 
+    //   Easy IVM case, all updates & inserts just need to add difference to 
     //   the view
     query total_premium_credits() {
         users
@@ -110,6 +111,18 @@ database! {
             |> sum() 
             ~> return;
     }
+}
+
+fn foo() {
+    let db = user_details::new();
+
+    let bob_id = db.new_user(String::from("Bob"), true).expect("No errors possible");
+    db.add_credits(bob_id, 23).expect("Valid query");
+
+    let jim_id = db.new_user(String::from("Jim"), false).expect("No errors possible");
+    
+    use user_details::query_results::AddCredits; 
+    assert!(matches(db.add_credits(jim_id, -30), AddCredits::PredicateError(_));
 }
 ```
 
@@ -124,3 +137,10 @@ Neither consider concurrency, this is difficult enough as it is.
 
 ![](./../diagrams/users_test_query.drawio.svg)
 *Note: Types are not shown, each connection has an associated `name -> type` mapping (e.g `id -> usize, name -> &str`)*
+
+Compare against naive implementation (both embedded, fair comparison), can also compare against postgres (very unfair but to demonstrate).
+
+### Workload
+Measure rate of operations per time unit.
+- Against a certain table size (updates and queries)
+- Cost of inserts as the table size increases
