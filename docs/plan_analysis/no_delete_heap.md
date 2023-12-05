@@ -41,7 +41,7 @@ We apply rule based optimisation on the whole plan (all queries & tables) to pus
 - Some pushes add constraints (e.g push through `order_by` constrains to the ordered data structures available, `limit` constrains to the fixed size data structures).
 - We can apply other optimisations (e.g dead column removal)
 
-![](./../images/no_delete_heap_plan.svg)
+![](./../diagrams/no_delete_heap_plan.drawio.svg)
 
 ### Generated Code
 

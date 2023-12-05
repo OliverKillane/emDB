@@ -58,7 +58,7 @@ Apply rule based opts, must consider checks (e.g refs and unique checks).
 - Because we know deletions never occur, tracking updates to both tables becomes trivial (track update number for each, references is view will always be valid)
 - Hence the performance gain is from caching the expensive join in a view, and reducing the work required to maintain the view.
 
-![](./../images/no_delete_hash.svg)
+![](./../diagrams/no_delete_hash.drawio.svg)
 
 ### Generated Code
 

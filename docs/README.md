@@ -2,7 +2,7 @@
 
 ### Slow Delta
 
-![](./images/slow_delta.svg)
+![](./diagrams/slow_delta.drawio.svg)
 
 Here the requirements for the delta / service do not align with the requirements of the database design typically used.
 
@@ -19,7 +19,7 @@ And yet these un-needed features compromise the design of the database on the ke
 
 ### Inefficient Analysis
 
-![](./images/inefficient_analysis.svg)
+![](./diagrams/inefficient_analysis.drawio.svg)
 
 Many organisations need to run analysis on chunks of historical data (e.g daily, weekly).
 
@@ -45,7 +45,7 @@ A good solution, particularly if the data must come from several different datab
 
 ### Complex Service
 
-![](./images/complex_service.svg)
+![](./diagrams/complex_service.drawio.svg)
 
 Most services are simply a collection of IO, state, and some logic. Here we focus on services where durability is not necessary.
 
@@ -69,7 +69,7 @@ One way to achieve this is to just use a database, but at the cost of access tim
 
 Embed a database-like library within the application.
 
-![](./images/dataframe_database.svg)
+![](./diagrams/dataframe_database.drawio.svg)
 
 There are however some inefficiencies:
 
@@ -82,7 +82,7 @@ There are however some inefficiencies:
 
 Given a schema and queries, generate a database to embed within application code.
 
-![](./images/solution_rough.svg)
+![](./diagrams/solution_rough.drawio.svg)
 
 - Easy to write schemas & queries.
 - Concurrency correctness, enforcing constraints/invariants and data structures automatically handled.
@@ -151,7 +151,7 @@ It is however missing key functionality:
 
 ## emDB
 
-![](./images/emDB.svg)
+![](./diagrams/emDB.drawio.svg)
 
 Less database, more schema compiler.
 
