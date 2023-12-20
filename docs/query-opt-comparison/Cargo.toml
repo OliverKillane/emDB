@@ -5,6 +5,12 @@ edition = "2021"
 
 [dependencies]
 typed-generational-arena = "0.2.5"
+slab = "0.4.9"
 
 [dev-dependencies]
-rstest = "0.18.2"
+divan = "0.1"
+rand = "0.8"
+
+[[bench]]
+name = "comparison"
+harness = false

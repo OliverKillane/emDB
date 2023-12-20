@@ -1,6 +1,6 @@
 ## Requirements
 Some schema and queries that are.
-- being the abilities of DBtoaster in a useful way
+- beating the abilities of DBtoaster in a useful way
 - look somewhat typical of some basic state
 - avoid too much complexity in schema (e.g. lots of foreign key relations), and simple enough to diagram for report
 - have several possible optimisations to choose from / justifications for discussion in report
@@ -35,7 +35,7 @@ database! {
         name: String,
         premium: bool,
         credits: i32
-    } @ gen_pk(id), pred(premium || credits > 0);
+    } @ gen_pk(id), pred(premium || credits > 0) as PremCredits;
 
     // Description:
     //   Create a row, pipe to insert, insert returns gen_pk id
@@ -49,7 +49,7 @@ database! {
             ~> return;
     }
 
-    // Description:
+    // Description
     //   Get an individual user's data.
     // Reasoning:
     //   - Performance reliant on access to users data structure

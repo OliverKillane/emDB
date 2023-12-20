@@ -1,0 +1,6 @@
+{
+    "julia.environmentPath": "/home/oliverkillane/files/emDB",
+    "rust-analyzer.linkedProjects": [
+        "./docs/query-opt-comparison/Cargo.toml"
+    ]
+}
