@@ -12,5 +12,5 @@ divan = "0.1"
 rand = "0.8"
 
 [[bench]]
-name = "comparison"
+name = "tables"
 harness = false

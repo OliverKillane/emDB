@@ -1,13 +1,15 @@
 use divan::{black_box, Bencher};
-use query_opt_comparison::{
+use query_opt_comparison::tables::{
     foresight::ForesightDatabase as ForeDB, naive::NaiveDatabase as NaiveDB, UserDetails,
 };
 use rand::{seq::SliceRandom, Rng};
 
-const TABLE_SIZES: [usize; 10] = [1, 4, 16, 64, 256, 1024, 4096, 16384, 65536, 262144];
+mod utils;
+use utils::*;
+
+const TABLE_SIZES: [usize; 4] = [4096, 16384, 65536, 262144];
 
 fn main() {
-    // Run `add` benchmark:
     divan::main();
 }
 
@@ -39,7 +41,7 @@ where
         })
 }
 
-fn random_table<'a, const SIZE: usize, T: UserDetails<'a>>() -> (Vec<usize>, T) {
+fn random_table<'a, const SIZE: usize, T: UserDetails<'a>>() -> (Vec<T::UsersID>, T) {
     let mut db = T::new();
     let mut rng = rand::thread_rng();
 
@@ -54,7 +56,7 @@ fn random_table<'a, const SIZE: usize, T: UserDetails<'a>>() -> (Vec<usize>, T) 
     ids.shuffle(&mut rng);
 
     for id in ids.iter() {
-        db.add_credits(*id, rng.gen_range(2..100));
+        db.add_credits(id.clone(), rng.gen_range(2..100));
     }
     db.reward_premium(2f32);
     black_box((ids, db))
@@ -108,7 +110,7 @@ where
 }
 
 #[divan::bench(
-    name = "Time taken to get the total credits of premium users",
+    name = "Time taken to reward premium users",
     types = [NaiveDB, ForeDB],
     consts = TABLE_SIZES,
     max_time = 1
@@ -120,4 +122,35 @@ where
     bencher
         .with_inputs(random_table::<N, T>)
         .bench_local_refs(|(_, db)| black_box(db.reward_premium(2f32)))
+}
+
+#[divan::bench(
+    name = "Random workload of N actions",
+    types = [NaiveDB, ForeDB],
+    consts = [100000]
+)]
+fn mixed_workload<'a, T, const N: usize>(bencher: Bencher)
+where
+    T: UserDetails<'a>,
+{
+    bencher.bench_local(|| {
+        let mut db = T::new();
+        let mut rng = rand::thread_rng();
+
+        // avoid reallocations
+        let mut ids = Vec::with_capacity(N);
+        ids.push(db.new_user(String::from("bob"), true));
+
+
+        for _ in 0..N {
+            choose! { rng
+                10 => { ids.push(db.new_user(String::from("bob"), true)); },
+                20 => { black_box(db.get_info(ids[rng.gen_range(0..ids.len())])); },
+                1 => { black_box(db.get_snapshot()); },
+                2 => { black_box(db.total_premium_credits()); },
+                1 => { black_box(db.reward_premium(2f32)); },
+                20 => { black_box(db.add_credits(ids[rng.gen_range(0..ids.len())], rng.gen_range(2..100))); },
+            }
+        }
+    })
 }
