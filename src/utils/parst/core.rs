@@ -3,8 +3,9 @@
 
 // TODO: need to clean up constraints so that all match Seq (constraints on function, versus struct, versus impl)
 
+use core::cell::OnceCell;
 use std::marker::PhantomData;
-
+use std::rc::{Rc, Weak};
 /// A trait for combining continuations and successed into single continuations
 /// - A continuation may contain many previous syntax errors, upon the next parser
 ///   succeeding, rather than propagate it's success, we want to propagate the previous
@@ -44,6 +45,7 @@ pub trait Parser<I> {
     /// The parser failed with this error.
     type E;
 
+    #[allow(clippy::type_complexity)]
     fn parse(&self, input: I) -> (I, ParseResult<Self::E, Self::C, Self::O>);
 }
 
@@ -554,22 +556,24 @@ impl<I1, I2, P: Parser<I2>> Parser<I1> for LiftInput<I1, I2, P> {
 }
 
 pub struct Recursive<I, O, E, C> {
-    parse: fn(Self) -> Box<dyn Parser<I, O = O, E = E, C = C>>,
+    parse: RecursiveParse<I, O, E, C>,
     _marker: PhantomData<I>,
 }
+type RecursiveParse<I, O, E, C> =
+    fn(Recursive<I, O, E, C>) -> Box<dyn Parser<I, O = O, E = E, C = C>>;
+type RecursiveGen<I, O, E, C> =
+    fn(Recursive<I, O, E, C>) -> Box<dyn Parser<I, O = O, E = E, C = C>>;
 
 /// Allows for the construction of recursive parsers.
 /// If parsed, constructs the contained parser with a contained parser than
 /// recursively builds the tree of parsers.
 /// - problem: Idk how well this optimises, requires heap allocation + dyn
 /// - maybe I can find a way to generate a self-referential parser, somehow
-//    without infinite types.
-/// TODO: mostly anything would be nicer than this.
-/// IDEA: ourboro, byref with &dyn Parser<I, E ... >, but then and lifetimes as
-///       part of the Parser trait? Lifetime-annotation hell on first attempt.
-pub fn recursive<I, O, E, C>(
-    parse: fn(Recursive<I, O, E, C>) -> Box<dyn Parser<I, O = O, E = E, C = C>>,
-) -> Recursive<I, O, E, C> {
+///    without infinite types.
+// TODO: mostly anything would be nicer than this.
+// IDEA: ourboro, byref with &dyn Parser<I, E ... >, but then and lifetimes as
+//       part of the Parser trait? Lifetime-annotation hell on first attempt.
+pub fn recursive<I, O, E, C>(parse: RecursiveGen<I, O, E, C>) -> Recursive<I, O, E, C> {
     Recursive {
         parse,
         _marker: PhantomData,
@@ -585,7 +589,53 @@ impl<I, O, E, C> Parser<I> for Recursive<I, O, E, C> {
         (self.parse)(Recursive {
             parse: self.parse,
             _marker: PhantomData,
-        }) // I dont like this, building at parsetime.
+        }) // TODO: I dont like this, building at parsetime.
         .parse(input)
+    }
+}
+
+pub struct Recursive2<I, O, E, C> {
+    parser: Rc<Box<dyn Parser<I, O = O, E = E, C = C>>>,
+    _marker: PhantomData<I>,
+}
+
+pub struct Recursive2Handle<I, O, E, C> {
+    parser: Weak<Box<dyn Parser<I, O = O, E = E, C = C>>>, // using dyn to avoid an infinite type
+    _marker: PhantomData<I>,
+}
+impl<I, O, E, C> Parser<I> for Recursive2Handle<I, O, E, C> {
+    type C = C;
+    type E = E;
+    type O = O;
+
+    fn parse(&self, input: I) -> (I, ParseResult<Self::E, Self::C, Self::O>) {
+        // NOTE: Recursive handler only used within the context of a recursive
+        //       parser, so we can assume on parse the item is present.
+        self.parser.upgrade().unwrap().parse(input)
+    }
+}
+
+pub fn recursive2<I, O, E, C, P: Parser<I, O = O, E = E, C = C> + 'static>(
+    parse: fn(Recursive2Handle<I, O, E, C>) -> P,
+) -> Recursive2<I, O, E, C> {
+    Recursive2 {
+        parser: Rc::new_cyclic(|w: &Weak<Box<dyn Parser<I, O = O, E = E, C = C>>>| {
+            let b: Box<dyn Parser<I, O = O, E = E, C = C>> = Box::new((parse)(Recursive2Handle {
+                parser: w.clone(),
+                _marker: PhantomData,
+            }));
+            b
+        }),
+        _marker: PhantomData,
+    }
+}
+
+impl<I, O, E, C> Parser<I> for Recursive2<I, O, E, C> {
+    type C = C;
+    type E = E;
+    type O = O;
+
+    fn parse(&self, input: I) -> (I, ParseResult<Self::E, Self::C, Self::O>) {
+        self.parser.parse(input)
     }
 }

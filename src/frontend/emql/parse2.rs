@@ -4,6 +4,7 @@ use proc_macro2::{Delimiter, TokenStream};
 use proc_macro_error::Diagnostic;
 use syn::token::Token;
 
+use super::ast::AST;
 use crate::utils::parst::{
     core::{
         either, many0, many1, map_suc, recover, seq, Either, MapSuc, ParseResult, Parser, Recover,
@@ -14,66 +15,47 @@ use crate::utils::parst::{
     },
 };
 
-use super::ast::AST;
-
 pub(super) fn parse(ts: TokenStream) -> Result<AST, LinkedList<Diagnostic>> {
-    let name_parser = recover(seq(matchident("name"), getident()), recoverpunct(';'));
-
-    let query_or_table_parser = seq(
-        matchpunct(';'),
-        either(
-            peekident("query"),
-            map_suc(
-                seq(
-                    matchident("query"),
-                    seq(
-                        getident(),
-                        seq(
-                            ingroup(Delimiter::Parenthesis, matchident("foo")),
-                            ingroup(Delimiter::Brace, matchident("bar")),
-                        ),
-                    ),
-                ),
-                |_| (),
-            ),
-            map_suc(seq(matchident("table"), matchident("bar")), |_| ()),
-        ),
-    );
-
-    let parser = seq(
-        seq(
-            name_parser,
-            many0(
-                peekpunct(';'),
-                recover(query_or_table_parser, recoverpunct(';')),
-            ),
-        ),
-        terminal(),
-    );
+    let parser = getident(); // todo
 
     let (_, res) = parser.parse(TokenIter::from(ts));
 
     match res {
         ParseResult::Suc(o) => Err(LinkedList::new()), // temporary
-        ParseResult::Con(c) => Err(c.to_list()),
-        ParseResult::Err(e) => Err(SpannedCont::from_err(e).to_list()),
+        ParseResult::Con(c) => Err(c.into_list()),
+        ParseResult::Err(e) => Err(SpannedCont::from_err(e).into_list()),
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use quote::quote;
+// fn name_parser() -> impl Parser<TokenIter> {
+//     recover(
+//         map_suc(
+//             seq(matchident("name"), seq(getident(), matchpunct(';'))),
+//             |(_, (name, _))| name,
+//         ),
+//         recoverpunct(';'),
+//     )
+// }
 
-    #[test]
-    fn check_ops() {
-        let ts = quote! {
-            |>
-        };
+// fn param_list_parser() -> impl Parser<TokenIter> {
 
-        println!("{:#?}", ts);
-    }
-}
+// }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use quote::quote;
+
+//     #[test]
+//     fn test_name_parser() {
+//         let ts = quote! {
+//             name my_databaseaa;
+//         };
+//         let parser = name_parser();
+//         let (out, res) = parser.parse(TokenIter::from(ts));
+//         assert!(matches!(res, ParseResult::Suc(_)));
+//     }
+// }
 
 // TODO:
 // - add blob parser
