@@ -1,345 +1,218 @@
-// use crate::frontend::{
-//     emql::ast::{Query, Table, AST},
-//     Diagnostics,
-// };
-// use proc_macro2::{
-//     token_stream::IntoIter, Delimiter, Group, Ident, Punct, Span, TokenStream, TokenTree,
-// };
-// use proc_macro_error::{Diagnostic, DiagnosticExt, Level, SpanRange};
+use std::collections::LinkedList;
 
-// use super::ast::{SingleType, Spanned};
+use proc_macro2::{Delimiter, Ident, TokenStream};
+use proc_macro_error::{Diagnostic, Level};
+use syn::{Expr, Type};
 
-// /// Parses the provided [TokenStream] as emQL to produce errors (in [Diagnostics]), and if possible an [AST].
-// /// - Even if errors are present, if the [AST] can be produced, then it can be returned and analysed.
-// /// - Multiple syntax errors are supported by adding to [Diagnostics]
-// ///
-// /// Rather than use a parser combinator this is hand written as:
-// /// - Tokentree abstraction + [IntoIter] being one-way + error recovery do not fit well to parser combinator abstractions
-// /// - emQL is relatively simple, complex parsing done by [syn] / rust syntax.
-// /// - Need best possible performance
-// pub(super) fn parse(ts: TokenStream, errs: &mut Diagnostics) -> Option<AST> {
-//     let mut iter = ts.into_iter();
-//     let name = parse_database_name(&mut iter, errs);
-//     let mut tables: Vec<Table> = vec![];
-//     let mut queries: Vec<Query> = vec![];
+use super::ast::{
+    Connector, Constraint, ConstraintExpr, FuncOp, Operator, Query, StreamExpr, Table, AST,
+};
+use crate::utils::parst::{
+    core::{either, many0, mapsuc, recover, recursive, seq, ParseResult, Parser, RecursiveHandle},
+    macros::{choice, seqs},
+    tokens::{
+        collectuntil, error, getident, gettoken, ingroup, isempty, listsep, matchident, matchpunct,
+        not, nothing, peekident, peekpunct, recoverpunct, syn, syntopunct, SpannedCont,
+        SpannedError, TokenIter,
+    },
+};
 
-//     loop {
-//         match parse_table_or_query(&mut iter, errs) {
-//             QueryOrTable::Query(q) => queries.push(q),
-//             QueryOrTable::Table(t) => tables.push(t),
-//             QueryOrTable::End => break,
-//             QueryOrTable::Err => (),
-//         }
-//     }
+pub(super) fn parse(ts: TokenStream) -> Result<AST, LinkedList<Diagnostic>> {
+    let parser = emdb_parser(); // todo
 
-//     if let Some((s, nm)) = name {
-//         Some(AST {
-//             name: Spanned { data: nm, span: s },
-//             tables,
-//             queries,
-//         });
+    let (_, res) = parser.parse(TokenIter::from(ts));
 
-//         // for moment
-//         None
-//     } else {
-//         None
-//     }
-// }
+    match res {
+        ParseResult::Suc(o) => Err(LinkedList::new()), // temporary
+        ParseResult::Con(c) => Err(c.into_list()),
+        ParseResult::Err(e) => Err(SpannedCont::from_err(e).into_list()),
+    }
+}
 
-// fn recover_past(
-//     err: Diagnostic,
-//     start: TokenTree,
-//     stop_after: fn(&TokenTree) -> bool,
-//     iter: &mut IntoIter,
-// ) -> Diagnostic {
-//     let start_span = start.span();
-//     let mut curr = start;
-//     while !stop_after(&curr) {
-//         if let Some(tt) = iter.next() {
-//             curr = tt;
-//         } else {
-//             break;
-//         }
-//     }
-//     err.span_range_note(
-//         SpanRange {
-//             first: start_span,
-//             last: curr.span(),
-//         },
-//         String::from("Skipped during parsing."),
-//     )
-// }
+enum QueryTable {
+    Query(Query),
+    Table(Table),
+}
 
-// const fn match_punct<const P: char>() -> fn(&TokenTree) -> bool {
-//     |tt| {
-//         if let TokenTree::Punct(punct) = tt {
-//             punct.as_char() == P
-//         } else {
-//             false
-//         }
-//     }
-// }
+fn emdb_parser() -> impl Parser<TokenIter, O = AST, C = SpannedCont, E = SpannedError> {
+    mapsuc(
+        seq(
+            name_parser(),
+            many0(
+                not(isempty()),
+                choice!(
+                    peekident("query") => mapsuc(parse_query(), |q| QueryTable::Query(q)),
+                    peekident("table") => mapsuc(parse_table(), |t| QueryTable::Table(t)),
+                    otherwise => error(gettoken(), |t| {
+                        Diagnostic::spanned(t.span(), Level::Error, String::from("expected query or table"))
+                    })
+                ),
+            ),
+        ),
+        |(name, objects)| {
+            let mut tables = vec![];
+            let mut queries = vec![];
+            for obj in objects {
+                match obj {
+                    QueryTable::Query(q) => queries.push(q),
+                    QueryTable::Table(t) => tables.push(t),
+                }
+            }
+            AST {
+                name,
+                tables,
+                queries,
+            }
+        },
+    )
+}
 
-// fn parse_ident(
-//     iter: &mut IntoIter,
-//     errs: &mut Diagnostics,
-//     err_msg: fn(Option<&TokenTree>) -> String,
-//     recovery: fn(&TokenTree) -> bool,
-// ) -> Option<Ident> {
-//     match iter.next() {
-//         Some(TokenTree::Ident(i)) => Some(i),
-//         Some(tt) => {
-//             errs.add(recover_past(
-//                 Diagnostic::spanned(tt.span(), Level::Error, err_msg(Some(&tt))),
-//                 tt,
-//                 recovery,
-//                 iter,
-//             ));
-//             None
-//         }
-//         None => {
-//             errs.add(Diagnostic::spanned(
-//                 Span::call_site(),
-//                 Level::Error,
-//                 err_msg(None),
-//             ));
-//             None
-//         }
-//     }
-// }
+fn name_parser() -> impl Parser<TokenIter, O = Ident, C = SpannedCont, E = SpannedError> {
+    mapsuc(
+        recover(
+            seqs!(matchident("name"), getident(), matchpunct(';')),
+            recoverpunct(';'),
+        ),
+        |(_, (name, _))| name,
+    )
+}
 
-// fn parse_group(
-//     iter: &mut IntoIter,
-//     errs: &mut Diagnostics,
-//     delim: Delimiter,
-//     err_msg: fn(Option<&TokenTree>) -> String,
-//     recovery: fn(&TokenTree) -> bool,
-// ) -> Option<Group> {
-//     match iter.next() {
-//         Some(TokenTree::Group(g)) if g.delimiter() == delim => Some(g),
-//         Some(tt) => {
-//             errs.add(recover_past(
-//                 Diagnostic::spanned(tt.span(), Level::Error, err_msg(Some(&tt))),
-//                 tt,
-//                 recovery,
-//                 iter,
-//             ));
-//             None
-//         }
-//         None => {
-//             errs.add(Diagnostic::spanned(
-//                 Span::call_site(),
-//                 Level::Error,
-//                 err_msg(None),
-//             ));
-//             None
-//         }
-//     }
-// }
+fn parse_query() -> impl Parser<TokenIter, O = Query, C = SpannedCont, E = SpannedError> {
+    mapsuc(
+        seqs!(
+            matchident("query"),
+            getident(),
+            ingroup(Delimiter::Parenthesis, member_list_parser()),
+            ingroup(Delimiter::Brace, many0(isempty(), stream_parser()))
+        ),
+        |(_, (name, (params, streams)))| Query {
+            name,
+            params,
+            streams,
+        },
+    )
+}
 
-// fn parse_punct(
-//     iter: &mut IntoIter,
-//     errs: &mut Diagnostics,
-//     sep: Option<char>,
-//     err_msg: fn(Option<&TokenTree>) -> String,
-//     recovery: fn(&TokenTree) -> bool,
-// ) -> Option<Punct> {
-//     match iter.next() {
-//         Some(TokenTree::Punct(p)) => Some(p),
-//         Some(tt) => {
-//             errs.add(recover_past(
-//                 Diagnostic::spanned(tt.span(), Level::Error, err_msg(Some(&tt))),
-//                 tt,
-//                 recovery,
-//                 iter,
-//             ));
-//             None
-//         }
-//         None => {
-//             errs.add(Diagnostic::spanned(
-//                 Span::call_site(),
-//                 Level::Error,
-//                 err_msg(None),
-//             ));
-//             None
-//         }
-//     }
-// }
+fn parse_table() -> impl Parser<TokenIter, O = Table, C = SpannedCont, E = SpannedError> {
+    mapsuc(
+        seqs!(
+            matchident("table"),
+            getident(),
+            ingroup(Delimiter::Brace, member_list_parser()),
+            either(
+                peekpunct('@'),
+                mapsuc(
+                    seqs!(
+                        matchpunct('@'),
+                        listsep(',', constraint_parser()),
+                        matchpunct(';')
+                    ),
+                    |(_, (cons, _))| cons
+                ),
+                mapsuc(nothing(), |()| vec![])
+            )
+        ),
+        |(_, (name, (cols, cons)))| Table { name, cols, cons },
+    )
+}
 
-// /// Parses `name <dbname> ;`
-// /// - Recovers until the next semicolon
-// /// - errors on end of input.
-// fn parse_database_name(iter: &mut IntoIter, errs: &mut Diagnostics) -> Option<(Span, String)> {
-//     const NAME: &'static str = "name";
-//     const SEMICOLON: fn(&TokenTree) -> bool = match_punct::<';'>();
+fn member_list_parser(
+) -> impl Parser<TokenIter, O = Vec<(Ident, Type)>, C = SpannedCont, E = SpannedError> {
+    // bug: listsep
+    listsep(
+        ',',
+        mapsuc(
+            seqs!(getident(), matchpunct(':'), syntopunct::<syn::Type>(',')),
+            |(m, (_, t))| (m, t),
+        ),
+    )
+}
 
-//     let kw_name = parse_ident(iter, errs, |_| format!("Expected '{NAME}'"), SEMICOLON)?;
-//     // iter.is_empty(); // TODO: check if this is the end of the input
+fn constraint_parser() -> impl Parser<TokenIter, O = Constraint, C = SpannedCont, E = SpannedError>
+{
+    fn inner(
+        name: &'static str,
+        p: impl Parser<TokenIter, O = ConstraintExpr, C = SpannedCont, E = SpannedError>,
+    ) -> impl Parser<TokenIter, O = Constraint, C = SpannedCont, E = SpannedError> {
+        mapsuc(
+            seqs!(
+                matchident(name),
+                ingroup(Delimiter::Parenthesis, p),
+                either(
+                    peekident("as"),
+                    mapsuc(seq(matchident("as"), getident()), |(_, i)| Some(i)),
+                    mapsuc(nothing(), |_| None)
+                )
+            ),
+            |(method, (p, alias))| Constraint {
+                alias,
+                method_span: method.span(),
+                expr: p,
+            },
+        )
+    }
 
-//     if kw_name.to_string() != NAME {
-//         errs.add(recover_past(
-//             Diagnostic::spanned(
-//                 kw_name.span(),
-//                 Level::Error,
-//                 format!("Expected '{NAME}', found '{kw_name}'"),
-//             ),
-//             TokenTree::Ident(kw_name),
-//             SEMICOLON,
-//             iter,
-//         ));
-//         return None;
-//     }
+    choice!(
+        peekident("unique") => inner("unique", mapsuc(getident(), |i| ConstraintExpr::Unique{field:i})),
+        peekident("pred") => inner("pred", mapsuc(syn(collectuntil(isempty())), |e| ConstraintExpr::Pred(e))),
+        peekident("genpk") => inner("genpk", mapsuc(getident(), |i| ConstraintExpr::GenPK{field:i})),
+        peekident("limit") => inner("limit", mapsuc(syn(collectuntil(isempty())), |e| ConstraintExpr::Limit{size:e})),
+        otherwise => error(getident(), |i| Diagnostic::spanned(i.span(), Level::Error, format!("expected a constraint but got {}", i.to_string())))
+    )
+}
 
-//     let db_name = parse_ident(
-//         iter,
-//         errs,
-//         |_| format!("Expected the database name"),
-//         SEMICOLON,
-//     )?;
+fn connector_parse() -> impl Parser<TokenIter, O = Connector, C = SpannedCont, E = SpannedError> {
+    choice!(
+        peekpunct('~') => mapsuc(seq(matchpunct('~'), matchpunct('>')), |(t1, _)| Connector{single: true, span: t1.span()}),
+        peekpunct('|') => mapsuc(seq(matchpunct('|'), matchpunct('>')), |(t1, _)| Connector{single: false, span: t1.span()}),
+        otherwise => error(seq(gettoken(), gettoken()), |(t1, t2)| Diagnostic::spanned(t1.span(), Level::Error, format!("expected either ~> or |> but got {}{}", t1.to_string(), t2.to_string())))
+    )
+}
 
-//     // let end = parse_punct(iter, errs, ';', |_| format!("Expected ';'"), SEMICOLON)?;
+fn operator_parse(
+    r: RecursiveHandle<TokenIter, StreamExpr, SpannedError, SpannedCont>,
+) -> impl Parser<TokenIter, O = Operator, C = SpannedCont, E = SpannedError> {
+    fn inner(
+        name: &'static str,
+        p: impl Parser<TokenIter, O = FuncOp, C = SpannedCont, E = SpannedError>,
+    ) -> impl Parser<TokenIter, O = Operator, C = SpannedCont, E = SpannedError> {
+        mapsuc(
+            seq(matchident(name), ingroup(Delimiter::Parenthesis, p)),
+            |(id, op)| Operator::FuncOp {
+                fn_span: id.span(),
+                op,
+            },
+        )
+    }
 
-//     Some((db_name.span(), db_name.to_string()))
-// }
+    choice!(
+        peekident("ret") => mapsuc(matchident("ret"), |m| Operator::Ret { ret_span: m.span() }),
+        peekident("ref") => mapsuc(seq(matchident("ref"), getident()), |(m, table_name)| Operator::Ref { ref_span: m.span(), table_name }),
+        peekident("let") => mapsuc(seq(matchident("let"), getident()), |(m, var_name)| Operator::Let { let_span: m.span(), var_name }),
+        peekident("use") => mapsuc(seq(matchident("use"), getident()), |(m, var_name)| Operator::Use { use_span: m.span(), var_name }),
+        peekident("scan") => inner("scan", mapsuc(getident(), |table_name| FuncOp::Scan{table_name})),
+        // todo: Add other ops
+        otherwise => error(gettoken(), |t| Diagnostic::spanned(t.span(), Level::Error, format!("expected an operator but got {}", t.to_string())))
+    )
+}
 
-// enum QueryOrTable {
-//     Query(Query),
-//     Table(Table),
-//     Err,
-//     End,
-// }
+fn stream_parser() -> impl Parser<TokenIter, O = StreamExpr, C = SpannedCont, E = SpannedError> {
+    recursive(|r| {
+        mapsuc(
+            seq(
+                operator_parse(r.clone()),
+                either(
+                    peekpunct(';'),
+                    mapsuc(nothing(), |()| None),
+                    mapsuc(seq(connector_parse(), r), |(c, s)| Some((c, Box::new(s)))),
+                ),
+            ),
+            |(op, con)| StreamExpr { op, con },
+        )
+    })
+}
 
-// fn parse_columns(
-//     tks: TokenStream,
-//     errs: &mut Diagnostics,
-// ) -> Vec<(Spanned<String>, Spanned<SingleType>)> {
-//     todo!()
-// }
-
-// fn parse_table(iter: &mut IntoIter, errs: &mut Diagnostics) -> Option<Table> {
-//     let tb_name = parse_ident(
-//         iter,
-//         errs,
-//         |_| format!("Expected the table name"),
-//         match_punct::<';'>(),
-//     )?;
-
-//     let table_content = parse_group(
-//         iter,
-//         errs,
-//         Delimiter::Brace,
-//         |_| String::from("Expected a table definition '{' ... '}'"),
-//         match_punct::<';'>(),
-//     )?;
-
-//     let cols = parse_columns(table_content.stream(), errs);
-
-//     // match_punct(
-//     //     iter,
-//     //     errs,
-//     //     '@',
-//     //     |_| format!("Expected '@'"),
-//     //     match_punct::<';'>(),
-//     // );
-
-//     todo!()
-// }
-
-// fn parse_table_or_query(iter: &mut IntoIter, errs: &mut Diagnostics) -> QueryOrTable {
-//     const QUERY: &'static str = "query";
-//     const TABLE: &'static str = "table";
-
-//     let kw_query_table = match iter.next() {
-//         Some(TokenTree::Ident(i)) => i,
-//         Some(tt) => {
-//             errs.add(recover_past(
-//                 Diagnostic::spanned(
-//                     tt.span(),
-//                     Level::Error,
-//                     format!("Expected either '{QUERY}' or '{TABLE}' definitions"),
-//                 ),
-//                 tt,
-//                 match_punct::<';'>(),
-//                 iter,
-//             ));
-//             return QueryOrTable::Err;
-//         }
-//         None => {
-//             return QueryOrTable::End;
-//         }
-//     };
-
-//     match kw_query_table.to_string().as_ref() {
-//         QUERY => QueryOrTable::End, // TODO
-//         TABLE => QueryOrTable::End, // TODO
-//         other => {
-//             errs.add(recover_past(
-//                 Diagnostic::spanned(
-//                     kw_query_table.span(),
-//                     Level::Error,
-//                     format!("Expected either '{QUERY}' or '{TABLE}' definitions, found '{other}'"),
-//                 ),
-//                 TokenTree::Ident(kw_query_table),
-//                 match_punct::<';'>(),
-//                 iter,
-//             ));
-//             QueryOrTable::Err
-//         }
-//     }
-// }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use quote::quote;
-
-//     #[test]
-//     fn can_parse_db_name() {
-//         fn check_names(ts: TokenStream, name: &str) {
-//             let mut errs = Diagnostics::new();
-//             let raw_name = parse_database_name(&mut ts.into_iter(), &mut errs);
-//             assert!(errs.empty());
-//             if let Some((_, parsed_name)) = raw_name {
-//                 assert_eq!(parsed_name, name);
-//             } else {
-//                 assert!(false)
-//             }
-//         }
-
-//         check_names(quote!(name bob;), "bob");
-//         check_names(quote!(name b;), "b");
-//     }
-
-//     #[test]
-//     fn recovery_from_invalid_names() {
-//         fn iter_get_name(ts: &mut IntoIter) -> Option<String> {
-//             let mut errs = Diagnostics::new();
-
-//             parse_database_name(ts, &mut errs).map_or(
-//                 {
-//                     // assert!(!errs.empty());
-//                     None
-//                 },
-//                 |(_, n)| {
-//                     assert!(errs.empty());
-//                     Some(n)
-//                 },
-//             )
-//         }
-
-//         let mut iter = quote! {
-//             name d-c;
-//             name bob;
-//             name ;
-//             na name;
-//             name hey;
-//         }
-//         .into_iter();
-
-//         assert_eq!(iter_get_name(&mut iter), None);
-//         assert_eq!(iter_get_name(&mut iter), Some(String::from("bob")));
-//         assert_eq!(iter_get_name(&mut iter), None);
-//         assert_eq!(iter_get_name(&mut iter), None);
-//         assert_eq!(iter_get_name(&mut iter), Some(String::from("hey")));
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+}

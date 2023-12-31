@@ -1,3 +1,5 @@
+use proc_macro2::Punct;
+
 use super::*;
 
 pub struct RecoverPunct {
@@ -58,4 +60,8 @@ impl Recover<TokenIter, SpannedError> for RecoverImmediate {
     fn recover(&self, input: TokenIter, err: SpannedError) -> (TokenIter, Self::C) {
         (input, SpannedCont::from_err(err))
     }
+}
+
+pub struct RecoverPunctPred<F: Fn(&Punct) -> bool> {
+    pred: F,
 }

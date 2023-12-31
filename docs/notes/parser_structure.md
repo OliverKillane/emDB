@@ -153,14 +153,14 @@ let query_params =
 // ret
 // ref table
 // let var
-        // ident_peek_choose(|i| 
-        //     match i {
-        //         "ret" => map_suc(seq(ident("ret"), punct(';')), |(i, )| Ops::Return(i.span())),
-        //         "let" => map_suc(seq(ident("let"), seq(get_ident(), punct(';'))), |(_, (i, _))| Ops::Let(i)),
-        //         op if ops.contains(op) => parse_op,
-        //         name => map_suc(get_ident(), )
-        //     }
-        // ),
+// ident_peek_choose(|i| 
+//     match i {
+//         "ret" => map_suc(seq(ident("ret"), punct(';')), |(i, )| Ops::Return(i.span())),
+//         "let" => map_suc(seq(ident("let"), seq(get_ident(), punct(';'))), |(_, (i, _))| Ops::Let(i)),
+//         op if ops.contains(op) => parse_op,
+//         name => map_suc(get_ident(), )
+//     }
+// ),
 // operator(..insides..)
 // table
 let stream = 

@@ -6,6 +6,8 @@
 use core::cell::OnceCell;
 use std::marker::PhantomData;
 use std::rc::{Rc, Weak};
+
+use syn::parse::Parse;
 /// A trait for combining continuations and successed into single continuations
 /// - A continuation may contain many previous syntax errors, upon the next parser
 ///   succeeding, rather than propagate it's success, we want to propagate the previous
@@ -489,14 +491,14 @@ where
     }
 }
 
-pub struct MapSuc<I, P: Parser<I>, O> {
+pub struct MapSuc<I, P: Parser<I>, O, F: Fn(P::O) -> O> {
     parser: P,
-    func: fn(P::O) -> O,
+    func: F,
     _marker: PhantomData<I>,
 }
 
 /// Map the result of a parser on success
-pub fn map_suc<I, P: Parser<I>, O>(parser: P, func: fn(P::O) -> O) -> MapSuc<I, P, O> {
+pub fn mapsuc<I, P: Parser<I>, O, F: Fn(P::O) -> O>(parser: P, func: F) -> MapSuc<I, P, O, F> {
     MapSuc {
         parser,
         func,
@@ -504,7 +506,7 @@ pub fn map_suc<I, P: Parser<I>, O>(parser: P, func: fn(P::O) -> O) -> MapSuc<I, 
     }
 }
 
-impl<I, P: Parser<I>, MO> Parser<I> for MapSuc<I, P, MO> {
+impl<I, P: Parser<I>, MO, F: Fn(P::O) -> MO> Parser<I> for MapSuc<I, P, MO, F> {
     type O = MO;
     type C = P::C;
     type E = P::E;
@@ -515,6 +517,41 @@ impl<I, P: Parser<I>, MO> Parser<I> for MapSuc<I, P, MO> {
             next_input,
             match res {
                 ParseResult::Suc(o) => ParseResult::Suc((self.func)(o)),
+                ParseResult::Con(c) => ParseResult::Con(c),
+                ParseResult::Err(e) => ParseResult::Err(e),
+            },
+        )
+    }
+}
+
+pub struct MapAll<I, O, P: Parser<I>, F: Fn(P::O) -> ParseResult<P::E, P::C, O>> {
+    parser: P,
+    func: F,
+    _marker: (PhantomData<I>, PhantomData<O>),
+}
+pub fn mapall<I, O, P: Parser<I>, F: Fn(P::O) -> ParseResult<P::E, P::C, O>>(
+    parser: P,
+    func: F,
+) -> MapAll<I, O, P, F> {
+    MapAll {
+        parser,
+        func,
+        _marker: (PhantomData, PhantomData),
+    }
+}
+impl<I, O, P: Parser<I>, F: Fn(P::O) -> ParseResult<P::E, P::C, O>> Parser<I>
+    for MapAll<I, O, P, F>
+{
+    type O = O;
+    type C = P::C;
+    type E = P::E;
+
+    fn parse(&self, input: I) -> (I, ParseResult<Self::E, Self::C, Self::O>) {
+        let (next_input, res) = self.parser.parse(input);
+        (
+            next_input,
+            match res {
+                ParseResult::Suc(o) => (self.func)(o),
                 ParseResult::Con(c) => ParseResult::Con(c),
                 ParseResult::Err(e) => ParseResult::Err(e),
             },
@@ -556,54 +593,25 @@ impl<I1, I2, P: Parser<I2>> Parser<I1> for LiftInput<I1, I2, P> {
 }
 
 pub struct Recursive<I, O, E, C> {
-    parse: RecursiveParse<I, O, E, C>,
-    _marker: PhantomData<I>,
-}
-type RecursiveParse<I, O, E, C> =
-    fn(Recursive<I, O, E, C>) -> Box<dyn Parser<I, O = O, E = E, C = C>>;
-type RecursiveGen<I, O, E, C> =
-    fn(Recursive<I, O, E, C>) -> Box<dyn Parser<I, O = O, E = E, C = C>>;
-
-/// Allows for the construction of recursive parsers.
-/// If parsed, constructs the contained parser with a contained parser than
-/// recursively builds the tree of parsers.
-/// - problem: Idk how well this optimises, requires heap allocation + dyn
-/// - maybe I can find a way to generate a self-referential parser, somehow
-///    without infinite types.
-// TODO: mostly anything would be nicer than this.
-// IDEA: ourboro, byref with &dyn Parser<I, E ... >, but then and lifetimes as
-//       part of the Parser trait? Lifetime-annotation hell on first attempt.
-pub fn recursive<I, O, E, C>(parse: RecursiveGen<I, O, E, C>) -> Recursive<I, O, E, C> {
-    Recursive {
-        parse,
-        _marker: PhantomData,
-    }
-}
-
-impl<I, O, E, C> Parser<I> for Recursive<I, O, E, C> {
-    type C = C;
-    type E = E;
-    type O = O;
-
-    fn parse(&self, input: I) -> (I, ParseResult<Self::E, Self::C, Self::O>) {
-        (self.parse)(Recursive {
-            parse: self.parse,
-            _marker: PhantomData,
-        }) // TODO: I dont like this, building at parsetime.
-        .parse(input)
-    }
-}
-
-pub struct Recursive2<I, O, E, C> {
     parser: Rc<Box<dyn Parser<I, O = O, E = E, C = C>>>,
     _marker: PhantomData<I>,
 }
 
-pub struct Recursive2Handle<I, O, E, C> {
+pub struct RecursiveHandle<I, O, E, C> {
     parser: Weak<Box<dyn Parser<I, O = O, E = E, C = C>>>, // using dyn to avoid an infinite type
     _marker: PhantomData<I>,
 }
-impl<I, O, E, C> Parser<I> for Recursive2Handle<I, O, E, C> {
+
+// TODO: object safety prevents
+impl<I, O, E, C> Clone for RecursiveHandle<I, O, E, C> {
+    fn clone(&self) -> Self {
+        Self {
+            parser: self.parser.clone(),
+            _marker: PhantomData,
+        }
+    }
+}
+impl<I, O, E, C> Parser<I> for RecursiveHandle<I, O, E, C> {
     type C = C;
     type E = E;
     type O = O;
@@ -615,27 +623,71 @@ impl<I, O, E, C> Parser<I> for Recursive2Handle<I, O, E, C> {
     }
 }
 
-pub fn recursive2<I, O, E, C, P: Parser<I, O = O, E = E, C = C> + 'static>(
-    parse: fn(Recursive2Handle<I, O, E, C>) -> P,
-) -> Recursive2<I, O, E, C> {
-    Recursive2 {
-        parser: Rc::new_cyclic(|w: &Weak<Box<dyn Parser<I, O = O, E = E, C = C>>>| {
-            let b: Box<dyn Parser<I, O = O, E = E, C = C>> = Box::new((parse)(Recursive2Handle {
+pub fn recursive<I, O, E, C, P: Parser<I, O = O, E = E, C = C> + 'static>(
+    parse: fn(RecursiveHandle<I, O, E, C>) -> P,
+) -> Recursive<I, O, E, C> {
+    Recursive {
+        parser: Rc::new_cyclic(move |w| {
+            Box::new((parse)(RecursiveHandle {
                 parser: w.clone(),
                 _marker: PhantomData,
-            }));
-            b
+            }))
         }),
         _marker: PhantomData,
     }
 }
 
-impl<I, O, E, C> Parser<I> for Recursive2<I, O, E, C> {
+impl<I, O, E, C> Parser<I> for Recursive<I, O, E, C> {
     type C = C;
     type E = E;
     type O = O;
 
     fn parse(&self, input: I) -> (I, ParseResult<Self::E, Self::C, Self::O>) {
         self.parser.parse(input)
+    }
+}
+
+pub struct Or<I, E, C, P1: Parser<I, O = bool, C = C, E = E>, P2: Parser<I, O = bool, C = C, E = E>>
+{
+    p1: P1,
+    p2: P2,
+    _marker: (PhantomData<I>, PhantomData<E>, PhantomData<C>),
+}
+
+pub fn or<I, E, C, P1: Parser<I, O = bool, C = C, E = E>, P2: Parser<I, O = bool, C = C, E = E>>(
+    p1: P1,
+    p2: P2,
+) -> Or<I, E, C, P1, P2> {
+    Or {
+        p1,
+        p2,
+        _marker: (PhantomData, PhantomData, PhantomData),
+    }
+}
+impl<I, E, C, P1: Parser<I, O = bool, C = C, E = E>, P2: Parser<I, O = bool, C = C, E = E>>
+    Parser<I> for Or<I, E, C, P1, P2>
+{
+    type O = bool;
+    type C = C;
+    type E = E;
+
+    fn parse(&self, input: I) -> (I, ParseResult<Self::E, Self::C, Self::O>) {
+        let (res_input, res) = self.p1.parse(input);
+        match res {
+            ParseResult::Err(e) => (res_input, ParseResult::Err(e)),
+            ParseResult::Con(c) => (res_input, ParseResult::Con(c)),
+            ParseResult::Suc(b) => {
+                if b {
+                    (res_input, ParseResult::Suc(true))
+                } else {
+                    let (res_input, res) = self.p2.parse(res_input);
+                    match res {
+                        ParseResult::Err(e) => (res_input, ParseResult::Err(e)),
+                        ParseResult::Con(c) => (res_input, ParseResult::Con(c)),
+                        ParseResult::Suc(b) => (res_input, ParseResult::Suc(b)),
+                    }
+                }
+            }
+        }
     }
 }

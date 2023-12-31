@@ -7,10 +7,12 @@ use std::collections::LinkedList;
 
 mod basic;
 mod derived;
+mod error;
 mod recovery;
 
 pub use basic::*;
 pub use derived::*;
+pub use error::*;
 pub use recovery::*;
 
 // TODO: make lookahead, lookback generic TokenIter<const Peek: usize, const Back: usize>

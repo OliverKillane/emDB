@@ -28,3 +28,21 @@
 //     } @ pk(field), unique(field2);
 
 // }
+
+// use emdb::database;
+
+// database! {
+//     name databaseaaaa;
+
+//     table aaa {
+//         a: i32
+//     }
+
+//     table aaa {
+
+//     }
+
+//     // query bob() {
+
+//     // }
+// }

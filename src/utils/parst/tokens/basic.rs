@@ -155,7 +155,7 @@ pub fn matchpunct(punct: char) -> MatchPunct {
     MatchPunct { punct }
 }
 impl Parser<TokenIter> for MatchPunct {
-    type O = ();
+    type O = Punct;
     type C = SpannedCont;
     type E = SpannedError;
 
@@ -163,7 +163,7 @@ impl Parser<TokenIter> for MatchPunct {
         match input.next() {
             Some(TokenTree::Punct(p)) => {
                 if p.as_char() == self.punct {
-                    (input, ParseResult::Suc(()))
+                    (input, ParseResult::Suc(p))
                 } else {
                     (
                         input,
@@ -461,5 +461,31 @@ impl Parser<TokenIter> for Nothing {
     type O = ();
     fn parse(&self, input: TokenIter) -> (TokenIter, ParseResult<Self::E, Self::C, Self::O>) {
         (input, ParseResult::Suc(()))
+    }
+}
+
+pub struct GetToken;
+pub fn gettoken() -> GetToken {
+    GetToken
+}
+impl Parser<TokenIter> for GetToken {
+    type O = TokenTree;
+    type C = SpannedCont;
+    type E = SpannedError;
+
+    fn parse(&self, mut input: TokenIter) -> (TokenIter, ParseResult<Self::E, Self::C, Self::O>) {
+        if let Some(tt) = input.next() {
+            (input, ParseResult::Suc(tt))
+        } else {
+            let span = input.last_span().unwrap_or_else(Span::call_site);
+            (
+                input,
+                ParseResult::Err(SpannedError::from(Diagnostic::spanned(
+                    span,
+                    proc_macro_error::Level::Error,
+                    String::from("Expected token, found nothing"),
+                ))),
+            )
+        }
     }
 }

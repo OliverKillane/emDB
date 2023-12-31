@@ -8,7 +8,7 @@ macro_rules! seqs {
         $p
     };
     ($p:expr , $($ts:tt)+) => {
-        seq($p, seqs!())
+        seq($p, seqs!($($ts)+))
     };
 }
 
@@ -36,7 +36,7 @@ pub(crate) use seqs;
 /// ```
 macro_rules! choice {
     (otherwise => $q:expr) => {$q};
-    ($p:expr => $q:expr $(, $ts:tt)+) => {
+    ($p:expr => $q:expr , $($ts:tt)+) => {
         either($p, $q, choice!($($ts)+))
     };
 }
