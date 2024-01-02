@@ -1,13 +1,11 @@
 use super::{
-    super::core::{seq, ConComb, ErrComb, ParseResult, Parser, Recover, Seq},
+    super::core::{seq, ParseResult, Parser, Seq},
     *,
 };
-use proc_macro2::{
-    token_stream::IntoIter, Delimiter, Group, Ident, Literal, Punct, Span, TokenStream, TokenTree,
-};
-use proc_macro_error::{Diagnostic, DiagnosticExt, SpanRange};
-use std::{collections::LinkedList, marker::PhantomData};
-use syn::parse::Parse as SynParse;
+use proc_macro2::{Delimiter, Ident, Literal, Punct, Span, TokenStream, TokenTree};
+use proc_macro_error::{Diagnostic, Level};
+use std::marker::PhantomData;
+use syn::{parse::Parse as SynParse, spanned::Spanned};
 
 pub struct GetIdent;
 pub fn getident() -> GetIdent {
@@ -265,10 +263,14 @@ impl Parser<TokenIter> for Terminal {
 
     fn parse(&self, mut input: TokenIter) -> (TokenIter, ParseResult<Self::E, Self::C, Self::O>) {
         if let Some(tt) = input.next() {
+            let big_span = input
+                .extract_iter()
+                .fold(tt.span(), |a, s| a.join(s.span()).unwrap());
             (
-                input,
+                // destroy the old iterator for a new one
+                TokenIter::from(TokenStream::new()),
                 ParseResult::Err(SpannedError::from(Diagnostic::spanned(
-                    tt.span(),
+                    big_span,
                     proc_macro_error::Level::Error,
                     String::from("Expected end of input"),
                 ))),
@@ -314,6 +316,15 @@ impl<P: Parser<TokenIter, E = SpannedError, C = SpannedCont>> Parser<TokenIter> 
     type E = SpannedError;
 
     fn parse(&self, mut input: TokenIter) -> (TokenIter, ParseResult<Self::E, Self::C, Self::O>) {
+        fn delim_display(delim: Delimiter) -> &'static str {
+            match delim {
+                Delimiter::Parenthesis => "(...)",
+                Delimiter::Brace => "{...}",
+                Delimiter::Bracket => "[...]",
+                Delimiter::None => "nothing",
+            }
+        }
+
         match input.next() {
             Some(TokenTree::Group(g)) => {
                 if g.delimiter() == self.delim {
@@ -334,8 +345,8 @@ impl<P: Parser<TokenIter, E = SpannedError, C = SpannedCont>> Parser<TokenIter> 
                             proc_macro_error::Level::Error,
                             format!(
                                 "Expected group with delimiter {:?}, found {:?}",
-                                self.delim,
-                                g.delimiter()
+                                delim_display(self.delim),
+                                delim_display(g.delimiter())
                             ),
                         ))),
                     )
@@ -357,8 +368,8 @@ impl<P: Parser<TokenIter, E = SpannedError, C = SpannedCont>> Parser<TokenIter> 
                         span,
                         proc_macro_error::Level::Error,
                         format!(
-                            "Expected a following group bracketed by {:?}, but no input present",
-                            self.delim
+                            "Expected a following group bracketed by {} but found nothing",
+                            delim_display(self.delim)
                         ),
                     ))),
                 )
@@ -439,12 +450,35 @@ impl<T: SynParse, P: Parser<TokenIter, O = TokenStream, C = SpannedCont, E = Spa
     fn parse(&self, input: TokenIter) -> (TokenIter, ParseResult<Self::E, Self::C, Self::O>) {
         let (new_inp, res) = self.parser.parse(input);
         match res {
-            ParseResult::Suc(tks) => match syn::parse2::<T>(tks) {
-                Err(e) => {
-                    todo!()
+            ParseResult::Suc(tks) => {
+                if !tks.is_empty() {
+                    match syn::parse2::<T>(tks.clone()) {
+                        Err(es) => {
+                            let spans = tks.span();
+                            let err = Diagnostic::spanned(
+                                spans,
+                                Level::Error,
+                                format!("Failed to parse {}", std::any::type_name::<T>()),
+                            );
+
+                            (
+                                new_inp,
+                                ParseResult::Err(SpannedError::from(
+                                    err.span_error(es.span(), es.to_string()),
+                                )),
+                            )
+                        }
+                        Ok(o) => (new_inp, ParseResult::Suc(o)),
+                    }
+                } else {
+                    let err = Diagnostic::spanned(
+                        new_inp.last_span().unwrap_or_else(Span::call_site),
+                        Level::Error,
+                        format!("Expected {}, found nothing", std::any::type_name::<T>()),
+                    );
+                    (new_inp, ParseResult::Err(SpannedError::from(err)))
                 }
-                Ok(o) => (new_inp, ParseResult::Suc(o)),
-            },
+            }
             ParseResult::Con(c) => (new_inp, ParseResult::Con(c)),
             ParseResult::Err(e) => (new_inp, ParseResult::Err(e)),
         }

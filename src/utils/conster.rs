@@ -26,6 +26,7 @@
 //!
 //! ## This Workaround
 //! This module contains my tools for working around the current limitations.
+#![allow(unused_macros, unused_imports)]
 
 /// Associates values with types through the [Const] trait.
 ///

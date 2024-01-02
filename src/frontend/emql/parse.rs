@@ -5,22 +5,28 @@ use proc_macro_error::{Diagnostic, Level};
 use syn::{Expr, Type};
 
 use super::ast::{
-    Connector, Constraint, ConstraintExpr, FuncOp, Operator, Query, StreamExpr, Table, AST,
+    BackendImpl, Connector, Constraint, ConstraintExpr, FuncOp, Operator, Query, StreamExpr, Table,
+    AST,
 };
-use crate::utils::parst::{
-    core::{either, many0, mapsuc, recover, recursive, seq, ParseResult, Parser, RecursiveHandle},
-    macros::{choice, seqs},
-    tokens::{
-        collectuntil, error, getident, gettoken, ingroup, isempty, listsep, matchident, matchpunct,
-        not, nothing, peekident, peekpunct, recoverpunct, syn, syntopunct, SpannedCont,
-        SpannedError, TokenIter,
+use crate::{
+    frontend::emql::ast::SortOrder,
+    utils::parst::{
+        core::{
+            either, many0, mapsuc, recover, recursive, seq, ParseResult, Parser, RecursiveHandle,
+        },
+        macros::{choice, seqs},
+        tokens::{
+            collectuntil, embelisherr, error, getident, gettoken, ingroup, isempty,
+            listseptrailing, matchident, matchpunct, not, nothing, peekident, peekpunct,
+            recoverimmediate, recoveruptopunct, syn, syntopunct, terminal, tkmatch, SpannedCont,
+            SpannedError, TokenIter,
+        },
     },
 };
 
 pub(super) fn parse(ts: TokenStream) -> Result<AST, LinkedList<Diagnostic>> {
-    let parser = emdb_parser(); // todo
-
-    let (_, res) = parser.parse(TokenIter::from(ts));
+    let parser = emql_parser();
+    let (_, res) = mapsuc(seq(parser, terminal()), |(o, ())| o).parse(TokenIter::from(ts));
 
     match res {
         ParseResult::Suc(o) => Err(LinkedList::new()), // temporary
@@ -29,37 +35,38 @@ pub(super) fn parse(ts: TokenStream) -> Result<AST, LinkedList<Diagnostic>> {
     }
 }
 
-enum QueryTable {
+enum EmqlItem {
     Query(Query),
     Table(Table),
+    Backend(BackendImpl),
 }
 
-fn emdb_parser() -> impl Parser<TokenIter, O = AST, C = SpannedCont, E = SpannedError> {
+fn emql_parser() -> impl Parser<TokenIter, O = AST, C = SpannedCont, E = SpannedError> {
     mapsuc(
-        seq(
-            name_parser(),
-            many0(
-                not(isempty()),
-                choice!(
-                    peekident("query") => mapsuc(parse_query(), |q| QueryTable::Query(q)),
-                    peekident("table") => mapsuc(parse_table(), |t| QueryTable::Table(t)),
-                    otherwise => error(gettoken(), |t| {
-                        Diagnostic::spanned(t.span(), Level::Error, String::from("expected query or table"))
-                    })
-                ),
+        many0(
+            not(isempty()),
+            choice!(
+                peekident("query") => mapsuc(query_parser(), |q| EmqlItem::Query(q)),
+                peekident("table") => mapsuc(table_parser(), |t| EmqlItem::Table(t)),
+                peekident("impl") => mapsuc(backend_parser(), |b| EmqlItem::Backend(b)),
+                otherwise => error(gettoken(), |t| {
+                    Diagnostic::spanned(t.span(), Level::Error, String::from("expected query or table"))
+                })
             ),
         ),
-        |(name, objects)| {
+        |emql_items| {
             let mut tables = vec![];
             let mut queries = vec![];
-            for obj in objects {
+            let mut backends = vec![];
+            for obj in emql_items {
                 match obj {
-                    QueryTable::Query(q) => queries.push(q),
-                    QueryTable::Table(t) => tables.push(t),
+                    EmqlItem::Query(q) => queries.push(q),
+                    EmqlItem::Table(t) => tables.push(t),
+                    EmqlItem::Backend(b) => backends.push(b),
                 }
             }
             AST {
-                name,
+                backends,
                 tables,
                 queries,
             }
@@ -67,23 +74,35 @@ fn emdb_parser() -> impl Parser<TokenIter, O = AST, C = SpannedCont, E = Spanned
     )
 }
 
-fn name_parser() -> impl Parser<TokenIter, O = Ident, C = SpannedCont, E = SpannedError> {
+fn backend_parser() -> impl Parser<TokenIter, O = BackendImpl, C = SpannedCont, E = SpannedError> {
     mapsuc(
-        recover(
-            seqs!(matchident("name"), getident(), matchpunct(';')),
-            recoverpunct(';'),
+        seq(
+            recover(
+                seqs!(matchident("impl"), getident(), matchident("as"), getident()),
+                recoveruptopunct(';'),
+            ),
+            matchpunct(';'),
         ),
-        |(_, (name, _))| name,
+        |((_, (db_backend, (_, db_name))), _)| BackendImpl {
+            db_name,
+            db_backend,
+        },
     )
 }
 
-fn parse_query() -> impl Parser<TokenIter, O = Query, C = SpannedCont, E = SpannedError> {
+fn query_parser() -> impl Parser<TokenIter, O = Query, C = SpannedCont, E = SpannedError> {
     mapsuc(
         seqs!(
             matchident("query"),
             getident(),
-            ingroup(Delimiter::Parenthesis, member_list_parser()),
-            ingroup(Delimiter::Brace, many0(isempty(), stream_parser()))
+            recover(
+                ingroup(Delimiter::Parenthesis, member_list_parser()),
+                recoverimmediate()
+            ),
+            recover(
+                ingroup(Delimiter::Brace, many0(not(isempty()), stream_parser())),
+                recoverimmediate()
+            )
         ),
         |(_, (name, (params, streams)))| Query {
             name,
@@ -93,7 +112,7 @@ fn parse_query() -> impl Parser<TokenIter, O = Query, C = SpannedCont, E = Spann
     )
 }
 
-fn parse_table() -> impl Parser<TokenIter, O = Table, C = SpannedCont, E = SpannedError> {
+fn table_parser() -> impl Parser<TokenIter, O = Table, C = SpannedCont, E = SpannedError> {
     mapsuc(
         seqs!(
             matchident("table"),
@@ -102,12 +121,14 @@ fn parse_table() -> impl Parser<TokenIter, O = Table, C = SpannedCont, E = Spann
             either(
                 peekpunct('@'),
                 mapsuc(
-                    seqs!(
+                    seq(
                         matchpunct('@'),
-                        listsep(',', constraint_parser()),
-                        matchpunct(';')
+                        ingroup(
+                            Delimiter::Bracket,
+                            listseptrailing(',', constraint_parser())
+                        )
                     ),
-                    |(_, (cons, _))| cons
+                    |(_, cons)| cons
                 ),
                 mapsuc(nothing(), |()| vec![])
             )
@@ -118,11 +139,14 @@ fn parse_table() -> impl Parser<TokenIter, O = Table, C = SpannedCont, E = Spann
 
 fn member_list_parser(
 ) -> impl Parser<TokenIter, O = Vec<(Ident, Type)>, C = SpannedCont, E = SpannedError> {
-    // bug: listsep
-    listsep(
+    listseptrailing(
         ',',
         mapsuc(
-            seqs!(getident(), matchpunct(':'), syntopunct::<syn::Type>(',')),
+            seqs!(
+                getident(),
+                matchpunct(':'),
+                syntopunct(tkmatch!(peek => Punct(',', _)))
+            ),
             |(m, (_, t))| (m, t),
         ),
     )
@@ -162,10 +186,13 @@ fn constraint_parser() -> impl Parser<TokenIter, O = Constraint, C = SpannedCont
 }
 
 fn connector_parse() -> impl Parser<TokenIter, O = Connector, C = SpannedCont, E = SpannedError> {
-    choice!(
-        peekpunct('~') => mapsuc(seq(matchpunct('~'), matchpunct('>')), |(t1, _)| Connector{single: true, span: t1.span()}),
-        peekpunct('|') => mapsuc(seq(matchpunct('|'), matchpunct('>')), |(t1, _)| Connector{single: false, span: t1.span()}),
-        otherwise => error(seq(gettoken(), gettoken()), |(t1, t2)| Diagnostic::spanned(t1.span(), Level::Error, format!("expected either ~> or |> but got {}{}", t1.to_string(), t2.to_string())))
+    embelisherr(
+        choice!(
+            peekpunct('~') => mapsuc(seq(matchpunct('~'), matchpunct('>')), |(t1, _)| Connector{single: true, span: t1.span()}),
+            peekpunct('|') => mapsuc(seq(matchpunct('|'), matchpunct('>')), |(t1, _)| Connector{single: false, span: t1.span()}),
+            otherwise => error(seq(gettoken(), gettoken()), |(t1, t2)| Diagnostic::spanned(t1.span(), Level::Error, format!("expected either ~> or |> but got {}{}", t1.to_string(), t2.to_string())))
+        ),
+        "Connect operators a single row passed (`~>`), or a stream of rows (`|>`)",
     )
 }
 
@@ -177,7 +204,10 @@ fn operator_parse(
         p: impl Parser<TokenIter, O = FuncOp, C = SpannedCont, E = SpannedError>,
     ) -> impl Parser<TokenIter, O = Operator, C = SpannedCont, E = SpannedError> {
         mapsuc(
-            seq(matchident(name), ingroup(Delimiter::Parenthesis, p)),
+            seq(
+                matchident(name),
+                recover(ingroup(Delimiter::Parenthesis, p), recoverimmediate()),
+            ),
             |(id, op)| Operator::FuncOp {
                 fn_span: id.span(),
                 op,
@@ -185,13 +215,64 @@ fn operator_parse(
         )
     }
 
+    fn fields_expr(
+    ) -> impl Parser<TokenIter, O = Vec<(Ident, Expr)>, C = SpannedCont, E = SpannedError> {
+        listseptrailing(
+            ',',
+            mapsuc(
+                seqs!(
+                    getident(),
+                    matchpunct('='),
+                    syntopunct(tkmatch!(peek => Punct(',', _)))
+                ),
+                |(id, (_, exp))| (id, exp),
+            ),
+        )
+    }
+
+    fn fields_assign(
+    ) -> impl Parser<TokenIter, O = Vec<(Ident, Type, Expr)>, C = SpannedCont, E = SpannedError>
+    {
+        listseptrailing(
+            ',',
+            mapsuc(
+                seqs!(
+                    getident(),
+                    matchpunct(':'),
+                    syntopunct(peekpunct('=')),
+                    matchpunct('='),
+                    syntopunct(peekpunct(','))
+                ),
+                |(id, (_, (t, (_, e))))| (id, t, e),
+            ),
+        )
+    }
+
     choice!(
-        peekident("ret") => mapsuc(matchident("ret"), |m| Operator::Ret { ret_span: m.span() }),
+        peekident("return") => mapsuc(matchident("return"), |m| Operator::Ret { ret_span: m.span() }),
         peekident("ref") => mapsuc(seq(matchident("ref"), getident()), |(m, table_name)| Operator::Ref { ref_span: m.span(), table_name }),
         peekident("let") => mapsuc(seq(matchident("let"), getident()), |(m, var_name)| Operator::Let { let_span: m.span(), var_name }),
         peekident("use") => mapsuc(seq(matchident("use"), getident()), |(m, var_name)| Operator::Use { use_span: m.span(), var_name }),
-        peekident("scan") => inner("scan", mapsuc(getident(), |table_name| FuncOp::Scan{table_name})),
-        // todo: Add other ops
+        peekident("update") => inner("update", mapsuc(seqs!(getident(), matchident("use"), fields_expr()), |(reference, (_, fields))| FuncOp::Update {reference, fields})),
+        peekident("insert") => inner("insert", mapsuc(getident(), |table_name| FuncOp::Insert{table_name})),
+        peekident("delete") => inner("delete", mapsuc(nothing(), |()| FuncOp::Delete)),
+        peekident("map") => inner("map", mapsuc(fields_assign(), |new_fields| FuncOp::Map{new_fields})),
+        peekident("unique") => inner("unique", mapsuc(seqs!(matchident("use"), getident(), matchident("as"), getident()), |(_, (from_field, (_, unique_field)))|  FuncOp::Unique { unique_field, from_field } )),
+        peekident("filter") => inner("filter", mapsuc(syn(collectuntil(isempty())), |e| FuncOp::Filter(e))),
+        peekident("row") => inner("row", mapsuc(fields_assign(), |fields| FuncOp::Row{fields})),
+        peekident("sort") => inner("sort", mapsuc(listseptrailing(',', mapsuc(seq(getident(), choice!(
+            peekident("asc") => mapsuc(matchident("asc"), |t| (SortOrder::Asc, t.span())),
+            peekident("desc") => mapsuc(matchident("desc"), |t| (SortOrder::Desc, t.span())),
+            otherwise => error(gettoken(), |t| Diagnostic::spanned(t.span(), Level::Error, format!("Can only sort by `asc` or `desc`, not by {:?}", t)))
+        )), |(i, (o, s))| (i, o, s))), |fields| FuncOp::Sort{fields})),
+        peekident("fold") => inner("fold", mapsuc(seqs!(
+            recover(ingroup(Delimiter::Parenthesis, fields_assign()), recoverimmediate()),
+            matchpunct('='),
+            matchpunct('>'),
+            recover(ingroup(Delimiter::Parenthesis, fields_expr()), recoverimmediate())
+        ) , |(initial, (_, (_, update)))| FuncOp::Fold {initial, update})),
+        peekident("assert") => inner("assert", mapsuc(syn(collectuntil(isempty())), |e| FuncOp::Assert(e))),
+        peekident("collect") => inner("collect", mapsuc(nothing(), |()| FuncOp::Collect)),
         otherwise => error(gettoken(), |t| Diagnostic::spanned(t.span(), Level::Error, format!("expected an operator but got {}", t.to_string())))
     )
 }
@@ -203,16 +284,11 @@ fn stream_parser() -> impl Parser<TokenIter, O = StreamExpr, C = SpannedCont, E 
                 operator_parse(r.clone()),
                 either(
                     peekpunct(';'),
-                    mapsuc(nothing(), |()| None),
+                    mapsuc(matchpunct(';'), |_| None),
                     mapsuc(seq(connector_parse(), r), |(c, s)| Some((c, Box::new(s)))),
                 ),
             ),
             |(op, con)| StreamExpr { op, con },
         )
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
 }

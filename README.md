@@ -29,3 +29,21 @@ Some useful commands:
 cargo doc --document-private-items           # Include Internal Documentation
 cargo test module::path::here -- --nocapture # Print from tests
 ```
+
+## Tasks:
+
+### Parst
+
+- [ ] syntax for fold
+- [ ] backend selection
+- [ ] parse Benchmarks
+- [ ] Debug for parsers
+- [ ] Add more recovery types
+- [ ] Literal Parser
+- [ ] Discussion of `seq(ingroup( ), ...)` specialisation for multithreading, +cost
+- [ ] Separate to library and make public
+
+## Plan
+
+- [ ] basic representation
+- [ ] dots printout

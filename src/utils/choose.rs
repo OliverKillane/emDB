@@ -13,7 +13,7 @@
 //!     };
 //! }
 //! ```
-
+#![allow(unused_macros, unused_imports)]
 macro_rules! total {
     ($($e:literal => $r:expr,)*) => {
         0 $( + $e)*

@@ -1,48 +1,15 @@
-// use emdb::{bob, database};
+use emdb::database;
 
-// database! {
-//     name my_databaseaa;
-//     query bob (foo){
-//         bar
-//     };
-//     table bar
-// }
+database! {
+    impl coolbackend as mydb;
 
-// database! {
+    table cool {
+        a: i32,
+    } @ [unique(id)]
 
-//     name mydatabase;
-
-//     query(x: i32, y: usize) = {
-//         name |> map(|x| a) |> let result;
-//         result |> groupby(field, it |> expr() |> unique()) |> let foo;
-
-//         result |> someexpr() |> let bar;
-
-//         tablename ~> filter() <! insert(something);
-//     }
-
-//     table tablename {
-//         field: i32,
-//         field2: String,
-//         field3: bool,
-//     } @ pk(field), unique(field2);
-
-// }
-
-// use emdb::database;
-
-// database! {
-//     name databaseaaaa;
-
-//     table aaa {
-//         a: i32
-//     }
-
-//     table aaa {
-
-//     }
-
-//     // query bob() {
-
-//     // }
-// }
+    query bob(a: i32) {
+        ref table |> assert(it < 3) |> delete() |> return |> delete();
+        // ref bob |> map(t: i32 = it.val) |>
+        // unique(tableb )
+    }
+}

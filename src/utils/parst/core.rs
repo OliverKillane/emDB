@@ -3,11 +3,9 @@
 
 // TODO: need to clean up constraints so that all match Seq (constraints on function, versus struct, versus impl)
 
-use core::cell::OnceCell;
 use std::marker::PhantomData;
 use std::rc::{Rc, Weak};
 
-use syn::parse::Parse;
 /// A trait for combining continuations and successed into single continuations
 /// - A continuation may contain many previous syntax errors, upon the next parser
 ///   succeeding, rather than propagate it's success, we want to propagate the previous
@@ -519,6 +517,39 @@ impl<I, P: Parser<I>, MO, F: Fn(P::O) -> MO> Parser<I> for MapSuc<I, P, MO, F> {
                 ParseResult::Suc(o) => ParseResult::Suc((self.func)(o)),
                 ParseResult::Con(c) => ParseResult::Con(c),
                 ParseResult::Err(e) => ParseResult::Err(e),
+            },
+        )
+    }
+}
+
+pub struct MapErr<I, P: Parser<I>, E, F: Fn(P::E) -> E> {
+    parser: P,
+    func: F,
+    _marker: PhantomData<I>,
+}
+
+/// Map the result of a parser on success
+pub fn maperr<I, P: Parser<I>, E, F: Fn(P::E) -> E>(parser: P, func: F) -> MapErr<I, P, E, F> {
+    MapErr {
+        parser,
+        func,
+        _marker: PhantomData,
+    }
+}
+
+impl<I, P: Parser<I>, ME, F: Fn(P::E) -> ME> Parser<I> for MapErr<I, P, ME, F> {
+    type O = P::O;
+    type C = P::C;
+    type E = ME;
+
+    fn parse(&self, input: I) -> (I, ParseResult<Self::E, Self::C, Self::O>) {
+        let (next_input, res) = self.parser.parse(input);
+        (
+            next_input,
+            match res {
+                ParseResult::Suc(o) => ParseResult::Suc(o),
+                ParseResult::Con(c) => ParseResult::Con(c),
+                ParseResult::Err(e) => ParseResult::Err((self.func)(e)),
             },
         )
     }

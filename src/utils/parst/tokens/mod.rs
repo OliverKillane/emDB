@@ -1,18 +1,20 @@
 //! [super::parst] implementation for parsing rust [Tokenstreams] with 1 token lookahead.
 
-use super::core::{seq, ConComb, ErrComb, ParseResult, Parser, Recover, Seq};
-use proc_macro2::{token_stream::IntoIter, Delimiter, Group, Ident, Span, TokenStream, TokenTree};
+use super::core::{seq, ConComb, ErrComb, Parser, Recover};
+use proc_macro2::{token_stream::IntoIter, Span, TokenStream, TokenTree};
 use proc_macro_error::{Diagnostic, DiagnosticExt, SpanRange};
 use std::collections::LinkedList;
 
 mod basic;
 mod derived;
 mod error;
+mod matcher;
 mod recovery;
 
 pub use basic::*;
 pub use derived::*;
 pub use error::*;
+pub use matcher::*;
 pub use recovery::*;
 
 // TODO: make lookahead, lookback generic TokenIter<const Peek: usize, const Back: usize>
@@ -52,6 +54,10 @@ impl TokenIter {
 
     fn last_span(&self) -> &Option<Span> {
         &self.prev_span
+    }
+
+    fn extract_iter(self) -> IntoIter {
+        self.iter
     }
 }
 

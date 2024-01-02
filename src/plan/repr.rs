@@ -185,11 +185,3 @@ pub(crate) enum SingleOperator<'a> {
     },
     Merge {},
 }
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn lol() {}
-}
