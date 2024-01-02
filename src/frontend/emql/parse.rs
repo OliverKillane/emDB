@@ -5,8 +5,8 @@ use proc_macro_error::{Diagnostic, Level};
 use syn::{Expr, Type};
 
 use super::ast::{
-    BackendImpl, Connector, Constraint, ConstraintExpr, FuncOp, Operator, Query, StreamExpr, Table,
-    AST,
+    Ast, BackendImpl, Connector, Constraint, ConstraintExpr, FuncOp, Operator, Query, StreamExpr,
+    Table,
 };
 use crate::{
     frontend::emql::ast::SortOrder,
@@ -24,7 +24,7 @@ use crate::{
     },
 };
 
-pub(super) fn parse(ts: TokenStream) -> Result<AST, LinkedList<Diagnostic>> {
+pub(super) fn parse(ts: TokenStream) -> Result<Ast, LinkedList<Diagnostic>> {
     let parser = emql_parser();
     let (_, res) = mapsuc(seq(parser, terminal()), |(o, ())| o).parse(TokenIter::from(ts));
 
@@ -41,14 +41,14 @@ enum EmqlItem {
     Backend(BackendImpl),
 }
 
-fn emql_parser() -> impl Parser<TokenIter, O = AST, C = SpannedCont, E = SpannedError> {
+fn emql_parser() -> impl Parser<TokenIter, O = Ast, C = SpannedCont, E = SpannedError> {
     mapsuc(
         many0(
             not(isempty()),
             choice!(
-                peekident("query") => mapsuc(query_parser(), |q| EmqlItem::Query(q)),
-                peekident("table") => mapsuc(table_parser(), |t| EmqlItem::Table(t)),
-                peekident("impl") => mapsuc(backend_parser(), |b| EmqlItem::Backend(b)),
+                peekident("query") => mapsuc(query_parser(), EmqlItem::Query),
+                peekident("table") => mapsuc(table_parser(), EmqlItem::Table),
+                peekident("impl") => mapsuc(backend_parser(), EmqlItem::Backend),
                 otherwise => error(gettoken(), |t| {
                     Diagnostic::spanned(t.span(), Level::Error, String::from("expected query or table"))
                 })
@@ -65,7 +65,7 @@ fn emql_parser() -> impl Parser<TokenIter, O = AST, C = SpannedCont, E = Spanned
                     EmqlItem::Backend(b) => backends.push(b),
                 }
             }
-            AST {
+            Ast {
                 backends,
                 tables,
                 queries,
@@ -178,10 +178,10 @@ fn constraint_parser() -> impl Parser<TokenIter, O = Constraint, C = SpannedCont
 
     choice!(
         peekident("unique") => inner("unique", mapsuc(getident(), |i| ConstraintExpr::Unique{field:i})),
-        peekident("pred") => inner("pred", mapsuc(syn(collectuntil(isempty())), |e| ConstraintExpr::Pred(e))),
+        peekident("pred") => inner("pred", mapsuc(syn(collectuntil(isempty())), ConstraintExpr::Pred)),
         peekident("genpk") => inner("genpk", mapsuc(getident(), |i| ConstraintExpr::GenPK{field:i})),
         peekident("limit") => inner("limit", mapsuc(syn(collectuntil(isempty())), |e| ConstraintExpr::Limit{size:e})),
-        otherwise => error(getident(), |i| Diagnostic::spanned(i.span(), Level::Error, format!("expected a constraint but got {}", i.to_string())))
+        otherwise => error(getident(), |i| Diagnostic::spanned(i.span(), Level::Error, format!("expected a constraint but got {}", i)))
     )
 }
 
@@ -190,7 +190,7 @@ fn connector_parse() -> impl Parser<TokenIter, O = Connector, C = SpannedCont, E
         choice!(
             peekpunct('~') => mapsuc(seq(matchpunct('~'), matchpunct('>')), |(t1, _)| Connector{single: true, span: t1.span()}),
             peekpunct('|') => mapsuc(seq(matchpunct('|'), matchpunct('>')), |(t1, _)| Connector{single: false, span: t1.span()}),
-            otherwise => error(seq(gettoken(), gettoken()), |(t1, t2)| Diagnostic::spanned(t1.span(), Level::Error, format!("expected either ~> or |> but got {}{}", t1.to_string(), t2.to_string())))
+            otherwise => error(seq(gettoken(), gettoken()), |(t1, t2)| Diagnostic::spanned(t1.span(), Level::Error, format!("expected either ~> or |> but got {}{}", t1, t2)))
         ),
         "Connect operators a single row passed (`~>`), or a stream of rows (`|>`)",
     )
@@ -258,7 +258,7 @@ fn operator_parse(
         peekident("delete") => inner("delete", mapsuc(nothing(), |()| FuncOp::Delete)),
         peekident("map") => inner("map", mapsuc(fields_assign(), |new_fields| FuncOp::Map{new_fields})),
         peekident("unique") => inner("unique", mapsuc(seqs!(matchident("use"), getident(), matchident("as"), getident()), |(_, (from_field, (_, unique_field)))|  FuncOp::Unique { unique_field, from_field } )),
-        peekident("filter") => inner("filter", mapsuc(syn(collectuntil(isempty())), |e| FuncOp::Filter(e))),
+        peekident("filter") => inner("filter", mapsuc(syn(collectuntil(isempty())), FuncOp::Filter)),
         peekident("row") => inner("row", mapsuc(fields_assign(), |fields| FuncOp::Row{fields})),
         peekident("sort") => inner("sort", mapsuc(listseptrailing(',', mapsuc(seq(getident(), choice!(
             peekident("asc") => mapsuc(matchident("asc"), |t| (SortOrder::Asc, t.span())),
@@ -271,9 +271,9 @@ fn operator_parse(
             matchpunct('>'),
             recover(ingroup(Delimiter::Parenthesis, fields_expr()), recoverimmediate())
         ) , |(initial, (_, (_, update)))| FuncOp::Fold {initial, update})),
-        peekident("assert") => inner("assert", mapsuc(syn(collectuntil(isempty())), |e| FuncOp::Assert(e))),
+        peekident("assert") => inner("assert", mapsuc(syn(collectuntil(isempty())), FuncOp::Assert)),
         peekident("collect") => inner("collect", mapsuc(nothing(), |()| FuncOp::Collect)),
-        otherwise => error(gettoken(), |t| Diagnostic::spanned(t.span(), Level::Error, format!("expected an operator but got {}", t.to_string())))
+        otherwise => error(gettoken(), |t| Diagnostic::spanned(t.span(), Level::Error, format!("expected an operator but got {}", t)))
     )
 }
 

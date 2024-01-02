@@ -34,7 +34,7 @@ impl TokenIter {
         let mut iter = ts.into_iter();
         Self {
             next: iter.next(),
-            iter: iter,
+            iter,
             curr_span: None,
             prev_span: None,
         }

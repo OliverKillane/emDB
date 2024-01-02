@@ -1,5 +1,5 @@
-use crate::frontend::emql::ast::AST;
+use crate::frontend::emql::ast::Ast;
 
-pub(super) fn semantic_analysis(ast: AST) -> bool {
+pub(super) fn semantic_analysis(ast: Ast) -> bool {
     todo!()
 }

@@ -6,7 +6,6 @@
 //! - Contains both rust and emDB types.
 //! [TODO] Add printout
 use std::collections::{HashMap, HashSet};
-use syn;
 use typed_arena::Arena;
 use typed_generational_arena::{Arena as GenArena, Index as GenIndex};
 

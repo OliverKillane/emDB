@@ -12,12 +12,12 @@ mod plan;
 mod utils;
 
 use crate::backend::{Backend, Volcano};
-use crate::frontend::{Frontend, EMQL};
+use crate::frontend::{Emql, Frontend};
 
 #[proc_macro_error]
 #[proc_macro]
 pub fn database(tk: TokenStream) -> TokenStream {
-    match EMQL::from_tokens(TokenStream2::from(tk)) {
+    match Emql::from_tokens(TokenStream2::from(tk)) {
         Err(ds) => {
             for d in ds {
                 d.emit()

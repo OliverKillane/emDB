@@ -34,7 +34,7 @@ cargo test module::path::here -- --nocapture # Print from tests
 
 ### Parst
 
-- [ ] syntax for fold
+- [x] syntax for fold
 - [ ] backend selection
 - [ ] parse Benchmarks
 - [ ] Debug for parsers
@@ -42,6 +42,8 @@ cargo test module::path::here -- --nocapture # Print from tests
 - [ ] Literal Parser
 - [ ] Discussion of `seq(ingroup( ), ...)` specialisation for multithreading, +cost
 - [ ] Separate to library and make public
+
+https://dl.acm.org/doi/pdf/10.1145/3409002
 
 ## Plan
 

@@ -98,7 +98,7 @@ pub(super) struct BackendImpl {
 }
 
 #[derive(Debug)]
-pub(super) struct AST {
+pub(super) struct Ast {
     pub backends: Vec<BackendImpl>,
     pub tables: Vec<Table>,
     pub queries: Vec<Query>,

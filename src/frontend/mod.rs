@@ -7,7 +7,7 @@ use crate::plan::repr::LogicalPlan;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro_error::Diagnostic;
 
-pub(crate) use emql::EMQL;
+pub(crate) use emql::Emql;
 
 pub(crate) struct Diagnostics {
     errs: Vec<Diagnostic>,
