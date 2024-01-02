@@ -7,9 +7,10 @@ edition = "2021"
 proc-macro = true
 
 [dependencies]
-syn = { version = "2.0.38", features = ["full"] }
+syn = { version = "2.0.45", features = ["full", "extra-traits"] }
 typed-arena = "2.0.2"
 typed-generational-arena = "0.2"
 proc-macro2 = { version = "1.0" }
 proc-macro-error = "1.0.4"
 quote = "1.0.33"
+rand = "0.8"
