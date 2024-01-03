@@ -1,5 +1,5 @@
 use super::{SpannedCont, SpannedError, TokenIter};
-use crate::utils::parst::core::{ParseResult, Parser};
+use crate::core::{ParseResult, Parser};
 use proc_macro2::{Spacing, TokenTree};
 
 pub enum Matcher<'a> {
@@ -7,6 +7,7 @@ pub enum Matcher<'a> {
     Punct(char, Spacing),
 }
 
+#[macro_export]
 macro_rules! gen_match {
     ($($ts:tt)+) => {
         {
@@ -14,7 +15,7 @@ macro_rules! gen_match {
 
             #[allow(unused_imports)]
             use proc_macro2::Spacing::*;
-            use crate::utils::parst::tokens::Matcher::*;
+            use $crate::tokens::Matcher::*;
 
 
             move |t: &Option<TokenTree>| match t {
@@ -31,7 +32,7 @@ macro_rules! gen_match {
         }
     };
 }
-pub(crate) use gen_match;
+pub use gen_match;
 
 /// parse a next token, based on a matcher, to produce and error.
 pub struct Match<PG>
@@ -74,26 +75,28 @@ where
 /// // Get any punct that is alone
 /// let parser3 = tkmatch!(cons => Punct(_, Alone));
 /// ```
+#[macro_export]
 macro_rules! tkmatch {
     (peek => $($ts:tt)+) => {
         {
-            use $crate::utils::parst::tokens::{gen_match, Match};
+            use $crate::tokens::{gen_match, Match};
             Match { peek: true, parser: gen_match!($($ts)+) }
         }
     };
     (cons => $($ts:tt)+) => {
         {
-            use $crate::utils::parst::tokens::{gen_match, Match};
+            use $crate::tokens::{gen_match, Match};
             Match { peek: false, parser: gen_match!($($ts)+) }
         }
     }
 }
-pub(crate) use tkmatch;
+
+pub use tkmatch;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::parst::{
+    use crate::{
         core::{seq, ParseResult},
         macros::seqs,
         tokens::{tkmatch, TokenIter},

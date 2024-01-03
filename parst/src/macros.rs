@@ -3,6 +3,7 @@
 /// ```ignore
 /// seqs!(A, B, C, D) = seq(A, seq(B, seq(C, D)));
 /// ```
+#[macro_export]
 macro_rules! seqs {
     ($p:expr) => {
         $p
@@ -12,7 +13,7 @@ macro_rules! seqs {
     };
 }
 
-pub(crate) use seqs;
+pub use seqs;
 
 /// ```ignore
 /// choice! {
@@ -34,6 +35,7 @@ pub(crate) use seqs;
 ///     ),
 /// )
 /// ```
+#[macro_export]
 macro_rules! choice {
     (otherwise => $q:expr) => {$q};
     ($p:expr => $q:expr , $($ts:tt)+) => {
@@ -41,4 +43,4 @@ macro_rules! choice {
     };
 }
 
-pub(crate) use choice;
+pub use choice;

@@ -118,5 +118,5 @@ impl Recover<TokenIter, SpannedError> for RecoverImmediate {
 }
 
 pub struct RecoverPunctPred<F: Fn(&Punct) -> bool> {
-    pred: F,
+    _pred: F,
 }

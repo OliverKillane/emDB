@@ -1,4 +1,4 @@
-//! [super::parst] implementation for parsing rust [Tokenstreams] with 1 token lookahead.
+//! implementation for parsing rust Tokenstreams with 1 token lookahead.
 
 use super::core::{seq, ConComb, ErrComb, Parser, Recover};
 use proc_macro2::{token_stream::IntoIter, Span, TokenStream, TokenTree};
@@ -89,7 +89,7 @@ impl SpannedCont {
 }
 
 impl<O> ConComb<O, Self> for SpannedCont {
-    fn combine_out(self, out: O) -> Self {
+    fn combine_out(self, _: O) -> Self {
         // entirely ignore the output - we don't care about it
         self
     }

@@ -8,19 +8,14 @@ use super::ast::{
     Ast, BackendImpl, Connector, Constraint, ConstraintExpr, FuncOp, Operator, Query, StreamExpr,
     Table,
 };
-use crate::{
-    frontend::emql::ast::SortOrder,
-    utils::parst::{
-        core::{
-            either, many0, mapsuc, recover, recursive, seq, ParseResult, Parser, RecursiveHandle,
-        },
-        macros::{choice, seqs},
-        tokens::{
-            collectuntil, embelisherr, error, getident, gettoken, ingroup, isempty,
-            listseptrailing, matchident, matchpunct, not, nothing, peekident, peekpunct,
-            recoverimmediate, recoveruptopunct, syn, syntopunct, terminal, tkmatch, SpannedCont,
-            SpannedError, TokenIter,
-        },
+use crate::frontend::emql::ast::SortOrder;
+use parst::{
+    core::{either, many0, mapsuc, recover, recursive, seq, ParseResult, Parser, RecursiveHandle},
+    macros::{choice, seqs},
+    tokens::{
+        collectuntil, embelisherr, error, getident, gettoken, ingroup, isempty, listseptrailing,
+        matchident, matchpunct, not, nothing, peekident, peekpunct, recoverimmediate,
+        recoveruptopunct, syn, syntopunct, terminal, tkmatch, SpannedCont, SpannedError, TokenIter,
     },
 };
 
