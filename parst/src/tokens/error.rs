@@ -2,7 +2,7 @@
 
 use proc_macro_error::Diagnostic;
 
-use crate::utils::parst::core::{mapall, ParseResult};
+use crate::core::{mapall, ParseResult};
 
 use super::{Parser, SpannedCont, SpannedError, TokenIter};
 

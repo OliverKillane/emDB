@@ -6,11 +6,11 @@ impl<'a, V: 'a> ArenaCore<'a, V> for SlabArena<V> {
     type Index = usize;
     type Iter = Iter<'a, V>;
 
-    fn insert(&self, value: V) -> Self::Index {
+    fn insert(&self, _value: V) -> Self::Index {
         todo!()
     }
 
-    fn get(&self, index: Self::Index) -> Option<&V> {
+    fn get(&self, _index: Self::Index) -> Option<&V> {
         todo!()
     }
 

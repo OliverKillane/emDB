@@ -113,8 +113,8 @@
 //! }
 //!```
 //!```
-//! # use query_opt_comparison::tables::UserDetails;
-//! # use query_opt_comparison::tables::naive::NaiveDatabase as UserDetailsDB;
+//! # use experiments::tables::UserDetails;
+//! # use experiments::tables::naive::NaiveDatabase as UserDetailsDB;
 //! fn foo() {
 //!     let mut db = UserDetailsDB::new();
 //!     let bob = db.new_user(String::from("bob"), true);

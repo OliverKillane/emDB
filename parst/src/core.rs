@@ -33,7 +33,7 @@ pub enum ParseResult<E, C, O> {
     Suc(O),
 }
 
-/// The core [Parser] trait for [parst]
+/// The core [Parser] trait for [crate]
 pub trait Parser<I> {
     /// The success output type
     type O;

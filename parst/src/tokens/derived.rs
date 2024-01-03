@@ -1,4 +1,4 @@
-use crate::utils::parst::core::{many0, maperr, or};
+use crate::core::{many0, maperr, or};
 
 use super::super::core::{either, many1, mapsuc, recover, Parser};
 use super::*;

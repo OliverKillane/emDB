@@ -1,5 +1,5 @@
 use divan::{black_box, Bencher};
-use query_opt_comparison::tables::{
+use experiments::tables::{
     foresight::ForesightDatabase as ForeDB, naive::NaiveDatabase as NaiveDB, UserDetails,
 };
 use rand::{seq::SliceRandom, Rng};
