@@ -74,7 +74,7 @@ pub trait CombiCon<Suc, Con> {
 /// let e_final = e4.inherit_con(c_total);
 /// ```
 ///
-/// Also allow for [continuations](Combi::Con) to be caught as errors (for example in [core::Choice], where the branch is know from a [success](Combi::Suc)).
+/// Also allow for [continuations](Combi::Con) to be caught as errors (for example in [core::choice], where the branch is know from a [success](Combi::Suc)).
 #[cfg_attr(
     feature = "nightly",
     rustc_on_unimplemented(

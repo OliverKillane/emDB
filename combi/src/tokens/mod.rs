@@ -1,42 +1,55 @@
 use crate::*;
 
 use proc_macro2::{token_stream::IntoIter, Span, TokenStream, TokenTree};
-use proc_macro_error::{Diagnostic, DiagnosticExt, SpanRange};
+use proc_macro_error::Diagnostic;
 use std::collections::LinkedList;
 
 pub mod basic;
+pub mod matcher;
+pub mod recovery;
 
 /// A wrapper for [TokenStream] that allows for 1-token lookahead, and records the current and last [Span]s.
 pub struct TokenIter {
     next: Option<TokenTree>,
     iter: IntoIter,
-    curr_span: Option<Span>,
+    curr_span: Span,
     prev_span: Option<Span>,
 }
 
 impl TokenIter {
-    pub fn from(ts: TokenStream) -> Self {
+    pub fn from(ts: TokenStream, start_span: Span) -> Self {
         let mut iter = ts.into_iter();
         Self {
             next: iter.next(),
             iter,
-            curr_span: None,
+            curr_span: start_span,
             prev_span: None,
         }
     }
 
+    /// Advance to the next token, and return `Some(token)` if present, otherwise return `None` and do not advance.
     fn next(&mut self) -> Option<TokenTree> {
-        let mut tk = self.iter.next();
-        std::mem::swap(&mut self.next, &mut tk);
-        self.prev_span = self.curr_span;
-        self.curr_span = tk.as_ref().map(|t| t.span());
-        tk
+        if let Some(ref tk) = self.next {
+            self.prev_span = Some(self.curr_span);
+            self.curr_span = tk.span();
+            let mut some_tk = self.iter.next();
+            std::mem::swap(&mut self.next, &mut some_tk);
+            some_tk
+        } else {
+            None
+        }
     }
 
     fn peek_next(&self) -> &Option<TokenTree> {
         &self.next
     }
 
+    /// The span of the last token from [Self::next].
+    fn cur_span(&self) -> &Span {
+        &self.curr_span
+    }
+
+    /// The span of the last, last token found from [Self::next].
     fn last_span(&self) -> &Option<Span> {
         &self.prev_span
     }
@@ -96,32 +109,11 @@ impl<S> CombiCon<S, TokenDiagnostic> for TokenDiagnostic {
 //       TokenParser may be implemented for the combi::core types by a
 //       downstream crate.
 //       See: https://github.com/rust-lang/rust/issues/50237
-pub trait TokenParser {
-    type Out;
-
-    fn parse(
-        &self,
-        input: TokenIter,
-    ) -> (
-        TokenIter,
-        CombiResult<Self::Out, TokenDiagnostic, TokenDiagnostic>,
-    );
-
-    fn expected(&self, f: &mut Formatter<'_>) -> Result<(), Error>;
-}
-
-impl<P: TokenParser> Combi for P {
-    type Suc = P::Out;
-    type Err = TokenDiagnostic;
-    type Con = TokenDiagnostic;
-    type Inp = TokenIter;
-    type Out = TokenIter;
-
-    fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
-        self.parse(input)
-    }
-
-    fn repr(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.expected(f)
-    }
-}
+// NOTE: Ideally I would make an alias, that binds the associated types of a
+//       Combi impl, then implement that, however we run into significant issues
+//       with potentially conflicting traits
+// TODO: create a binding for recovery and parsers, like with:
+//       ```rust
+//       trait Alias: Trait<Item=char> {}
+//       impl<T: Trait<Item=char>> Alias for T {}
+//       ```
