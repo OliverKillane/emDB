@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 
 use super::{TokenDiagnostic, TokenIter};
 use crate::{Combi, CombiResult, Repr};
+use derive_where::derive_where;
 use proc_macro_error::{DiagnosticExt, SpanRange};
 
 /// Recover until the parser succeeds with true
@@ -23,7 +24,7 @@ where
     }
 }
 
-#[derive(Clone)]
+#[derive_where(Clone; P)]
 pub struct Until<P, T>
 where
     P: Combi<
@@ -78,7 +79,7 @@ where
                     return (input, CombiResult::Con(err));
                 }
                 crate::CombiResult::Con(_) | crate::CombiResult::Suc(false) => (),
-                // If failing, just propagate the last error
+                // If failing, just propagate the original error
                 crate::CombiResult::Err(_) => return (input, CombiResult::Err(err)),
             }
         }

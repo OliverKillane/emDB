@@ -3,8 +3,9 @@ use std::marker::PhantomData;
 use super::{TokenDiagnostic, TokenIter};
 use crate::{
     core::{seqdiff, DiffRes},
-    Combi, CombiErr, CombiResult, Repr,
+    Combi, CombiCon, CombiErr, CombiResult, Repr,
 };
+use derive_where::derive_where;
 use proc_macro2::{Delimiter, Ident, Literal, Punct, Span, TokenStream, TokenTree};
 use proc_macro_error::{Diagnostic, Level};
 use syn::{parse::Parse as SynParse, spanned::Spanned};
@@ -201,11 +202,10 @@ impl Combi for GetPunct {
     }
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
-pub struct MatchPunct {
-    punct: char,
-}
-impl Combi for MatchPunct {
+pub struct matchpunct(pub char);
+impl Combi for matchpunct {
     type Suc = Punct;
     type Err = TokenDiagnostic;
     type Con = TokenDiagnostic;
@@ -221,7 +221,7 @@ impl Combi for MatchPunct {
     ) {
         match input.next() {
             Some(TokenTree::Punct(p)) => {
-                if p.as_char() == self.punct {
+                if p.as_char() == self.0 {
                     (input, CombiResult::Suc(p))
                 } else {
                     (
@@ -229,7 +229,7 @@ impl Combi for MatchPunct {
                         CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(
                             p.span(),
                             proc_macro_error::Level::Error,
-                            format!("Expected punct {}, found {}", self.punct, p),
+                            format!("Expected punct {}, found {}", self.0, p),
                         ))),
                     )
                 }
@@ -239,7 +239,7 @@ impl Combi for MatchPunct {
                 CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(
                     tt.span(),
                     proc_macro_error::Level::Error,
-                    format!("Expected punct {}, found {}", self.punct, tt),
+                    format!("Expected punct {}, found {}", self.0, tt),
                 ))),
             ),
             None => {
@@ -249,7 +249,7 @@ impl Combi for MatchPunct {
                     CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(
                         span,
                         proc_macro_error::Level::Error,
-                        format!("Expected punct {}, found nothing", self.punct),
+                        format!("Expected punct {}, found nothing", self.0),
                     ))),
                 )
             }
@@ -257,7 +257,7 @@ impl Combi for MatchPunct {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self.punct)
+        write!(f, "{}", self.0)
     }
 }
 
@@ -404,7 +404,7 @@ where
     RecovGroup(delim, seqdiff(parser, Terminal))
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RecovGroup<P>(pub Delimiter, pub seqdiff<P, Terminal>)
 where
     P: Combi<Inp = TokenIter, Out = TokenIter, Con = TokenDiagnostic, Err = TokenDiagnostic>
@@ -511,22 +511,22 @@ where
 pub struct collectuntil<P>(pub P)
 where
     P: Combi<
-            Inp = TokenIter,
-            Out = TokenIter,
-            Suc = bool,
-            Err = TokenDiagnostic,
-            Con = TokenDiagnostic,
-        > + Clone;
+        Inp = TokenIter,
+        Out = TokenIter,
+        Suc = bool,
+        Err = TokenDiagnostic,
+        Con = TokenDiagnostic,
+    >;
 
 impl<P> Combi for collectuntil<P>
 where
     P: Combi<
-            Inp = TokenIter,
-            Out = TokenIter,
-            Suc = bool,
-            Err = TokenDiagnostic,
-            Con = TokenDiagnostic,
-        > + Clone,
+        Inp = TokenIter,
+        Out = TokenIter,
+        Suc = bool,
+        Err = TokenDiagnostic,
+        Con = TokenDiagnostic,
+    >,
 {
     type Suc = TokenStream;
     type Err = TokenDiagnostic;
@@ -575,12 +575,12 @@ pub fn syn<T, P>(p: P) -> Syn<T, P>
 where
     T: SynParse,
     P: Combi<
-            Inp = TokenIter,
-            Out = TokenIter,
-            Suc = TokenStream,
-            Con = TokenDiagnostic,
-            Err = TokenDiagnostic,
-        > + Clone,
+        Inp = TokenIter,
+        Out = TokenIter,
+        Suc = TokenStream,
+        Con = TokenDiagnostic,
+        Err = TokenDiagnostic,
+    >,
 {
     Syn {
         parser: p,
@@ -588,17 +588,18 @@ where
     }
 }
 
-#[derive(Clone)]
+#[derive_where(Clone; P)]
+#[derive_where(Debug; P)]
 pub struct Syn<T, P>
 where
     T: SynParse,
     P: Combi<
-            Inp = TokenIter,
-            Out = TokenIter,
-            Suc = TokenStream,
-            Con = TokenDiagnostic,
-            Err = TokenDiagnostic,
-        > + Clone,
+        Inp = TokenIter,
+        Out = TokenIter,
+        Suc = TokenStream,
+        Con = TokenDiagnostic,
+        Err = TokenDiagnostic,
+    >,
 {
     parser: P,
     _marker: PhantomData<T>,
@@ -606,14 +607,14 @@ where
 
 impl<T, P> Combi for Syn<T, P>
 where
-    T: SynParse + Clone,
+    T: SynParse,
     P: Combi<
-            Inp = TokenIter,
-            Out = TokenIter,
-            Suc = TokenStream,
-            Con = TokenDiagnostic,
-            Err = TokenDiagnostic,
-        > + Clone,
+        Inp = TokenIter,
+        Out = TokenIter,
+        Suc = TokenStream,
+        Con = TokenDiagnostic,
+        Err = TokenDiagnostic,
+    >,
 {
     type Suc = T;
     type Err = TokenDiagnostic;
@@ -722,6 +723,7 @@ impl Combi for Terminal {
         mut input: Self::Inp,
     ) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         if let Some(tt) = input.next() {
+            // BUG: will fail on non-nightly due to `a.join` retuning None
             let big_span = input
                 .extract_iter()
                 .fold(tt.span(), |a, s| a.join(s.span()).unwrap());

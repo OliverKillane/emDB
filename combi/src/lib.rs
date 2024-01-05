@@ -4,8 +4,8 @@ use std::fmt::{Display, Error, Formatter};
 
 pub mod core;
 pub mod derived;
+pub mod logical;
 pub mod macros;
-
 // #[cfg(feature = "tokens")]
 pub mod tokens;
 

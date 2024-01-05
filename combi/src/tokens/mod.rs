@@ -5,9 +5,10 @@ use proc_macro_error::Diagnostic;
 use std::collections::LinkedList;
 
 pub mod basic;
+pub mod derived;
+pub mod error;
 pub mod matcher;
 pub mod recovery;
-
 /// A wrapper for [TokenStream] that allows for 1-token lookahead, and records the current and last [Span]s.
 pub struct TokenIter {
     next: Option<TokenTree>,
@@ -117,3 +118,45 @@ impl<S> CombiCon<S, TokenDiagnostic> for TokenDiagnostic {
 //       trait Alias: Trait<Item=char> {}
 //       impl<T: Trait<Item=char>> Alias for T {}
 //       ```
+
+/// An alias for the [Combi] trait, for token parsers
+pub trait TokenParser<S>:
+    Combi<Suc = S, Err = TokenDiagnostic, Con = TokenDiagnostic, Inp = TokenIter, Out = TokenIter>
+{
+}
+impl<
+        S,
+        T: Combi<
+            Suc = S,
+            Err = TokenDiagnostic,
+            Con = TokenDiagnostic,
+            Inp = TokenIter,
+            Out = TokenIter,
+        >,
+    > TokenParser<S> for T
+{
+}
+
+/// An alias for the [Combi] trait, for recovery parsers
+pub trait TokenRecover<S>:
+    Combi<
+    Suc = S,
+    Err = TokenDiagnostic,
+    Con = TokenDiagnostic,
+    Inp = (TokenDiagnostic, TokenIter),
+    Out = TokenIter,
+>
+{
+}
+impl<
+        S,
+        T: Combi<
+            Suc = S,
+            Err = TokenDiagnostic,
+            Con = TokenDiagnostic,
+            Inp = (TokenDiagnostic, TokenIter),
+            Out = TokenIter,
+        >,
+    > TokenRecover<S> for T
+{
+}

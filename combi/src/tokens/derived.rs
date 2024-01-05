@@ -1,63 +1,48 @@
-// use crate::core::{many0, maperr, or};
+use proc_macro2::Ident;
+use syn::{parse::Parse as SynParse, token::Token};
 
-// use super::super::core::{either, many1, mapsuc, recover, Parser};
-// use super::*;
-// use syn::parse::Parse as SynParse;
+use crate::{
+    core::{choice, mapsuc, nothing, recover, seq},
+    derived::{many0, many1},
+    logical::{not, or},
+};
 
-// /// Use syn to parse tokens collected to a parser
-// pub fn syntopunct<
-//     T: SynParse,
-//     End: Combi<Inp=TokenIter, >,
-// >(
-//     end: End,
-// ) -> impl Parser<TokenIter, O = T, C = SpannedCont, E = SpannedError> {
-//     syn(collectuntil(or(end, isempty())))
-// }
+use super::{
+    basic::{collectuntil, isempty, matchident, matchpunct, peekident, peekpunct, syn},
+    recovery::until,
+    TokenParser,
+};
 
-// /// Parse a punct separated list
-// pub fn listsep<I: Parser<TokenIter, C = SpannedCont, E = SpannedError>>(
-//     sep: char,
-//     item: I,
-// ) -> impl Parser<TokenIter, O = Vec<I::O>, C = SpannedCont, E = SpannedError> {
-//     either(
-//         isempty(),
-//         mapsuc(nothing(), |()| vec![]),
-//         many1(
-//             either(
-//                 peekpunct(sep),
-//                 mapsuc(matchpunct(sep), |_| true),
-//                 mapsuc(nothing(), |_| false),
-//             ),
-//             recover(item, recoveruptopunct(sep)),
-//         ),
-//     )
-// }
+/// Use syn to parse tokens collected to a parser
+pub fn syntopunct<T: SynParse, End: TokenParser<bool>>(end: End) -> impl TokenParser<T> {
+    syn(collectuntil(or(end, isempty())))
+}
 
-// pub fn listseptrailing<I: Parser<TokenIter, C = SpannedCont, E = SpannedError>>(
-//     sep: char,
-//     item: I,
-// ) -> impl Parser<TokenIter, O = Vec<I::O>, C = SpannedCont, E = SpannedError> {
-//     many0(
-//         not(isempty()),
-//         mapsuc(
-//             seq(
-//                 recover(item, recoveruptopunct(sep)),
-//                 either(isempty(), nothing(), mapsuc(matchpunct(sep), |_| ())),
-//             ),
-//             |(i, ())| i,
-//         ),
-//     )
-// }
+/// Parse a punct separated list
+pub fn listsep<S, I: TokenParser<S> + Clone>(sep: char, item: I) -> impl TokenParser<Vec<S>> {
+    choice(
+        isempty(),
+        mapsuc(nothing(), |()| vec![]),
+        many1(
+            choice(
+                peekpunct(sep),
+                mapsuc(matchpunct(sep), |_| true),
+                mapsuc(nothing(), |_| false),
+            ),
+            recover(item, until(peekpunct(sep))),
+        ),
+    )
+}
 
-// pub fn not<I, P: Parser<I, O = bool>>(parser: P) -> impl Parser<I, O = bool, C = P::C, E = P::E> {
-//     mapsuc(parser, |t| !t)
-// }
-
-// pub fn embelisherr<P: Parser<TokenIter, C = SpannedCont, E = SpannedError>>(
-//     parser: P,
-//     msg: &'static str,
-// ) -> impl Parser<TokenIter, O = P::O, C = SpannedCont, E = SpannedError> {
-//     maperr(parser, move |e| {
-//         SpannedError::from(e.main.note(String::from(msg)))
-//     })
-// }
+pub fn listseptrailing<S, I: TokenParser<S>>(sep: char, item: I) -> impl TokenParser<Vec<S>> {
+    many0(
+        not(isempty()),
+        mapsuc(
+            seq(
+                recover(item, until(peekpunct(sep))),
+                choice(isempty(), nothing(), mapsuc(matchpunct(sep), |_| ())),
+            ),
+            |(i, ())| i,
+        ),
+    )
+}
