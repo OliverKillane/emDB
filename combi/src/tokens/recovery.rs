@@ -78,7 +78,11 @@ where
                     );
                     return (input, CombiResult::Con(err));
                 }
-                crate::CombiResult::Con(_) | crate::CombiResult::Suc(false) => (),
+                crate::CombiResult::Con(_) | crate::CombiResult::Suc(false) => {
+                    if input.next().is_none() {
+                        return (input, CombiResult::Err(err));
+                    }
+                }
                 // If failing, just propagate the original error
                 crate::CombiResult::Err(_) => return (input, CombiResult::Err(err)),
             }

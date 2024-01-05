@@ -84,6 +84,12 @@ impl TokenDiagnostic {
             },
         }
     }
+
+    pub fn into_list(self) -> LinkedList<Diagnostic> {
+        let mut list = self.prev;
+        list.push_back(self.main);
+        list
+    }
 }
 
 impl CombiErr<TokenDiagnostic> for TokenDiagnostic {

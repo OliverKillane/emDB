@@ -1,4 +1,6 @@
 //! An easily extensible function combinator library
+#![allow(internal_features)]
+#![feature(rustc_attrs)]
 
 use std::fmt::{Display, Error, Formatter};
 
@@ -6,10 +8,14 @@ pub mod core;
 pub mod derived;
 pub mod logical;
 pub mod macros;
-// #[cfg(feature = "tokens")]
+#[cfg(feature = "tokens")]
 pub mod tokens;
 
-#[derive(PartialEq, Eq, Debug)]
+#[cfg(feature = "text")]
+pub mod text;
+
+/// The result of [Combi] computation
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum CombiResult<S, C, E> {
     Suc(S),
     Con(C),

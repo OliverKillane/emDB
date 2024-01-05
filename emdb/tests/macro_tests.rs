@@ -1,15 +1,13 @@
-use emdb::database;
+// use emdb::database;
 
-database! {
-    impl coolbackend as mydb;
+// database! {
+//     imaapl cool as my_db;
 
-    table cool {
-        a: i32,
-    } @ [unique(id)]
+//     table users {
+//         a: ~,
+//     } @ [ pred(a < {77%}), genpk(a)]
 
-    query bob(a: i32) {
-        ref table |> assert(it < 3) |> delete() |> return |> delete();
-        // ref bob |> map(t: i32 = it.val) |>
-        // unique(tableb )
-    }
-}
+//     query bob() {
+
+//     }
+// }

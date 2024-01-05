@@ -1,5 +1,4 @@
-use proc_macro2::Ident;
-use syn::{parse::Parse as SynParse, token::Token};
+use syn::parse::Parse as SynParse;
 
 use crate::{
     core::{choice, mapsuc, nothing, recover, seq},
@@ -8,7 +7,7 @@ use crate::{
 };
 
 use super::{
-    basic::{collectuntil, isempty, matchident, matchpunct, peekident, peekpunct, syn},
+    basic::{collectuntil, isempty, matchpunct, peekpunct, syn},
     recovery::until,
     TokenParser,
 };

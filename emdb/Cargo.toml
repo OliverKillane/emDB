@@ -14,4 +14,4 @@ proc-macro2 = { version = "1.0" }
 proc-macro-error = "1.0.4"
 quote = "1.0.33"
 rand = "0.8"
-parst = { path = "../parst" }
+combi = { path = "../combi", features = ["tokens"] }

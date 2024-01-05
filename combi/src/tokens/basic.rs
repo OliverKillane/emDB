@@ -3,8 +3,9 @@ use std::marker::PhantomData;
 use super::{TokenDiagnostic, TokenIter};
 use crate::{
     core::{seqdiff, DiffRes},
-    Combi, CombiCon, CombiErr, CombiResult, Repr,
+    Combi, CombiErr, CombiResult, Repr,
 };
+use colored::Colorize;
 use derive_where::derive_where;
 use proc_macro2::{Delimiter, Ident, Literal, Punct, Span, TokenStream, TokenTree};
 use proc_macro_error::{Diagnostic, Level};
@@ -54,7 +55,7 @@ impl Combi for GetIdent {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "<identifier>")
+        write!(f, "{}", "<ident>".blue())
     }
 }
 
@@ -117,7 +118,7 @@ impl Combi for MatchIdent {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self.text)
+        write!(f, "{}", self.text.magenta())
     }
 }
 
@@ -149,7 +150,7 @@ impl Combi for PeekIdent {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self.ident)
+        write!(f, " {} ", self.ident.magenta())
     }
 }
 
@@ -198,7 +199,7 @@ impl Combi for GetPunct {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "<punct>")
+        write!(f, "{}", "<punct>".blue())
     }
 }
 
@@ -257,7 +258,7 @@ impl Combi for matchpunct {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.0.to_string().magenta())
     }
 }
 
@@ -289,7 +290,7 @@ impl Combi for PeekPunct {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self.punct)
+        write!(f, "{}", self.punct.to_string().magenta())
     }
 }
 
@@ -337,7 +338,7 @@ impl Combi for GetLiteral {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "<literal>")
+        write!(f, "{}", "<literal>".blue())
     }
 }
 
@@ -398,22 +399,19 @@ fn describe_tokentree(tt: &TokenTree) -> String {
 /// - The parser must consume all input
 pub fn recovgroup<P>(delim: Delimiter, parser: P) -> RecovGroup<P>
 where
-    P: Combi<Inp = TokenIter, Out = TokenIter, Con = TokenDiagnostic, Err = TokenDiagnostic>
-        + Clone,
+    P: Combi<Inp = TokenIter, Out = TokenIter, Con = TokenDiagnostic, Err = TokenDiagnostic>,
 {
-    RecovGroup(delim, seqdiff(parser, Terminal))
+    RecovGroup(delim, seqdiff(parser, terminal))
 }
 
 #[derive(Clone, Debug)]
-pub struct RecovGroup<P>(pub Delimiter, pub seqdiff<P, Terminal>)
+pub struct RecovGroup<P>(pub Delimiter, pub seqdiff<P, terminal>)
 where
-    P: Combi<Inp = TokenIter, Out = TokenIter, Con = TokenDiagnostic, Err = TokenDiagnostic>
-        + Clone;
+    P: Combi<Inp = TokenIter, Out = TokenIter, Con = TokenDiagnostic, Err = TokenDiagnostic>;
 
 impl<P> Combi for RecovGroup<P>
 where
-    P: Combi<Inp = TokenIter, Out = TokenIter, Con = TokenDiagnostic, Err = TokenDiagnostic>
-        + Clone,
+    P: Combi<Inp = TokenIter, Out = TokenIter, Con = TokenDiagnostic, Err = TokenDiagnostic>,
 {
     type Suc = P::Suc;
     type Err = TokenDiagnostic;
@@ -502,7 +500,7 @@ where
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         let (l, r) = delim_sep(self.0);
-        write!(f, "{}{}{}", l, Repr(&self.1), r)
+        write!(f, "{}{}{}", l.magenta(), Repr(&self.1), r.magenta())
     }
 }
 
@@ -708,10 +706,11 @@ impl Combi for gettoken {
     }
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone)]
-pub struct Terminal;
+pub struct terminal;
 
-impl Combi for Terminal {
+impl Combi for terminal {
     type Suc = ();
     type Err = TokenDiagnostic;
     type Con = TokenDiagnostic;

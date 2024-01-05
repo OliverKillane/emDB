@@ -1,5 +1,4 @@
 //! The core, use agnostic, combinators for [Combi] upon which others can be constructed.
-//! - Each has a type, a construction function and a [Combi] implementation.
 
 use super::*;
 use derive_where::derive_where;
@@ -35,14 +34,15 @@ impl<P: Combi> Combi for id<P> {
 }
 
 /// Applies a [Combi] with no changes
-pub fn nothing<E, C, I>() -> NothingP<E, C, I> {
-    NothingP(PhantomData, PhantomData, PhantomData)
+pub fn nothing<E, C, I>() -> Nothing<E, C, I> {
+    Nothing(PhantomData, PhantomData, PhantomData)
 }
 
+#[doc(hidden)]
 #[derive_where(Clone, Debug)]
-pub struct NothingP<E, C, I>(PhantomData<E>, PhantomData<C>, PhantomData<I>);
+pub struct Nothing<E, C, I>(PhantomData<E>, PhantomData<C>, PhantomData<I>);
 
-impl<E, C, I> Combi for NothingP<E, C, I> {
+impl<E, C, I> Combi for Nothing<E, C, I> {
     type Suc = ();
     type Err = E;
     type Con = C;
@@ -115,10 +115,16 @@ where
     }
 }
 
+/// The [success](Combi::Suc) type for [seqdiff]
 pub enum DiffRes<F, S> {
     First(F),
     Second(S),
 }
+/// Sequences two [Combi]s, of different output types.
+/// ```ignore
+/// // equivalent to
+/// seq(mapsuc(P1, DiffRes::First), mapsuc(P1, DiffRes::Second))
+/// ```
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
 pub struct seqdiff<P1, P2>(pub P1, pub P2)
@@ -249,6 +255,43 @@ where
     }
 }
 
+/// Applies a provided function to successful results that decides the entire [CombiResult].
+#[allow(non_camel_case_types)]
+#[derive_where(Clone; F: Clone, P: Clone)]
+#[derive_where(Debug; F: Debug, P: Debug)]
+pub struct mapall<S, P, F>(pub P, pub F)
+where
+    F: Fn(P::Suc) -> CombiResult<S, P::Con, P::Err>,
+    P: Combi;
+
+impl<S, P, F> Combi for mapall<S, P, F>
+where
+    F: Fn(P::Suc) -> CombiResult<S, P::Con, P::Err>,
+    P: Combi,
+{
+    type Suc = S;
+    type Err = P::Err;
+    type Con = P::Con;
+    type Inp = P::Inp;
+    type Out = P::Out;
+
+    fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
+        let (p_out, p_res) = self.0.comp(input);
+        (
+            p_out,
+            match p_res {
+                CombiResult::Suc(s) => (self.1)(s),
+                CombiResult::Con(c) => CombiResult::Con(c),
+                CombiResult::Err(e) => CombiResult::Err(e),
+            },
+        )
+    }
+
+    fn repr(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        self.0.repr(f)
+    }
+}
+
 /// Applies the primary parser, if it [succeeds](Combi::Suc) or is a [continuation](Combi::Con) then this is returned.
 ///
 /// If it errors, then the recovery parser is provided the error and output as its input.
@@ -328,16 +371,11 @@ where
     }
 
     fn repr(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(
-            f,
-            "{} => ({} | {})",
-            Repr(&self.0),
-            Repr(&self.1),
-            Repr(&self.2)
-        )
+        write!(f, "{} or {}", Repr(&self.1), Repr(&self.2))
     }
 }
 
+/// Based on the optional success of a [Combi], either passes output to a combi for `None`, or passes the success appended to the output to the some [Combi].
 #[allow(non_camel_case_types)]
 #[derive_where(Clone; CP: Clone, PS: Clone, PN: Clone)]
 #[derive_where(Debug; CP: Debug, PS: Debug, PN: Debug)]
@@ -391,24 +429,24 @@ where
 #[allow(non_camel_case_types)]
 #[derive_where(Clone; SP: Clone, PSS: Clone, F: Clone, R: Clone)]
 #[derive_where(Debug; SP: Debug, PSS: Debug, F: Debug, R: Debug)]
-pub struct select<S, C, SP, PSS, F, R, const N: usize>(pub SP, pub PSS, pub F, pub R)
+pub struct select<S, C, SP, PSS, F, R>(pub SP, pub PSS, pub F, pub R)
 where
     SP: Combi,
     F: Fn(
         &PSS,
         SP::Suc,
     ) -> &dyn Combi<Inp = SP::Out, Out = SP::Out, Suc = S, Err = SP::Err, Con = C>,
-    R: Fn(&PSS) -> [&dyn Combi<Inp = SP::Out, Out = SP::Out, Suc = S, Err = SP::Err, Con = C>; N],
+    R: Fn(&PSS, &mut Formatter<'_>) -> Result<(), Error>,
     SP::Err: CombiErr<SP::Con>;
 
-impl<S, C, SP, PSS, F, R, const N: usize> Combi for select<S, C, SP, PSS, F, R, N>
+impl<S, C, SP, PSS, F, R> Combi for select<S, C, SP, PSS, F, R>
 where
     SP: Combi,
     F: Fn(
         &PSS,
         SP::Suc,
     ) -> &dyn Combi<Inp = SP::Out, Out = SP::Out, Suc = S, Err = SP::Err, Con = C>,
-    R: Fn(&PSS) -> [&dyn Combi<Inp = SP::Out, Out = SP::Out, Suc = S, Err = SP::Err, Con = C>; N],
+    R: Fn(&PSS, &mut Formatter<'_>) -> Result<(), Error>,
     SP::Err: CombiErr<SP::Con>,
 {
     type Suc = S;
@@ -428,9 +466,7 @@ where
 
     fn repr(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{} => (", Repr(&self.0))?;
-        for i in (self.3)(&self.1) {
-            write!(f, "{} | ", Repr(i))?;
-        }
+        (self.3)(&self.1, f)?;
         write!(f, ")")?;
         Ok(())
     }
@@ -451,6 +487,7 @@ where
     }
 }
 
+#[doc(hidden)]
 #[derive_where(Clone; P: Clone, FI: Clone, FO: Clone)]
 #[derive_where(Debug; P: Debug, FI: Debug, FO: Debug)]
 pub struct Lift<I, O, P, FI, FO>
@@ -506,6 +543,7 @@ where
     }
 }
 
+#[doc(hidden)]
 #[derive_where(Clone; P: Clone, FI: Clone, FO: Clone)]
 #[derive_where(Debug; P: Debug, FI: Debug, FO: Debug)]
 pub struct LiftCarry<I, O, TL, P, FI, FO>
@@ -564,6 +602,7 @@ where
 
 type RecurBox<I, O, S, E, C> = Box<dyn Combi<Inp = I, Out = O, Suc = S, Con = C, Err = E>>;
 
+#[doc(hidden)]
 #[derive_where(Clone, Debug)]
 pub struct RecursiveHandle<I, O, S, E, C> {
     #[allow(clippy::type_complexity)]
@@ -583,11 +622,12 @@ impl<I, O, S, E, C> Combi for RecursiveHandle<I, O, S, E, C> {
     }
 
     fn repr(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "...")
+        write!(f, "<recur>")
     }
 }
 
-// No Debug implementation for recursive
+// BUG: No Debug implementation for recursive
+#[doc(hidden)]
 #[derive_where(Clone)]
 pub struct Recursive<I, O, S, E, C> {
     #[allow(clippy::type_complexity)]
@@ -606,7 +646,7 @@ impl<I, O, S, E, C> Combi for Recursive<I, O, S, E, C> {
     }
 
     fn repr(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", Repr(&**(self.p)))
+        write!(f, "<recursive: {}>", Repr(&**(self.p)))
     }
 }
 
@@ -677,7 +717,16 @@ where
                                 cont = Some(c);
                             }
                         }
-                        CombiResult::Err(_) => todo!(),
+                        CombiResult::Err(e) => {
+                            return (
+                                input,
+                                CombiResult::Err(if let Some(c_prev) = cont {
+                                    e.inherit_con(c_prev)
+                                } else {
+                                    e
+                                }),
+                            )
+                        }
                     }
                 }
                 CombiResult::Con(c) => {
@@ -691,7 +740,7 @@ where
     }
 
     fn repr(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}{}...", Repr(&self.0), Repr(&self.1))
+        write!(f, "{}...", Repr(&self.1))
     }
 }
 
@@ -763,6 +812,7 @@ where
     }
 }
 
+/// Applies the provided function to the [input](Combi::Inp), to produce [output](Combi::Out), always succeeds with `()`
 pub fn pipemap<I, O, E, C, F>(f: F) -> PipeMap<I, O, E, C, F>
 where
     F: Fn(I) -> O,
@@ -772,6 +822,8 @@ where
         _marker: PhantomData,
     }
 }
+
+#[doc(hidden)]
 #[derive_where(Clone; F: Clone)]
 #[derive_where(Debug; F: Debug)]
 pub struct PipeMap<I, O, E, C, F>
@@ -801,6 +853,11 @@ where
     }
 }
 
+/// Passes the success of one [Combi] to another.
+/// ```ignore
+/// // similar to choicesome, but CP's success is passed
+/// choicesome(mapsuc(CP, Some), lift(SP, |s| s.unwrap(), |s| s), nothing())
+/// ```
 #[allow(non_camel_case_types)]
 #[derive_where(Clone; CP: Clone, SP: Clone)]
 #[derive_where(Debug; CP: Debug, SP: Debug)]
@@ -836,59 +893,28 @@ where
     }
 }
 
+/// Overrides [Combi::repr]
 #[allow(non_camel_case_types)]
-#[derive_where(Clone; P1, P2)]
-pub struct or<O, P1, P2>(pub P1, pub P2)
+#[derive(Clone, Debug)]
+pub struct setrepr<P>(pub P, pub &'static str)
 where
-    P1: Combi<Inp = O, Out = O, Suc = bool>,
-    P2: Combi<Inp = O, Out = O, Suc = bool, Con = P1::Con, Err = P1::Err>,
-    P1::Err: CombiErr<P1::Con>,
-    P1::Con: CombiCon<bool, P1::Con>;
+    P: Combi;
 
-impl<O, P1, P2> Combi for or<O, P1, P2>
+impl<P> Combi for setrepr<P>
 where
-    P1: Combi<Inp = O, Out = O, Suc = bool>,
-    P2: Combi<Inp = O, Out = O, Suc = bool, Con = P1::Con, Err = P1::Err>,
-    P1::Err: CombiErr<P1::Con>,
-    P1::Con: CombiCon<bool, P1::Con>,
+    P: Combi,
 {
-    type Suc = bool;
-    type Err = P1::Err;
-    type Con = P1::Con;
-    type Inp = O;
-    type Out = O;
+    type Suc = P::Suc;
+    type Err = P::Err;
+    type Con = P::Con;
+    type Inp = P::Inp;
+    type Out = P::Out;
 
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
-        let (p1_out, p1_res) = self.0.comp(input);
-        match p1_res {
-            CombiResult::Suc(true) => (p1_out, CombiResult::Suc(true)),
-            CombiResult::Err(e) => (p1_out, CombiResult::Err(e)),
-            CombiResult::Suc(false) => {
-                let (p2_out, p2_res) = self.1.comp(p1_out);
-                (
-                    p2_out,
-                    match p2_res {
-                        CombiResult::Suc(s) => CombiResult::Suc(s),
-                        CombiResult::Err(e) => CombiResult::Err(e),
-                        CombiResult::Con(c) => CombiResult::Con(c),
-                    },
-                )
-            }
-            CombiResult::Con(c) => {
-                let (p2_out, p2_res) = self.1.comp(p1_out);
-                (
-                    p2_out,
-                    match p2_res {
-                        CombiResult::Suc(s) => CombiResult::Con(c.combine_suc(s)),
-                        CombiResult::Con(c2) => CombiResult::Con(c.combine_con(c2)),
-                        CombiResult::Err(e) => CombiResult::Err(e.inherit_con(c)),
-                    },
-                )
-            }
-        }
+        self.0.comp(input)
     }
 
-    fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{} or {}", Repr(&self.0), Repr(&self.1))
+    fn repr(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "{}", self.1)
     }
 }

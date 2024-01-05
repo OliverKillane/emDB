@@ -1,10 +1,14 @@
-//! Use agnostic parsers that can be derived from the [crate::core] [Combis](Combi).
+//! [Combi]s derived by function from the [core] combinators.
 
 use crate::{
     core::{lift, manyappsep, mapsuc, pipesuc},
     Combi, CombiCon, CombiErr,
 };
 
+/// Use the `s` selection [Combi] to determine if `p` should be applied, continues until `s` succeeds with false.
+/// ```text
+/// S P S P S P ... S <- false
+/// ```
 pub fn many0<O, SP, IP>(
     s: SP,
     p: IP,
@@ -18,6 +22,10 @@ where
     lift(manyappsep(s, p), |i| (Vec::new(), i), |o| o)
 }
 
+/// Apply the item parser, then apply [many0], collecting all the results.
+/// ```text
+/// P S P S P S P ... S <- false
+/// ```
 pub fn many1<O, SP, IP>(
     sep: SP,
     item: IP,

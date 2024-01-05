@@ -1,6 +1,6 @@
-use derive_where::derive_where;
-
+//! Combinators dealing with boolean [success](Combi::Suc) types.
 use crate::{Combi, CombiCon, CombiErr, CombiResult, Repr};
+use derive_where::derive_where;
 
 #[allow(non_camel_case_types)]
 #[derive_where(Clone; P1, P2)]
