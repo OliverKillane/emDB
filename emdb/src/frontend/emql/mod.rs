@@ -2,7 +2,6 @@
 //! [TokenStream] -> parse -> ([AST] + errors) -> translate -> ([LogicalPlan] + errors) -> [Backend]
 mod ast;
 mod parse;
-
 mod sem;
 mod trans;
 use std::collections::LinkedList;
