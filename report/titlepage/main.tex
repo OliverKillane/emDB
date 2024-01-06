@@ -1,0 +1,36 @@
+\definecolor{myblue}{RGB}{0, 102, 204}  % Adjust the RGB values for your desired shade of blue
+
+\newcommand{\titlecredit}[2]{\begin{minipage}[t]{.3\textwidth}
+        \Large
+        \centering
+        \textbf{#1}
+        \\ \vspace{1mm} #2
+    \end{minipage}}
+
+\begin{titlepage}
+    % The main title page
+    \begin{tikzpicture}[remember picture,overlay]
+        \fill[myblue] (current page.north west) rectangle ++(\paperwidth,-40mm);
+        \node[anchor=north west, inner sep=0pt] at ([shift={(1cm,-1cm)}]current page.north west) {\includesvg[height=20mm]{titlepage/images/imperial_logo}};
+    \end{tikzpicture}
+    \begin{center}
+        \vspace{4cm}
+        \Huge
+        \textbf{MEng Individual Project}
+        \huge
+        \\ \vspace{1mm}
+        \textbf{Department of Computing}
+        \\ \vspace{60mm}
+        \HUGE \mintinline{rust}{emdb!}
+        \vspace{60mm}
+        \normalsize
+        \\ \vspace{3cm}
+        \begin{center}
+            \titlecredit{Author}{Oliver Killane}
+            \titlecredit{Supervisor}{Holger Pirk}
+            \titlecredit{Second Marker}{Tobe Decided}
+        \end{center}
+        \vspace{5mm}
+        \nth{14} November 2023
+    \end{center}
+\end{titlepage}
