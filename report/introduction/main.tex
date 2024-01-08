@@ -1,49 +1,21 @@
 \chapter{Introduction}
 
-% Key points
-% 1. Actually memory is fine, hence in memory works
-% 2. Queries are often known
-% 3. Many applications need fast, correct, data stores
-% 3 kinds of application to optimise
+\section{Identified Problems}
+
+\subsection{Slow Delta}
+\includegraphics[width=\textwidth]{_drawio/introduction/images/slowdelta.drawio.pdf}
+\subsection{Complex State}
+\subsection{Costly Analysis}
+
+\subsection{Commonality}
 
 
-% Structure:
-% What do we want, simple, fast, cheap.
-% Inefficient Service Pattern
-% - evidence of use - fast or cheap
-% - redis/caching databases
-% Slow Analysis Pattern
-% - fast, cheap or simple
-% Complex State Pattern
-% - fast or simple
+Reference current solutions for background.
 
-% postgres over network where is time spent
-% https://wiki.postgresql.org/wiki/Performance_Analysis_Tools
+\subsection{Current Solutions}
+\subsubsection{Databases}
+\subsubsection{Dataframes}
+\subsubsection{Embedded Databases}
 
-% Solutions
-% faster databases - get papers
-% faster storage
-% faster networks - considerable part of latency
-
-% embedded databases
-% - remove network
-% - remove disk
-
-% the spectrum of embedded databases
-% Comparison of performance duckdb, sqlite
-
-% none consider fact: we know the queries we are going to run
-
-% the query
-% unspecialised data structures (queries unknown)
-% specialised data structures (queries known)
-
-% this is the essence, we can make an embedded database to take advantage of knowing all queries that can be run.
-% optimise and make data structure choices based on query, rather
-
-% the project structure
-
-% Background
-% - Similar Projects (VoltDB, duckDB)
-% - intro to the rust compiler
-% - intro to query language design
+\subsection{Proposed Solution}
+Generate an in memory embedded database to avoid cost.

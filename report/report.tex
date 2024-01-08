@@ -1,21 +1,34 @@
 \documentclass{report}
 \usepackage{xcolor}
-\usepackage[a4paper, margin=1in]{geometry}
+\usepackage[a4paper, margin=.4in]{geometry}
 \usepackage{tikz}
 \usepackage{graphicx}
 \usepackage{svg}
 \usepackage{minted}
 \usepackage{moresize}
 \usepackage{nth}
+\usepackage{lmodern}
+\usepackage{relsize}
+\usepackage{biblatex}
+\addbibresource{refs.bib}
+
+
 
 \begin{document}
 
 \include{titlepage/main}
 
 \tableofcontents
+\listoffigures
+\listoftables
 
 \newpage
 
-\include{introduction/main}
+\input{introduction/main}
+\input{background/main}
+\input{project_plan/main}
+\input{evaluation_plan/main}
+
+\printbibliography
 
 \end{document}

@@ -9,5 +9,13 @@
 *.bak*
 *.listing
 *.pdf
+*.bbl
+*.bcf
+*.blg
+*.lof
+*.lot
+*.run.xml
+
 svg-inkscape
+_drawio
 _minted*
