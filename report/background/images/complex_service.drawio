@@ -1,0 +1,91 @@
+<mxfile host="65bd71144e">
+    <diagram id="yyNnXC2hBrJY6bm2mzGz" name="Page-1">
+        <mxGraphModel dx="755" dy="2425" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-37" value="" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="10" width="220" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-38" value="Complex &lt;br&gt;Non-Persistent&lt;br&gt;State" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=2" parent="1" vertex="1">
+                    <mxGeometry x="230" y="20" width="100" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-39" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;" parent="1" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="90" y="20" as="sourcePoint"/>
+                        <mxPoint x="120" y="30" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-40" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;" parent="1" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="80" y="50" as="sourcePoint"/>
+                        <mxPoint x="120" y="49.84999999999991" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-41" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;" parent="1" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="90" y="80" as="sourcePoint"/>
+                        <mxPoint x="120" y="70" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-43" value="Complex Service" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="310" y="-37.5" width="100" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-44" value="Application&lt;br&gt;Logic" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=2" parent="1" vertex="1">
+                    <mxGeometry x="130" y="20" width="100" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-45" value="Service serves clients using some application logic, while maintaining state. Persistence not required, performance is.&amp;nbsp;&amp;nbsp;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;rounded=0;fontStyle=2;fontSize=8;" parent="1" vertex="1">
+                    <mxGeometry x="250" y="-27.5" width="220" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="410" y="10" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="15" style="edgeStyle=none;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;startArrow=classic;startFill=1;" edge="1" parent="1" source="7" target="14">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="7" value="Wrapper" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=2;horizontal=0;" vertex="1" parent="1">
+                    <mxGeometry x="520" y="20" width="35" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;" edge="1" parent="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="380" y="20" as="sourcePoint"/>
+                        <mxPoint x="410" y="30" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="9" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;" edge="1" parent="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="370" y="50" as="sourcePoint"/>
+                        <mxPoint x="410" y="49.84999999999991" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="10" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;" edge="1" parent="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="380" y="80" as="sourcePoint"/>
+                        <mxPoint x="410" y="70" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="12" value="Application&lt;br&gt;Logic" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=2" vertex="1" parent="1">
+                    <mxGeometry x="420" y="20" width="100" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="14" value="State" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fontStyle=1" vertex="1" parent="1">
+                    <mxGeometry x="600" y="10" width="60" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="17" value="Database implementation ensures correct implementation of schema and queries provided by developer." style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;rounded=0;fontStyle=2;fontSize=8;" vertex="1" parent="1">
+                    <mxGeometry x="490" y="-32.5" width="170" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="18" value="Network connection and generalised database implementation compromise performance.&amp;nbsp;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#FF0000;fontSize=8;" vertex="1" parent="1">
+                    <mxGeometry x="440" y="90" width="210" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="19" value="Developer time required to manually implement correct &amp;amp; efficient state management.&amp;nbsp;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#FF0000;fontSize=8;" vertex="1" parent="1">
+                    <mxGeometry x="135" y="90" width="190" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="20" value="" style="endArrow=none;html=1;fontSize=8;fontColor=#FF0000;strokeWidth=2;dashed=1;" edge="1" parent="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="360" y="130" as="sourcePoint"/>
+                        <mxPoint x="360" y="10" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

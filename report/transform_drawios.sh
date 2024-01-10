@@ -4,16 +4,16 @@
 # with the same path. 
 
 WORK_DIR=$(dirname "$0")
-
+rm -rf "$WORK_DIR/_drawio"
 function transform() {
     OUT_DIR="_drawio"
     file=$1
     directory="$OUT_DIR/$(dirname $file)"
     out_file="$OUT_DIR/$file.pdf"
     mkdir -p $directory &&
-    echo "Created Directory for $file" && 
+    echo "converting $file" && 
     drawio $file -x --format=pdf -t --crop -o $out_file > /dev/null 2>&1 &&
-    echo "Converted to PDF $file $out_file> "
+    echo -e "\e[1A\e[K✅ $file"
 }
 export -f transform
 
