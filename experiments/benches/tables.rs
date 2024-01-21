@@ -1,21 +1,24 @@
 use divan::{black_box, Bencher};
-use experiments::tables::{
-    foresight::ForesightDatabase as ForeDB, naive::NaiveDatabase as NaiveDB, UserDetails,
-};
+use experiments::tables::{ForesightDatabase, NaiveDatabase, UserDetails};
+
 use rand::{seq::SliceRandom, Rng};
 
 mod utils;
 use utils::*;
 
-const TABLE_SIZES: [usize; 4] = [4096, 16384, 65536, 262144];
+// const TABLE_SIZES: [usize; 9] = [1, 8, 64, 128, 512, 4096, 16384, 65536, 262144];
+const TABLE_SIZES: [usize; 6] = [1, 8, 16, 32, 64, 128];
+
+use experiments::tables::{DuckDBDatabase, SQLiteDatabase};
 
 fn main() {
     divan::main();
 }
 
+/// Time taken for a number of inserts of random premium/non-premium
 #[divan::bench(
-    name = "Time taken for a number of inserts of random premium/non-premium",
-    types = [NaiveDB, ForeDB],
+    name = "random_inserts",
+    types = [DuckDBDatabase, ForesightDatabase, NaiveDatabase, SQLiteDatabase],
     consts = TABLE_SIZES
 )]
 fn inserts<'a, T, const N: usize>(bencher: Bencher)
@@ -56,15 +59,16 @@ fn random_table<'a, const SIZE: usize, T: UserDetails<'a>>() -> (Vec<T::UsersID>
     ids.shuffle(&mut rng);
 
     for id in ids.iter() {
-        db.add_credits(id.clone(), rng.gen_range(2..100));
+        db.add_credits(id.clone(), rng.gen_range(2..100)).unwrap();
     }
-    db.reward_premium(2f32);
+    db.reward_premium(2f32).unwrap();
     black_box((ids, db))
 }
 
+/// Time taken to get ids in random order
 #[divan::bench(
-    name = "Time taken to get ids in random order",
-    types = [NaiveDB, ForeDB],
+    name = "random_get_ids",
+    types = [DuckDBDatabase, ForesightDatabase, NaiveDatabase, SQLiteDatabase],
     consts = TABLE_SIZES
 )]
 fn gets<'a, T, const N: usize>(bencher: Bencher)
@@ -75,14 +79,15 @@ where
         .with_inputs(random_table::<N, T>)
         .bench_local_refs(|(ids, db)| {
             for id in ids {
-                black_box(db.get_info(*id));
+                black_box(db.get_info(*id)).unwrap();
             }
         })
 }
 
+/// Time taken to get a snapshot
 #[divan::bench(
-    name = "Time taken to get a snapshot",
-    types = [NaiveDB, ForeDB],
+    name = "snapshot",
+    types = [DuckDBDatabase, ForesightDatabase, NaiveDatabase, SQLiteDatabase],
     consts = TABLE_SIZES
 )]
 fn snapshot<'a, T, const N: usize>(bencher: Bencher)
@@ -94,9 +99,10 @@ where
         .bench_local_refs(|(_, db)| black_box(db.get_snapshot()))
 }
 
+/// Time taken to get the total credits of premium users
 #[divan::bench(
-    name = "Time taken to get the total credits of premium users",
-    types = [NaiveDB, ForeDB],
+    name = "get_total_prem_credits",
+    types = [DuckDBDatabase, ForesightDatabase, NaiveDatabase, SQLiteDatabase],
     consts = TABLE_SIZES,
     max_time = 1
 )]
@@ -109,9 +115,10 @@ where
         .bench_local_refs(|(_, db)| black_box(db.total_premium_credits()))
 }
 
+/// Time taken to reward premium users
 #[divan::bench(
-    name = "Time taken to reward premium users",
-    types = [NaiveDB, ForeDB],
+    name = "reward_premium_users",
+    types = [DuckDBDatabase, ForesightDatabase, NaiveDatabase, SQLiteDatabase],
     consts = TABLE_SIZES,
     max_time = 1
 )]
@@ -124,10 +131,11 @@ where
         .bench_local_refs(|(_, db)| black_box(db.reward_premium(2f32)))
 }
 
+/// Random workload of N actions
 #[divan::bench(
-    name = "Random workload of N actions",
-    types = [NaiveDB, ForeDB],
-    consts = [100000]
+    name = "random_workloads",
+    types = [DuckDBDatabase, ForesightDatabase, NaiveDatabase, SQLiteDatabase],
+    consts = [1024, 2048, 4096]
 )]
 fn mixed_workload<'a, T, const N: usize>(bencher: Bencher)
 where
@@ -141,15 +149,14 @@ where
         let mut ids = Vec::with_capacity(N);
         ids.push(db.new_user(String::from("bob"), true));
 
-
         for _ in 0..N {
             choose! { rng
                 10 => { ids.push(db.new_user(String::from("bob"), true)); },
-                20 => { black_box(db.get_info(ids[rng.gen_range(0..ids.len())])); },
+                20 => { black_box(db.get_info(ids[rng.gen_range(0..ids.len())])).unwrap(); },
                 1 => { black_box(db.get_snapshot()); },
                 2 => { black_box(db.total_premium_credits()); },
-                1 => { black_box(db.reward_premium(2f32)); },
-                20 => { black_box(db.add_credits(ids[rng.gen_range(0..ids.len())], rng.gen_range(2..100))); },
+                1 => { let _ = black_box(db.reward_premium(1.2f32)); },
+                20 => { let _ = black_box(db.add_credits(ids[rng.gen_range(0..ids.len())], rng.gen_range(2..100))); },
             }
         }
     })

@@ -1,6 +1,8 @@
 \documentclass{report}
 \usepackage{xcolor}
-\usepackage[a4paper, margin=.4in]{geometry}
+\usepackage[a4paper,  total={185mm,260mm},
+ left=10mm,
+ top=20mm]{geometry}
 \usepackage{tikz}
 \usepackage{graphicx}
 \usepackage{svg}
@@ -17,6 +19,30 @@
 \begin{document}
 
 \include{titlepage/main}
+
+\begin{abstract}
+    Embedded databases allow developers to easily embed a data store within an
+    application while providing a convenient query interface. For many
+    applications, the schema of the data store is static, and the set of
+    parameterized queries is known at application compile time.
+    \\
+    \\ No existing embedded databases take advantage of this knowledge for
+    logical optimisation. The goal of this project is to build one that does.
+    \\
+    \\ The main outcome of this project is \textit{emdb}: a prototype embedded
+    database compiler that generates the optimised code for a data store from a
+    schema and queries.
+\end{abstract}
+
+\renewcommand{\abstractname}{Acknowledgements}
+\begin{abstract}
+    I would like to thank my suprvisor, Dr. Holger Pirk, for his willingness to
+    supervise my wild idea, and for his teaching of the data processing module
+    that inspired it.
+    \\
+    \\ I would also like to thank my friends, family, neighbours, Imperial College, and God for their support.
+\end{abstract}
+
 
 \tableofcontents
 \listoffigures

@@ -120,23 +120,21 @@ impl<'a> UserDetails<'a> for ForesightDatabase<'a> {
             None => Err(AddCreditsErr::IDNotFound),
         }
     }
-    fn reward_premium(&mut self, cred_bonus: f32) -> Result<i32, PremCreditsErr> {
+    fn reward_premium(&mut self, cred_bonus: f32) -> Result<i64, PremCreditsErr> {
         for (_, v) in self.prem_user.iter_mut() {
             if !premcred_predicate(true, ((v.credits as f32) * cred_bonus) as i32) {
                 return Err(PremCreditsErr);
             }
         }
-        let mut total_creds = 0;
         let mut cred_diff = 0;
         for (_, v) in self.prem_user.iter_mut() {
             let new_creds = ((v.credits as f32) * cred_bonus) as i32;
-            total_creds += new_creds;
             cred_diff += (new_creds - v.credits) as i64;
             v.credits = new_creds;
         }
         self.premium_credits += cred_diff;
 
-        Ok(total_creds)
+        Ok(cred_diff)
     }
     fn total_premium_credits(&self) -> i64 {
         self.premium_credits

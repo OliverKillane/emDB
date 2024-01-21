@@ -1,4 +1,4 @@
-use divan::{black_box, Bencher};
+use divan;
 
 fn main() {
     divan::main();

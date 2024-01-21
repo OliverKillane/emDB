@@ -20,10 +20,12 @@
 //!
 //! ## Custom Schema
 //! ### Schema
-//! ```ignore
-//! // mocked up in emQL frontend not yet complete
+//! ```
+//! use emdb::database;
+//!
 //! database! {
-//!     name user_details;
+//!     impl syncronous as user_details;
+//!     impl plan_view as user_details_view;
 //!
 //!     // Reasoning:
 //!     //  - Constraint checking required, needs to fail immediately (hybrid IVM)
@@ -31,10 +33,14 @@
 //!     //    two tables for premium & non-premium users
 //!     //  - Very simple table
 //!     table users {
+//!         id: usize,
 //!         name: String,
 //!         premium: bool,
-//!         credits: i32
-//!     } @ gen_id(id), pred(premium || credits >= 0) as PremCredits;
+//!         credits: i32,
+//!     } @ [
+//!         genpk(id),
+//!         pred(premium || credits > 0) as prem_credits,
+//!     ]
 //!
 //!     // Description:
 //!     //   Create a row, pipe to insert, insert returns gen_pk id
@@ -43,7 +49,7 @@
 //!     //     hence we know the table alone determines id
 //!     //   - Move semantics (taking ownership of data structure from outside the database)
 //!     query new_user(username: String, prem: bool) {
-//!         row(name = username, premium = prem, credits = 0 )
+//!         row(name: String = username, premium: bool = prem, credits: i32 = 0 )
 //!             |> insert(users)
 //!             ~> return;
 //!     }
@@ -53,13 +59,13 @@
 //!     // Reasoning:
 //!     //   - Performance reliant on access to users data structure
 //!     //     hence need to make a good choice of mapping (user id -> data) here.
-//!     query get_info(user_id: users::ID) {
-//!         users
-//!             |> unique(id is user_id)
+//!     query get_info(user_id: usize) {
+//!         use users
+//!             |> unique(use user_id as id)
 //!             ~> return;
 //!     }
 //!
-//!     // Description:
+//!      // Description:
 //!     //    Get a snapshot of the entire users table state
 //!     // Reasoning:
 //!     //    - We can collect the database to a single structure decided by the compiler.
@@ -67,7 +73,9 @@
 //!     //      immutable attribute, return reference bound to lifetime of database).
 //!     //    - choosing a data structure for `users` table that is good for iteration
 //!     query get_snapshot() {
-//!         users |> collect() ~> return;
+//!         use users
+//!             |> collect()
+//!             ~> return;
 //!     }
 //!
 //!     // Description
@@ -76,10 +84,10 @@
 //!     //   - Need to apply constraint immediately
 //!     //   - Need to index data structure
 //!     //   - Database can see only credits is updated
-//!     query add_credits(user: users::ID, creds: i32) {
+//!     query add_credits(user: usize, creds: i32) {
 //!         ref users
-//!             |> unique(it.id is user)
-//!             ~> update(it.credits = credits + creds);
+//!             |> unique(use user as id)
+//!             ~> update(it use credits = credits + creds);
 //!     }
 //!
 //!     // Description:
@@ -91,10 +99,10 @@
 //!     query reward_premium(cred_bonus: f32) {
 //!         ref users
 //!             |> filter(it.premium)
-//!             |> map(user: ref users = it, new_creds: i32 = ((it.credits as f32) * cred_bonus) as i32)
-//!             |> update(it.credits = new_creds)
+//!             |> map(user: users::Ref = it, new_creds: i32 = ((it.credits as f32) * cred_bonus) as i32)
+//!             |> update(it use credits = new_creds)
 //!             |> map(creds: i32 = new_creds)
-//!             |> sum()
+//!             |> fold((sum: i64 = 0) => (sum = sum + creds))
 //!             ~> return;
 //!     }
 //!
@@ -104,10 +112,10 @@
 //!     //   Easy IVM case, all updates & inserts just need to add difference to
 //!     //   the view
 //!     query total_premium_credits() {
-//!         users
+//!         use users
 //!             |> filter(premium)
 //!             |> map(credits: i64 = credits)
-//!             |> sum()
+//!             |> fold((sum: i64 = 0) => (sum = sum + credits))
 //!             ~> return;
 //!     }
 //! }
@@ -145,8 +153,14 @@
 //! - Against a certain table size (updates and queries)
 //! - Cost of inserts as the table size increases
 
-pub mod foresight;
-pub mod naive;
+mod duckdb;
+mod foresight;
+mod naive;
+mod sqlite;
+pub use duckdb::DuckDBDatabase;
+pub use foresight::ForesightDatabase;
+pub use naive::NaiveDatabase;
+pub use sqlite::SQLiteDatabase;
 
 #[derive(Debug)]
 pub struct PremCreditsErr;
@@ -179,31 +193,37 @@ pub trait UserDetails<'a> {
     ) -> Result<UserInfo<Self::ReturnString, Self::UsersID>, IDNotFoundErr>;
     fn get_snapshot(&self) -> Vec<UserInfo<Self::ReturnString, Self::UsersID>>;
     fn add_credits(&mut self, user: Self::UsersID, creds: i32) -> Result<(), AddCreditsErr>;
-    fn reward_premium(&mut self, cred_bonus: f32) -> Result<i32, PremCreditsErr>;
+    fn reward_premium(&mut self, cred_bonus: f32) -> Result<i64, PremCreditsErr>;
     fn total_premium_credits(&self) -> i64;
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::tables::{foresight::ForesightDatabase, naive::NaiveDatabase};
-
     use super::*;
 
-    #[test]
-    fn basic_intersts() {
-        fn test<'a, T: UserDetails<'a>>() {
-            let mut db = T::new();
-            let bob = db.new_user(String::from("bob"), true);
+    fn test<'a, T: UserDetails<'a>>() {
+        let mut db = T::new();
+        let bob = db.new_user(String::from("bob"), true);
 
-            assert_eq!(db.get_info(bob).unwrap().credits, 0);
-            db.add_credits(bob, 10).unwrap();
+        assert_eq!(db.get_info(bob).unwrap().credits, 0);
+        db.add_credits(bob, 10).unwrap();
 
-            assert_eq!(db.get_info(bob).unwrap().credits, 10);
-            assert_eq!(db.reward_premium(2f32).unwrap(), 20);
-            assert_eq!(db.total_premium_credits(), 20);
-        }
-
-        test::<NaiveDatabase>();
-        test::<ForesightDatabase>();
+        assert_eq!(db.get_info(bob).unwrap().credits, 10);
+        assert_eq!(db.reward_premium(2f32).unwrap(), 10);
+        assert_eq!(db.total_premium_credits(), 20);
     }
+
+    macro_rules! testall {
+        ($name:ident, $db:ty) => {
+            #[test]
+            fn $name() {
+                test::<$db>();
+            }
+        };
+    }
+
+    testall!(naive, NaiveDatabase);
+    testall!(foresight, ForesightDatabase);
+    testall!(duckdb, DuckDBDatabase);
+    testall!(sqlite, SQLiteDatabase);
 }

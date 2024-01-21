@@ -15,4 +15,4 @@ rm -rf $DRAWIO_DIR &&
 mkdir $DRAWIO_DIR &&
 
 # Search for drawio files and convert them in parallel
-find $WORK_DIR -type f -name "*.drawio" -not -name "_*" -print | xargs --max-procs $CORES -I {} /bin/bash -c "$TOOLS_DIR/transform.sh $DRAWIO_DIR {}"
+find $WORK_DIR -type f -name "*.drawio" -not -name "_*" -print | xargs --max-procs $CORES -I {} /bin/bash -c "$TOOLS_DIR/drawio_transform.sh $DRAWIO_DIR {}"

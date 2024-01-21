@@ -1,3 +1,6 @@
+#![allow(unused_macros)]
+#![allow(unused_imports)]
+
 macro_rules! total {
     ($($e:literal => $r:expr,)*) => {
         0 $( + $e)*

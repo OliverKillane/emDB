@@ -17,5 +17,4 @@
 *.run.xml
 
 svg-inkscape
-_drawio
-_minted*
+_*
