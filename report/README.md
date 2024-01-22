@@ -2,9 +2,8 @@
 
 ### Build
 
-```bash
-# Convertd drawios to pdfs for import, placed in _drawio directory for use in \includegraphics{}
-./transform_drawios.sh
-```
+To generate artifacts required for the report (plots, drawio & tables) a cli is included.
 
-Could not get drawio to work from write18 - I have no idea why (drawio internally fails if called from write18).
+```bash
+./tools/cli.py --help
+```

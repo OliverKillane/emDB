@@ -7,7 +7,7 @@ and interfactions with a store, but come with performance caveats.
 \\
 \\ For example a common OLTP pattern is to use a database to store the current state of a service.
 \begin{center}
-    \includegraphics[scale=1.2]{_drawio/background/images/slow_delta.drawio.pdf}
+    \includegraphics[scale=1.2]{_drawio/background/images/slow_delta.pdf}
 \end{center}
 \vspace{-1cm}
 \noindent For many such applications the following holds.
@@ -20,7 +20,7 @@ and interfactions with a store, but come with performance caveats.
 \end{enumerate}
 A spectrum of solutions exist to embed a store in an application, here generally placed according to the strength of abstraction provided.
 \begin{center}
-    \includegraphics[width=\textwidth]{_drawio/introduction/images/problem_space.drawio.pdf}
+    \includegraphics[width=\textwidth]{_drawio/introduction/images/problem_space.pdf}
 \end{center}
 Unfortunately the strongest abstractions are present in embedded databases that do not take advantage of \ref{lab:known_queries_item} as by design they both support shcema changes, and are independent from the host language (for example duckDB is embedable in Python, Java, Julia (and other) applications).
 \\
@@ -28,7 +28,7 @@ Unfortunately the strongest abstractions are present in embedded databases that 
 An ideal system would allow such a datastore to be expressed in a query language, with an embeddable
 implementation generated for use, and optimised using the full knowledge of the query set \& schema.
 \begin{center}
-    \includegraphics[width=\textwidth]{_drawio/introduction/images/ideal_system.drawio.pdf}
+    \includegraphics[width=\textwidth]{_drawio/introduction/images/ideal_system.pdf}
 \end{center}
 \noindent
 No such ideal system exists. The purpose of this project is to develop a
@@ -83,6 +83,9 @@ When multiple rows are changed, this includes iterating through and pre-generati
             ~> return;
     }
 \end{minted}
+\begin{center}
+    \includegraphics[width=\textwidth]{_plots/introduction/plots/random_insert_boxplot.pdf}
+\end{center}
 
 \begin{minted}{rust}
     // Description
@@ -153,4 +156,9 @@ When multiple rows are changed, this includes iterating through and pre-generati
 \end{minted}
 \section{Objectives}
 
+
+
 \section{Contributions}
+% Combi
+% Divan
+% emdb
