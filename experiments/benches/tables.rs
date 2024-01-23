@@ -1,5 +1,6 @@
 use divan::{black_box, Bencher};
-use experiments::tables::{ForesightDatabase, NaiveDatabase, UserDetails};
+use experiments::tables::{DuckDBDatabase as DuckDB, SQLiteDatabase as SQLite};
+use experiments::tables::{ForesightDatabase as Foresight, NaiveDatabase as Naive, UserDetails};
 
 use rand::{seq::SliceRandom, Rng};
 
@@ -7,9 +8,7 @@ mod utils;
 use utils::*;
 
 // const TABLE_SIZES: [usize; 9] = [1, 8, 64, 128, 512, 4096, 16384, 65536, 262144];
-const TABLE_SIZES: [usize; 6] = [1, 8, 16, 32, 64, 128];
-
-use experiments::tables::{DuckDBDatabase, SQLiteDatabase};
+const TABLE_SIZES: [usize; 3] = [1, 8, 16];
 
 fn main() {
     divan::main();
@@ -18,7 +17,7 @@ fn main() {
 /// Time taken for a number of inserts of random premium/non-premium
 #[divan::bench(
     name = "random_inserts",
-    types = [DuckDBDatabase, ForesightDatabase, NaiveDatabase, SQLiteDatabase],
+    types = [Foresight, Naive, DuckDB, SQLite],
     consts = TABLE_SIZES
 )]
 fn inserts<'a, T, const N: usize>(bencher: Bencher)
@@ -68,7 +67,7 @@ fn random_table<'a, const SIZE: usize, T: UserDetails<'a>>() -> (Vec<T::UsersID>
 /// Time taken to get ids in random order
 #[divan::bench(
     name = "random_get_ids",
-    types = [DuckDBDatabase, ForesightDatabase, NaiveDatabase, SQLiteDatabase],
+    types = [Foresight, Naive, SQLite],
     consts = TABLE_SIZES
 )]
 fn gets<'a, T, const N: usize>(bencher: Bencher)
@@ -87,7 +86,7 @@ where
 /// Time taken to get a snapshot
 #[divan::bench(
     name = "snapshot",
-    types = [DuckDBDatabase, ForesightDatabase, NaiveDatabase, SQLiteDatabase],
+    types = [Foresight, Naive, DuckDB, SQLite],
     consts = TABLE_SIZES
 )]
 fn snapshot<'a, T, const N: usize>(bencher: Bencher)
@@ -102,7 +101,7 @@ where
 /// Time taken to get the total credits of premium users
 #[divan::bench(
     name = "get_total_prem_credits",
-    types = [DuckDBDatabase, ForesightDatabase, NaiveDatabase, SQLiteDatabase],
+    types = [Foresight, Naive, SQLite],
     consts = TABLE_SIZES,
     max_time = 1
 )]
@@ -118,7 +117,7 @@ where
 /// Time taken to reward premium users
 #[divan::bench(
     name = "reward_premium_users",
-    types = [DuckDBDatabase, ForesightDatabase, NaiveDatabase, SQLiteDatabase],
+    types = [Foresight, Naive, SQLite],
     consts = TABLE_SIZES,
     max_time = 1
 )]
@@ -134,7 +133,7 @@ where
 /// Random workload of N actions
 #[divan::bench(
     name = "random_workloads",
-    types = [DuckDBDatabase, ForesightDatabase, NaiveDatabase, SQLiteDatabase],
+    types = [Foresight, Naive, SQLite],
     consts = [1024, 2048, 4096]
 )]
 fn mixed_workload<'a, T, const N: usize>(bencher: Bencher)

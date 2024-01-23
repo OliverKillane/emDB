@@ -4,29 +4,29 @@ import matplotlib.pyplot as plt
 import json
 from pathlib import Path
 from typing import Any, Callable
-from utils import common_line, common_boxplot
+from utils import common_line, common_boxplot, common_rates
 import tikzplotlib
 
 GRAPH_FUNCTIONS: dict[str, Callable[[Any], None]] = {
     "random_inserts": common_line(
         "random_inserts", "Time taken to insert rows", "Number of rows"
     ),
-    "random_get_ids": common_line(
+    "random_get_ids": common_rates(
         "random_get_ids",
-        "Time taken to retrieve all rows in random order",
+        "Rows per second when all rows are fetched in random order",
         "Number of rows",
     ),
-    "snapshot": common_line(
+    "snapshot": common_boxplot(
         "snapshot",
-        "Time taken to return a snapshot of the all rows in the database",
-        "Number of rows",
+        "Comparative time to make a snapshot of 262144 rows",
+        262144,
     ),
-    "get_total_prem_credits": common_line(
+    "get_total_prem_credits": common_boxplot(
         "get_total_prem_credits",
-        "Time taken to filter and sum the credits of all premium users",
-        "Number of rows",
+        "Comparative time to calculate the total premium credits for 262144 rows",
+        262144,
     ),
-    "reward_premium_users": common_line(
+    "reward_premium_users": common_rates(
         "reward_premium_users",
         "Time taken to update all premium users credits, and return the change in credits",
         "Number of rows",
@@ -37,7 +37,7 @@ GRAPH_FUNCTIONS: dict[str, Callable[[Any], None]] = {
         "Number of actions",
     ),
     "random_insert_boxplot": common_boxplot(
-        "random_inserts", "Comparative time for inserts of 128 rows", 128
+        "random_inserts", "Comparative time for inserts of 262144 rows", 262144
     ),
 }
 PARAM_PDF = "pdf"

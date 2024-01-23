@@ -11,9 +11,29 @@
 \usepackage{nth}
 \usepackage{lmodern}
 \usepackage{relsize}
+\usepackage{hyperref}
 \usepackage{biblatex}
+\usepackage[most]{tcolorbox}
 \addbibresource{refs.bib}
 
+% \begin{definitionbox}{term}
+%	... the term's definition ...
+% \end{definitionbox}
+\newtcolorbox[auto counter,number within=section]{definitionbox}[2][]{%
+	colback=black!5!white,colframe=black,arc=0mm,sharp corners=all,fonttitle=\bfseries,%
+	title=#2}
+
+% \begin{prosbox}
+%	... the term's definition ...
+% \end{prosbox}
+\newtcolorbox[]{prosbox}[1][]{%
+	colback=green!5!white,breakable,colframe=green!75!black,leftrule=3mm,arc=0mm,sharp corners=all, #1}
+ 
+% \begin{prosbox}
+%	... the term's definition ...
+% \end{prosbox}
+\newtcolorbox[]{consbox}[1][]{%
+	colback=red!5!white,breakable,colframe=red!75!black,leftrule=3mm,arc=0mm,sharp corners=all, #1}
 
 \begin{document}
 
@@ -39,13 +59,18 @@
     supervise my wild idea, and for his teaching of the data processing module
     that inspired it.
     \\
-    \\ I would also like to thank my friends, family, neighbours, Imperial College, and God for their support.
+    \\ I would also like to thank my friends, family, neighbours, Imperial College,
+    and God for their support.
+    \\
+    \\ Finally I would like to thank the general population for not implementing what appears to be a
+    no-brainer solution to improving the usability \& performance of embedded databases, and leaving it
+    open for this \& future individual projects.
 \end{abstract}
 
 
 \tableofcontents
-\listoffigures
-\listoftables
+% \listoffigures
+% \listoftables
 
 \newpage
 

@@ -47,6 +47,13 @@ def get_args():
         help="Generate plots for the directory",
         metavar="<path>",
     )
+    plots_parser.add_argument(
+        "--rerun",
+        type=lambda c: {"y" : True, "n": False}[c],
+        default=False,
+        help="Select if to rerun the benchmarks",
+        choices=[True,False],
+    )
     return parser.parse_args()
 
 
@@ -76,13 +83,12 @@ def transform_files(
     files = [
         (base_path, drawio_base, path, aux) for path in get_files(base_path, suffix)
     ]
-    print(files)
     shutil.rmtree(drawio_base, ignore_errors=True)
     Pool().map(worker, files)
 
 
 def run_benchmarks(
-    experiments_dir: Path, bench_dir: Path, name: str, cache: bool = True
+    experiments_dir: Path, bench_dir: Path, name: str, cache: bool
 ):
     # run the benchmarks wth output
     bench_dir.mkdir(exist_ok=True)
@@ -135,8 +141,8 @@ def main():
 
     if args.subparser == "drawio":
         transform_files(report_dir, drawio_dir, args.subdir, "drawio", drawio_transform)
-    if args.subparser == "plots":
-        run_benchmarks(experiments_dir, bench_dir, "tables")
+    elif args.subparser == "plots":
+        run_benchmarks(experiments_dir, bench_dir, "tables", not args.rerun)
         transform_files(
             report_dir,
             graphs_dir,
