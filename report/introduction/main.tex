@@ -1,9 +1,9 @@
 \chapter{Introduction}
 \section{Motivation}
 Many applications require a fast, structured data store. Correctly implementing
-a custom solution in a general purpose programming language is a development cost.
+a correct, performant custom solution in a general purpose programming language is a significant development cost.
 Relational databases provide an attrative interface for describing the structure
-and interfactions with a store, but come with performance caveats.
+and interfactions with a store, but come with performance caveats and are not trivially integrated into applications.
 \\
 \\ For example a common OLTP pattern is to use a database to store the current state of a service.
 \begin{center}
@@ -22,7 +22,7 @@ Another more common pattern is to use implement complex state of an application 
 \begin{center}
     \includegraphics[scale=1]{_drawio/introduction/images/complex_service.pdf}
 \end{center}
-Much like the first pattern, a schema and set of queries including constraints are present, however the
+Much like the first pattern, a schema and set of queries including constraints are present. The
 burden is either on the programmer to implement, or on the performance of the application when using the
 convenience of a query language \& database.
 \\
@@ -43,9 +43,10 @@ implementation generated for use, and optimised using the full knowledge of the 
 \end{center}
 \noindent
 No such ideal system exists.
-\section{Experimentation}
+
+\section{Experimentation}\label{sec:intro_experimentation}
 We can quantify the potential upside of such an ideal system by comparing its performance against both a naive/unoptimised implementation, and against existing embedded databases.
-in-memory embedded databases against a \textit{naive} and \textit{foresight} implementations written in rust.
+in-memory embedded databases against a \textit{naive} and \textit{foresight} implementations.
 \begin{center}
     \begin{tabular}{l p{.8\textwidth}}
         \textbf{Naive}     & Implemented assuming the provided queries are only a subset of all required. uses a generational arena\cite{TypedGenerationalArenaRepo} that supports insert, delete \& update . \\
@@ -170,9 +171,6 @@ The objective of the project is to build the following system.
 \begin{center}
     \includegraphics[width=\textwidth]{_drawio/introduction/images/emdbprototype.pdf}
 \end{center}
-This can be broken down into several sub objectives.
-\\
-\\
 \begin{tabular}{l p{.8\textwidth}}
     \textbf{Objective 1.} & \textit{Construct a basic emQL query compiler the supporting a subset of SQL functionality}
 \end{tabular}
@@ -194,3 +192,13 @@ This can be broken down into several sub objectives.
     Important to ensure the correctness of the system, as well as to demonstrate a performance
     improvement by the optimizer over a large variety of plans.
 \end{quote}
+
+\subsubsection{Additional Contributions}
+As part of the project we will also make contributions to the following.
+\begin{center}
+    \begin{tabular}{l p{.8\textwidth}}
+        \textbf{Additional 1.} & \textit{Developing an easy to use parser-combinator library for rust tokenstreams called Combi.}
+        \\ \textbf{Additional 2.} & \textit{Contributions to the divan benchmarks library to support the project.}
+        \\ \textbf{Additional 3.} & \textit{A well-documented standalone data structure code generation library (as will be used by the emdb compiler)}
+    \end{tabular}
+\end{center}

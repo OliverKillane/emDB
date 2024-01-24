@@ -1,1 +1,20 @@
 \chapter{Evaluation Plan}
+\section{Tests for Objectives}
+\begin{tabular}{l p{.8\textwidth}}
+    \textbf{Objective 1.} & \textit{Construct a basic emQL query compiler the supporting a subset of SQL functionality}
+\end{tabular}
+\begin{quote}
+    Evaluated by implementing several schema (including the \ref{sec:intro_experimentation} user details schema) and testing the correctness of each.
+\end{quote}
+\begin{tabular}{l p{.8\textwidth}}
+    \textbf{Objective 2.} & \textit{Develop a logical optimiser that demonstrates a performance improvement by using the queries to make data structure choices}
+\end{tabular}
+\begin{quote}
+    Evaluated by comparing the performance of the compiler on the aforementioned test schemas with logical optimisations on, off, and against duckDB \& SQLite (with graph plan views as evidence the optimisations being applied).
+\end{quote}
+\begin{tabular}{l p{.8\textwidth}}
+    \textbf{Objective 3.} & \textit{Implement a comprehensive set of tested, benchmarked example schemas}
+\end{tabular}
+\begin{quote}
+    Evaluated by covering all major operators, and by measuring the coverage of the compiler with coverage instrumentation.
+\end{quote}
