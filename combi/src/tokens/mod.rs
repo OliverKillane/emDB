@@ -1,8 +1,12 @@
-use crate::*;
+//! Parser combinators for consuming [tokenstreams](TokenStream) to create [rust compiler diagnostics](Diagnostic).
+//! - No backtracking is permitted
+//! - 1-token of lookahead provided by [TokenIter::peek_next]
 
 use proc_macro2::{token_stream::IntoIter, Span, TokenStream, TokenTree};
 use proc_macro_error::Diagnostic;
 use std::collections::LinkedList;
+
+use crate::{Combi, CombiCon, CombiErr};
 
 pub mod basic;
 pub mod derived;
@@ -41,21 +45,21 @@ impl TokenIter {
         }
     }
 
-    fn peek_next(&self) -> &Option<TokenTree> {
+    pub fn peek_next(&self) -> &Option<TokenTree> {
         &self.next
     }
 
     /// The span of the last token from [Self::next].
-    fn cur_span(&self) -> &Span {
+    pub fn cur_span(&self) -> &Span {
         &self.curr_span
     }
 
     /// The span of the last, last token found from [Self::next].
-    fn last_span(&self) -> &Option<Span> {
+    pub fn last_span(&self) -> &Option<Span> {
         &self.prev_span
     }
 
-    fn extract_iter(self) -> IntoIter {
+    pub fn extract_iter(self) -> IntoIter {
         self.iter
     }
 }

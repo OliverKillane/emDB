@@ -1,0 +1,87 @@
+\documentclass{report}
+\usepackage{xcolor}
+\usepackage[a4paper,  total={185mm,260mm},
+ left=10mm,
+ top=20mm]{geometry}
+\usepackage{tikz}
+\usepackage{graphicx}
+\usepackage{svg}
+\usepackage{minted}
+\usepackage{moresize}
+\usepackage{nth}
+\usepackage{lmodern}
+\usepackage{relsize}
+\usepackage[only,llbracket,rrbracket]{stmaryrd}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage{biblatex}
+\usepackage[most]{tcolorbox}
+\addbibresource{refs.bib}
+
+% \begin{definitionbox}{term}
+%	... the term's definition ...
+% \end{definitionbox}
+\newtcolorbox[auto counter,number within=section]{definitionbox}[2][]{%
+	colback=black!5!white,colframe=black,arc=0mm,sharp corners=all,fonttitle=\bfseries,%
+	title=#2}
+
+% \begin{prosbox}
+%	... the term's definition ...
+% \end{prosbox}
+\newtcolorbox[]{prosbox}[1][]{%
+	colback=green!5!white,breakable,colframe=green!75!black,leftrule=3mm,arc=0mm,sharp corners=all, #1}
+ 
+% \begin{prosbox}
+%	... the term's definition ...
+% \end{prosbox}
+\newtcolorbox[]{consbox}[1][]{%
+	colback=red!5!white,breakable,colframe=red!75!black,leftrule=3mm,arc=0mm,sharp corners=all, #1}
+
+\begin{document}
+
+\include{titlepage/main}
+
+\begin{abstract}
+    Embedded databases allow developers to easily embed a data store within an
+    application while providing a convenient query interface. For many
+    applications, the schema of the data store is static, and the set of
+    parameterized queries is known at application compile time.
+    \\
+    \\ No existing embedded databases take advantage of this knowledge for
+    logical optimisation. The goal of this project is to build one that does.
+    \\
+    \\ The main outcome of this project is \textit{emdb}: a prototype embedded
+    database compiler that generates the optimised code for a data store from a
+    schema and queries.
+\end{abstract}
+
+\renewcommand{\abstractname}{Acknowledgements}
+\begin{abstract}
+    I would like to thank my suprvisor, Dr. Holger Pirk, for his willingness to
+    supervise my wild idea, and for his teaching of the data processing module
+    that inspired it.
+    \\
+    \\ I would also like to thank my friends, family,and the staff of Imperial
+    College for enabling me to persue my passion in computer science.
+    \\
+    \\ Finally I would like to thank the public at large for not implementing
+    this project before I could.
+\end{abstract}
+
+
+\tableofcontents
+% \listoffigures
+% \listoftables
+
+\newpage
+
+\input{introduction/main}
+\input{background/main}
+\input{project_plan/main}
+\input{evaluation_plan/main}
+
+\input{ethics/main}
+
+\printbibliography
+
+\end{document}

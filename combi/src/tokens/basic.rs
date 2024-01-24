@@ -397,6 +397,7 @@ fn describe_tokentree(tt: &TokenTree) -> String {
 /// - Recovers from errors inside the group
 /// - Recovers from incorrect bracket type usage
 /// - The parser must consume all input
+// TODO: look into exploiting paralellism here for `seq(recovgroup(...), ...)`
 pub fn recovgroup<P>(delim: Delimiter, parser: P) -> RecovGroup<P>
 where
     P: Combi<Inp = TokenIter, Out = TokenIter, Con = TokenDiagnostic, Err = TokenDiagnostic>,
