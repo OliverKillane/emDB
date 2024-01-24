@@ -88,6 +88,7 @@ def plot_line(title: str, param_name: str, bench: Benchmark):
     # plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.legend()
 
+
 def common_line(name: str, title: str, param: str):
     def plot(data: Any):
         bench = process_benchmark(data["benchmarks"]["tables"][name])
@@ -95,6 +96,7 @@ def common_line(name: str, title: str, param: str):
         plot_line(title, param, bench)
 
     return plot
+
 
 def plot_rates(title: str, param_name: str, bench: Benchmark):
     def param_format(value, _):
@@ -112,7 +114,15 @@ def plot_rates(title: str, param_name: str, bench: Benchmark):
         # Sort the values by the parameter
         sorted_values = sorted(values.items())
         parameters, mean_values, min_values, max_values = zip(
-            *[(param, param / (stat.mean / 10**12), param / (stat.fastest / 10**12), param / (stat.slowest / 10**12)) for (param, stat) in sorted_values]
+            *[
+                (
+                    param,
+                    param / (stat.mean / 10**12),
+                    param / (stat.fastest / 10**12),
+                    param / (stat.slowest / 10**12),
+                )
+                for (param, stat) in sorted_values
+            ]
         )
 
         plt.plot(parameters, mean_values, color=colors[i], label=name)
@@ -136,6 +146,7 @@ def plot_rates(title: str, param_name: str, bench: Benchmark):
     ax.xaxis.set_major_formatter(FuncFormatter(param_format))
     ax.set_xlim(left=1)
     plt.legend()
+
 
 def common_rates(name: str, title: str, param: str):
     def plot(data: Any):

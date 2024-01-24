@@ -155,7 +155,6 @@
 
 mod duckdb;
 mod foresight;
-mod macrodb;
 mod naive;
 mod sqlite;
 pub use duckdb::DuckDBDatabase;
