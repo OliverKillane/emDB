@@ -1,8 +1,8 @@
 use emdb::database;
 
 database! {
-    impl syncronous as user_details;
-    impl plan_view as user_details_view;
+    impl graph as user_details_view;
+    impl simple as user_details;
 
     // Reasoning:
     //  - Constraint checking required, needs to fail immediately (hybrid IVM)
@@ -16,7 +16,7 @@ database! {
         credits: i32,
     } @ [
         genpk(id),
-        pred(premium || credits > 0) as prem_credits,
+        pred(premium || credits > 0) as prem_credits
     ]
 
     // Description:

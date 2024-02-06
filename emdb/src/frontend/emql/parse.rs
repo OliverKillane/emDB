@@ -34,7 +34,7 @@ pub(super) fn parse(ts: TokenStream) -> Result<Ast, LinkedList<Diagnostic>> {
         mapsuc(seqdiff(parser, terminal), |(o, ())| o).comp(TokenIter::from(ts, Span::call_site()));
 
     match res {
-        CombiResult::Suc(s) => Err(LinkedList::new()), // temporary
+        CombiResult::Suc(s) => Ok(s),
         CombiResult::Con(es) | CombiResult::Err(es) => Err(es.into_list()),
     }
 }
@@ -94,8 +94,8 @@ fn backend_parser() -> impl TokenParser<BackendImpl> {
             matchpunct(';'),
         ),
         |((_, (db_backend, (_, db_name))), _)| BackendImpl {
-            db_name,
-            db_backend,
+            name: db_name,
+            target: db_backend,
         },
     )
 }

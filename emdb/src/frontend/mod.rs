@@ -3,7 +3,7 @@ mod sql;
 
 use std::collections::LinkedList;
 
-use crate::plan::repr::LogicalPlan;
+use crate::plan::{repr::LogicalPlan, targets::Targets};
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro_error::Diagnostic;
 
@@ -29,6 +29,6 @@ impl Diagnostics {
     }
 }
 
-pub(crate) trait Frontend<'a> {
-    fn from_tokens(input: TokenStream2) -> Result<LogicalPlan<'a>, LinkedList<Diagnostic>>;
+pub(crate) trait Frontend {
+    fn from_tokens(input: TokenStream2) -> Result<(Targets, LogicalPlan), LinkedList<Diagnostic>>;
 }

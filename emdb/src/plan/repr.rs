@@ -1,186 +1,251 @@
-//! The logical plan data structure for emDB
-//!
-//! ## Purpose
-//! All logical optimisations occur on this plan.
-//! - Frontend & Backend agnostic
-//! - Contains both rust and emDB types.
-//! [TODO] Add printout
 use std::collections::{HashMap, HashSet};
-use typed_arena::Arena;
+
+use proc_macro2::Ident;
+use syn::{Expr, Type};
 use typed_generational_arena::{Arena as GenArena, Index as GenIndex};
 
-pub(crate) enum SingleType {
-    /// A Rust Type
-    RsType(syn::Type),
+pub(crate) type ComplexCons<T> = Option<(T, Option<Ident>)>;
 
-    /// Immutable string representation
-    Text { length: usize },
+pub(crate) enum UniqueCons {
+    Unique(Option<Ident>),
+    NotUnique,
 }
 
-pub(crate) enum DataType {
-    /// A series of data, streamed through operators.
-    Stream(Box<DataType>),
-
-    /// A normal database row, propagated through operators
-    Row(RowType),
-
-    /// It is a reference, for use in ref streams (e.g inserts to a table).
-    /// - Not necessarily just a rust reference (e.g a LockGuard, borrow of some
-    ///   string type reference)
-    /// - Can reference a table, or an intermediate materialised table.
-    Ref(Box<DataType>),
-
-    /// A Rust Type
-    Single(SingleType),
+pub(crate) struct LogicalColumnConstraint {
+    pub(crate) read: bool,
+    pub(crate) write: bool,
+    pub(crate) unique: UniqueCons,
 }
 
-/// ## Contains the entire logical plan.
-pub(crate) struct LogicalPlan<'a> {
-    stream_operators: GenArena<StreamNode<'a>>,
-    single_operators: GenArena<SingleNode<'a>>,
-    var_single: Arena<VarSingle>,
-    methods: Arena<CallOperator<'a>>,
-    tables: GenArena<Table>,
+pub(crate) struct LogicalRowConstraint {
+    pub(crate) insert: bool,
+    pub(crate) delete: bool,
+    pub(crate) limit: ComplexCons<Expr>,
+    pub(crate) genpk: ComplexCons<Ident>,
+    pub(crate) preds: Vec<(Expr, Option<Ident>)>,
 }
 
-pub(crate) struct VarSingle {
-    datatype: DataType,
+pub(crate) struct LogicalColumn {
+    pub(crate) constraints: LogicalColumnConstraint,
+    pub(crate) data_type: Type,
 }
 
-/// The return value of a Call Operator
-/// - Some stream returns can be optimised into references, or lock guards.
-/// - Some need to collect to a single.
-pub(crate) enum ReturnVal<'a> {
-    None,
-    Single(SingleNode<'a>),
-    Stream(StreamNode<'a>),
+pub(crate) struct LogicalTable {
+    pub(crate) name: Ident,
+    pub(crate) constraints: LogicalRowConstraint,
+    pub(crate) columns: HashMap<Ident, LogicalColumn>,
 }
 
-pub(crate) struct CallOperator<'a> {
-    name: String,
-    args: HashMap<String, &'a VarSingle>,
-    returnval: ReturnVal<'a>,
+pub(crate) enum RecordData {
+    Record(Record),
+    Ref(GenIndex<LogicalTable>), // Represented by Ref<table type>
+    Rust(Type),
+}
+pub(crate) struct Record {
+    pub(crate) fields: HashMap<Ident, RecordData>,
 }
 
-#[derive(PartialEq, Eq, Hash)]
-pub(crate) enum RowOrdering {
-    Ascending,
-    Descending,
-}
-
-pub(crate) type ColIndex = usize;
-
-#[derive(PartialEq, Eq, Hash)]
-pub(crate) enum Constraint {
-    Unique { col: ColIndex },
-    Ordered { ords: Vec<(ColIndex, RowOrdering)> },
-    Asserts { col: ColIndex },
-    LimitRows { size: usize },
-    References { col: TableIndex },
-}
-
-pub(crate) type RowType = Vec<SingleType>;
-pub(crate) struct Table {
-    cols: RowType,
-    initialdata: Vec<Vec<syn::Expr>>,
-    constraints: HashSet<Constraint>,
-}
-
-pub(crate) type SingleIndex<'a> = GenIndex<SingleNode<'a>>;
-pub(crate) type StreamIndex<'a> = GenIndex<StreamNode<'a>>;
-pub(crate) type TableIndex = GenIndex<Table>;
-
-pub(crate) struct StreamNode<'a> {
-    op: StreamOperator<'a>,
-    output: DataType,
-}
-
-pub(crate) enum StreamOperator<'a> {
-    Scan {
-        source: TableIndex,
+pub(crate) enum Edge {
+    Bi {
+        from: GenIndex<Operator>,
+        to: GenIndex<Operator>,
+        with: Record,
+        stream: bool,
     },
-    Map {
-        prev: StreamIndex<'a>,
-        func: (),
-    },
-    Sort {
-        prev: StreamIndex<'a>,
-        col: (),
-        sort: (),
-    },
-    Join {
-        left: StreamIndex<'a>,
-        right: StreamIndex<'a>,
-        cond: (),
-    },
-    Limit {
-        prev: StreamIndex<'a>,
-        vol: SingleIndex<'a>,
-    },
-    Filter {
-        prev: StreamIndex<'a>,
-        cond: (),
+    Uni {
+        from: GenIndex<Operator>,
+        with: Record,
+        stream: bool,
     },
 
-    /// Allows users to repeat a stream a given number of times
-    /// - `1,2,3` through repeat(2) becomes `1,1,2,2,3,3`
-    Repeat {
-        prev: StreamIndex<'a>,
-        times: SingleIndex<'a>,
-    },
-
-    /// Groups by a given column identifier from a row stream
-    /// - breaks the pipeline breaker (partially)
-    GroupBy {
-        prev: StreamIndex<'a>,
-        col: ColIndex,
-    },
-
-    /// Appends two streams of the same type
-    Union {
-        left: StreamIndex<'a>,
-        right: StreamIndex<'a>,
-    },
-
-    Minus {
-        left: StreamIndex<'a>,
-        right: StreamIndex<'a>,
-    },
-
-    /// Converts a stream of values into a temporary table from which references
-    /// can be streamed
-    Materialise {
-        prev: SingleIndex<'a>,
-    },
+    /// Used for incomplete graphs during construction
+    Null,
 }
 
-pub(crate) struct SingleNode<'a> {
-    op: SingleOperator<'a>,
-    output: DataType,
-}
+pub(crate) enum Operator {
+    // Table Access ============================================================
+    /// Apply a series of updates from a stream, the updated rows are propagated
+    /// INV: mapping and output have the same fields
+    /// INV: mapping expressions only contain fields from input and globals
+    /// INV: mapping assignment only contains fields from referenced table
+    Update {
+        input: GenIndex<Edge>,
+        reference: Expr, // todo fix
+        table: GenIndex<LogicalTable>,
+        mapping: HashMap<Ident, (Type, Expr)>,
+        output: GenIndex<Edge>,
+    },
 
-pub(crate) enum SingleOperator<'a> {
+    /// Insert a single row or a stream into a table, the inserted rows
+    /// are propagated
+    /// INV: input and output have the same fields
+    /// INV: input has same fields as table
+    Insert {
+        input: GenIndex<Edge>,
+        table: GenIndex<LogicalTable>,
+        output: GenIndex<Edge>,
+    },
+
+    /// Delete a single row or a stream from a table by reference,
+    /// the deleted rows are propagated
+    /// INV: input is a stream or single of row references
+    /// INV: output contains the tuple of removed values, same fields as table
+    Delete {
+        input: GenIndex<Edge>,
+        table: GenIndex<LogicalTable>,
+        output: GenIndex<Edge>,
+    },
+
+    /// Gets a unique row from a table
     Unique {
-        prev: StreamIndex<'a>,
-        col: (),
-        select: (),
+        unique_field: Ident,
+        refs: bool,
+        table: GenIndex<LogicalTable>,
+        output: GenIndex<Edge>,
     },
-    Select {
-        prev: StreamIndex<'a>,
-        col: (),
-        func: (),
+
+    /// Scan a table to generate a stream (optionally of references)
+    /// INV: if refs then output is a record of ref.
+    Scan {
+        refs: bool,
+        table: GenIndex<LogicalTable>,
+        output: GenIndex<Edge>,
     },
-    Var {
-        prev: &'a VarSingle,
+
+    // Basic Operations ========================================================
+    /// Applying a function over a stream of values
+    /// INV: output fields match mapping fields
+    /// INV: mapping expressions only contain fields from input and globals
+    Map {
+        input: GenIndex<Edge>,
+        mapping: HashMap<Ident, (Type, Expr)>,
+        output: GenIndex<Edge>,
     },
-    Const {
-        datatype: SingleType,
-        value: syn::Expr,
-    },
-    /// Allows the user to constrain types
+
+    /// A fold operation over a stream of values
+    /// INV: initial fields only contain globals
+    /// INV: update expressions only contain fields from input, initial and globals
+    /// INV: output matches initial types
     Fold {
-        prev: StreamIndex<'a>,
-        collect_fun: (),
+        input: GenIndex<Edge>,
+        initial: HashMap<Ident, (Type, Expr)>,
+        update: HashMap<Ident, Expr>,
+        output: GenIndex<Edge>,
     },
-    Merge {},
+
+    /// Filter a stream of values
+    /// INV: predicate expression only contains fields from input and globals
+    Filter {
+        input: GenIndex<Edge>,
+        predicate: Expr,
+        output: GenIndex<Edge>,
+    },
+
+    /// Sort the input given some keys and ordering
+    /// INV: input and output must have the same fields
+    /// INV: input and output must both be streams
+    /// INV: The identified fields must exist in the input
+    Sort {
+        input: GenIndex<Edge>,
+        sort_order: Vec<(Ident, SortOrder)>,
+        output: GenIndex<Edge>,
+    },
+
+    /// Assert a boolean expression over a stream, or single value
+    /// INV: input type is same as output type
+    /// INV: predicate expression only contains fields from input and globals
+    Assert {
+        input: GenIndex<Edge>,
+        assert: Expr,
+        output: GenIndex<Edge>,
+    },
+
+    // Stream Creation =========================================================
+    /// Generate a single row
+    /// INV: output matches fields
+    /// INV: output is a single
+    Row {
+        fields: HashMap<Ident, (Type, Expr)>,
+        output: GenIndex<Edge>,
+    },
+
+    /// Given an operator output, multiply it into multiple outputs
+    Multiply {
+        input: GenIndex<Edge>,
+        outputs: HashSet<GenIndex<Edge>>,
+    },
+
+    // Query Wrangling =========================================================
+    /// A parameter from a query
+    /// INV: output is a single, with the same name and type as parameter
+    QueryParam {
+        param: GenIndex<LogicalQueryParams>,
+        output: GenIndex<Edge>,
+    },
+
+    /// The end of a stream (may be referenced by a return, or discarded)
+    End { input: GenIndex<Edge> },
+}
+
+impl Operator {
+    fn get_only_output(&self) -> Option<GenIndex<Edge>> {
+        match self {
+            Operator::Update { output, .. }
+            | Operator::Insert { output, .. }
+            | Operator::Delete { output, .. }
+            | Operator::Unique { output, .. }
+            | Operator::Scan { output, .. }
+            | Operator::Map { output, .. }
+            | Operator::Fold { output, .. }
+            | Operator::Filter { output, .. }
+            | Operator::Sort { output, .. }
+            | Operator::Assert { output, .. }
+            | Operator::Row { output, .. }
+            | Operator::QueryParam { output, .. } => Some(*output),
+            _ => None,
+        }
+    }
+}
+
+pub(crate) enum SortOrder {
+    Asc,
+    Desc,
+}
+
+pub(crate) struct LogicalQuery {
+    name: Ident,
+    params: Vec<LogicalQueryParams>,
+    /// INV is an [Operator::End] operator
+    returnval: GenIndex<Operator>,
+}
+
+pub(crate) struct LogicalQueryParams {
+    pub(crate) name: Ident,
+    pub(crate) data_type: Type,
+}
+
+pub(crate) struct LogicalPlan {
+    pub(crate) queryparams: GenArena<LogicalQueryParams>,
+    pub(crate) queries: GenArena<LogicalQuery>,
+    pub(crate) tables: GenArena<LogicalTable>,
+    pub(crate) record_types: GenArena<Record>,
+    pub(crate) operators: GenArena<Operator>,
+    pub(crate) operator_edges: GenArena<Edge>,
+}
+
+impl LogicalPlan {
+    pub fn new() -> Self {
+        LogicalPlan {
+            queryparams: GenArena::new(),
+            queries: GenArena::new(),
+            tables: GenArena::new(),
+            record_types: GenArena::new(),
+            operators: GenArena::new(),
+            operator_edges: GenArena::new(),
+        }
+    }
+
+    fn validate(&self) {}
+
+    fn replace_operator() {}
 }

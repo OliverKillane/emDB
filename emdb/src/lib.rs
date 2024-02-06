@@ -4,6 +4,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro_error::{proc_macro_error, Diagnostic, Level};
+use quote::quote;
 extern crate proc_macro;
 
 mod backend;
@@ -11,7 +12,7 @@ mod frontend;
 mod plan;
 mod utils;
 
-use crate::backend::{Backend, Volcano};
+use crate::backend::{Backend, GraphViz, Simple};
 use crate::frontend::{Emql, Frontend};
 
 #[proc_macro_error]
@@ -24,7 +25,28 @@ pub fn database(tk: TokenStream) -> TokenStream {
             }
             TokenStream::new()
         }
-        Ok(lp) => proc_macro::TokenStream::from(Volcano::generate_code(lp)),
+        Ok((targets, lp)) => {
+            let impls = targets
+                .backends
+                .into_iter()
+                .map(|(t, backend)| {
+                    let code = (match backend {
+                        plan::targets::Target::Simple => Simple::generate_code,
+                        plan::targets::Target::Graphviz => GraphViz::generate_code,
+                    })(&lp);
+
+                    quote! {
+                        mod #t {
+                            #code
+                        }
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            proc_macro::TokenStream::from(quote! {
+                #(#impls)*
+            })
+        }
     }
 }
 

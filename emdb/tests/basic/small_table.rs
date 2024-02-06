@@ -1,7 +1,7 @@
 use emdb::database;
 
 database! {
-    impl coolbackend as mydb;
+    impl graph as mydb;
 
     table simple {
         a: i32,

@@ -93,8 +93,8 @@ pub(super) struct Query {
 
 #[derive(Debug)]
 pub(super) struct BackendImpl {
-    pub db_name: Ident,
-    pub db_backend: Ident,
+    pub name: Ident,
+    pub target: Ident,
 }
 
 #[derive(Debug)]

@@ -6,16 +6,19 @@ mod sem;
 mod trans;
 use std::collections::LinkedList;
 
-use crate::{frontend::Frontend, plan::repr::LogicalPlan};
+use crate::{
+    frontend::Frontend,
+    plan::{repr::LogicalPlan, targets::Targets},
+};
 use proc_macro2::TokenStream;
 use proc_macro_error::Diagnostic;
 
 pub struct Emql;
 
-impl<'a> Frontend<'a> for Emql {
-    fn from_tokens(input: TokenStream) -> Result<LogicalPlan<'a>, LinkedList<Diagnostic>> {
+impl Frontend for Emql {
+    fn from_tokens(input: TokenStream) -> Result<(Targets, LogicalPlan), LinkedList<Diagnostic>> {
         let ast = parse::parse(input)?;
-        let res_ast = trans::translate(ast)?;
-        Ok(res_ast)
+        let (targets, res_ast) = trans::translate(ast)?;
+        Ok((targets, res_ast))
     }
 }
