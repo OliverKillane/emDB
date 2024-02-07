@@ -245,7 +245,9 @@ fn operator_parse(
         peekident("insert") => inner("insert", mapsuc(getident(), |table_name| FuncOp::Insert{table_name})),
         peekident("delete") => inner("delete", mapsuc(nothing(), |()| FuncOp::Delete)),
         peekident("map") => inner("map", mapsuc(fields_assign(), |new_fields| FuncOp::Map{new_fields})),
-        peekident("unique") => inner("unique", mapsuc(seqs!(matchident("use"), getident(), matchident("as"), getident()), |(_, (from_field, (_, unique_field)))|  FuncOp::Unique { unique_field, from_field } )),
+        peekident("unique") => inner("unique", mapsuc(seqs!(
+            choices!(peekident("ref") => mapsuc(matchident("ref"), |_| true), otherwise => mapsuc(nothing(), |_|false)),
+            getident(), matchident("for"), getident(), matchident("as"), syn(collectuntil(isempty()))), |(refs, (table, (_, (unique_field, (_, from_expr)))))|  FuncOp::Unique { table, refs, unique_field, from_expr } )),
         peekident("filter") => inner("filter", mapsuc(syn(collectuntil(isempty())), FuncOp::Filter)),
         peekident("row") => inner("row", mapsuc(fields_assign(), |fields| FuncOp::Row{fields})),
         peekident("sort") => inner("sort", mapsuc(listseptrailing(',', mapsuc(seq(getident(), choices!(

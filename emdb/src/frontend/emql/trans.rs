@@ -1,21 +1,22 @@
 use std::collections::{HashMap, HashSet, LinkedList};
 
-use proc_macro2::Ident;
+use proc_macro2::{Ident, Span};
 use proc_macro_error::{Diagnostic, Level};
-use syn::spanned::Spanned;
+use syn::{spanned::Spanned, Expr, Type};
 
 use crate::{
-    frontend::emql::ast::{Ast, ConstraintExpr},
+    frontend::emql::ast::{Ast, ConstraintExpr, FuncOp, StreamExpr},
     plan::{
         repr::{
-            LogicalColumn, LogicalColumnConstraint, LogicalPlan, LogicalQuery,
-            LogicalRowConstraint, LogicalTable, UniqueCons,
+            GenIndex, LogicalColumn, LogicalColumnConstraint, LogicalOperator, LogicalPlan,
+            LogicalQuery, LogicalRowConstraint, LogicalTable, Record, RecordData, UniqueCons,
         },
         targets::{Target, Targets},
     },
+    utils::misc::singlelist,
 };
 
-use super::ast::{BackendImpl, Constraint, Query, Table};
+use super::ast::{BackendImpl, Constraint, Operator, Query, Table};
 
 pub(super) fn translate(
     Ast {
@@ -35,6 +36,15 @@ pub(super) fn translate(
             }
             Err(mut table_errs) => {
                 errs.append(&mut table_errs);
+            }
+        }
+    }
+
+    for query in queries {
+        match translate_query(query, &mut logical_plan) {
+            Ok(_) => (), // TODO COMPLETE
+            Err(mut query_errs) => {
+                errs.append(&mut query_errs);
             }
         }
     }
@@ -263,6 +273,15 @@ pub(super) fn translate_table(
     }
 }
 
+enum AvailName {
+    Table(GenIndex<LogicalTable>),
+    Variable {
+        used: Option<Ident>,
+        data_type: Record,
+        location: GenIndex<LogicalOperator>,
+    },
+}
+
 fn translate_query(
     Query {
         name,
@@ -271,13 +290,251 @@ fn translate_query(
     }: Query,
     lp: &mut LogicalPlan,
 ) -> Result<(), LinkedList<Diagnostic>> {
-    // let query = lp.queries.insert(LogicalQuery {
-    //     name,
-    //     params: todo!(),
-    //     returnval: todo!(),
-    // })
+    // A map of all used names, starts with the tables, includes variables
+    // INV: never remove a name from this map
+    let mut avail_names: HashMap<Ident, AvailName> = lp
+        .tables
+        .iter()
+        .map(|(id, LogicalTable { name, .. })| (name.clone(), AvailName::Table(id)))
+        .collect::<HashMap<_, _>>();
 
-    // TODO: implement
+    let mut errs = LinkedList::new();
 
-    todo!()
+    // INV: only one return statement can be present
+    let mut return_used = false;
+
+    for StreamExpr { op, con } in streams {
+        match translate_streamexpr_first(&mut avail_names, lp, op) {
+            Err(mut es) => errs.append(&mut es),
+            Ok((op_index, data_type)) => (), // TODO COMPLETE this
+        }
+    }
+
+    if errs.len() > 0 {
+        Err(errs)
+    } else {
+        Ok(())
+    }
+}
+
+fn translate_streamexpr_first(
+    avail_names: &mut HashMap<Ident, AvailName>,
+    lp: &mut LogicalPlan,
+    op: Operator,
+) -> Result<(GenIndex<LogicalOperator>, Record), LinkedList<Diagnostic>> {
+    match op {
+        Operator::Use { use_span, var_name } => match avail_names.get_mut(&var_name) {
+            Some(name) => match name {
+                AvailName::Table(t) => Ok((
+                    lp.operators.insert(LogicalOperator::Scan {
+                        refs: false,
+                        table: t.clone(),
+                        output: None,
+                    }),
+                    lp.tables.get(*t).expect("INV: table must exist").get_type(),
+                )),
+                AvailName::Variable {
+                    data_type,
+                    used,
+                    location,
+                } => {
+                    if used.is_some() {
+                        Err(singlelist(Diagnostic::spanned(
+                            var_name.span(),
+                            Level::Error,
+                            format!("Variable `{}` already used", var_name),
+                        )))
+                    } else {
+                        *used = Some(var_name.clone());
+                        Ok((*location, data_type.clone()))
+                    }
+                }
+            },
+            None => Err(singlelist(Diagnostic::spanned(
+                var_name.span(),
+                Level::Error,
+                format!("Unknown table or variable {} used", var_name),
+            ))),
+        },
+        Operator::Ref {
+            ref_span,
+            table_name,
+        } => match avail_names.get(&table_name) {
+            Some(name) => match name {
+                AvailName::Table(t) => Ok((
+                    lp.operators.insert(LogicalOperator::Scan {
+                        refs: true,
+                        table: t.clone(),
+                        output: None,
+                    }),
+                    lp.tables.get(*t).expect("INV: table must exist").get_type(),
+                )),
+                AvailName::Variable {
+                    data_type,
+                    used,
+                    location,
+                } => Err({
+                    let d = Diagnostic::spanned(
+                        ref_span,
+                        Level::Error,
+                        format!("Cannot stream references from a variable {}", table_name),
+                    );
+
+                    singlelist(if let Some(before) = used {
+                        d.span_note(
+                            before.span(),
+                            "Furthermore variable was already used here".to_owned(),
+                        )
+                    } else {
+                        d
+                    })
+                }),
+            },
+
+            None => Err(singlelist(Diagnostic::spanned(
+                table_name.span(),
+                Level::Error,
+                format!("Unknown table {} referenced", table_name),
+            ))),
+        },
+        Operator::FuncOp {
+            fn_span,
+            op: FuncOp::Row { fields },
+        } => {
+            let (new_fields, record) = deduplicate_row_fields(fields)?;
+            Ok((
+                lp.operators.insert(LogicalOperator::Row {
+                    fields: new_fields,
+                    output: None,
+                }),
+                record,
+            ))
+        }
+        Operator::FuncOp {
+            fn_span,
+            op:
+                FuncOp::Unique {
+                    table,
+                    refs,
+                    unique_field,
+                    from_expr,
+                },
+        } => {
+            // Need to check that the unique constraint is applied to the relevant table.
+            match avail_names.get(&table) {
+                Some(AvailName::Table(t)) => {
+                    let table = lp.tables.get(*t).expect("INV: table must exist");
+                    if let Some(LogicalColumn { constraints, .. }) =
+                        table.columns.get(&unique_field)
+                    {
+                        if let UniqueCons::Unique(_) = constraints.unique {
+                            Ok((
+                                lp.operators.insert(LogicalOperator::Unique {
+                                    table: t.clone(),
+                                    refs,
+                                    unique_field,
+                                    from_expr,
+                                    output: None,
+                                }),
+                                table.get_type(),
+                            ))
+                        } else {
+                            Err(singlelist(Diagnostic::spanned(
+                                unique_field.span(),
+                                Level::Error,
+                                format!("Field `{}` is not unique", unique_field),
+                            )))
+                        }
+                    } else {
+                        Err(singlelist(Diagnostic::spanned(
+                            unique_field.span(),
+                            Level::Error,
+                            format!("Field `{}` does not exist", unique_field),
+                        )))
+                    }
+                }
+                Some(AvailName::Variable { used, .. }) => Err(singlelist(Diagnostic::spanned(
+                    table.span(),
+                    Level::Error,
+                    format!("Cannot use variable `{}` as a table", table),
+                ))),
+                None => Err(singlelist(Diagnostic::spanned(
+                    table.span(),
+                    Level::Error,
+                    format!("Unknown table `{}`", table),
+                ))),
+            }
+        }
+        other => {
+            let (span, name) = extract_span_name(other);
+            Err(singlelist(Diagnostic::spanned(
+                span,
+                Level::Error,
+                format!("Cannot use {} at the start of a stream expression", name),
+            )))
+        }
+    }
+}
+
+fn deduplicate_row_fields(
+    fields: Vec<(Ident, Type, Expr)>,
+) -> Result<(HashMap<Ident, (Type, Expr)>, Record), LinkedList<Diagnostic>> {
+    let mut new_fields = HashMap::new();
+    let mut errs = LinkedList::new();
+
+    for (name, data_type, expr) in fields {
+        if let Some(dup) = new_fields.insert(name.clone(), (data_type, expr)) {
+            errs.push_back(Diagnostic::spanned(
+                name.span(),
+                Level::Error,
+                format!("Field `{}` is already defined", name),
+            ));
+        }
+    }
+
+    if errs.len() > 0 {
+        Err(errs)
+    } else {
+        let record = Record {
+            fields: new_fields
+                .iter()
+                .map(|(a, (t, _))| (a.clone(), RecordData::Rust(t.clone())))
+                .collect(),
+            stream: false,
+        };
+        Ok((new_fields, record))
+    }
+}
+
+fn extract_span_name(op: Operator) -> (Span, &'static str) {
+    match op {
+        Operator::Ret { ret_span } => (ret_span, "return"),
+        Operator::Ref {
+            ref_span,
+            table_name,
+        } => (ref_span, "table reference"),
+        Operator::Let { let_span, var_name } => (let_span, "variable declaration"),
+        Operator::Use { use_span, var_name } => (use_span, "variable or table usage"),
+        Operator::FuncOp { fn_span, op } => (
+            fn_span,
+            match op {
+                FuncOp::Update { reference, fields } => "update",
+                FuncOp::Insert { table_name } => "insert",
+                FuncOp::Delete => "delete",
+                FuncOp::Map { new_fields } => "map",
+                FuncOp::Unique {
+                    table,
+                    refs,
+                    unique_field,
+                    from_expr,
+                } => "unique",
+                FuncOp::Filter(_) => "filter",
+                FuncOp::Row { fields } => "row",
+                FuncOp::Sort { fields } => "sort",
+                FuncOp::Fold { initial, update } => "fold",
+                FuncOp::Assert(_) => "assertion",
+                FuncOp::Collect => "collect",
+            },
+        ),
+    }
 }

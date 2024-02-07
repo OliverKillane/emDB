@@ -37,8 +37,7 @@ database! {
     //   - Performance reliant on access to users data structure
     //     hence need to make a good choice of mapping (user id -> data) here.
     query get_info(user_id: usize) {
-        use users
-            |> unique(use user_id as id)
+        unique(users for id as user_id)
             ~> return;
     }
 
@@ -62,8 +61,7 @@ database! {
     //   - Need to index data structure
     //   - Database can see only credits is updated
     query add_credits(user: usize, creds: i32) {
-        ref users
-            |> unique(use user as id)
+        unique(ref users for id as user)
             ~> update(it use credits = credits + creds);
     }
 

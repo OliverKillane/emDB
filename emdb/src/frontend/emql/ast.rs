@@ -31,8 +31,10 @@ pub(super) enum FuncOp {
         new_fields: Vec<(Ident, Type, Expr)>,
     },
     Unique {
+        table: Ident,
+        refs: bool,
         unique_field: Ident,
-        from_field: Ident,
+        from_expr: Expr,
     },
     Filter(Expr),
     Row {
