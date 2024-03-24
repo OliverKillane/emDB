@@ -182,16 +182,34 @@ fn constraint_parser() -> impl TokenParser<Constraint> {
         peekident("pred") => inner("pred", mapsuc(syn(collectuntil(isempty())), ConstraintExpr::Pred)),
         peekident("genpk") => inner("genpk", mapsuc(getident(), |i| ConstraintExpr::GenPK{field:i})),
         peekident("limit") => inner("limit", mapsuc(syn(collectuntil(isempty())), |e| ConstraintExpr::Limit{size:e})),
-        otherwise => error(getident(), |i| Diagnostic::spanned(i.span(), Level::Error, format!("expected a constraint but got {}", i)))
+        otherwise => error(getident(), |i| Diagnostic::spanned(i.span(), Level::Error, format!("expected a constraint (e.g. pred, unique) but got {}", i)))
     )
 }
 
 fn connector_parse() -> impl TokenParser<Connector> {
     embelisherr(
         choices!(
-            peekpunct('~') => mapsuc(seq(matchpunct('~'), matchpunct('>')), |(t1, _)| Connector{single: true, span: t1.span()}),
-            peekpunct('|') => mapsuc(seq(matchpunct('|'), matchpunct('>')), |(t1, _)| Connector{single: false, span: t1.span()}),
-            otherwise => error(seq(gettoken, gettoken), |(t1, t2)| Diagnostic::spanned(t1.span(), Level::Error, format!("expected either ~> or |> but got {}{}", t1, t2)))
+            peekpunct('~') => mapsuc(
+                seq(
+                    matchpunct('~'),
+                    matchpunct('>')
+                ),
+                |(t1, _)| Connector{stream: false, span: t1.span()}
+            ),
+            peekpunct('|') => mapsuc(
+                seq(
+                    matchpunct('|'),
+                    matchpunct('>')
+                ),
+                |(t1, _)| Connector{stream: true, span: t1.span()}
+            ),
+            otherwise => error(
+                seq(
+                    gettoken,
+                    gettoken
+                ),
+                |(t1, t2)| Diagnostic::spanned(t1.span(), Level::Error, format!("expected either ~> or |> but got {}{}", t1, t2))
+            )
         ),
         "Connect operators a single row passed (`~>`), or a stream of rows (`|>`)",
     )
@@ -237,32 +255,128 @@ fn operator_parse(
     }
 
     choices!(
-        peekident("return") => mapsuc(matchident("return"), |m| Operator::Ret { ret_span: m.span() }),
-        peekident("ref") => mapsuc(seq(matchident("ref"), getident()), |(m, table_name)| Operator::Ref { ref_span: m.span(), table_name }),
-        peekident("let") => mapsuc(seq(matchident("let"), getident()), |(m, var_name)| Operator::Let { let_span: m.span(), var_name }),
-        peekident("use") => mapsuc(seq(matchident("use"), getident()), |(m, var_name)| Operator::Use { use_span: m.span(), var_name }),
-        peekident("update") => inner("update", mapsuc(seqs!(getident(), matchident("use"), fields_expr()), |(reference, (_, fields))| FuncOp::Update {reference, fields})),
-        peekident("insert") => inner("insert", mapsuc(getident(), |table_name| FuncOp::Insert{table_name})),
-        peekident("delete") => inner("delete", mapsuc(nothing(), |()| FuncOp::Delete)),
-        peekident("map") => inner("map", mapsuc(fields_assign(), |new_fields| FuncOp::Map{new_fields})),
-        peekident("unique") => inner("unique", mapsuc(seqs!(
-            choices!(peekident("ref") => mapsuc(matchident("ref"), |_| true), otherwise => mapsuc(nothing(), |_|false)),
-            getident(), matchident("for"), getident(), matchident("as"), syn(collectuntil(isempty()))), |(refs, (table, (_, (unique_field, (_, from_expr)))))|  FuncOp::Unique { table, refs, unique_field, from_expr } )),
-        peekident("filter") => inner("filter", mapsuc(syn(collectuntil(isempty())), FuncOp::Filter)),
-        peekident("row") => inner("row", mapsuc(fields_assign(), |fields| FuncOp::Row{fields})),
-        peekident("sort") => inner("sort", mapsuc(listseptrailing(',', mapsuc(seq(getident(), choices!(
-            peekident("asc") => mapsuc(matchident("asc"), |t| (SortOrder::Asc, t.span())),
-            peekident("desc") => mapsuc(matchident("desc"), |t| (SortOrder::Desc, t.span())),
-            otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, format!("Can only sort by `asc` or `desc`, not by {:?}", t)))
-        )), |(i, (o, s))| (i, o, s))), |fields| FuncOp::Sort{fields})),
-        peekident("fold") => inner("fold", mapsuc(seqs!(
-            recovgroup(Delimiter::Parenthesis, fields_assign()),
-            matchpunct('='),
-            matchpunct('>'),
-            recovgroup(Delimiter::Parenthesis, fields_expr())
-        ) , |(initial, (_, (_, update)))| FuncOp::Fold {initial, update})),
-        peekident("assert") => inner("assert", mapsuc(syn(collectuntil(isempty())), FuncOp::Assert)),
-        peekident("collect") => inner("collect", mapsuc(nothing(), |()| FuncOp::Collect)),
+        peekident("return") => mapsuc(
+            matchident("return"),
+            |m| Operator::Ret { ret_span: m.span() }
+        ),
+        peekident("ref") => mapsuc(
+            seq(
+                matchident("ref"),
+                getident()
+            ),
+            |(m, table_name)| Operator::Ref { ref_span: m.span(), table_name }
+        ),
+        peekident("let") => mapsuc(
+            seq(
+                matchident("let"),
+                getident()
+            ),
+            |(m, var_name)| Operator::Let { let_span: m.span(), var_name }
+        ),
+        peekident("use") => mapsuc(
+            seq(
+                matchident("use"),
+                getident()
+            ),
+            |(m, var_name)| Operator::Use { use_span: m.span(), var_name }
+        ),
+        peekident("update") => inner(
+            "update",
+            mapsuc(
+                seqs!(
+                    getident(),
+                    matchident("use"),
+                    fields_expr()
+                ),
+                |(reference, (_, fields))| FuncOp::Update {reference, fields}
+            )
+        ),
+        peekident("insert") => inner(
+            "insert",
+            mapsuc(
+                getident(),
+                |table_name| FuncOp::Insert{table_name}
+            )
+        ),
+        peekident("delete") => inner(
+            "delete",
+            mapsuc(
+                nothing(),
+                |()| FuncOp::Delete
+            )
+        ),
+        peekident("map") => inner(
+            "map",
+            mapsuc(
+                fields_assign(),
+                |new_fields| FuncOp::Map{new_fields}
+            )
+        ),
+        peekident("unique") => inner(
+            "unique",
+            mapsuc(
+                seqs!(
+                    choices!(
+                        peekident("ref") => mapsuc(matchident("ref"), |_| true),
+                        otherwise => mapsuc(nothing(), |_|false)
+                    ),
+                    getident(),
+                    matchident("for"),
+                    getident(),
+                    matchident("as"),
+                    syn(collectuntil(isempty()))
+                ),
+                |(refs, (table, (_, (unique_field, (_, from_expr)))))|  FuncOp::Unique { table, refs, unique_field, from_expr }
+            )
+        ),
+        peekident("filter") => inner(
+            "filter",
+            mapsuc(
+                syn(collectuntil(isempty())),
+                FuncOp::Filter
+            )
+        ),
+        peekident("row") => inner(
+            "row",
+            mapsuc(
+                fields_assign(),
+                |fields| FuncOp::Row{fields}
+            )
+        ),
+        peekident("sort") => inner(
+            "sort",
+            mapsuc(listseptrailing(',', mapsuc(
+                seq(
+                    getident(),
+                    choices!(
+                        peekident("asc") => mapsuc(matchident("asc"), |t| (SortOrder::Asc, t.span())),
+                        peekident("desc") => mapsuc(matchident("desc"), |t| (SortOrder::Desc, t.span())),
+                        otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, format!("Can only sort by `asc` or `desc`, not by {:?}", t)))
+                    )
+                ),
+                |(i, (o, s))| (i, o, s))), |fields| FuncOp::Sort{fields}
+            )
+        ),
+        peekident("fold") => inner("fold", mapsuc(
+            seqs!(
+                recovgroup(Delimiter::Parenthesis, fields_assign()),
+                matchpunct('='),
+                matchpunct('>'),
+                recovgroup(Delimiter::Parenthesis, fields_expr())
+            ) , |(initial, (_, (_, update)))| FuncOp::Fold {initial, update})
+        ),
+        peekident("assert") => inner("assert",
+            mapsuc(
+                syn(collectuntil(isempty())),
+                FuncOp::Assert
+            )
+        ),
+        peekident("collect") => inner("collect",
+            mapsuc(
+                nothing(),
+                |()| FuncOp::Collect
+            )
+        ),
         otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, format!("expected an operator but got {}", t)))
     )
 }

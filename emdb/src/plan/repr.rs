@@ -1,8 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
 use proc_macro2::Ident;
-use syn::{Expr, Type};
+use syn::{Type, Expr};
 use typed_generational_arena::{Index, NonzeroGeneration, StandardArena as GenArena};
+
 
 pub(crate) type GenIndex<T> = Index<T, usize, NonzeroGeneration<usize>>;
 
@@ -12,58 +13,30 @@ pub(crate) enum UniqueCons {
 }
 
 pub(crate) struct LogicalColumnConstraint {
-    pub(crate) read: bool,
-    pub(crate) write: bool,
     pub(crate) unique: UniqueCons,
 }
 
 pub(crate) struct LogicalRowConstraint {
-    pub(crate) insert: bool,
-    pub(crate) delete: bool,
     pub(crate) limit: Option<(Expr, Option<Ident>)>,
     pub(crate) genpk: Option<(Ident, Option<Ident>)>,
     pub(crate) preds: Vec<(Expr, Option<Ident>)>,
 }
 
-#[derive(Clone)]
-pub(crate) enum ColumnType {
-    Concrete(Type),
-    Synthetic {
-        implemented: Option<Type>,
-        reference: Expr,
-    },
-}
-
 pub(crate) struct LogicalColumn {
     pub(crate) constraints: LogicalColumnConstraint,
-    pub(crate) data_type: ColumnType,
+    pub(crate) data_type: Type,
 }
 
-/// Add synthetic rows
 pub(crate) struct LogicalTable {
     pub(crate) name: Ident,
     pub(crate) constraints: LogicalRowConstraint,
     pub(crate) columns: HashMap<Ident, LogicalColumn>,
 }
 
-impl LogicalTable {
-    pub(crate) fn get_type(&self) -> Record {
-        let mut fields = HashMap::new();
-        for (name, col) in &self.columns {
-            // TODO unchecked insert
-            fields.insert(name.clone(), RecordData::Rust(col.data_type.clone()));
-        }
-        Record {
-            fields,
-            stream: true,
-        }
-    }
-}
-
 #[derive(Clone)]
 pub(crate) enum RecordData {
     Record(Record),
-    Ref(GenIndex<LogicalTable>), // Represented by Ref<table type>
+    Ref(TableKey), // Represented by Ref<table type>
     Rust(Type),
 }
 #[derive(Clone)]
@@ -87,9 +60,24 @@ pub(crate) enum Edge {
     Null,
 }
 
-// TODO: Each operator is marked by the query it is from
-type EdgeKey = Option<GenIndex<Edge>>;
-pub(crate) enum LogicalOperator {
+pub(crate) type EdgeKey = GenIndex<Edge>;
+
+pub(crate) enum TableAccess {
+    Ref,
+    AllCols,
+    Selection(Vec<Ident>),
+}
+
+pub(crate) type QueryKey = GenIndex<LogicalQuery>;
+
+struct LogicalOperator {
+    query: Option<QueryKey>,
+    operator: LogicalOp
+}
+
+pub(crate) type TableKey = GenIndex<LogicalTable>;
+
+pub(crate) enum LogicalOp {
     // Table Access ============================================================
     /// Apply a series of updates from a stream, the updated rows are propagated
     /// INV: mapping and output have the same fields
@@ -98,7 +86,7 @@ pub(crate) enum LogicalOperator {
     Update {
         input: EdgeKey,
         reference: Expr, // todo fix
-        table: GenIndex<LogicalTable>,
+        table: TableKey,
         mapping: HashMap<Ident, (Type, Expr)>,
         output: EdgeKey,
     },
@@ -109,7 +97,7 @@ pub(crate) enum LogicalOperator {
     /// INV: input has same fields as table
     Insert {
         input: EdgeKey,
-        table: GenIndex<LogicalTable>,
+        table: TableKey,
         output: EdgeKey,
     },
 
@@ -119,7 +107,7 @@ pub(crate) enum LogicalOperator {
     /// INV: output contains the tuple of removed values, same fields as table
     Delete {
         input: EdgeKey,
-        table: GenIndex<LogicalTable>,
+        table: TableKey,
         output: EdgeKey,
     },
 
@@ -128,17 +116,17 @@ pub(crate) enum LogicalOperator {
     ///      field in the table
     Unique {
         unique_field: Ident,
-        refs: bool,
+        access: TableAccess,
         from_expr: Expr,
-        table: GenIndex<LogicalTable>,
+        table: TableKey,
         output: EdgeKey,
     },
 
     /// Scan a table to generate a stream (optionally of references)
     /// INV: if refs then output is a record of ref.
     Scan {
-        refs: bool,
-        table: GenIndex<LogicalTable>,
+        access: TableAccess,
+        table: TableKey,
         output: EdgeKey,
     },
 
@@ -212,31 +200,6 @@ pub(crate) enum LogicalOperator {
         input: EdgeKey,
         outputs: HashSet<EdgeKey>,
     },
-
-    // Query Wrangling =========================================================
-    /// A parameter from a query
-
-    /// The end of a stream (may be referenced by a return, or discarded)
-    End { input: EdgeKey },
-}
-
-impl LogicalOperator {
-    fn get_only_output(&self) -> Option<EdgeKey> {
-        match self {
-            LogicalOperator::Update { output, .. }
-            | LogicalOperator::Insert { output, .. }
-            | LogicalOperator::Delete { output, .. }
-            | LogicalOperator::Unique { output, .. }
-            | LogicalOperator::Scan { output, .. }
-            | LogicalOperator::Map { output, .. }
-            | LogicalOperator::Fold { output, .. }
-            | LogicalOperator::Filter { output, .. }
-            | LogicalOperator::Sort { output, .. }
-            | LogicalOperator::Assert { output, .. }
-            | LogicalOperator::Row { output, .. } => Some(*output),
-            _ => None,
-        }
-    }
 }
 
 pub(crate) enum SortOrder {
@@ -245,10 +208,11 @@ pub(crate) enum SortOrder {
 }
 
 pub(crate) struct LogicalQuery {
-    name: Ident,
-    params: Vec<LogicalQueryParams>,
-    /// INV is an [Operator::End] operator
-    returnval: GenIndex<LogicalOperator>,
+    pub name: Ident,
+    /// INV: is an [Environment::QueryParams]
+    pub params: Vec<LogicalQueryParams>,
+    /// INV is an [Edge::Uni]
+    pub returnval: Option<EdgeKey>,
 }
 
 pub(crate) struct LogicalQueryParams {
@@ -259,7 +223,6 @@ pub(crate) struct LogicalQueryParams {
 pub(crate) struct LogicalPlan {
     pub(crate) queries: GenArena<LogicalQuery>,
     pub(crate) tables: GenArena<LogicalTable>,
-    pub(crate) record_types: GenArena<Record>,
     pub(crate) operators: GenArena<LogicalOperator>,
     pub(crate) operator_edges: GenArena<Edge>,
 }
@@ -269,13 +232,8 @@ impl LogicalPlan {
         LogicalPlan {
             queries: GenArena::new(),
             tables: GenArena::new(),
-            record_types: GenArena::new(),
             operators: GenArena::new(),
             operator_edges: GenArena::new(),
         }
     }
-
-    fn validate(&self) {}
-
-    fn replace_operator() {}
 }

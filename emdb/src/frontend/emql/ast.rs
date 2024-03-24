@@ -54,7 +54,7 @@ pub(super) enum FuncOp {
 #[derive(Debug)]
 pub(super) struct Connector {
     /// single (~>) or stream (|>)
-    pub single: bool,
+    pub stream: bool,
     pub span: Span,
 }
 

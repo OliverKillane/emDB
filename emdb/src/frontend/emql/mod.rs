@@ -4,6 +4,7 @@ mod ast;
 mod parse;
 mod sem;
 mod trans;
+mod trans2;
 use std::collections::LinkedList;
 
 use crate::{
@@ -18,7 +19,10 @@ pub struct Emql;
 impl Frontend for Emql {
     fn from_tokens(input: TokenStream) -> Result<(Targets, LogicalPlan), LinkedList<Diagnostic>> {
         let ast = parse::parse(input)?;
-        let (targets, res_ast) = trans::translate(ast)?;
-        Ok((targets, res_ast))
+
+        Err(LinkedList::new())
+
+        // let (targets, res_ast) = trans::translate(ast)?;
+        // Ok((targets, res_ast))
     }
 }

@@ -8,8 +8,7 @@ use crate::{
     frontend::emql::ast::{Ast, ConstraintExpr, FuncOp, StreamExpr},
     plan::{
         repr::{
-            GenIndex, LogicalColumn, LogicalColumnConstraint, LogicalOperator, LogicalPlan,
-            LogicalQuery, LogicalRowConstraint, LogicalTable, Record, RecordData, UniqueCons,
+            GenIndex, LogicalColumn, LogicalColumnConstraint, LogicalOperator, LogicalPlan, LogicalQuery, LogicalRowConstraint, LogicalTable, Record, RecordData, TableAccess, UniqueCons
         },
         targets::{Target, Targets},
     },
@@ -111,18 +110,24 @@ pub(super) fn extract_targets(
     }
 }
 
+
+
+
+
+
 /// Translate a table definition into the logical plan
 ///
 /// Must ensure the following invariants hold:
 /// - Each column has a unique name
 /// - Each constraint has a unique name
-pub(super) fn translate_table(
+pub(super) fn add_table(
+    lp: &mut LogicalPlan,
     Table { name, cols, cons }: Table,
-) -> Result<LogicalTable, LinkedList<Diagnostic>> {
+) -> Option<LinkedList<Diagnostic>> {
     let mut errs = LinkedList::new();
-
+    
+    // Add each column, checking for duplicate names
     let mut columns: HashMap<Ident, LogicalColumn> = HashMap::new();
-
     for (col_name, col_type) in cols {
         match columns.get_key_value(&col_name) {
             Some((duplicate, _)) => errs.push_back(
@@ -141,8 +146,6 @@ pub(super) fn translate_table(
                     col_name,
                     LogicalColumn {
                         constraints: LogicalColumnConstraint {
-                            read: true,
-                            write: true,
                             unique: UniqueCons::NotUnique,
                         },
                         data_type: col_type,
@@ -152,12 +155,9 @@ pub(super) fn translate_table(
         }
     }
 
+    // Add each constraint, checking aliases used are unique.
     let mut constraint_names: HashSet<Ident> = HashSet::new();
-
-    // Default constraints allow for insertion and deletion
     let mut constraints = LogicalRowConstraint {
-        insert: true,
-        delete: true,
         limit: None,
         genpk: None,
         preds: Vec::new(),
@@ -262,14 +262,16 @@ pub(super) fn translate_table(
         }
     }
 
+    lp.tables.insert(LogicalTable {
+        name,
+        constraints,
+        columns,
+    });
+
     if errs.len() > 0 {
-        Err(errs)
+        Some(errs)
     } else {
-        Ok(LogicalTable {
-            name,
-            constraints,
-            columns,
-        })
+        None
     }
 }
 
@@ -282,13 +284,13 @@ enum AvailName {
     },
 }
 
-fn translate_query(
+fn add_query(
+    lp: &mut LogicalPlan,
     Query {
         name,
         params,
         streams,
     }: Query,
-    lp: &mut LogicalPlan,
 ) -> Result<(), LinkedList<Diagnostic>> {
     // A map of all used names, starts with the tables, includes variables
     // INV: never remove a name from this map
@@ -306,7 +308,9 @@ fn translate_query(
     for StreamExpr { op, con } in streams {
         match translate_streamexpr_first(&mut avail_names, lp, op) {
             Err(mut es) => errs.append(&mut es),
-            Ok((op_index, data_type)) => (), // TODO COMPLETE this
+            Ok((op_index, data_type)) => {
+
+            }
         }
     }
 
@@ -317,9 +321,22 @@ fn translate_query(
     }
 }
 
-fn translate_streamexpr_first(
-    avail_names: &mut HashMap<Ident, AvailName>,
+fn tran_add_query(
     lp: &mut LogicalPlan,
+    Query {
+        name,
+        params,
+        streams,
+    }: Query,
+) -> Option<LinkedList<Diagnostic>> {
+    todo!()
+}
+
+/// Translate the first operator in a stream expression
+/// - Includes only the access and row creation operators (all of which have a single output)
+fn translate_streamexpr_first(
+    lp: &mut LogicalPlan,
+    avail_names: &mut HashMap<Ident, AvailName>,
     op: Operator,
 ) -> Result<(GenIndex<LogicalOperator>, Record), LinkedList<Diagnostic>> {
     match op {
@@ -327,7 +344,7 @@ fn translate_streamexpr_first(
             Some(name) => match name {
                 AvailName::Table(t) => Ok((
                     lp.operators.insert(LogicalOperator::Scan {
-                        refs: false,
+                        refs: TableAccess::AllCols,
                         table: t.clone(),
                         output: None,
                     }),
@@ -431,7 +448,7 @@ fn translate_streamexpr_first(
                             Ok((
                                 lp.operators.insert(LogicalOperator::Unique {
                                     table: t.clone(),
-                                    refs,
+                                    access: if refs {TableAccess::Ref} else {TableAccess::AllCols},
                                     unique_field,
                                     from_expr,
                                     output: None,
@@ -537,4 +554,10 @@ fn extract_span_name(op: Operator) -> (Span, &'static str) {
             },
         ),
     }
+}
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
 }
