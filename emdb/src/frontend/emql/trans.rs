@@ -1,131 +1,98 @@
-use std::collections::{HashMap, HashSet, LinkedList};
-
-use proc_macro2::{Ident, Span};
-use proc_macro_error::{Diagnostic, Level};
-use syn::{spanned::Spanned, Expr, Type};
+use std::{
+    borrow::Borrow,
+    collections::{HashMap, HashSet, LinkedList},
+    mem,
+};
 
 use crate::{
-    frontend::emql::ast::{Ast, ConstraintExpr, FuncOp, StreamExpr},
+    backend::{BackendTypes, GraphViz, Simple},
     plan::{
+        helpers::*,
         repr::{
-            GenIndex, LogicalColumn, LogicalColumnConstraint, LogicalOperator, LogicalPlan, LogicalQuery, LogicalRowConstraint, LogicalTable, Record, RecordData, TableAccess, UniqueCons
+            Edge, EdgeKey, LogicalColumn, LogicalColumnConstraint, LogicalOp, LogicalOperator,
+            LogicalPlan, LogicalQuery, LogicalQueryParams, LogicalRowConstraint, LogicalTable,
+            OpKey, QueryKey, Record, RecordData, TableAccess, TableKey, UniqueCons,
         },
-        targets::{Target, Targets},
     },
     utils::misc::singlelist,
 };
+use proc_macro2::{Ident, Span};
+use proc_macro_error::{Diagnostic, Level};
+use syn::{spanned::Spanned, Expr};
 
-use super::ast::{BackendImpl, Constraint, Operator, Query, Table};
+use super::ast::{
+    Ast, BackendImpl, BackendKind, Connector, Constraint, ConstraintExpr, FuncOp, Operator, Query,
+    StreamExpr, Table,
+};
 
-pub(super) fn translate(
+fn ast_to_logical(
     Ast {
         backends,
         tables,
         queries,
     }: Ast,
-) -> Result<(Targets, LogicalPlan), LinkedList<Diagnostic>> {
-    let mut logical_plan = LogicalPlan::new();
-
-    let mut errs = LinkedList::new();
+) -> Result<LogicalPlan, LinkedList<Diagnostic>> {
+    let mut errors = LinkedList::new();
+    let mut lp = LogicalPlan::new();
+    let mut qs = HashSet::new();
+    let mut tn = HashMap::new();
+    let mut bks = HashMap::new();
 
     for table in tables {
-        match translate_table(table) {
-            Ok(table) => {
-                logical_plan.tables.insert(table);
-            }
-            Err(mut table_errs) => {
-                errs.append(&mut table_errs);
-            }
-        }
+        errors.append(&mut add_table(&mut lp, &mut tn, table));
     }
 
     for query in queries {
-        match translate_query(query, &mut logical_plan) {
-            Ok(_) => (), // TODO COMPLETE
-            Err(mut query_errs) => {
-                errs.append(&mut query_errs);
-            }
-        }
+        errors.append(&mut add_query(&mut lp, &mut qs, &tn, query));
     }
 
-    match extract_targets(backends) {
-        Ok(ts) => {
-            if errs.len() > 0 {
-                Err(errs)
-            } else {
-                Ok((ts, logical_plan))
-            }
-        }
-        Err(mut es) => {
-            errs.append(&mut es);
-            Err(errs)
-        }
-    }
-}
-
-/// Extract the targets/backends to be run for the plan
-pub(super) fn extract_targets(
-    parsed_tagets: Vec<BackendImpl>,
-) -> Result<Targets, LinkedList<Diagnostic>> {
-    let mut backends: HashMap<Ident, Target> = HashMap::new();
-    let mut errs = LinkedList::new();
-
-    for BackendImpl { name, target } in parsed_tagets {
-        if let Some((duplicate, _)) = backends.get_key_value(&name) {
-            errs.push_back(
-                Diagnostic::spanned(
-                    name.span(),
-                    Level::Error,
-                    format!(
-                        "Cannot use name `{}` as it is already used. Names must be unique",
-                        name
-                    ),
-                )
-                .span_note(duplicate.span(), "Already used here".to_owned()),
-            );
-        } else {
-            let target = match target.to_string().as_str() {
-                "graph" => Some(Target::Graphviz),
-                "simple" => Some(Target::Simple),
-                _ => {
-                    errs.push_back(Diagnostic::spanned(
-                        target.span(),
-                        Level::Error,
-                        format!("Unknown target `{}`", target),
-                    ));
-                    None
-                }
-            };
-
-            if let Some(target) = target {
-                backends.insert(name, target);
-            }
-        }
+    for backend in backends {
+        errors.append(&mut add_backend(&mut bks, backend));
     }
 
-    if errs.len() > 0 {
-        Err(errs)
+    if errors.is_empty() {
+        Ok(lp)
     } else {
-        Ok(Targets { backends })
+        Err(errors)
     }
 }
 
+fn add_backend(
+    bks: &mut HashMap<Ident, BackendTypes>,
+    BackendImpl { name, target }: BackendImpl,
+) -> LinkedList<Diagnostic> {
+    let mut errors = LinkedList::new();
+    if let Some((other_name, _)) = bks.get_key_value(&name) {
+        errors.push_back(
+            Diagnostic::spanned(
+                name.span(),
+                Level::Error,
+                format!("Redefinition of backend {}", name),
+            )
+            .span_error(
+                other_name.span(),
+                format!("{} originally defined here", name),
+            ),
+        );
+    } else {
+        bks.insert(
+            name,
+            match target {
+                BackendKind::Graph => BackendTypes::GraphViz(GraphViz),
+                BackendKind::Simple => BackendTypes::Simple(Simple),
+            },
+        );
+    }
+    errors
+}
 
-
-
-
-
-/// Translate a table definition into the logical plan
-///
-/// Must ensure the following invariants hold:
-/// - Each column has a unique name
-/// - Each constraint has a unique name
-pub(super) fn add_table(
+fn add_table(
     lp: &mut LogicalPlan,
+    tn: &mut HashMap<Ident, TableKey>,
     Table { name, cols, cons }: Table,
-) -> Option<LinkedList<Diagnostic>> {
+) -> LinkedList<Diagnostic> {
     let mut errs = LinkedList::new();
-    
+
     // Add each column, checking for duplicate names
     let mut columns: HashMap<Ident, LogicalColumn> = HashMap::new();
     for (col_name, col_type) in cols {
@@ -262,170 +229,387 @@ pub(super) fn add_table(
         }
     }
 
-    lp.tables.insert(LogicalTable {
-        name,
+    let tk = lp.tables.insert(LogicalTable {
+        name: name.clone(),
         constraints,
         columns,
     });
 
-    if errs.len() > 0 {
-        Some(errs)
+    if let Some((other_t, _)) = tn.get_key_value(&name) {
+        errs.push_back(
+            Diagnostic::spanned(
+                name.span(),
+                Level::Error,
+                format!("Redefinition of table {}", name),
+            )
+            .span_error(other_t.span(), format!("{} originally defined here", name)),
+        );
     } else {
-        None
+        tn.insert(name, tk);
     }
+
+    errs
 }
 
-enum AvailName {
-    Table(GenIndex<LogicalTable>),
-    Variable {
-        used: Option<Ident>,
-        data_type: Record,
-        location: GenIndex<LogicalOperator>,
-    },
+struct Return {
+    span: Span,
+    index: OpKey,
 }
 
+#[derive(Clone)]
+struct Continue {
+    data_type: Record,
+    prev_edge: EdgeKey,
+    last_span: Span,
+}
+
+enum StreamContext {
+    Nothing { last_span: Span },
+    Returned(Return),
+    Continue(Continue),
+}
+
+enum VarState {
+    Used { created: Span, used: Span },
+    Available { created: Span, state: Continue },
+}
+
+/// Adds a new query from the AST to the logical plan
+///
+/// Checks for:
+/// - Duplicate query names
+/// - DUplicate returns
 fn add_query(
     lp: &mut LogicalPlan,
+    qs: &mut HashSet<Ident>,
+    tn: &HashMap<Ident, TableKey>,
     Query {
         name,
         params,
         streams,
     }: Query,
-) -> Result<(), LinkedList<Diagnostic>> {
-    // A map of all used names, starts with the tables, includes variables
-    // INV: never remove a name from this map
-    let mut avail_names: HashMap<Ident, AvailName> = lp
-        .tables
-        .iter()
-        .map(|(id, LogicalTable { name, .. })| (name.clone(), AvailName::Table(id)))
-        .collect::<HashMap<_, _>>();
+) -> LinkedList<Diagnostic> {
+    let mut errors = LinkedList::new();
 
-    let mut errs = LinkedList::new();
+    // if the name is duplicated, we can still analyse the query & add to the logical plan
+    if let Some(other_q) = qs.get(&name) {
+        errors.push_back(
+            Diagnostic::spanned(
+                name.span(),
+                Level::Error,
+                format!("Redefinition of query {}", name),
+            )
+            .span_error(other_q.span(), format!("{} originally defined here", name)),
+        );
+    } else {
+        qs.insert(name.clone());
+    }
 
-    // INV: only one return statement can be present
-    let mut return_used = false;
+    let params = params
+        .into_iter()
+        .map(|(name, data_type)| LogicalQueryParams { name, data_type })
+        .collect();
+    let qk = lp.queries.insert(LogicalQuery {
+        name: name.clone(),
+        params,
+        returnval: None,
+    });
+    let mut vs = HashMap::new();
+    let mut ret: Option<Return> = None;
 
-    for StreamExpr { op, con } in streams {
-        match translate_streamexpr_first(&mut avail_names, lp, op) {
-            Err(mut es) => errs.append(&mut es),
-            Ok((op_index, data_type)) => {
-
-            }
+    for stream in streams {
+        match build_streamexpr(lp, tn, qk, &mut vs, stream) {
+            Ok(r) => match (&mut ret, r) {
+                (Some(prev_ret), Some(new_ret)) => {
+                    errors.push_back(
+                        Diagnostic::spanned(
+                            new_ret.span,
+                            Level::Error,
+                            format!("multiple return statements for {}", name),
+                        )
+                        .span_error(prev_ret.span, format!("Previous return for {} here", name)),
+                    );
+                }
+                (Some(_), None) => (),
+                (None, rs) => ret = rs,
+            },
+            Err(mut es) => errors.append(&mut es),
         }
     }
 
-    if errs.len() > 0 {
-        Err(errs)
+    if let Some(ret) = ret {
+        lp.queries[qk].returnval = Some(ret.index);
+    }
+
+    errors
+}
+
+/// helper for extracting a map of unique fields by Ident
+fn extract_fields<T>(fields: Vec<(Ident, T)>) -> Result<HashMap<Ident, T>, LinkedList<Diagnostic>> {
+    let mut map_fields: HashMap<Ident, T> = HashMap::with_capacity(fields.len());
+    let mut errors = LinkedList::new();
+    for (id, content) in fields {
+        if let Some((other_id, _)) = map_fields.get_key_value(&id) {
+            errors.push_back(
+                Diagnostic::spanned(
+                    id.span(),
+                    Level::Error,
+                    format!("Duplicate field present {}", id),
+                )
+                .span_error(other_id.span(), "Already defined here".to_owned()),
+            );
+        } else {
+            map_fields.insert(id, content);
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(map_fields)
     } else {
-        Ok(())
+        Err(errors)
     }
 }
 
-fn tran_add_query(
+fn build_streamexpr(
     lp: &mut LogicalPlan,
-    Query {
-        name,
-        params,
-        streams,
-    }: Query,
-) -> Option<LinkedList<Diagnostic>> {
-    todo!()
+    tn: &HashMap<Ident, TableKey>,
+    qk: QueryKey,
+    vs: &mut HashMap<Ident, VarState>,
+    StreamExpr { op, con }: StreamExpr,
+) -> Result<Option<Return>, LinkedList<Diagnostic>> {
+    match build_op_start(lp, tn, qk, vs, op) {
+        Ok(ctx) => {
+            let mut errors = LinkedList::new();
+            match recur_stream(lp, tn, qk, vs, ctx, &mut errors, con) {
+                Ok(res) => Ok(res),
+                Err(()) => Err(errors),
+            }
+        }
+        Err(es) => Err(es),
+    }
 }
 
-/// Translate the first operator in a stream expression
-/// - Includes only the access and row creation operators (all of which have a single output)
-fn translate_streamexpr_first(
+fn recur_stream(
     lp: &mut LogicalPlan,
-    avail_names: &mut HashMap<Ident, AvailName>,
-    op: Operator,
-) -> Result<(GenIndex<LogicalOperator>, Record), LinkedList<Diagnostic>> {
-    match op {
-        Operator::Use { use_span, var_name } => match avail_names.get_mut(&var_name) {
-            Some(name) => match name {
-                AvailName::Table(t) => Ok((
-                    lp.operators.insert(LogicalOperator::Scan {
-                        refs: TableAccess::AllCols,
-                        table: t.clone(),
-                        output: None,
-                    }),
-                    lp.tables.get(*t).expect("INV: table must exist").get_type(),
-                )),
-                AvailName::Variable {
+    tn: &HashMap<Ident, TableKey>,
+    qk: QueryKey,
+    vs: &mut HashMap<Ident, VarState>,
+    ctx: StreamContext,
+    errs: &mut LinkedList<Diagnostic>, // TODO: thunkify or convert to loop. We mutate a passed list to make tail-call elimination easier (but rust has no TCO yet)
+    con: Option<(Connector, Box<StreamExpr>)>,
+) -> Result<Option<Return>, ()> {
+    match (ctx, con) {
+        // No more operators (no data in, or data discarded)
+        (StreamContext::Nothing { last_span }, None) => Ok(None),
+        (StreamContext::Continue { .. }, None) => Ok(None),
+
+        // Returning data from the query
+        (StreamContext::Returned(ret), None) => Ok(Some(ret)),
+
+        // Continue to next operator
+        (
+            StreamContext::Continue(Continue {
+                data_type,
+                prev_edge,
+                last_span,
+            }),
+            Some((conn, nxt)),
+        ) => {
+            if data_type.stream != conn.stream {
+                errs.push_back(
+                    Diagnostic::spanned(
+                        conn.span,
+                        Level::Error,
+                        if data_type.stream {
+                            "Expected a stream, but found a single connector"
+                        } else {
+                            "Expected a single, but found a stream connector"
+                        }
+                        .to_owned(),
+                    )
+                    .span_note(last_span.clone(), "Previous stream type".to_owned()),
+                );
+            }
+
+            let StreamExpr { op, con } = *nxt;
+
+            match build_op_continue(
+                lp,
+                tn,
+                qk,
+                vs,
+                Continue {
                     data_type,
-                    used,
-                    location,
-                } => {
-                    if used.is_some() {
-                        Err(singlelist(Diagnostic::spanned(
-                            var_name.span(),
-                            Level::Error,
-                            format!("Variable `{}` already used", var_name),
-                        )))
-                    } else {
-                        *used = Some(var_name.clone());
-                        Ok((*location, data_type.clone()))
-                    }
+                    prev_edge,
+                    last_span,
+                },
+                op,
+            ) {
+                Ok(new_ctx) => recur_stream(lp, tn, qk, vs, new_ctx, errs, con),
+                Err(mut es) => {
+                    errs.append(&mut es);
+                    Err(())
                 }
-            },
-            None => Err(singlelist(Diagnostic::spanned(
-                var_name.span(),
-                Level::Error,
-                format!("Unknown table or variable {} used", var_name),
-            ))),
-        },
+            }
+        }
+
+        // Invalid Combos
+        (StreamContext::Nothing { last_span }, Some((conn, _))) => {
+            errs.push_back(
+                Diagnostic::spanned(
+                    last_span,
+                    Level::Error,
+                    "No output data provided for next operator".to_owned(),
+                )
+                .span_error(
+                    conn.span,
+                    format!(
+                        "Expected a {} out here",
+                        if conn.stream {
+                            "stream of data"
+                        } else {
+                            "singe data"
+                        }
+                    ),
+                ),
+            );
+            Err(())
+        }
+        (StreamContext::Returned(r), Some((conn, _))) => {
+            errs.push_back(
+                Diagnostic::spanned(
+                    r.span,
+                    Level::Error,
+                    format!("Early return leaves no data for the next operator"),
+                )
+                .span_error(
+                    conn.span,
+                    format!(
+                        "Expected a {} out here",
+                        if conn.stream {
+                            "stream of data"
+                        } else {
+                            "singe data"
+                        }
+                    ),
+                ),
+            );
+            Err(())
+        }
+    }
+}
+
+fn build_op_start(
+    lp: &mut LogicalPlan,
+    tn: &HashMap<Ident, TableKey>,
+    qk: QueryKey,
+    vs: &mut HashMap<Ident, VarState>,
+    op: Operator,
+) -> Result<StreamContext, LinkedList<Diagnostic>> {
+    fn error_cannot_start(name: &str, span: Span) -> LinkedList<Diagnostic> {
+        singlelist(Diagnostic::spanned(
+            span,
+            Level::Error,
+            format!(
+                "Cannot start stream from a {}, only use, ref and unique(..) can start streams",
+                name
+            ),
+        ))
+    }
+    match op {
+        // start the stream
         Operator::Ref {
             ref_span,
             table_name,
-        } => match avail_names.get(&table_name) {
-            Some(name) => match name {
-                AvailName::Table(t) => Ok((
-                    lp.operators.insert(LogicalOperator::Scan {
-                        refs: true,
-                        table: t.clone(),
-                        output: None,
-                    }),
-                    lp.tables.get(*t).expect("INV: table must exist").get_type(),
-                )),
-                AvailName::Variable {
-                    data_type,
-                    used,
-                    location,
-                } => Err({
-                    let d = Diagnostic::spanned(
-                        ref_span,
-                        Level::Error,
-                        format!("Cannot stream references from a variable {}", table_name),
-                    );
-
-                    singlelist(if let Some(before) = used {
-                        d.span_note(
-                            before.span(),
-                            "Furthermore variable was already used here".to_owned(),
-                        )
-                    } else {
-                        d
-                    })
-                }),
-            },
-
-            None => Err(singlelist(Diagnostic::spanned(
-                table_name.span(),
-                Level::Error,
-                format!("Unknown table {} referenced", table_name),
-            ))),
-        },
-        Operator::FuncOp {
-            fn_span,
-            op: FuncOp::Row { fields },
         } => {
-            let (new_fields, record) = deduplicate_row_fields(fields)?;
-            Ok((
-                lp.operators.insert(LogicalOperator::Row {
-                    fields: new_fields,
-                    output: None,
-                }),
-                record,
-            ))
+            // Needs to come from a valid table
+            if let Some(table_id) = tn.get(&table_name) {
+                let data_type = Record {
+                    fields: HashMap::from([(table_name, RecordData::Ref(*table_id))]),
+                    stream: true,
+                };
+
+                let out_edge = lp.operator_edges.insert(Edge::Null);
+
+                let ref_op = lp.operators.insert(LogicalOperator {
+                    query: Some(qk),
+                    operator: LogicalOp::Scan {
+                        access: TableAccess::Ref,
+                        table: *table_id,
+                        output: out_edge,
+                    },
+                });
+
+                lp.operator_edges[out_edge] = Edge::Uni {
+                    from: ref_op,
+                    with: data_type.clone(),
+                };
+
+                Ok(StreamContext::Continue(Continue {
+                    data_type,
+                    prev_edge: out_edge,
+                    last_span: ref_span,
+                }))
+            } else {
+                Err(singlelist(Diagnostic::spanned(
+                    ref_span,
+                    Level::Error,
+                    format!("No such table {}", table_name),
+                )))
+            }
+        }
+        Operator::Use { use_span, var_name } => {
+            if let Some(table_id) = tn.get(&var_name) {
+                let data_type = lp.tables.get(*table_id).unwrap().get_all_cols_type();
+                let out_edge = lp.operator_edges.insert(Edge::Null);
+                let use_op = lp.operators.insert(LogicalOperator {
+                    query: Some(qk),
+                    operator: LogicalOp::Scan {
+                        access: TableAccess::AllCols,
+                        table: *table_id,
+                        output: out_edge,
+                    },
+                });
+                lp.operator_edges[out_edge] = Edge::Uni {
+                    from: use_op,
+                    with: data_type.clone(),
+                };
+
+                Ok(StreamContext::Continue(Continue {
+                    data_type,
+                    prev_edge: out_edge,
+                    last_span: use_span,
+                }))
+            } else if let Some(var) = vs.get_mut(&var_name) {
+                match var {
+                    VarState::Used { created, used } => Err(singlelist(
+                        Diagnostic::spanned(
+                            use_span,
+                            Level::Error,
+                            format!("Variable {} has already been used", var_name),
+                        )
+                        .span_error(*created, "Was created here".to_owned())
+                        .span_error(*used, "And consumed here".to_owned()),
+                    )),
+                    VarState::Available { created, state } => {
+                        let ret = Ok(StreamContext::Continue(state.clone()));
+                        *var = VarState::Used {
+                            created: *created,
+                            used: use_span,
+                        };
+                        ret
+                    }
+                }
+            } else {
+                Err(singlelist(Diagnostic::spanned(
+                    use_span,
+                    Level::Error,
+                    format!(
+                        "There are no variables or tables called {} available to use",
+                        var_name
+                    ),
+                )))
+            }
         }
         Operator::FuncOp {
             fn_span,
@@ -437,127 +621,209 @@ fn translate_streamexpr_first(
                     from_expr,
                 },
         } => {
-            // Need to check that the unique constraint is applied to the relevant table.
-            match avail_names.get(&table) {
-                Some(AvailName::Table(t)) => {
-                    let table = lp.tables.get(*t).expect("INV: table must exist");
-                    if let Some(LogicalColumn { constraints, .. }) =
-                        table.columns.get(&unique_field)
-                    {
-                        if let UniqueCons::Unique(_) = constraints.unique {
-                            Ok((
-                                lp.operators.insert(LogicalOperator::Unique {
-                                    table: t.clone(),
-                                    access: if refs {TableAccess::Ref} else {TableAccess::AllCols},
-                                    unique_field,
-                                    from_expr,
-                                    output: None,
-                                }),
-                                table.get_type(),
-                            ))
-                        } else {
-                            Err(singlelist(Diagnostic::spanned(
-                                unique_field.span(),
-                                Level::Error,
-                                format!("Field `{}` is not unique", unique_field),
-                            )))
-                        }
-                    } else {
-                        Err(singlelist(Diagnostic::spanned(
-                            unique_field.span(),
-                            Level::Error,
-                            format!("Field `{}` does not exist", unique_field),
-                        )))
-                    }
-                }
-                Some(AvailName::Variable { used, .. }) => Err(singlelist(Diagnostic::spanned(
+            if let Some(table_id) = tn.get(&table) {
+                let out_edge = lp.operator_edges.insert(Edge::Null);
+
+                let (unique_op, data_type) = if refs {
+                    (
+                        lp.operators.insert(LogicalOperator {
+                            query: Some(qk),
+                            operator: LogicalOp::Unique {
+                                unique_field,
+                                access: TableAccess::Ref,
+                                from_expr,
+                                table: *table_id,
+                                output: out_edge,
+                            },
+                        }),
+                        Record {
+                            fields: HashMap::from([(table, RecordData::Ref(*table_id))]),
+                            stream: true,
+                        },
+                    )
+                } else {
+                    (
+                        lp.operators.insert(LogicalOperator {
+                            query: Some(qk),
+                            operator: LogicalOp::Unique {
+                                unique_field,
+                                access: TableAccess::AllCols,
+                                from_expr,
+                                table: *table_id,
+                                output: out_edge,
+                            },
+                        }),
+                        lp.tables.get(*table_id).unwrap().get_all_cols_type(),
+                    )
+                };
+
+                lp.operator_edges[out_edge] = Edge::Uni {
+                    from: unique_op,
+                    with: data_type.clone(),
+                };
+
+                Ok(StreamContext::Continue(Continue {
+                    data_type,
+                    prev_edge: out_edge,
+                    last_span: fn_span,
+                }))
+            } else {
+                Err(singlelist(Diagnostic::spanned(
                     table.span(),
                     Level::Error,
-                    format!("Cannot use variable `{}` as a table", table),
-                ))),
-                None => Err(singlelist(Diagnostic::spanned(
-                    table.span(),
-                    Level::Error,
-                    format!("Unknown table `{}`", table),
-                ))),
+                    format!("No table named {} found", table),
+                )))
             }
         }
-        other => {
-            let (span, name) = extract_span_name(other);
-            Err(singlelist(Diagnostic::spanned(
-                span,
-                Level::Error,
-                format!("Cannot use {} at the start of a stream expression", name),
-            )))
-        }
+
+        // otherwise
+        Operator::FuncOp { fn_span, op } => Err(error_cannot_start("function", fn_span)),
+        Operator::Ret { ret_span } => Err(error_cannot_start("return", ret_span)),
+        Operator::Let { let_span, var_name } => Err(error_cannot_start("let", let_span)),
     }
 }
 
-fn deduplicate_row_fields(
-    fields: Vec<(Ident, Type, Expr)>,
-) -> Result<(HashMap<Ident, (Type, Expr)>, Record), LinkedList<Diagnostic>> {
-    let mut new_fields = HashMap::new();
-    let mut errs = LinkedList::new();
-
-    for (name, data_type, expr) in fields {
-        if let Some(dup) = new_fields.insert(name.clone(), (data_type, expr)) {
-            errs.push_back(Diagnostic::spanned(
-                name.span(),
-                Level::Error,
-                format!("Field `{}` is already defined", name),
-            ));
-        }
+fn build_op_continue(
+    lp: &mut LogicalPlan,
+    tn: &HashMap<Ident, TableKey>,
+    qk: QueryKey,
+    vs: &mut HashMap<Ident, VarState>,
+    prev: Continue,
+    curr_op: Operator,
+) -> Result<StreamContext, LinkedList<Diagnostic>> {
+    fn cannot_use_op(name: &str, span: Span) -> LinkedList<Diagnostic> {
+        singlelist(Diagnostic::spanned(
+            span,
+            Level::Error,
+            format!("Cannot use {} in the middle of a stream", name),
+        ))
     }
 
-    if errs.len() > 0 {
-        Err(errs)
-    } else {
-        let record = Record {
-            fields: new_fields
-                .iter()
-                .map(|(a, (t, _))| (a.clone(), RecordData::Rust(t.clone())))
-                .collect(),
-            stream: false,
-        };
-        Ok((new_fields, record))
-    }
-}
-
-fn extract_span_name(op: Operator) -> (Span, &'static str) {
-    match op {
-        Operator::Ret { ret_span } => (ret_span, "return"),
+    match curr_op {
+        // starting a stream
         Operator::Ref {
             ref_span,
             table_name,
-        } => (ref_span, "table reference"),
-        Operator::Let { let_span, var_name } => (let_span, "variable declaration"),
-        Operator::Use { use_span, var_name } => (use_span, "variable or table usage"),
-        Operator::FuncOp { fn_span, op } => (
+        } => Err(cannot_use_op("ref", ref_span)),
+        Operator::Use { use_span, var_name } => Err(cannot_use_op("use", use_span)),
+        Operator::FuncOp {
             fn_span,
-            match op {
-                FuncOp::Update { reference, fields } => "update",
-                FuncOp::Insert { table_name } => "insert",
-                FuncOp::Delete => "delete",
-                FuncOp::Map { new_fields } => "map",
+            op:
                 FuncOp::Unique {
                     table,
                     refs,
                     unique_field,
                     from_expr,
-                } => "unique",
-                FuncOp::Filter(_) => "filter",
-                FuncOp::Row { fields } => "row",
-                FuncOp::Sort { fields } => "sort",
-                FuncOp::Fold { initial, update } => "fold",
-                FuncOp::Assert(_) => "assertion",
-                FuncOp::Collect => "collect",
-            },
-        ),
+                },
+        } => Err(cannot_use_op("unique", fn_span)),
+
+        // operations on the stream
+        Operator::FuncOp {
+            fn_span,
+            op: FuncOp::Update { reference, fields },
+        } => build_update(lp, tn, qk, vs, prev, reference, fields),
+        Operator::FuncOp {
+            fn_span,
+            op: FuncOp::Insert { table_name },
+        } => todo!(),
+        Operator::FuncOp {
+            fn_span,
+            op: FuncOp::Delete,
+        } => todo!(),
+        Operator::FuncOp {
+            fn_span,
+            op: FuncOp::Map { new_fields },
+        } => todo!(),
+        Operator::FuncOp {
+            fn_span,
+            op: FuncOp::Filter(_),
+        } => todo!(),
+        Operator::FuncOp {
+            fn_span,
+            op: FuncOp::Row { fields },
+        } => todo!(),
+        Operator::FuncOp {
+            fn_span,
+            op: FuncOp::Sort { fields },
+        } => todo!(),
+        Operator::FuncOp {
+            fn_span,
+            op: FuncOp::Fold { initial, update },
+        } => todo!(),
+        Operator::FuncOp {
+            fn_span,
+            op: FuncOp::Assert(_),
+        } => todo!(),
+        Operator::FuncOp {
+            fn_span,
+            op: FuncOp::Collect,
+        } => todo!(),
+
+        // ending the stream
+        Operator::Ret { ret_span } => {
+            let return_op = lp.operators.insert(LogicalOperator {
+                query: Some(qk),
+                operator: LogicalOp::Return {
+                    input: prev.prev_edge,
+                },
+            });
+
+            Ok(StreamContext::Returned(Return {
+                span: ret_span,
+                index: return_op,
+            }))
+        }
+
+        Operator::Let { let_span, var_name } => {
+            if let Some(varstate) = vs.get(&var_name) {
+                match varstate {
+                    VarState::Used { created, used } => Err(singlelist(
+                        Diagnostic::spanned(
+                            let_span,
+                            Level::Error,
+                            format!("Cannot assign to already created variable {}", var_name),
+                        )
+                        .span_error(*created, "Created here".to_owned())
+                        .span_error(*used, "used here".to_owned()),
+                    )),
+                    VarState::Available { created, state } => Err(singlelist(
+                        Diagnostic::spanned(
+                            let_span,
+                            Level::Error,
+                            format!("Cannot assign to already created variable {}", var_name),
+                        )
+                        .span_error(*created, "Created here".to_owned()),
+                    )),
+                }
+            } else {
+                vs.insert(
+                    var_name,
+                    VarState::Available {
+                        created: let_span,
+                        state: prev,
+                    },
+                );
+                Ok(StreamContext::Nothing {
+                    last_span: let_span,
+                })
+            }
+        }
     }
 }
 
+fn build_update(
+    lp: &mut LogicalPlan,
+    tn: &HashMap<Ident, TableKey>,
+    qk: QueryKey,
+    vs: &mut HashMap<Ident, VarState>,
+    prev: Continue,
 
-#[cfg(test)]
-mod test {
-    use super::*;
+    // include the fields that are part of the AST
+    reference: Ident,
+    fields: Vec<(Ident, Expr)>,
+) -> Result<StreamContext, LinkedList<Diagnostic>> {
+    todo!()
 }
+
+// TODO: work out better structure for the build_update, build_assert etc functions
+// TODO: work out synthetic types representation

@@ -1,9 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use proc_macro2::Ident;
-use syn::{Type, Expr};
+use syn::{Expr, Type};
 use typed_generational_arena::{Index, NonzeroGeneration, StandardArena as GenArena};
-
 
 pub(crate) type GenIndex<T> = Index<T, usize, NonzeroGeneration<usize>>;
 
@@ -70,9 +69,9 @@ pub(crate) enum TableAccess {
 
 pub(crate) type QueryKey = GenIndex<LogicalQuery>;
 
-struct LogicalOperator {
-    query: Option<QueryKey>,
-    operator: LogicalOp
+pub(crate) struct LogicalOperator {
+    pub query: Option<QueryKey>,
+    pub operator: LogicalOp,
 }
 
 pub(crate) type TableKey = GenIndex<LogicalTable>;
@@ -85,7 +84,7 @@ pub(crate) enum LogicalOp {
     /// INV: mapping assignment only contains fields from referenced table
     Update {
         input: EdgeKey,
-        reference: Expr, // todo fix
+        reference: Ident,
         table: TableKey,
         mapping: HashMap<Ident, (Type, Expr)>,
         output: EdgeKey,
@@ -200,6 +199,10 @@ pub(crate) enum LogicalOp {
         input: EdgeKey,
         outputs: HashSet<EdgeKey>,
     },
+
+    // Stream Control ==========================================================
+    /// Return values from a query
+    Return { input: EdgeKey },
 }
 
 pub(crate) enum SortOrder {
@@ -207,12 +210,13 @@ pub(crate) enum SortOrder {
     Desc,
 }
 
+pub(crate) type OpKey = GenIndex<LogicalOperator>;
+
 pub(crate) struct LogicalQuery {
     pub name: Ident,
-    /// INV: is an [Environment::QueryParams]
     pub params: Vec<LogicalQueryParams>,
-    /// INV is an [Edge::Uni]
-    pub returnval: Option<EdgeKey>,
+    /// INV is a [LogicalOp::Return]
+    pub returnval: Option<OpKey>,
 }
 
 pub(crate) struct LogicalQueryParams {

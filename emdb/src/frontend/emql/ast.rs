@@ -28,7 +28,7 @@ pub(super) enum FuncOp {
     },
     Delete,
     Map {
-        new_fields: Vec<(Ident, Type, Expr)>,
+        new_fields: Vec<(Ident, (Type, Expr))>,
     },
     Unique {
         table: Ident,
@@ -38,13 +38,13 @@ pub(super) enum FuncOp {
     },
     Filter(Expr),
     Row {
-        fields: Vec<(Ident, Type, Expr)>,
+        fields: Vec<(Ident, (Type, Expr))>,
     },
     Sort {
-        fields: Vec<(Ident, SortOrder, Span)>,
+        fields: Vec<(Ident, (SortOrder, Span))>,
     },
     Fold {
-        initial: Vec<(Ident, Type, Expr)>,
+        initial: Vec<(Ident, (Type, Expr))>,
         update: Vec<(Ident, Expr)>,
     },
     Assert(Expr),
@@ -96,7 +96,13 @@ pub(super) struct Query {
 #[derive(Debug)]
 pub(super) struct BackendImpl {
     pub name: Ident,
-    pub target: Ident,
+    pub target: BackendKind,
+}
+
+#[derive(Debug)]
+pub(super) enum BackendKind {
+    Graph,
+    Simple,
 }
 
 #[derive(Debug)]

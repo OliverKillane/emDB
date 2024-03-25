@@ -5,8 +5,8 @@ use proc_macro_error::{Diagnostic, Level};
 use syn::{Expr, Type};
 
 use super::ast::{
-    Ast, BackendImpl, Connector, Constraint, ConstraintExpr, FuncOp, Operator, Query, StreamExpr,
-    Table,
+    Ast, BackendImpl, BackendKind, Connector, Constraint, ConstraintExpr, FuncOp, Operator, Query,
+    StreamExpr, Table,
 };
 use crate::frontend::emql::ast::SortOrder;
 
@@ -88,7 +88,16 @@ fn backend_parser() -> impl TokenParser<BackendImpl> {
     mapsuc(
         seq(
             recover(
-                seqs!(matchident("impl"), getident(), matchident("as"), getident()),
+                seqs!(
+                    matchident("impl"),
+                    choices! {
+                        peekident("graph") => mapsuc(matchident("graph"), |_| BackendKind::Graph),
+                        peekident("simple") => mapsuc(matchident("simple"), |_| BackendKind::Simple),
+                        otherwise => error(getident(), |i| Diagnostic::spanned(i.span(), Level::Error, format!("expected either `graph` or `simple` but got {}", i)))
+                    },
+                    matchident("as"),
+                    getident()
+                ),
                 until(peekpunct(';')),
             ),
             matchpunct(';'),
@@ -238,7 +247,7 @@ fn operator_parse(
         )
     }
 
-    fn fields_assign() -> impl TokenParser<Vec<(Ident, Type, Expr)>> {
+    fn fields_assign() -> impl TokenParser<Vec<(Ident, (Type, Expr))>> {
         listseptrailing(
             ',',
             mapsuc(
@@ -249,7 +258,7 @@ fn operator_parse(
                     matchpunct('='),
                     syntopunct(peekpunct(','))
                 ),
-                |(id, (_, (t, (_, e))))| (id, t, e),
+                |(id, (_, (t, (_, e))))| (id, (t, e)),
             ),
         )
     }
@@ -354,7 +363,7 @@ fn operator_parse(
                         otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, format!("Can only sort by `asc` or `desc`, not by {:?}", t)))
                     )
                 ),
-                |(i, (o, s))| (i, o, s))), |fields| FuncOp::Sort{fields}
+                |(i, (o, s))| (i, (o, s)))), |fields| FuncOp::Sort{fields}
             )
         ),
         peekident("fold") => inner("fold", mapsuc(
