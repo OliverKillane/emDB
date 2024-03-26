@@ -17,7 +17,6 @@ pub(crate) struct LogicalColumnConstraint {
 
 pub(crate) struct LogicalRowConstraint {
     pub(crate) limit: Option<(Expr, Option<Ident>)>,
-    pub(crate) genpk: Option<(Ident, Option<Ident>)>,
     pub(crate) preds: Vec<(Expr, Option<Ident>)>,
 }
 
@@ -86,7 +85,7 @@ pub(crate) enum LogicalOp {
         input: EdgeKey,
         reference: Ident,
         table: TableKey,
-        mapping: HashMap<Ident, (Type, Expr)>,
+        mapping: HashMap<Ident, Expr>,
         output: EdgeKey,
     },
 
@@ -106,6 +105,7 @@ pub(crate) enum LogicalOp {
     /// INV: output contains the tuple of removed values, same fields as table
     Delete {
         input: EdgeKey,
+        reference: Ident,
         table: TableKey,
         output: EdgeKey,
     },
@@ -125,6 +125,16 @@ pub(crate) enum LogicalOp {
     /// INV: if refs then output is a record of ref.
     Scan {
         access: TableAccess,
+        table: TableKey,
+        output: EdgeKey,
+    },
+
+    /// Dereference a table reference and place in a variable
+    /// INV: the 'named' not present in the input record
+    DeRef {
+        input: EdgeKey,
+        reference: Ident,
+        named: Ident,
         table: TableKey,
         output: EdgeKey,
     },

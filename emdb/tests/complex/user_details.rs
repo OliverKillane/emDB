@@ -1,5 +1,7 @@
 use emdb::database;
 
+// TODO: update for the removal of genpk
+
 database! {
     impl graph as user_details_view;
     impl simple as user_details;

@@ -1,6 +1,7 @@
 //! # The emQL language frontend
 //! [TokenStream] -> parse -> ([AST] + errors) -> translate -> ([LogicalPlan] + errors) -> [Backend]
 mod ast;
+mod errors;
 mod parse;
 mod trans;
 use std::collections::LinkedList;

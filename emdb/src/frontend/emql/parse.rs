@@ -189,7 +189,6 @@ fn constraint_parser() -> impl TokenParser<Constraint> {
     choices!(
         peekident("unique") => inner("unique", mapsuc(getident(), |i| ConstraintExpr::Unique{field:i})),
         peekident("pred") => inner("pred", mapsuc(syn(collectuntil(isempty())), ConstraintExpr::Pred)),
-        peekident("genpk") => inner("genpk", mapsuc(getident(), |i| ConstraintExpr::GenPK{field:i})),
         peekident("limit") => inner("limit", mapsuc(syn(collectuntil(isempty())), |e| ConstraintExpr::Limit{size:e})),
         otherwise => error(getident(), |i| Diagnostic::spanned(i.span(), Level::Error, format!("expected a constraint (e.g. pred, unique) but got {}", i)))
     )
@@ -350,6 +349,17 @@ fn operator_parse(
             mapsuc(
                 fields_assign(),
                 |fields| FuncOp::Row{fields}
+            )
+        ),
+        peekident("deref") => inner(
+            "deref",
+            mapsuc(
+                seqs!(
+                    getident(),
+                    matchident("as"),
+                    getident()
+                ),
+                |(reference, (_, named))| FuncOp::DeRef { reference, named }
             )
         ),
         peekident("sort") => inner(

@@ -1,6 +1,6 @@
 // TODO: parameterize by span type (want to go to resolved AST spanned by types)
 use proc_macro2::{Ident, Span};
-use syn::{self, Expr, Type};
+use syn::{Expr, Type};
 
 #[derive(Debug)]
 pub(super) enum Operator {
@@ -40,6 +40,10 @@ pub(super) enum FuncOp {
     Row {
         fields: Vec<(Ident, (Type, Expr))>,
     },
+    DeRef {
+        reference: Ident,
+        named: Ident,
+    },
     Sort {
         fields: Vec<(Ident, (SortOrder, Span))>,
     },
@@ -68,7 +72,6 @@ pub(super) struct StreamExpr {
 pub(super) enum ConstraintExpr {
     Unique { field: Ident },
     Pred(Expr),
-    GenPK { field: Ident },
     Limit { size: Expr },
 }
 
