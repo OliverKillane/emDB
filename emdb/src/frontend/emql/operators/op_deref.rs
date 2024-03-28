@@ -51,6 +51,9 @@ impl EMQLOperator for DeRef {
                     RecordData::Scalar(ScalarType::Rust(t)) => Err(singlelist(
                         errors::query_deref_cannot_deref_rust_type(&reference, t),
                     )),
+                    RecordData::Scalar(ScalarType::Bag(t)) => Err(singlelist(
+                        errors::query_deref_cannot_deref_bag_type(lp, &reference, t),
+                    )),
                     RecordData::Scalar(ScalarType::Ref(table_id)) => {
                         let table_id_copy = *table_id;
                         let table_type = lp.tables.get(*table_id).unwrap().get_all_cols_type();

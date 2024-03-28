@@ -25,6 +25,14 @@ impl EMQLOperator for Filter {
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, filter_expr } = self;
-        Err(singlelist(errors::operator_unimplemented(&call)))
+        if let Some(prev) = cont {
+            let out_edge = lp.operator_edges.insert(Edge::Null);
+            let assert_op = lp.operators.insert(LogicalOperator { query: Some(qk), operator: LogicalOp::Filter { input: prev.prev_edge, predicate: filter_expr, output: out_edge } });
+            lp.operator_edges[out_edge] = Edge::Uni { from: assert_op, with: prev.data_type.clone() };
+
+            Ok(StreamContext::Continue(Continue { data_type: prev.data_type, prev_edge: out_edge, last_span: call.span() }))
+        } else {
+            Err(singlelist(errors::query_cannot_start_with_operator(&call)))
+        }
     }
 }

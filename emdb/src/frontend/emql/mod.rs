@@ -19,9 +19,9 @@ pub struct Emql;
 impl Frontend for Emql {
     fn from_tokens(input: TokenStream) -> Result<(Targets, LogicalPlan), LinkedList<Diagnostic>> {
         let ast = parse::parse(input)?;
+        let lp = sem::ast_to_logical(ast)?;
 
         Err(LinkedList::new())
-
         // let (targets, res_ast) = trans::translate(ast)?;
         // Ok((targets, res_ast))
     }

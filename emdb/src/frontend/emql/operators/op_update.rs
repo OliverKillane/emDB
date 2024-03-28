@@ -101,7 +101,7 @@ impl EMQLOperator for Update {
                     Ok(StreamContext::Continue(Continue {
                         data_type: out_data_type,
                         prev_edge: out_edge,
-                        last_span: reference.span(),
+                        last_span: call.span(),
                     }))
                 } else {
                     Err(errors)

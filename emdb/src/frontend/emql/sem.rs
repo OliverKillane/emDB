@@ -14,8 +14,7 @@ use crate::{
 use proc_macro2::{Ident, Span};
 use proc_macro_error::Diagnostic;
 use std::collections::{HashMap, HashSet, LinkedList};
-
-use super::operators::{build_logical};
+use super::operators::build_logical;
 
 pub(super) struct ReturnVal {
     pub span: Span,
@@ -41,7 +40,7 @@ pub(super) enum VarState {
 }
 
 
-fn ast_to_logical(
+pub fn ast_to_logical(
     Ast {
         backends,
         tables,
@@ -218,18 +217,7 @@ fn add_query(
     let params = raw_params
         .into_iter()
         .filter_map(|(name, data_type)| {
-            let dt = match data_type {
-                AstType::RsType(t) => Some(ScalarType::Rust(t)),
-                AstType::TableRef(table_ref) => {
-                    if let Some(table_id) = tn.get(&table_ref) {
-                        Some(ScalarType::Ref(*table_id))
-                    } else {
-                        errors
-                            .push_back(errors::query_param_ref_table_not_found(&name, &table_ref));
-                        None
-                    }
-                }
-            }?;
+            let dt = ast_typeto_scalar(tn, data_type, &mut errors, |e| errors::query_param_ref_table_not_found(&name, e))?;
 
             Some(LogicalQueryParams {
                 name,
@@ -266,7 +254,6 @@ fn add_query(
     if let Some(ret) = ret {
         lp.queries[qk].returnval = Some(ret.index);
     }
-
     errors
 }
 
@@ -281,8 +268,8 @@ fn build_streamexpr(
         Ok(ctx) => {
             let mut errors = LinkedList::new();
             match recur_stream(lp, tn, qk, vs, ctx, &mut errors, con) {
-                Ok(res) => Ok(res),
-                Err(()) => Err(errors),
+                Ok(res) if errors.is_empty()  => Ok(res),
+                _ => Err(errors)
             }
         }
         Err(es) => Err(es),
@@ -378,4 +365,18 @@ pub fn extract_fields<T>(
     }
 
     (map_fields, errors)
+}
+
+pub fn ast_typeto_scalar(tn: &HashMap<Ident, TableKey>, t: AstType, errors: &mut LinkedList<Diagnostic>, err_fn: impl Fn(&Ident) -> Diagnostic,) -> Option<ScalarType> {
+    match t {
+        AstType::RsType(t) => Some(ScalarType::Rust(t)),
+        AstType::TableRef(table_ref) => {
+            if let Some(table_id) = tn.get(&table_ref) {
+                Some(ScalarType::Ref(*table_id))
+            } else {
+                errors.push_back(err_fn(&table_ref));
+                None
+            }
+        }
+    }
 }

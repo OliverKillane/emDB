@@ -8,11 +8,16 @@
 //! ```
 //!
 
+use std::collections::HashMap;
+
 use crate::plan::helpers::*;
-use crate::plan::repr::{LogicalPlan, Record, RecordData};
+use crate::plan::repr::{LogicalPlan, Record, RecordData, TableKey};
+use itertools::Itertools;
 use proc_macro2::{Ident, Span};
 use proc_macro_error::{Diagnostic, Level};
 use syn::Type;
+
+use super::sem::VarState;
 
 const BACKEND: &str = "TABLE";
 const TABLE: &str = "TABLE";
@@ -523,12 +528,15 @@ pub(super) fn query_use_variable_already_used(
     .span_error(used, "And consumed here".to_owned())
 }
 
-pub(super) fn query_invalid_use(usage: &Ident) -> Diagnostic {
+pub(super) fn query_invalid_use(usage: &Ident, tn: &HashMap<Ident, TableKey>, vs: &HashMap<Ident, VarState>) -> Diagnostic {
     let err_name = error_name(QUERY, 33);
+    let vars = vs.iter().filter_map(|(var, state)| if matches!(state, VarState::Available { .. }) {Some(var)} else {None} ).join(", ");
+    let tables = tn.keys().join(", ");
     Diagnostic::spanned(usage.span(), Level::Error, format!(
         "{err_name} Invalid use of variable `{usage}`",
-    )).help(format!(
-        "Either use an existing table or variable, or make a new table `table {usage} {{ ... }} @ [ ... ]` or a new variable ` ... |> let {usage}`"
+    )).help(format!("Currently available variables are {vars}, and tables {tables}"  ))
+    .help(format!(
+        "To introduce a new `{usage}` make a new table `table {usage} {{ ... }} @ [ ... ]` or a new variable ` ... |> let {usage}`"
     ))
 }
 
@@ -550,6 +558,40 @@ pub(super) fn query_let_variable_already_assigned(
         diag
     }
 }
+
+pub(super) fn query_deref_cannot_deref_bag_type(
+    lp: &LogicalPlan,
+    reference: &Ident,
+    t: &Record,
+) -> Diagnostic {
+    let err_name = error_name(QUERY, 35);
+    Diagnostic::spanned(
+        reference.span(),
+        Level::Error,
+        format!(
+            "{err_name} Cannot dereference a bag of records `{}`",
+            WithPlan {
+                plan: lp,
+                extended: t
+            }
+        ),
+    )
+}
+pub(super) fn query_cannot_return_stream(
+    last: Span,
+    ret: Span,
+) -> Diagnostic {
+    let err_name = error_name(QUERY, 36);
+    Diagnostic::spanned(
+        ret,
+        Level::Error,
+        format!(
+            "{err_name} Cannot return a stream from a query",
+        ),
+    ).span_note(last, "The previous operator provides the values".to_owned())
+    .help(format!("Use a `collect` operator to convert the stream into a bag of records"))
+}
+
 
 pub(super) fn operator_unimplemented(call: &Ident) -> Diagnostic {
     Diagnostic::spanned(

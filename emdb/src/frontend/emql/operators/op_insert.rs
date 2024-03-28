@@ -51,7 +51,7 @@ impl EMQLOperator for Insert {
                         }
                         Some(
                             other
-                            @ (RecordData::Scalar(ScalarType::Ref(_)) | RecordData::Record(_)),
+                            @ (RecordData::Scalar(ScalarType::Ref(_) | ScalarType::Bag(_)) | RecordData::Record(_)),
                         ) => {
                             errors.push_back(errors::query_insert_field_type_mismatch(
                                 lp,

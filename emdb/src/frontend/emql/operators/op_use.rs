@@ -62,7 +62,7 @@ impl EMQLOperator for Use {
                     }
                 }
             } else {
-                Err(singlelist(errors::query_invalid_use(&var_name)))
+                Err(singlelist(errors::query_invalid_use(&var_name, tn, vs)))
             }
         } else {
             Err(singlelist(errors::query_operator_cannot_come_first(&call)))

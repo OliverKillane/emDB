@@ -119,6 +119,6 @@ create_operator!(Operator as
     op_deref::DeRef, 
     op_sort::Sort, 
     op_fold::Fold, 
-    op_assert::Assert, 
+    op_assert::Assert,
     op_collect::Collect
 );

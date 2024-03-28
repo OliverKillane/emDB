@@ -35,6 +35,7 @@ pub(crate) struct LogicalTable {
 pub(crate) enum ScalarType {
     Ref(TableKey), // Represented by Ref<table type>
     Rust(Type),
+    Bag(Record), // Used by collect
 }
 
 #[derive(Clone)]
@@ -150,7 +151,7 @@ pub(crate) enum LogicalOp {
     /// INV: mapping expressions only contain fields from input and globals
     Map {
         input: EdgeKey,
-        mapping: HashMap<Ident, (Type, Expr)>,
+        mapping: HashMap<Ident, Expr>,
         output: EdgeKey,
     },
 
@@ -205,7 +206,7 @@ pub(crate) enum LogicalOp {
     /// INV: output matches fields
     /// INV: output is a single
     Row {
-        fields: HashMap<Ident, (Type, Expr)>,
+        fields: HashMap<Ident, Expr>,
         output: EdgeKey,
     },
 
@@ -218,6 +219,13 @@ pub(crate) enum LogicalOp {
     // Stream Control ==========================================================
     /// Return values from a query
     Return { input: EdgeKey },
+
+
+    // Logical Sugar ===========================================================
+    /// A fold that outputs a collection of all data input, included here to allow 
+    /// the optimiser to reason more easily about the data structure size & type
+    /// given many queries collect multiple rows.
+    Collect {input: EdgeKey, output: EdgeKey}
 }
 
 pub(crate) enum SortOrder {

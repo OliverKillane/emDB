@@ -12,7 +12,6 @@ database! {
     //    two tables for premium & non-premium users
     //  - Very simple table
     table users {
-        id: usize,
         name: String,
         premium: bool,
         credits: i32,
@@ -28,7 +27,7 @@ database! {
     //   - Move semantics (taking ownership of data structure from outside the database)
     query new_user(username: String, prem: bool) {
         row(name: String = username, premium: bool = prem, credits: i32 = 0 )
-            |> insert(users)
+            ~> insert(users)
             ~> return;
     }
 
@@ -37,8 +36,9 @@ database! {
     // Reasoning:
     //   - Performance reliant on access to users data structure
     //     hence need to make a good choice of mapping (user id -> data) here.
-    query get_info(user_id: usize) {
-        unique(users for id as user_id)
+    query get_info(user_id: ref users) {
+        row(it: ref users = user_id)
+            ~> deref(it as userdata) 
             ~> return;
     }
 
@@ -61,9 +61,9 @@ database! {
     //   - Need to apply constraint immediately
     //   - Need to index data structure
     //   - Database can see only credits is updated
-    query add_credits(user: usize, creds: i32) {
-        unique(ref users for id as user)
-            ~> update(it use credits = credits + creds);
+    query add_credits(user: ref users, creds: i32) {
+        row(user_id: ref users = users)
+            ~> update(user_id use credits = credits + creds);
     }
 
     // Description:
@@ -74,9 +74,10 @@ database! {
     //   - can be inlined to very simple iterate over &mut and increment sum
     query reward_premium(cred_bonus: f32) {
         ref users
+            |> deref(users as it)
             |> filter(it.premium)
-            |> map(user: users::Ref = it, new_creds: i32 = ((it.credits as f32) * cred_bonus) as i32)
-            |> update(it use credits = new_creds)
+            |> map(users: ref users = users, new_creds: i32 = ((it.credits as f32) * cred_bonus) as i32)
+            |> update(users use credits = new_creds)
             |> map(creds: i32 = new_creds)
             |> fold((sum: i64 = 0) => (sum = sum + creds))
             ~> return;

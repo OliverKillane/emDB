@@ -12,14 +12,14 @@ database! {
     // cool comment here
     query insert(a_initial: i32) {
         row(a: i32 = a_initial, b: String = "hello".to_string(), c: (u32, i32) = (0, 0))
-            |> insert(simple)
+            ~> insert(simple)
             ~> return;
     }
 
     table other {} @ [pred(1 + 1 == 2)]
 
     query update_b(new_b: String) {
-        ref simple |> update(it use b = new_b) |> return;
+        ref simple |> update(simple use b = new_b) |> collect ~> return;
     }
 
     query single_maths() {

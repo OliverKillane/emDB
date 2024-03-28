@@ -27,15 +27,19 @@ impl EMQLOperator for Return {
             last_span,
         }) = cont
         {
-            let return_op = lp.operators.insert(LogicalOperator {
-                query: Some(qk),
-                operator: LogicalOp::Return { input: prev_edge },
-            });
-
-            Ok(StreamContext::Returned(ReturnVal {
-                span: call.span(),
-                index: return_op,
-            }))
+            if data_type.stream {
+                Err(singlelist(errors::query_cannot_return_stream(last_span, call.span())))
+            } else {
+                let return_op = lp.operators.insert(LogicalOperator {
+                    query: Some(qk),
+                    operator: LogicalOp::Return { input: prev_edge },
+                });
+    
+                Ok(StreamContext::Returned(ReturnVal {
+                    span: call.span(),
+                    index: return_op,
+                }))
+            }
         } else {
             Err(singlelist(errors::query_cannot_start_with_operator(&call)))
         }

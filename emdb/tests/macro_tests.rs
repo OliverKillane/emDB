@@ -1,13 +1,15 @@
-// use emdb::database;
+use emdb::database;
 
-// database! {
-//     imaapl cool as my_db;
+database!{
+    impl graph as my_db;
 
-//     table users {
-//         a: ~,
-//     } @ [ pred(a < {77%}), genpk(a)]
+    table simple {
+        a: i32,
+        b: String,
+        c: (u32, i32),
+    } @ [unique(a), pred(c.0 > c.1) as c_predicate, pred(b.len() < 10) as b_length]
 
-//     query bob() {
-
-//     }
-// }
+    query cool() {
+        use simple |> collect ~> return;
+    }
+}

@@ -1,5 +1,7 @@
 //! Functions for building [super::repr::LogicalPlan]
-use std::fmt::{Debug, Display};
+use std::fmt::Display;
+
+use quote::ToTokens;
 
 use crate::plan::repr::{RecordData, ScalarType};
 
@@ -55,7 +57,13 @@ impl<'a, 'b> Display for WithPlan<'a, &'b ScalarType> {
                 // INV: the type is valid => the index is in the plan
                 write!(f, "ref {}", self.plan.tables.get(*t).unwrap().name)
             }
-            ScalarType::Rust(t) => t.fmt(f),
+            ScalarType::Rust(t) => t.to_token_stream().fmt(f),
+            ScalarType::Bag(b) => {
+                write!(f, "collected {{{}}}", WithPlan {
+                    plan: self.plan,
+                    extended: b
+                })
+            }
         }
     }
 }
