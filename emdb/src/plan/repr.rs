@@ -32,10 +32,15 @@ pub(crate) struct LogicalTable {
 }
 
 #[derive(Clone)]
-pub(crate) enum RecordData {
-    Record(Record),
+pub(crate) enum ScalarType {
     Ref(TableKey), // Represented by Ref<table type>
     Rust(Type),
+}
+
+#[derive(Clone)]
+pub(crate) enum RecordData {
+    Record(Record),
+    Scalar(ScalarType),
 }
 #[derive(Clone)]
 pub(crate) struct Record {
@@ -231,7 +236,7 @@ pub(crate) struct LogicalQuery {
 
 pub(crate) struct LogicalQueryParams {
     pub(crate) name: Ident,
-    pub(crate) data_type: Type,
+    pub(crate) data_type: ScalarType,
 }
 
 pub(crate) struct LogicalPlan {

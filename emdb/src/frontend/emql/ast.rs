@@ -1,58 +1,12 @@
 // TODO: parameterize by span type (want to go to resolved AST spanned by types)
+use super::operators::Operator;
 use proc_macro2::{Ident, Span};
 use syn::{Expr, Type};
 
 #[derive(Debug)]
-pub(super) enum Operator {
-    Ret { ret_span: Span },
-    Ref { ref_span: Span, table_name: Ident },
-    Let { let_span: Span, var_name: Ident },
-    Use { use_span: Span, var_name: Ident },
-    FuncOp { fn_span: Span, op: FuncOp },
-}
-
-#[derive(Debug)]
-pub(super) enum SortOrder {
-    Asc,
-    Desc,
-}
-
-#[derive(Debug)]
-pub(super) enum FuncOp {
-    Update {
-        reference: Ident,
-        fields: Vec<(Ident, Expr)>,
-    },
-    Insert {
-        table_name: Ident,
-    },
-    Delete,
-    Map {
-        new_fields: Vec<(Ident, (Type, Expr))>,
-    },
-    Unique {
-        table: Ident,
-        refs: bool,
-        unique_field: Ident,
-        from_expr: Expr,
-    },
-    Filter(Expr),
-    Row {
-        fields: Vec<(Ident, (Type, Expr))>,
-    },
-    DeRef {
-        reference: Ident,
-        named: Ident,
-    },
-    Sort {
-        fields: Vec<(Ident, (SortOrder, Span))>,
-    },
-    Fold {
-        initial: Vec<(Ident, (Type, Expr))>,
-        update: Vec<(Ident, Expr)>,
-    },
-    Assert(Expr),
-    Collect,
+pub(super) enum AstType {
+    RsType(syn::Type),
+    TableRef(Ident),
 }
 
 #[derive(Debug)]
@@ -85,14 +39,14 @@ pub(super) struct Constraint {
 #[derive(Debug)]
 pub(super) struct Table {
     pub name: Ident,
-    pub cols: Vec<(Ident, syn::Type)>,
+    pub cols: Vec<(Ident, Type)>,
     pub cons: Vec<Constraint>,
 }
 
 #[derive(Debug)]
 pub(super) struct Query {
     pub name: Ident,
-    pub params: Vec<(Ident, syn::Type)>,
+    pub params: Vec<(Ident, AstType)>,
     pub streams: Vec<StreamExpr>,
 }
 
