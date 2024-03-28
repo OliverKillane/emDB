@@ -1,5 +1,5 @@
 //! Functions for building [super::repr::LogicalPlan]
-use std::fmt::{write, Debug, Display};
+use std::fmt::{Debug, Display};
 
 use crate::plan::repr::{RecordData, ScalarType};
 

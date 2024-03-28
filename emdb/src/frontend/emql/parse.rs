@@ -1,4 +1,4 @@
-use std::collections::LinkedList;
+use std::collections::{LinkedList};
 
 use proc_macro2::{Delimiter, Ident, Span, TokenStream};
 use proc_macro_error::{Diagnostic, Level};
@@ -23,7 +23,7 @@ use combi::{
             peekpunct, recovgroup, syn, terminal,
         },
         derived::{listseptrailing, syntopunct},
-        error::{embelisherr, error, expectederr},
+        error::{embelisherr, error},
         recovery::until,
         TokenDiagnostic, TokenIter, TokenParser,
     },
@@ -112,7 +112,7 @@ fn backend_parser() -> impl TokenParser<BackendImpl> {
 }
 
 fn query_parser() -> impl TokenParser<Query> {
-    expectederr(mapsuc(
+    mapsuc(
         seqs!(
             matchident("query"),
             getident(),
@@ -124,7 +124,7 @@ fn query_parser() -> impl TokenParser<Query> {
             params,
             streams,
         },
-    ))
+    )
 }
 
 fn table_parser() -> impl TokenParser<Table> {
@@ -153,15 +153,12 @@ fn table_parser() -> impl TokenParser<Table> {
 }
 
 fn member_list_parser() -> impl TokenParser<Vec<(Ident, Type)>> {
-    setrepr(
-        listseptrailing(
-            ',',
-            mapsuc(
-                seqs!(getident(), matchpunct(':'), syntopunct(peekpunct(','))),
-                |(m, (_, t))| (m, t),
-            ),
+    listseptrailing(
+        ',',
+        mapsuc(
+            seqs!(getident(), matchpunct(':'), syntopunct(peekpunct(','))),
+            |(m, (_, t))| (m, t),
         ),
-        "<name> : <Type>, ...",
     )
 }
 
@@ -263,10 +260,43 @@ fn stream_parser() -> impl TokenParser<StreamExpr> {
     })
 }
 
-// TODO: duplicated code
 fn type_parser(punct: char) -> impl TokenParser<AstType> {
     choices! {
         peekident("ref") => mapsuc(seq(matchident("ref"), getident()), |(_, i)| AstType::TableRef(i)),
         otherwise => mapsuc(syntopunct(peekpunct(punct)), AstType::RsType)
     }
+}
+
+// helper function for the functional style operators
+pub fn functional_style<T>(
+    name: &'static str,
+    p: impl TokenParser<T>,
+) -> impl TokenParser<(Ident, T)> {
+    seq(matchident(name), recovgroup(Delimiter::Parenthesis, p))
+}
+
+pub fn fields_expr() -> impl TokenParser<Vec<(Ident, Expr)>> {
+    listseptrailing(
+        ',',
+        mapsuc(
+            seqs!(getident(), matchpunct('='), syntopunct(peekpunct(','))),
+            |(id, (_, exp))| (id, exp),
+        ),
+    )
+}
+
+pub fn fields_assign() -> impl TokenParser<Vec<(Ident, (AstType, Expr))>> {
+    listseptrailing(
+        ',',
+        mapsuc(
+            seqs!(
+                getident(),
+                matchpunct(':'),
+                type_parser('='),
+                matchpunct('='),
+                syntopunct(peekpunct(','))
+            ),
+            |(id, (_, (t, (_, e))))| (id, (t, e)),
+        ),
+    )
 }

@@ -8,18 +8,38 @@ use crate::{
         errors,
     },
     plan::repr::{
-        Edge, EdgeKey, LogicalColumn, LogicalColumnConstraint, LogicalOp, LogicalOperator,
-        LogicalPlan, LogicalQuery, LogicalQueryParams, LogicalRowConstraint, LogicalTable, OpKey,
-        QueryKey, Record, RecordData, ScalarType, TableAccess, TableKey, UniqueCons,
+        Record, EdgeKey, LogicalColumn, LogicalColumnConstraint, LogicalPlan, LogicalQuery, LogicalQueryParams, LogicalRowConstraint, LogicalTable, OpKey, QueryKey, ScalarType, TableKey, UniqueCons
     },
-    utils::misc::singlelist,
 };
 use proc_macro2::{Ident, Span};
-use proc_macro_error::{Diagnostic, Level};
+use proc_macro_error::Diagnostic;
 use std::collections::{HashMap, HashSet, LinkedList};
-use syn::Expr;
 
-use super::operators::{build_logical, Continue, ReturnVal, StreamContext, VarState};
+use super::operators::{build_logical};
+
+pub(super) struct ReturnVal {
+    pub span: Span,
+    pub index: OpKey,
+}
+
+#[derive(Clone)]
+pub(super) struct Continue {
+    pub data_type: Record,
+    pub prev_edge: EdgeKey,
+    pub last_span: Span,
+}
+
+pub(super) enum StreamContext {
+    Nothing { last_span: Span },
+    Returned(ReturnVal),
+    Continue(Continue),
+}
+
+pub(super) enum VarState {
+    Used { created: Span, used: Span },
+    Available { created: Span, state: Continue },
+}
+
 
 fn ast_to_logical(
     Ast {
@@ -176,11 +196,6 @@ fn add_table(
     errs
 }
 
-/// Adds a new query from the AST to the logical plan
-///
-/// Checks for:
-/// - Duplicate query names
-/// - DUplicate returns
 fn add_query(
     lp: &mut LogicalPlan,
     qs: &mut HashSet<Ident>,
@@ -253,25 +268,6 @@ fn add_query(
     }
 
     errors
-}
-
-// TODO: duplicated code
-/// helper for extracting a map of unique fields by Ident
-fn extract_fields<T>(
-    fields: Vec<(Ident, T)>,
-    err_fn: impl Fn(&Ident, &Ident) -> Diagnostic,
-) -> (HashMap<Ident, T>, LinkedList<Diagnostic>) {
-    let mut map_fields: HashMap<Ident, T> = HashMap::with_capacity(fields.len());
-    let mut errors = LinkedList::new();
-    for (id, content) in fields {
-        if let Some((other_id, _)) = map_fields.get_key_value(&id) {
-            errors.push_back(err_fn(&id, other_id));
-        } else {
-            map_fields.insert(id, content);
-        }
-    }
-
-    (map_fields, errors)
 }
 
 fn build_streamexpr(
@@ -363,4 +359,23 @@ fn recur_stream(
             Err(())
         }
     }
+}
+
+
+/// helper for extracting a map of unique fields by Ident
+pub fn extract_fields<T>(
+    fields: Vec<(Ident, T)>,
+    err_fn: impl Fn(&Ident, &Ident) -> Diagnostic,
+) -> (HashMap<Ident, T>, LinkedList<Diagnostic>) {
+    let mut map_fields: HashMap<Ident, T> = HashMap::with_capacity(fields.len());
+    let mut errors = LinkedList::new();
+    for (id, content) in fields {
+        if let Some((other_id, _)) = map_fields.get_key_value(&id) {
+            errors.push_back(err_fn(&id, other_id));
+        } else {
+            map_fields.insert(id, content);
+        }
+    }
+
+    (map_fields, errors)
 }

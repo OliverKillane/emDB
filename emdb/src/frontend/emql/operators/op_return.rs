@@ -6,7 +6,7 @@ pub struct Return {
 }
 
 impl EMQLOperator for Return {
-    const NAME: &'static str = "ret";
+    const NAME: &'static str = "return";
 
     fn build_parser() -> impl TokenParser<Self> {
         mapsuc(matchident(Self::NAME), |call| Return { call })

@@ -31,7 +31,8 @@ database!{
     query collect_most_cool() {
         ref cool
             |> deref(it as cool_vals)
-            |> sort(cool_vals.something desc)
+            |> map(sort_on: i32 = cool_vals.something)
+            |> sort(sort_on desc)
             |> truncate(10)
             |> map(id: ref cool = it)
             |> collect()
@@ -40,7 +41,7 @@ database!{
 
     query complex() {
         use cool 
-            |> map(x i32 = cool_val)
+            |> map(x: i32 = cool_val)
             |> filter(x > 10)
             |> let large_than_10;
         

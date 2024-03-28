@@ -17,7 +17,6 @@ database! {
         premium: bool,
         credits: i32,
     } @ [
-        genpk(id),
         pred(premium || credits > 0) as prem_credits
     ]
 
@@ -52,7 +51,7 @@ database! {
     //    - choosing a data structure for `users` table that is good for iteration
     query get_snapshot() {
         use users
-            |> collect()
+            |> collect
             ~> return;
     }
 

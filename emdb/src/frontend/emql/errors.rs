@@ -9,7 +9,7 @@
 //!
 
 use crate::plan::helpers::*;
-use crate::plan::repr::{LogicalPlan, Record, RecordData, TableKey};
+use crate::plan::repr::{LogicalPlan, Record, RecordData};
 use proc_macro2::{Ident, Span};
 use proc_macro_error::{Diagnostic, Level};
 use syn::Type;
