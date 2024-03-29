@@ -31,6 +31,7 @@ pub(crate) struct LogicalTable {
     pub(crate) columns: HashMap<Ident, LogicalColumn>,
 }
 
+
 #[derive(Clone)]
 pub(crate) enum ScalarType {
     Ref(TableKey), // Represented by Ref<table type>

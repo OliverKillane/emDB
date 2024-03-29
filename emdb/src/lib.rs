@@ -12,6 +12,8 @@ mod frontend;
 mod plan;
 mod utils;
 
+mod newplan;
+
 use crate::backend::{Backend, GraphViz, Simple};
 use crate::frontend::{Emql, Frontend};
 

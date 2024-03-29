@@ -1,10 +1,13 @@
+use combi::tokens::{basic::peekpunct, derived::syntopunct};
+
+use crate::frontend::emql::parse::type_parser;
+
 use super::*;
 
 #[derive(Debug)]
 pub struct Fold {
     call: Ident,
-    initial: Vec<(Ident, (AstType, Expr))>,
-    update: Vec<(Ident, Expr)>,
+    fields: Vec<(Ident, (AstType, Expr, Expr))>
 }
 
 impl EMQLOperator for Fold {
@@ -14,17 +17,25 @@ impl EMQLOperator for Fold {
         mapsuc(
             functional_style(
                 Self::NAME,
-                seqs!(
-                    recovgroup(Delimiter::Parenthesis, fields_assign()),
-                    matchpunct('='),
-                    matchpunct('>'),
-                    recovgroup(Delimiter::Parenthesis, fields_expr())
-                ),
+                listseptrailing(',',
+    mapsuc(
+            seqs!(
+                getident(),
+                matchpunct(':'),
+                type_parser('='),
+                matchpunct('='),
+                syntopunct(peekpunct('-')),
+                matchpunct('-'),
+                matchpunct('>'),
+                syntopunct(peekpunct(','))
             ),
-            |(call, (initial, (_, (_, update))))| Fold {
+            |(id, (_, (t, (_, (initial, (_, (_, update)))))))| (id, (t, initial, update))
+        )
+    ),
+            ),
+            |(call, fields)| Fold {
                 call,
-                initial,
-                update,
+                fields
             },
         )
     }
@@ -39,9 +50,20 @@ impl EMQLOperator for Fold {
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self {
             call,
-            initial,
-            update,
+            fields
         } = self;
-        Err(singlelist(errors::operator_unimplemented(&call)))
+        if let Some(Continue { data_type, prev_edge, last_span }) = cont {
+            // must input stream
+            // create output type
+            // bing chilling
+
+
+
+          Err(singlelist(errors::operator_unimplemented(&call)))
+
+
+        } else {
+            Err(singlelist(errors::query_cannot_start_with_operator(&call)))
+        }
     }
 }

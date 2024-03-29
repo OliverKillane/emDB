@@ -260,7 +260,7 @@ fn stream_parser() -> impl TokenParser<StreamExpr> {
     })
 }
 
-fn type_parser(punct: char) -> impl TokenParser<AstType> {
+pub fn type_parser(punct: char) -> impl TokenParser<AstType> {
     choices! {
         peekident("ref") => mapsuc(seq(matchident("ref"), getident()), |(_, i)| AstType::TableRef(i)),
         otherwise => mapsuc(syntopunct(peekpunct(punct)), AstType::RsType)

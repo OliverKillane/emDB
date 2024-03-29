@@ -79,7 +79,7 @@ database! {
             |> map(users: ref users = users, new_creds: i32 = ((it.credits as f32) * cred_bonus) as i32)
             |> update(users use credits = new_creds)
             |> map(creds: i32 = new_creds)
-            |> fold((sum: i64 = 0) => (sum = sum + creds))
+            |> fold(sum: i64 = 0 -> sum + creds)
             ~> return;
     }
 
@@ -92,7 +92,7 @@ database! {
         use users
             |> filter(premium)
             |> map(credits: i64 = credits)
-            |> fold((sum: i64 = 0) => (sum = sum + credits))
+            |> fold(sum: i64 = 0 -> sum + credits)
             ~> return;
     }
 }

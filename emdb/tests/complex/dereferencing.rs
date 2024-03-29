@@ -33,9 +33,10 @@ database!{
             |> deref(it as cool_vals)
             |> map(sort_on: i32 = cool_vals.something)
             |> sort(sort_on desc)
-            |> truncate(10)
+            |> take(10)
             |> map(id: ref cool = it)
-            |> collect()
+            |> collect(type foo)
+            ~> map(blah: type foo = it. c: i32 = 0)
             ~> return;
     }
 

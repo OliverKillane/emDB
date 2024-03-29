@@ -18,14 +18,14 @@ use combi::{
     tokens::{
         basic::{
             collectuntil, getident, gettoken, isempty, matchident, matchpunct, peekident,
-            recovgroup, syn,
+            syn,
         },
         derived::listseptrailing,
         error::error,
         TokenParser,
     },
 };
-use proc_macro2::{Delimiter, Ident, Span};
+use proc_macro2::{Ident, Span};
 use proc_macro_error::{Diagnostic, Level};
 use std::{
     collections::{HashMap, LinkedList},

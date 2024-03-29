@@ -15,9 +15,10 @@ database! {
             |> groupby( age for { 
                     map(len: usize = forename.len(), surname: String = surname ) 
                  |> sort(len desc) 
-                 |> first() 
+                 |> collect(type foo)
               })
-            |> return;
+            |> map(age, b: type foo = )
+            ~> return;
     }
 
 }
