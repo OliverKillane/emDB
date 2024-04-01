@@ -1,3 +1,5 @@
+use self::plan::RecordConc;
+
 use super::*;
 use super::super::sem::ast_typeto_scalar;
 
@@ -19,10 +21,12 @@ impl EMQLOperator for Map {
 
     fn build_logical(
         self,
-        lp: &mut LogicalPlan,
-        tn: &HashMap<Ident, TableKey>,
-        qk: QueryKey,
+        lp: &mut plan::LogicalPlan,
+        tn: &HashMap<Ident, plan::Key<plan::Table>>,
+        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
+        ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
+        mo: &mut Option<plan::Key<plan::Operator>>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, new_fields } = self;
@@ -32,22 +36,37 @@ impl EMQLOperator for Map {
             let mut type_fields = HashMap::new();
             let mut expr_fields = HashMap::new();
 
-            for (field, (dt, expr)) in fields.into_iter().filter_map(|(field, (ast_type, expr))| {let dt = RecordData::Scalar(ast_typeto_scalar(tn, ast_type, &mut errors, |e| errors::query_nonexistent_table(&call, e))?); Some((field, (dt, expr)))} ) {
-                type_fields.insert(field.clone(), dt);
-                expr_fields.insert(field, expr);
+            for (field, (ast_type, expr)) in fields.into_iter() {
+                match ast_typeto_scalar(tn, ts, ast_type, |e| errors::query_nonexistent_table(&call, e), errors::query_no_cust_type_found) {
+                    Ok(t) => {
+                        let t_index = lp.scalar_types.insert(t);
+                        type_fields.insert(field.clone(), t_index);
+                        expr_fields.insert(field, expr);
+                    },
+                    Err(e) => {
+                        errors.push_back(e);
+                    }
+                }
             }
 
-            
             if errors.is_empty() {
-                let dt = Record { fields: type_fields, stream: data_type.stream };
+                let data = plan::Data {
+                    fields: lp.record_types.insert(plan::ConcRef::Conc(RecordConc { fields: type_fields })),
+                    stream: data_type.stream,
+                };
 
-                let out_edge = lp.operator_edges.insert(Edge::Null);
-                let row_op = lp.operators.insert(LogicalOperator { query: Some(qk), operator: LogicalOp::Map { input: prev_edge, mapping: expr_fields, output: out_edge } });
-                lp.operator_edges[out_edge] = Edge::Uni { from: row_op, with: dt.clone() };
+                let out_edge = lp.operator_edges.insert(plan::DataFlow::Null);
+                
+                let map_op = lp.operators.insert(plan::Operator {
+                    query: qk,
+                    kind: plan::OperatorKind::Pure(plan::PureOperator::Map { input: prev_edge, mapping: expr_fields, output: out_edge  }),
+                });
+                
+                lp.operator_edges[out_edge] = plan::DataFlow::Incomplete { from: map_op, with: data.clone() };
 
                 Ok(
                     StreamContext::Continue(Continue {
-                        data_type: dt,
+                        data_type: data,
                         prev_edge: out_edge,
                         last_span: call.span(),
                     })

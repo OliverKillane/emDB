@@ -4,54 +4,54 @@ use super::*;
 pub struct Ref {
     call: Ident,
     table_name: Ident,
+    out_ref: Ident,
 }
 
 impl EMQLOperator for Ref {
     const NAME: &'static str = "ref";
 
     fn build_parser() -> impl TokenParser<Self> {
-        mapsuc(seq(matchident("ref"), getident()), |(call, table_name)| {
-            Ref { call, table_name }
+        mapsuc(seqs!(
+            matchident("ref"), 
+            getident(),
+            matchident("as"),
+            getident()
+        ), |(call, (table_name, (_, out_ref)))| {
+            Ref { call, table_name, out_ref }
         })
     }
 
     fn build_logical(
         self,
-        lp: &mut LogicalPlan,
-        tn: &HashMap<Ident, TableKey>,
-        qk: QueryKey,
+        lp: &mut plan::LogicalPlan,
+        tn: &HashMap<Ident, plan::Key<plan::Table>>,
+        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
+        ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
+        mo: &mut Option<plan::Key<plan::Operator>>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
-        let Self { call, table_name } = self;
+        let Self { call, table_name, out_ref } = self;
         if cont.is_none() {
             if let Some(table_id) = tn.get(&table_name) {
-                let data_type = Record {
-                    fields: HashMap::from([(
-                        table_name,
-                        RecordData::Scalar(ScalarType::Ref(*table_id)),
-                    )]),
-                    stream: true,
+                let access = plan::TableAccess::Ref(out_ref.clone());
+                let record_out = plan::Data {
+                    fields: plan::generate_access(*table_id, access.clone(), lp).unwrap(),
+                    stream: true
                 };
-
-                let out_edge = lp.operator_edges.insert(Edge::Null);
-
-                let ref_op = lp.operators.insert(LogicalOperator {
-                    query: Some(qk),
-                    operator: LogicalOp::Scan {
-                        access: TableAccess::Ref,
-                        table: *table_id,
-                        output: out_edge,
-                    },
+                let out_edge = lp.operator_edges.insert(plan::DataFlow::Null);
+                let ref_op = lp.operators.insert(plan::Operator {
+                    query: qk,
+                    kind: plan::OperatorKind::Access { access_after: mo.clone(), op: plan::AccessOperator::Scan { access , table: *table_id, output: out_edge } },
                 });
-
-                lp.operator_edges[out_edge] = Edge::Uni {
+                
+                lp.operator_edges[out_edge] = plan::DataFlow::Incomplete {
                     from: ref_op,
-                    with: data_type.clone(),
+                    with: record_out.clone(),
                 };
 
                 Ok(StreamContext::Continue(Continue {
-                    data_type,
+                    data_type: record_out,
                     prev_edge: out_edge,
                     last_span: call.span(),
                 }))

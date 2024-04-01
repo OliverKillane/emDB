@@ -1,30 +1,28 @@
+use super::operators::build_logical;
 use crate::{
-    backend::{BackendTypes, GraphViz, Simple},
+    backend,
     frontend::emql::{
         ast::{
-            Ast, AstType, BackendImpl, BackendKind, Connector, Constraint, ConstraintExpr, Query,
-            StreamExpr, Table,
+            Ast, AstType, BackendImpl, Connector, Constraint, ConstraintExpr, Query, StreamExpr,
+            Table,
         },
         errors,
     },
-    plan::repr::{
-        Record, EdgeKey, LogicalColumn, LogicalColumnConstraint, LogicalPlan, LogicalQuery, LogicalQueryParams, LogicalRowConstraint, LogicalTable, OpKey, QueryKey, ScalarType, TableKey, UniqueCons
-    },
+    plan,
 };
 use proc_macro2::{Ident, Span};
 use proc_macro_error::Diagnostic;
 use std::collections::{HashMap, HashSet, LinkedList};
-use super::operators::build_logical;
 
 pub(super) struct ReturnVal {
     pub span: Span,
-    pub index: OpKey,
+    pub index: plan::Key<plan::Operator>,
 }
 
 #[derive(Clone)]
 pub(super) struct Continue {
-    pub data_type: Record,
-    pub prev_edge: EdgeKey,
+    pub data_type: plan::Data,
+    pub prev_edge: plan::Key<plan::DataFlow>,
     pub last_span: Span,
 }
 
@@ -39,16 +37,15 @@ pub(super) enum VarState {
     Available { created: Span, state: Continue },
 }
 
-
 pub fn ast_to_logical(
     Ast {
         backends,
         tables,
         queries,
     }: Ast,
-) -> Result<LogicalPlan, LinkedList<Diagnostic>> {
+) -> Result<(plan::LogicalPlan, backend::Targets), LinkedList<Diagnostic>> {
     let mut errors = LinkedList::new();
-    let mut lp = LogicalPlan::new();
+    let mut lp = plan::LogicalPlan::new();
     let mut qs = HashSet::new();
     let mut tn = HashMap::new();
     let mut bks = HashMap::new();
@@ -66,53 +63,56 @@ pub fn ast_to_logical(
     }
 
     if errors.is_empty() {
-        Ok(lp)
+        Ok((lp, backend::Targets { impls: bks }))
     } else {
         Err(errors)
     }
 }
 
 fn add_backend(
-    bks: &mut HashMap<Ident, BackendTypes>,
-    BackendImpl { name, target }: BackendImpl,
+    bks: &mut HashMap<Ident, backend::Backend>,
+    BackendImpl {
+        impl_name,
+        backend_name,
+        options,
+    }: BackendImpl,
 ) -> LinkedList<Diagnostic> {
-    let mut errors = LinkedList::new();
-    if let Some((other_name, _)) = bks.get_key_value(&name) {
-        errors.push_back(errors::backend_redefined(&name, other_name));
-    } else {
-        bks.insert(
-            name,
-            match target {
-                BackendKind::Graph => BackendTypes::GraphViz(GraphViz),
-                BackendKind::Simple => BackendTypes::Simple(Simple),
-            },
-        );
+    let (i, mut errors) = match backend::parse_options(backend_name, options) {
+        Ok(b) => (Some(b), LinkedList::new()),
+        Err(es) => (None, es),
+    };
+
+    if let Some((other_name, _)) = bks.get_key_value(&impl_name) {
+        errors.push_back(errors::backend_redefined(&impl_name, other_name));
+    } else if let Some(b) = i {
+        bks.insert(impl_name, b);
     }
     errors
 }
 
 fn add_table(
-    lp: &mut LogicalPlan,
-    tn: &mut HashMap<Ident, TableKey>,
+    lp: &mut plan::LogicalPlan,
+    tn: &mut HashMap<Ident, plan::Key<plan::Table>>,
     Table { name, cols, cons }: Table,
 ) -> LinkedList<Diagnostic> {
     let mut errs = LinkedList::new();
 
     // Add each column, checking for duplicate names
-    let mut columns: HashMap<Ident, LogicalColumn> = HashMap::new();
+    let mut columns: HashMap<Ident, plan::Column> = HashMap::new();
     for (col_name, col_type) in cols {
         match columns.get_key_value(&col_name) {
             Some((duplicate, _)) => {
                 errs.push_back(errors::table_column_redefined(&col_name, duplicate))
             }
             None => {
+                let type_index = lp
+                    .scalar_types
+                    .insert(plan::ConcRef::Conc(plan::ScalarTypeConc::Rust(col_type)));
                 columns.insert(
                     col_name,
-                    LogicalColumn {
-                        constraints: LogicalColumnConstraint {
-                            unique: UniqueCons::NotUnique,
-                        },
-                        data_type: col_type,
+                    plan::Column {
+                        cons: plan::ColumnConstraints { unique: None },
+                        data_type: type_index,
                     },
                 );
             }
@@ -121,7 +121,7 @@ fn add_table(
 
     // Add each constraint, checking aliases used are unique.
     let mut constraint_names: HashSet<Ident> = HashSet::new();
-    let mut constraints = LogicalRowConstraint {
+    let mut row_cons = plan::RowConstraints {
         limit: None,
         preds: Vec::new(),
     };
@@ -141,19 +141,19 @@ fn add_table(
         }
         match expr {
             ConstraintExpr::Unique { field } => match columns.get_mut(&field) {
-                Some(LogicalColumn {
-                    constraints,
-                    data_type,
-                }) => match &constraints.unique {
-                    UniqueCons::Unique(maybe_alias) => {
+                Some(plan::Column { cons, data_type }) => match &cons.unique {
+                    Some(cons) => {
                         errs.push_back(errors::table_constraint_duplicate_unique(
                             &field,
                             method_span,
-                            maybe_alias,
+                            &cons.alias,
                         ));
                     }
-                    UniqueCons::NotUnique => {
-                        constraints.unique = UniqueCons::Unique(alias);
+                    None => {
+                        cons.unique = Some(plan::Constraint {
+                            alias,
+                            cons: plan::Unique,
+                        });
                     }
                 },
                 None => errs.push_back(errors::table_constraint_nonexistent_unique_column(
@@ -164,25 +164,31 @@ fn add_table(
                 )),
             },
             ConstraintExpr::Pred(expr) => {
-                constraints.preds.push((expr, alias));
+                row_cons.preds.push(plan::Constraint {
+                    alias,
+                    cons: plan::Pred(expr),
+                });
             }
             ConstraintExpr::Limit { size } => {
-                if let Some((ref limit, ref other_alias)) = constraints.limit {
+                if let Some(plan::Constraint { alias, cons }) = &row_cons.limit {
                     errs.push_back(errors::table_constraint_duplicate_limit(
                         &alias,
                         &name,
                         method_span,
                     ));
                 } else {
-                    constraints.limit = Some((size, alias));
+                    row_cons.limit = Some(plan::Constraint {
+                        alias,
+                        cons: plan::Limit(size),
+                    });
                 }
             }
         }
     }
 
-    let tk = lp.tables.insert(LogicalTable {
+    let tk = lp.tables.insert(plan::Table {
         name: name.clone(),
-        constraints,
+        row_cons,
         columns,
     });
 
@@ -196,15 +202,19 @@ fn add_table(
 }
 
 fn add_query(
-    lp: &mut LogicalPlan,
+    lp: &mut plan::LogicalPlan,
     qs: &mut HashSet<Ident>,
-    tn: &HashMap<Ident, TableKey>,
+    tn: &HashMap<Ident, plan::Key<plan::Table>>,
     Query {
         name,
         params,
         streams,
     }: Query,
 ) -> LinkedList<Diagnostic> {
+    let mut vs = HashMap::new();
+    let mut ts = HashMap::new();
+    let mut mo = None;
+    let mut ret: Option<ReturnVal> = None;
     let (raw_params, mut errors) = extract_fields(params, errors::query_parameter_redefined);
 
     // if the name is duplicated, we can still analyse the query & add to the logical plan
@@ -217,25 +227,30 @@ fn add_query(
     let params = raw_params
         .into_iter()
         .filter_map(|(name, data_type)| {
-            let dt = ast_typeto_scalar(tn, data_type, &mut errors, |e| errors::query_param_ref_table_not_found(&name, e))?;
-
-            Some(LogicalQueryParams {
-                name,
-                data_type: dt,
-            })
+            match ast_typeto_scalar(
+                tn,
+                &mut ts,
+                data_type,
+                |e| errors::query_param_ref_table_not_found(&name, e),
+                errors::query_no_cust_type_found,
+            ) {
+                Ok(t) => Some((name, lp.scalar_types.insert(t))),
+                Err(e) => {
+                    errors.push_back(e);
+                    None
+                }
+            }
         })
         .collect();
 
-    let qk = lp.queries.insert(LogicalQuery {
+    let qk = lp.queries.insert(plan::Query {
         name: name.clone(),
         params,
         returnval: None,
     });
-    let mut vs = HashMap::new();
-    let mut ret: Option<ReturnVal> = None;
 
     for stream in streams {
-        match build_streamexpr(lp, tn, qk, &mut vs, stream) {
+        match build_streamexpr(lp, tn, qk, &mut vs, &mut ts, &mut mo, stream) {
             Ok(r) => match (&mut ret, r) {
                 (Some(prev_ret), Some(new_ret)) => {
                     errors.push_back(errors::query_multiple_returns(
@@ -258,18 +273,20 @@ fn add_query(
 }
 
 fn build_streamexpr(
-    lp: &mut LogicalPlan,
-    tn: &HashMap<Ident, TableKey>,
-    qk: QueryKey,
+    lp: &mut plan::LogicalPlan,
+    tn: &HashMap<Ident, plan::Key<plan::Table>>,
+    qk: plan::Key<plan::Query>,
     vs: &mut HashMap<Ident, VarState>,
+    ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
+    mo: &mut Option<plan::Key<plan::Operator>>,
     StreamExpr { op, con }: StreamExpr,
 ) -> Result<Option<ReturnVal>, LinkedList<Diagnostic>> {
-    match build_logical(op, lp, tn, qk, vs, None) {
+    match build_logical(op, lp, tn, qk, vs, ts, mo, None) {
         Ok(ctx) => {
             let mut errors = LinkedList::new();
-            match recur_stream(lp, tn, qk, vs, ctx, &mut errors, con) {
-                Ok(res) if errors.is_empty()  => Ok(res),
-                _ => Err(errors)
+            match recur_stream(lp, tn, qk, vs, ts, mo, ctx, &mut errors, con) {
+                Ok(res) if errors.is_empty() => Ok(res),
+                _ => Err(errors),
             }
         }
         Err(es) => Err(es),
@@ -277,10 +294,12 @@ fn build_streamexpr(
 }
 
 fn recur_stream(
-    lp: &mut LogicalPlan,
-    tn: &HashMap<Ident, TableKey>,
-    qk: QueryKey,
+    lp: &mut plan::LogicalPlan,
+    tn: &HashMap<Ident, plan::Key<plan::Table>>,
+    qk: plan::Key<plan::Query>,
     vs: &mut HashMap<Ident, VarState>,
+    ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
+    mo: &mut Option<plan::Key<plan::Operator>>,
     ctx: StreamContext,
     errs: &mut LinkedList<Diagnostic>, // TODO: thunkify or convert to loop. We mutate a passed list to make tail-call elimination easier (but rust has no TCO yet)
     con: Option<(Connector, Box<StreamExpr>)>,
@@ -318,13 +337,15 @@ fn recur_stream(
                 tn,
                 qk,
                 vs,
+                ts,
+                mo,
                 Some(Continue {
                     data_type,
                     prev_edge,
                     last_span,
                 }),
             ) {
-                Ok(new_ctx) => recur_stream(lp, tn, qk, vs, new_ctx, errs, con),
+                Ok(new_ctx) => recur_stream(lp, tn, qk, vs, ts, mo, new_ctx, errs, con),
                 Err(mut es) => {
                     errs.append(&mut es);
                     Err(())
@@ -348,7 +369,6 @@ fn recur_stream(
     }
 }
 
-
 /// helper for extracting a map of unique fields by Ident
 pub fn extract_fields<T>(
     fields: Vec<(Ident, T)>,
@@ -367,15 +387,29 @@ pub fn extract_fields<T>(
     (map_fields, errors)
 }
 
-pub fn ast_typeto_scalar(tn: &HashMap<Ident, TableKey>, t: AstType, errors: &mut LinkedList<Diagnostic>, err_fn: impl Fn(&Ident) -> Diagnostic,) -> Option<ScalarType> {
+pub fn ast_typeto_scalar(
+    tn: &HashMap<Ident, plan::Key<plan::Table>>,
+    ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
+    t: AstType,
+    table_err_fn: impl Fn(&Ident) -> Diagnostic,
+    cust_err_fn: impl Fn(&Ident) -> Diagnostic,
+) -> Result<plan::ScalarType, Diagnostic> {
     match t {
-        AstType::RsType(t) => Some(ScalarType::Rust(t)),
+        AstType::RsType(t) => Ok(plan::ConcRef::Conc(plan::ScalarTypeConc::Rust(t))),
         AstType::TableRef(table_ref) => {
             if let Some(table_id) = tn.get(&table_ref) {
-                Some(ScalarType::Ref(*table_id))
+                Ok(plan::ConcRef::Conc(plan::ScalarTypeConc::TableRef(
+                    *table_id,
+                )))
             } else {
-                errors.push_back(err_fn(&table_ref));
-                None
+                Err(table_err_fn(&table_ref))
+            }
+        }
+        AstType::Custom(id) => {
+            if let Some(k) = ts.get(&id) {
+                Ok(plan::ConcRef::Ref(*k))
+            } else {
+                Err(cust_err_fn(&id))
             }
         }
     }

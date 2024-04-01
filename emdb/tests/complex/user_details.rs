@@ -38,7 +38,7 @@ database! {
     //     hence need to make a good choice of mapping (user id -> data) here.
     query get_info(user_id: ref users) {
         row(it: ref users = user_id)
-            ~> deref(it as userdata) 
+            ~> deref(it as userdata)
             ~> return;
     }
 
@@ -76,6 +76,7 @@ database! {
         ref users
             |> deref(users as it)
             |> filter(it.premium)
+            .map(|user| )
             |> map(users: ref users = users, new_creds: i32 = ((it.credits as f32) * cred_bonus) as i32)
             |> update(users use credits = new_creds)
             |> map(creds: i32 = new_creds)

@@ -1,6 +1,6 @@
 use combi::tokens::{basic::peekpunct, derived::syntopunct};
 
-use crate::frontend::emql::parse::type_parser;
+use crate::frontend::emql::parse::{type_parser, type_parser_to_punct};
 
 use super::*;
 
@@ -22,7 +22,7 @@ impl EMQLOperator for Fold {
             seqs!(
                 getident(),
                 matchpunct(':'),
-                type_parser('='),
+                type_parser_to_punct('='),
                 matchpunct('='),
                 syntopunct(peekpunct('-')),
                 matchpunct('-'),
@@ -42,10 +42,12 @@ impl EMQLOperator for Fold {
 
     fn build_logical(
         self,
-        lp: &mut LogicalPlan,
-        tn: &HashMap<Ident, TableKey>,
-        qk: QueryKey,
+        lp: &mut plan::LogicalPlan,
+        tn: &HashMap<Ident, plan::Key<plan::Table>>,
+        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
+        ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
+        mo: &mut Option<plan::Key<plan::Operator>>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self {

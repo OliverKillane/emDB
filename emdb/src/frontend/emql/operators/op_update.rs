@@ -26,10 +26,12 @@ impl EMQLOperator for Update {
 
     fn build_logical(
         self,
-        lp: &mut LogicalPlan,
-        tn: &HashMap<Ident, TableKey>,
-        qk: QueryKey,
+        lp: &mut plan::LogicalPlan,
+        tn: &HashMap<Ident, plan::Key<plan::Table>>,
+        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
+        ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
+        mo: &mut Option<plan::Key<plan::Operator>>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self {
@@ -42,29 +44,30 @@ impl EMQLOperator for Update {
                 extract_fields(fields, errors::query_operator_field_redefined);
 
             // get the table to update
-            let raw_table_id = match prev.data_type.fields.get(&reference) {
-                Some(RecordData::Scalar(ScalarType::Ref(table))) => Some(table),
-                Some(d) => {
-                    errors.push_back(errors::query_expected_reference_type_for_update(
-                        lp, d, &reference,
-                    ));
-                    None
+            let raw_table_id = if let Some(sk) = lp.get_record_type(prev.data_type.fields).fields.get(&reference) {
+                match lp.get_scalar_type(*sk) {
+                    plan::ScalarTypeConc::TableRef(table) => Some(*table),
+                    _ => {
+                        errors.push_back(errors::query_expected_reference_type_for_update(
+                            lp, sk, &reference,
+                        ));
+                        None
+                    }
                 }
-                None => {
-                    errors.push_back(errors::query_update_reference_not_present(
-                        lp,
-                        &reference,
-                        prev.last_span,
-                        &prev.data_type,
-                    ));
-                    None
-                }
+            } else {
+                errors.push_back(errors::query_update_reference_not_present(
+                    lp,
+                    &reference,
+                    prev.last_span,
+                    &prev.data_type.fields,
+                ));
+                None
             };
 
             if let (Some(table_id), nondup_fields) = (raw_table_id, raw_fields) {
                 // TODO: we could check the non-duplicate fields, cost/benefit unclear
 
-                let table = lp.tables.get(*table_id).unwrap();
+                let table = lp.get_table(table_id);
 
                 for (id, _) in nondup_fields.iter() {
                     if !table.columns.contains_key(id) {
@@ -73,33 +76,24 @@ impl EMQLOperator for Update {
                 }
 
                 if errors.is_empty() {
-                    let out_edge = lp.operator_edges.insert(Edge::Null);
-                    let update_op = lp.operators.insert(LogicalOperator {
-                        query: Some(qk),
-                        operator: LogicalOp::Update {
+                    let out_edge = lp.operator_edges.insert(plan::DataFlow::Null);
+                    let update_op = lp.operators.insert(
+                        plan::Operator { query: qk, kind: plan::OperatorKind::Modify { modify_after: mo.clone(), op: plan::ModifyOperator::Update { 
                             input: prev.prev_edge,
                             reference: reference.clone(),
-                            table: *table_id,
+                            table: table_id,
                             mapping: nondup_fields,
-                            output: out_edge,
-                        },
-                    });
+                            output: out_edge, } } }
+                    );
+                    *mo = Some(update_op);
 
-                    let out_data_type = Record {
-                        fields: HashMap::from([(
-                            reference.clone(),
-                            RecordData::Scalar(ScalarType::Ref(*table_id)),
-                        )]),
-                        stream: prev.data_type.stream,
-                    };
-
-                    lp.operator_edges[out_edge] = Edge::Uni {
+                    lp.operator_edges[out_edge] = plan::DataFlow::Incomplete {
                         from: update_op,
-                        with: out_data_type.clone(),
+                        with: prev.data_type.clone(),
                     };
 
                     Ok(StreamContext::Continue(Continue {
-                        data_type: out_data_type,
+                        data_type: prev.data_type,
                         prev_edge: out_edge,
                         last_span: call.span(),
                     }))

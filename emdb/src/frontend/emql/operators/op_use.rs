@@ -18,26 +18,26 @@ impl EMQLOperator for Use {
 
     fn build_logical(
         self,
-        lp: &mut LogicalPlan,
-        tn: &HashMap<Ident, TableKey>,
-        qk: QueryKey,
+        lp: &mut plan::LogicalPlan,
+        tn: &HashMap<Ident, plan::Key<plan::Table>>,
+        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
+        ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
+        mo: &mut Option<plan::Key<plan::Operator>>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, var_name } = self;
         if cont.is_none() {
             if let Some(table_id) = tn.get(&var_name) {
-                let data_type = lp.tables.get(*table_id).unwrap().get_all_cols_type();
-                let out_edge = lp.operator_edges.insert(Edge::Null);
-                let use_op = lp.operators.insert(LogicalOperator {
-                    query: Some(qk),
-                    operator: LogicalOp::Scan {
-                        access: TableAccess::AllCols,
-                        table: *table_id,
-                        output: out_edge,
-                    },
-                });
-                lp.operator_edges[out_edge] = Edge::Uni {
+                let table = lp.get_table(*table_id);
+                let access = plan::TableAccess::AllCols;
+                let record_type = plan::generate_access(*table_id, access.clone(), lp).unwrap();
+                let out_edge = lp.operator_edges.insert(plan::DataFlow::Null);
+                let use_op = lp.operators.insert(plan::Operator { query: qk, kind: plan::OperatorKind::Access { access_after: mo.clone(), op: plan::AccessOperator::Scan { access, table: *table_id, output: out_edge } } });
+                *mo = Some(use_op);
+                let data_type = plan::Data { fields: record_type, stream: true };
+
+                lp.operator_edges[out_edge] = plan::DataFlow::Incomplete {
                     from: use_op,
                     with: data_type.clone(),
                 };

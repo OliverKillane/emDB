@@ -1,5 +1,6 @@
-use std::collections::{HashMap, HashSet};
-use super::{Data, Key, Query, ScalarType, Table};
+use std::collections::HashMap;
+
+use super::{Data, Key, Query, ScalarType, Table, TableAccess};
 use proc_macro2::Ident;
 use syn::Expr;
 
@@ -12,20 +13,11 @@ pub enum DataFlow {
 
     /// (For graph construction)
     /// INV: None exist in the edges after graph construction
-    Incomplete {
-        from: Key<Operator>,
-        with: Data,
-    },
+    Incomplete { from: Key<Operator>, with: Data },
 
     /// (For graph construction)
     /// INV: None exist in the edges after graph construction
     Null,
-}
-
-pub enum TableAccess {
-    Ref,
-    AllCols,
-    Selection(Vec<Ident>),
 }
 
 pub enum SortOrder {
@@ -53,6 +45,7 @@ pub enum ModifyOperator {
     Insert {
         input: Key<DataFlow>,
         table: Key<Table>,
+        out_ref: Ident,
         output: Key<DataFlow>,
     },
 
@@ -93,10 +86,11 @@ pub enum AccessOperator {
     DeRef {
         input: Key<DataFlow>,
         reference: Ident,
+        access: TableAccess,
         named: Ident,
         table: Key<Table>,
         output: Key<DataFlow>,
-    }
+    },
 }
 
 pub enum PureOperator {
@@ -147,13 +141,17 @@ pub enum PureOperator {
         output: Key<DataFlow>,
     },
 
-    /// A fold that outputs a collection of all data input, included here to allow 
+    /// A fold that outputs a collection of all data input, included here to allow
     /// the optimiser to reason more easily about the data structure size & type
     /// given many queries collect multiple rows.
     /// - Generates the [ScalarType::Bag] types
-    /// - Could technically be implemented as a fold, but more difficult to reason 
+    /// - Could technically be implemented as a fold, but more difficult to reason
     ///   about folds generally, and we want the backend to determine the bag's type
-    Collect { input: Key<DataFlow>, output: Key<DataFlow> }
+    Collect {
+        input: Key<DataFlow>,
+        into: Ident,
+        output: Key<DataFlow>,
+    },
 }
 
 pub enum FlowOperator {
@@ -175,23 +173,26 @@ pub enum FlowOperator {
     Return { input: Key<DataFlow> },
 
     /// Stream in and then discard
-    Discard {input: Key<DataFlow> },
+    Discard { input: Key<DataFlow> },
 }
 
-// TODO: add querykey back to all
+pub struct Operator {
+    pub query: Key<Query>,
+    pub kind: OperatorKind,
+}
 
-pub enum Operator {
+pub enum OperatorKind {
     /// Used for operators that modify table state.
     /// Within a query they need to be strictly ordered (as one may read the modifications from another)
     /// INV: [Operator::Modify.access_after] is a [Operator::Modify] or [Operator::Access]
     Modify {
-        modify_after: Key<Operator>,
+        modify_after: Option<Key<Operator>>,
         op: ModifyOperator,
     },
 
     /// INV: `access_after` is a [Operator::Modify] or [Operator::Access]
     Access {
-        access_after: Key<Operator>,
+        access_after: Option<Key<Operator>>,
         op: AccessOperator,
     },
 

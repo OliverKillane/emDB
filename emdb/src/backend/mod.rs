@@ -1,16 +1,66 @@
-use proc_macro2::TokenStream;
+use crate::plan;
+use crate::utils::misc::singlelist;
+use proc_macro2::{Ident, TokenStream};
+use proc_macro_error::{Diagnostic, Level};
+use std::collections::{HashMap, LinkedList};
 
-use crate::plan::repr::LogicalPlan;
-mod graphviz;
-mod simple;
-
-pub(crate) use graphviz::GraphViz;
-pub(crate) use simple::Simple;
-pub(crate) enum BackendTypes {
-    Simple(Simple),
-    GraphViz(GraphViz),
+pub trait EMDBBackend: Sized {
+    const NAME: &'static str;
+    fn parse_options(options: Option<TokenStream>) -> Result<Self, LinkedList<Diagnostic>>;
+    fn generate_code(
+        self,
+        impl_name: Ident,
+        plan: &plan::LogicalPlan,
+    ) -> Result<TokenStream, LinkedList<Diagnostic>>;
 }
 
-pub(crate) trait Backend {
-    fn generate_code(plan: &LogicalPlan) -> TokenStream;
+macro_rules! create_backend {
+    ($op:ident as $($m:ident :: $t:ident),*) => {
+
+        $(
+            mod $m;
+            use $m::$t;
+        )*
+
+        pub enum $op {
+            $(
+                $t($t),
+            )*
+        }
+
+        pub fn parse_options(backend_name: Ident, options: Option<TokenStream>) -> Result<$op, LinkedList<Diagnostic>> {
+            match backend_name.to_string().as_str() {
+                $(
+                    $t::NAME => $t::parse_options(options).map(|v| $op::$t(v)),
+                )*
+                _ => Err(singlelist(no_such_backend(&backend_name)))
+            }
+        }
+
+        pub fn generate_code(
+            op: $op,
+            impl_name: Ident,
+            plan: &plan::LogicalPlan
+        ) -> Result<TokenStream, LinkedList<Diagnostic>> {
+            match op {
+                $(
+                    $op::$t(i) => i.generate_code(impl_name, plan),
+                )*
+            }
+        }
+    };
+}
+
+create_backend!(Backend as planviz::PlanViz);
+
+pub struct Targets {
+    pub impls: HashMap<Ident, Backend>,
+}
+
+fn no_such_backend(backend_name: &Ident) -> Diagnostic {
+    Diagnostic::spanned(
+        backend_name.span(),
+        Level::Error,
+        format!("No such backend"),
+    )
 }

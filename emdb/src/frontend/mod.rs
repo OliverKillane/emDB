@@ -3,11 +3,11 @@ mod sql;
 
 use std::collections::LinkedList;
 
-use crate::plan::{repr::LogicalPlan, targets::Targets};
-use proc_macro2::TokenStream as TokenStream2;
-use proc_macro_error::Diagnostic;
-
+use crate::backend;
+use crate::plan;
 pub(crate) use emql::Emql;
+use proc_macro2::TokenStream;
+use proc_macro_error::Diagnostic;
 
 pub(crate) struct Diagnostics {
     errs: Vec<Diagnostic>,
@@ -30,5 +30,7 @@ impl Diagnostics {
 }
 
 pub(crate) trait Frontend {
-    fn from_tokens(input: TokenStream2) -> Result<(Targets, LogicalPlan), LinkedList<Diagnostic>>;
+    fn from_tokens(
+        input: TokenStream,
+    ) -> Result<(plan::LogicalPlan, backend::Targets), LinkedList<Diagnostic>>;
 }

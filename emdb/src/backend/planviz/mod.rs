@@ -1,14 +1,28 @@
-use crate::plan::repr::LogicalPlan;
+use syn::spanned::Spanned;
 
-use super::Backend;
-use proc_macro2::TokenStream;
+use super::*;
+use crate::utils::misc::singlelist;
 use quote::quote;
+mod errors;
 
-pub(crate) struct GraphViz;
+pub struct PlanViz;
 
-impl Backend for GraphViz {
-    fn generate_code(plan: &LogicalPlan) -> TokenStream {
-        quote! { pub fn say_cool(x: bool) -> i32 { 3} }
+impl EMDBBackend for PlanViz {
+    const NAME: &'static str = "planviz";
+
+    fn parse_options(options: Option<TokenStream>) -> Result<Self, LinkedList<Diagnostic>> {
+        if let Some(opts) = options {
+            Err(singlelist(errors::no_accepted_options(opts.span())))
+        } else {
+            Ok(PlanViz)
+        }
+    }
+    fn generate_code(self, impl_name: Ident, plan: &plan::LogicalPlan) -> Result<TokenStream, LinkedList<Diagnostic>> {
+        Ok(quote!{
+            pub fn give_graph() -> &'static str {
+                "hello there"
+            }
+        })
     }
 }
 

@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
+use std::collections::LinkedList;
+
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro_error::{proc_macro_error, Diagnostic, Level};
@@ -12,10 +14,7 @@ mod frontend;
 mod plan;
 mod utils;
 
-mod newplan;
-
-use crate::backend::{Backend, GraphViz, Simple};
-use crate::frontend::{Emql, Frontend};
+use frontend::{Emql, Frontend};
 
 #[proc_macro_error]
 #[proc_macro]
@@ -27,23 +26,29 @@ pub fn database(tk: TokenStream) -> TokenStream {
             }
             TokenStream::new()
         }
-        Ok((targets, lp)) => {
-            let impls = targets
-                .backends
+        Ok((lp, bks)) => {
+            let mut errors = LinkedList::new();
+            let impls = bks
+                .impls
                 .into_iter()
-                .map(|(t, backend)| {
-                    let code = (match backend {
-                        plan::targets::Target::Simple => Simple::generate_code,
-                        plan::targets::Target::Graphviz => GraphViz::generate_code,
-                    })(&lp);
-
-                    quote! {
-                        mod #t {
-                            #code
+                .filter_map(|(id, backend)| {
+                    match backend::generate_code(backend, id.clone(), &lp) {
+                        Ok(code) => Some(quote! {
+                            mod #id {
+                                #code
+                            }
+                        }),
+                        Err(mut e) => {
+                            errors.append(&mut e);
+                            None
                         }
                     }
                 })
                 .collect::<Vec<_>>();
+
+            for e in errors {
+                e.emit()
+            }
 
             proc_macro::TokenStream::from(quote! {
                 #(#impls)*

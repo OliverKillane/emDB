@@ -1,4 +1,4 @@
-use std::collections::{LinkedList};
+use std::collections::LinkedList;
 
 use proc_macro2::{Delimiter, Ident, Span, TokenStream};
 use proc_macro_error::{Diagnostic, Level};
@@ -6,8 +6,7 @@ use syn::{Expr, Type};
 
 use super::{
     ast::{
-        Ast, AstType, BackendImpl, BackendKind, Connector, Constraint, ConstraintExpr, Query,
-        StreamExpr, Table,
+        Ast, AstType, BackendImpl, Connector, Constraint, ConstraintExpr, Query, StreamExpr, Table,
     },
     operators::{parse_operator, Operator},
 };
@@ -92,21 +91,22 @@ fn backend_parser() -> impl TokenParser<BackendImpl> {
             recover(
                 seqs!(
                     matchident("impl"),
-                    choices! {
-                        peekident("graph") => mapsuc(matchident("graph"), |_| BackendKind::Graph),
-                        peekident("simple") => mapsuc(matchident("simple"), |_| BackendKind::Simple),
-                        otherwise => error(getident(), |i| Diagnostic::spanned(i.span(), Level::Error, format!("expected either `graph` or `simple` but got {}", i)))
-                    },
+                    getident(),
                     matchident("as"),
-                    getident()
+                    getident(),
+                    choices!(
+                        peekpunct(';') => mapsuc(nothing(), |()| None),
+                        otherwise => mapsuc(recovgroup(Delimiter::Brace, collectuntil(isempty())), Option::Some)
+                    )
                 ),
                 until(peekpunct(';')),
             ),
             matchpunct(';'),
         ),
-        |((_, (db_backend, (_, db_name))), _)| BackendImpl {
-            name: db_name,
-            target: db_backend,
+        |((_, (backend_name, (_, (impl_name, options)))), _)| BackendImpl {
+            impl_name,
+            backend_name,
+            options,
         },
     )
 }
@@ -167,7 +167,7 @@ fn query_param_list_parser() -> impl TokenParser<Vec<(Ident, AstType)>> {
         listseptrailing(
             ',',
             mapsuc(
-                seqs!(getident(), matchpunct(':'), type_parser(',')),
+                seqs!(getident(), matchpunct(':'), type_parser_to_punct(',')),
                 |(m, (_, t))| (m, t),
             ),
         ),
@@ -260,11 +260,16 @@ fn stream_parser() -> impl TokenParser<StreamExpr> {
     })
 }
 
-pub fn type_parser(punct: char) -> impl TokenParser<AstType> {
+pub fn type_parser(end: impl TokenParser<bool>) -> impl TokenParser<AstType> {
     choices! {
         peekident("ref") => mapsuc(seq(matchident("ref"), getident()), |(_, i)| AstType::TableRef(i)),
-        otherwise => mapsuc(syntopunct(peekpunct(punct)), AstType::RsType)
+        peekident("type") => mapsuc(seq(matchident("type"), getident()), |(_, i)| AstType::Custom(i)),
+        otherwise => mapsuc(syntopunct(end), AstType::RsType)
     }
+}
+
+pub fn type_parser_to_punct(end: char) -> impl TokenParser<AstType> {
+    type_parser(peekpunct(end))
 }
 
 // helper function for the functional style operators
@@ -292,7 +297,7 @@ pub fn fields_assign() -> impl TokenParser<Vec<(Ident, (AstType, Expr))>> {
             seqs!(
                 getident(),
                 matchpunct(':'),
-                type_parser('='),
+                type_parser_to_punct('='),
                 matchpunct('='),
                 syntopunct(peekpunct(','))
             ),

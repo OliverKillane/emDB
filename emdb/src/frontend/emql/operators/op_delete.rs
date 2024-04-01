@@ -1,3 +1,5 @@
+use self::plan::ScalarTypeConc;
+
 use super::*;
 
 #[derive(Debug)]
@@ -17,10 +19,12 @@ impl EMQLOperator for Delete {
 
     fn build_logical(
         self,
-        lp: &mut LogicalPlan,
-        tn: &HashMap<Ident, TableKey>,
-        qk: QueryKey,
+        lp: &mut plan::LogicalPlan,
+        tn: &HashMap<Ident, plan::Key<plan::Table>>,
+        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
+        ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
+        mo: &mut Option<plan::Key<plan::Operator>>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, field } = self;
@@ -30,19 +34,13 @@ impl EMQLOperator for Delete {
             last_span,
         }) = cont
         {
-            if let Some(ts) = data_type.fields.get(&field) {
-                if let RecordData::Scalar(ScalarType::Ref(table_id)) = ts {
-                    let out_edge = lp.operator_edges.insert(Edge::Null);
-                    let delete_op = lp.operators.insert(LogicalOperator {
-                        query: Some(qk),
-                        operator: LogicalOp::Delete {
-                            input: prev_edge,
-                            reference: field,
-                            table: *table_id,
-                            output: out_edge,
-                        },
-                    });
-                    lp.operator_edges[out_edge] = Edge::Uni {
+            if let Some(ts) = lp.get_record_type(data_type.fields).fields.get(&field) {
+                if let ScalarTypeConc::TableRef(table_id) = lp.get_scalar_type(*ts) {
+                    let table_id_copy = *table_id;
+                    let out_edge = lp.operator_edges.insert(plan::DataFlow::Null);
+                    let delete_op = lp.operators.insert(plan::Operator { query: qk, kind: plan::OperatorKind::Modify { modify_after: mo.clone(), op: plan::ModifyOperator::Delete { input: prev_edge, reference: field, table: table_id_copy, output: out_edge } } });
+                    *mo = Some(delete_op.clone());
+                    lp.operator_edges[out_edge] = plan::DataFlow::Incomplete {
                         from: delete_op,
                         with: data_type.clone(),
                     };

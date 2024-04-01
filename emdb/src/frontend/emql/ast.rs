@@ -1,12 +1,13 @@
 // TODO: parameterize by span type (want to go to resolved AST spanned by types)
 use super::operators::Operator;
-use proc_macro2::{Ident, Span};
+use proc_macro2::{Ident, Span, TokenStream};
 use syn::{Expr, Type};
 
 #[derive(Debug)]
 pub(super) enum AstType {
     RsType(syn::Type),
     TableRef(Ident),
+    Custom(Ident),
 }
 
 #[derive(Debug)]
@@ -52,14 +53,9 @@ pub(super) struct Query {
 
 #[derive(Debug)]
 pub(super) struct BackendImpl {
-    pub name: Ident,
-    pub target: BackendKind,
-}
-
-#[derive(Debug)]
-pub(super) enum BackendKind {
-    Graph,
-    Simple,
+    pub impl_name: Ident,
+    pub backend_name: Ident,
+    pub options: Option<TokenStream>,
 }
 
 #[derive(Debug)]

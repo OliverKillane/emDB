@@ -1,14 +1,14 @@
 //! ## EMQL Operators
 //! each operator defines its parser, and how it is translated into the logical plan.
-//! 
+//!
 //! Every operator has:
 //! - A a module representing the operator, with a struct included.
 //! - Each needs to implement [EMQLOperator]   
-//! - the [create_operator] macro generates a single enumeration and 
-//!   associated parse and logical translation functions (we avoid using 
-//!   `Bx<dyn EMQLOperator>` by polymorphism through the [Operator] enum)
-//! 
-//! To create a new operator, simply add a new module and [EMQLOperator], then 
+//! - the [create_operator] macro generates a single enumeration and
+//!   associated parse and logical translation functions (we avoid using
+//!   `Box<dyn EMQLOperator>` by polymorphism through the [Operator] enum)
+//!
+//! To create a new operator, simply add a new module and [EMQLOperator], then
 //! add it to the [create_operator] macro invocation.
 
 use crate::frontend::emql::errors;
@@ -17,8 +17,7 @@ use combi::{
     macros::{choices, seqs},
     tokens::{
         basic::{
-            collectuntil, getident, gettoken, isempty, matchident, matchpunct, peekident,
-            syn,
+            collectuntil, getident, gettoken, isempty, matchident, matchpunct, peekident, syn,
         },
         derived::listseptrailing,
         error::error,
@@ -37,11 +36,9 @@ use crate::utils::misc::singlelist;
 
 // translation for plans
 use super::ast::AstType;
-use crate::frontend::emql::parse::{
-    fields_assign, fields_expr, functional_style,
-};
+use crate::frontend::emql::parse::{fields_assign, fields_expr, functional_style};
 use crate::frontend::emql::sem::{extract_fields, Continue, ReturnVal, StreamContext, VarState};
-use crate::plan::repr::*;
+use crate::plan;
 
 trait EMQLOperator: Sized + Debug {
     const NAME: &'static str;
@@ -49,12 +46,20 @@ trait EMQLOperator: Sized + Debug {
     fn build_parser() -> impl TokenParser<Self>;
 
     /// Convert the operator to a logical plan node
+    ///
+    /// - [tn] represents the identifier to table mapping
+    ///
+    ///
+    ///
+    ///
     fn build_logical(
         self,
-        lp: &mut LogicalPlan,
-        tn: &HashMap<Ident, TableKey>,
-        qk: QueryKey,
+        lp: &mut plan::LogicalPlan,
+        tn: &HashMap<Ident, plan::Key<plan::Table>>,
+        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
+        ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
+        mo: &mut Option<plan::Key<plan::Operator>>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>>;
 }
@@ -89,36 +94,38 @@ macro_rules! create_operator {
 
         pub fn build_logical(
             op: $op,
-            lp: &mut LogicalPlan,
-            tn: &HashMap<Ident, TableKey>,
-            qk: QueryKey,
+            lp: &mut plan::LogicalPlan,
+            tn: &HashMap<Ident, plan::Key<plan::Table>>,
+            qk: plan::Key<plan::Query>,
             vs: &mut HashMap<Ident, VarState>,
+            ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
+            mo: &mut Option<plan::Key<plan::Operator>>,
             cont: Option<Continue>,
         ) -> Result<StreamContext, LinkedList<Diagnostic>> {
             match op {
                 $(
-                    $op::$t(i) => i.build_logical(lp, tn, qk, vs, cont),
+                    $op::$t(i) => i.build_logical(lp, tn, qk, vs, ts, mo, cont),
                 )*
             }
         }
     };
 }
 
-create_operator!(Operator as
-    op_return::Return, 
-    op_ref::Ref, 
-    op_let::Let, 
-    op_use::Use, 
-    op_update::Update, 
-    op_insert::Insert, 
-    op_delete::Delete, 
-    op_map::Map, 
-    op_unique::Unique, 
-    op_filter::Filter, 
-    op_row::Row, 
-    op_deref::DeRef, 
-    op_sort::Sort, 
-    op_fold::Fold, 
+create_operator!(
+    Operator as op_return::Return,
+    op_ref::Ref,
+    op_let::Let,
+    op_use::Use,
+    op_update::Update,
+    op_insert::Insert,
+    op_delete::Delete,
+    op_map::Map,
+    op_unique::Unique,
+    op_filter::Filter,
+    op_row::Row,
+    op_deref::DeRef,
+    op_sort::Sort,
+    op_fold::Fold,
     op_assert::Assert,
     op_collect::Collect
 );

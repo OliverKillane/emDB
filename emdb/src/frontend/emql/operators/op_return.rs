@@ -14,10 +14,12 @@ impl EMQLOperator for Return {
 
     fn build_logical(
         self,
-        lp: &mut LogicalPlan,
-        tn: &HashMap<Ident, TableKey>,
-        qk: QueryKey,
+        lp: &mut plan::LogicalPlan,
+        tn: &HashMap<Ident, plan::Key<plan::Table>>,
+        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
+        ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
+        mo: &mut Option<plan::Key<plan::Operator>>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call } = self;
@@ -30,10 +32,7 @@ impl EMQLOperator for Return {
             if data_type.stream {
                 Err(singlelist(errors::query_cannot_return_stream(last_span, call.span())))
             } else {
-                let return_op = lp.operators.insert(LogicalOperator {
-                    query: Some(qk),
-                    operator: LogicalOp::Return { input: prev_edge },
-                });
+                let return_op = lp.operators.insert(plan::Operator { query: qk, kind: plan::OperatorKind::Flow(plan::FlowOperator::Return { input: prev_edge }) });
     
                 Ok(StreamContext::Returned(ReturnVal {
                     span: call.span(),

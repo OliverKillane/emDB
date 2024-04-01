@@ -2,7 +2,7 @@
 
 use emdb::database;
 
-database!{
+database! {
 
     table cool {
         name: String,
@@ -14,7 +14,7 @@ database!{
         row(name: String = name, something: i32 = 0)
             |> insert(cool)
             ~> return;
-    } 
+    }
 
     query update_cool(id: ref cool) {
         row(id: ref cool = id)
@@ -38,17 +38,19 @@ database!{
             |> collect(type foo)
             ~> map(blah: type foo = it. c: i32 = 0)
             ~> return;
+
+
     }
 
     query complex() {
-        use cool 
+        use cool
             |> map(x: i32 = cool_val)
             |> filter(x > 10)
             |> let large_than_10;
-        
+
         use larger_than_10
             |> fork(let x1, x2);
-        
+
         use x1 |> first() ~> return;
         use x2 |> sort(x2.something desc);
     }

@@ -10,8 +10,7 @@
 
 use std::collections::HashMap;
 
-use crate::plan::helpers::*;
-use crate::plan::repr::{LogicalPlan, Record, RecordData, TableKey};
+use crate::plan::{Key, LogicalPlan, Record, ScalarType, ScalarTypeConc, Table, WithPlan};
 use itertools::Itertools;
 use proc_macro2::{Ident, Span};
 use proc_macro_error::{Diagnostic, Level};
@@ -227,7 +226,7 @@ pub(super) fn query_param_ref_table_not_found(query: &Ident, table_ref: &Ident) 
 
 pub(super) fn query_expected_reference_type_for_update(
     lp: &LogicalPlan,
-    dt: &RecordData,
+    dt: &Key<ScalarType>,
     reference: &Ident,
 ) -> Diagnostic {
     let err_name = error_name(QUERY, 14);
@@ -269,7 +268,7 @@ pub(super) fn query_update_reference_not_present(
     lp: &LogicalPlan,
     reference: &Ident,
     prev_span: Span,
-    dt: &Record,
+    dt: &Key<Record>,
 ) -> Diagnostic {
     let err_name = error_name(QUERY, 17);
 
@@ -310,7 +309,7 @@ pub(super) fn query_insert_field_type_mismatch(
     lp: &LogicalPlan,
     call: &Ident,
     field: &Ident,
-    passed_type: &RecordData,
+    passed_type: &Key<Record>,
     expected_type: &Type,
     prev_span: Span,
 ) -> Diagnostic {
@@ -390,7 +389,7 @@ pub(super) fn query_delete_field_not_reference(
     lp: &LogicalPlan,
     call: &Ident,
     field: &Ident,
-    dt: &RecordData,
+    dt: &Key<ScalarType>,
 ) -> Diagnostic {
     let err_name = error_name(QUERY, 23);
 
@@ -448,7 +447,7 @@ pub(super) fn query_deref_cannot_deref_rust_type(reference: &Ident, t: &Type) ->
 pub(super) fn query_deref_cannot_deref_record(
     lp: &LogicalPlan,
     reference: &Ident,
-    t: &Record,
+    t: &Key<Record>,
 ) -> Diagnostic {
     let err_name = error_name(QUERY, 27);
     Diagnostic::spanned(
@@ -528,9 +527,22 @@ pub(super) fn query_use_variable_already_used(
     .span_error(used, "And consumed here".to_owned())
 }
 
-pub(super) fn query_invalid_use(usage: &Ident, tn: &HashMap<Ident, TableKey>, vs: &HashMap<Ident, VarState>) -> Diagnostic {
+pub(super) fn query_invalid_use(
+    usage: &Ident,
+    tn: &HashMap<Ident, Key<Table>>,
+    vs: &HashMap<Ident, VarState>,
+) -> Diagnostic {
     let err_name = error_name(QUERY, 33);
-    let vars = vs.iter().filter_map(|(var, state)| if matches!(state, VarState::Available { .. }) {Some(var)} else {None} ).join(", ");
+    let vars = vs
+        .iter()
+        .filter_map(|(var, state)| {
+            if matches!(state, VarState::Available { .. }) {
+                Some(var)
+            } else {
+                None
+            }
+        })
+        .join(", ");
     let tables = tn.keys().join(", ");
     Diagnostic::spanned(usage.span(), Level::Error, format!(
         "{err_name} Invalid use of variable `{usage}`",
@@ -562,7 +574,7 @@ pub(super) fn query_let_variable_already_assigned(
 pub(super) fn query_deref_cannot_deref_bag_type(
     lp: &LogicalPlan,
     reference: &Ident,
-    t: &Record,
+    t: &Key<Record>,
 ) -> Diagnostic {
     let err_name = error_name(QUERY, 35);
     Diagnostic::spanned(
@@ -577,21 +589,64 @@ pub(super) fn query_deref_cannot_deref_bag_type(
         ),
     )
 }
-pub(super) fn query_cannot_return_stream(
-    last: Span,
-    ret: Span,
-) -> Diagnostic {
+pub(super) fn query_cannot_return_stream(last: Span, ret: Span) -> Diagnostic {
     let err_name = error_name(QUERY, 36);
     Diagnostic::spanned(
         ret,
         Level::Error,
-        format!(
-            "{err_name} Cannot return a stream from a query",
-        ),
-    ).span_note(last, "The previous operator provides the values".to_owned())
-    .help(format!("Use a `collect` operator to convert the stream into a bag of records"))
+        format!("{err_name} Cannot return a stream from a query",),
+    )
+    .span_note(last, "The previous operator provides the values".to_owned())
+    .help(format!(
+        "Use a `collect` operator to convert the stream into a bag of records"
+    ))
 }
 
+pub(super) fn query_table_access_nonexisted_columns(table_name: &Ident, col: &Ident) -> Diagnostic {
+    let err_name = error_name(QUERY, 37);
+    Diagnostic::spanned(
+        col.span(),
+        Level::Error,
+        format!("{err_name} Cannot access {col} as it does not exist in {table_name}"),
+    )
+    .span_note(table_name.span(), format!("{table_name} defined here"))
+}
+
+pub(super) fn query_invalid_record_type(
+    lp: &LogicalPlan,
+    op: &Ident,
+    prev: Span,
+    expected: &Key<Record>,
+    found: &Key<Record>,
+) -> Diagnostic {
+    let err_name = error_name(QUERY, 38);
+
+    Diagnostic::spanned(
+        op.span(),
+        Level::Error,
+        format!(
+            "{err_name} Data type does not match, expected {} but found {}",
+            WithPlan {
+                plan: lp,
+                extended: expected
+            },
+            WithPlan {
+                plan: lp,
+                extended: found
+            }
+        ),
+    )
+}
+
+pub(super) fn query_no_cust_type_found(t: &Ident) -> Diagnostic {
+    let err_name = error_name(QUERY, 39);
+
+    Diagnostic::spanned(
+        t.span(),
+        Level::Error,
+        format!("{err_name} Cannot find type {t}"),
+    )
+}
 
 pub(super) fn operator_unimplemented(call: &Ident) -> Diagnostic {
     Diagnostic::spanned(

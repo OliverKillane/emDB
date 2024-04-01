@@ -1,6 +1,6 @@
 use emdb::database;
 
-database!{
+database! {
     impl graph as my_db;
 
     table simple {
@@ -15,14 +15,14 @@ database!{
 
     // wrong_type goes to compiler bug for ~
     query badly_written(wrong_type: i32, other_type: i32) {
-        use nonexistent_table 
-            |> collect 
+        use nonexistent_table
+            |> collect
             ~> return;
 
-        ref simple 
-            |> deref(simple as cool) 
+        ref simple
+            |> deref(simple as cool)
             |> map(val1: i32 = cool.a, myref: ref simple = simple)
-            |> collect 
+            |> collect
             ~> return;
     }
 }
