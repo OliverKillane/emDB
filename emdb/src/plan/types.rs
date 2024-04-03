@@ -1,6 +1,6 @@
 //! Types for the logical plan.
 
-use super::{GenArena, Key, LogicalPlan, Table, WithPlan};
+use super::{GenArena, Key, Plan, Table, With};
 use proc_macro2::Ident;
 use quote::ToTokens;
 use std::{
@@ -35,7 +35,7 @@ pub struct RecordConc {
     pub fields: HashMap<Ident, Key<ScalarType>>,
 }
 
-/// Used to describe types for [super::OperatorEdge] in the operator graph
+/// Used to describe types for [`super::OperatorEdge`] in the operator graph
 #[derive(Clone)]
 pub struct Data {
     pub fields: Key<Record>,
@@ -48,7 +48,7 @@ pub type ScalarType = ConcRef<ScalarTypeConc>;
 pub enum ScalarTypeConc {
     /// A reference to a row in a table, allows the user to interact wit row
     /// references while still allowing the backend to decide what they are.
-    /// ```
+    /// ```ignore
     /// ref cool_table |> collect ~> return;
     /// ```
     /// - Can use different types of references depending table implementation
@@ -59,13 +59,13 @@ pub enum ScalarTypeConc {
     /// backend. Allows the plan to express the type, without specifying its
     /// implementation.
     ///
-    /// ```
+    /// ```ignore
     ///  |> take(10) // with cardinality determination allocate bag for 10
     ///  |> collect(it as type my_fixed_bag)
     ///  ~> return;
     /// ```
     ///
-    /// ```
+    /// ```ignore
     /// use table_a
     ///  |> sort(it desc) // could reuse heap from sort as the bag type
     ///  |> collect(it as type my_variable_bag)
@@ -86,7 +86,7 @@ pub enum ScalarTypeConc {
 // TODO: parameterise the types so that we can reason about temporarily
 // equal types -> i.e the concretes are parameterised by the record type
 
-pub fn record_type_eq(lp: &LogicalPlan, r1: &Key<Record>, r2: &Key<Record>) -> bool {
+pub fn record_type_eq(lp: &Plan, r1: &Key<Record>, r2: &Key<Record>) -> bool {
     if r1 == r2 {
         return true;
     }
@@ -105,10 +105,10 @@ pub fn record_type_eq(lp: &LogicalPlan, r1: &Key<Record>, r2: &Key<Record>) -> b
         }
         fields.remove(id);
     }
-    return fields.is_empty();
+    fields.is_empty()
 }
 
-pub fn scalar_type_eq(lp: &LogicalPlan, t1: &Key<ScalarType>, t2: &Key<ScalarType>) -> bool {
+pub fn scalar_type_eq(lp: &Plan, t1: &Key<ScalarType>, t2: &Key<ScalarType>) -> bool {
     if t1 == t2 {
         return true;
     }
@@ -128,7 +128,7 @@ pub fn scalar_type_eq(lp: &LogicalPlan, t1: &Key<ScalarType>, t2: &Key<ScalarTyp
 }
 
 pub fn append_field(
-    lp: &mut LogicalPlan,
+    lp: &mut Plan,
     existing: Key<Record>,
     new_field: Ident,
     new_value: Key<ScalarType>,
@@ -144,7 +144,7 @@ pub fn append_field(
 }
 
 // Helpers for type access
-impl LogicalPlan {
+impl Plan {
     pub fn get_scalar_type(&self, k: Key<ScalarType>) -> &ScalarTypeConc {
         self.scalar_types
             .get(k)
@@ -162,22 +162,21 @@ impl LogicalPlan {
 
 // boilerplate for displaying types ============================================
 
-impl<'a, 'b> Display for WithPlan<'a, &'b Key<Record>> {
+impl<'a, 'b> Display for With<'a, &'b Key<Record>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{{")?;
-        for (field, ty) in self
+        for (field, ty) in &self
             .plan
             .record_types
             .get(*self.extended)
             .unwrap()
             .get_conc(&self.plan.record_types)
             .fields
-            .iter()
         {
             write!(
                 f,
                 "{field}: {}, ",
-                WithPlan {
+                With {
                     plan: self.plan,
                     extended: ty
                 }
@@ -187,7 +186,7 @@ impl<'a, 'b> Display for WithPlan<'a, &'b Key<Record>> {
     }
 }
 
-impl<'a, 'b> Display for WithPlan<'a, &'b Key<ScalarType>> {
+impl<'a, 'b> Display for With<'a, &'b Key<ScalarType>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let conc_t = self
             .plan
@@ -203,13 +202,13 @@ impl<'a, 'b> Display for WithPlan<'a, &'b Key<ScalarType>> {
                 write!(
                     f,
                     "collected {}",
-                    WithPlan {
+                    With {
                         plan: self.plan,
                         extended: b
                     }
                 )
             }
-            ScalarTypeConc::Record(r) => WithPlan {
+            ScalarTypeConc::Record(r) => With {
                 plan: self.plan,
                 extended: r,
             }
@@ -219,7 +218,7 @@ impl<'a, 'b> Display for WithPlan<'a, &'b Key<ScalarType>> {
     }
 }
 
-impl<'a, 'b> Display for WithPlan<'a, &'b Data> {
+impl<'a, 'b> Display for With<'a, &'b Data> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -229,7 +228,7 @@ impl<'a, 'b> Display for WithPlan<'a, &'b Data> {
             } else {
                 "single record"
             },
-            WithPlan {
+            With {
                 plan: self.plan,
                 extended: &self.extended.fields
             }

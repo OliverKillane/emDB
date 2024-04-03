@@ -10,7 +10,7 @@ pub trait EMDBBackend: Sized {
     fn generate_code(
         self,
         impl_name: Ident,
-        plan: &plan::LogicalPlan,
+        plan: &plan::Plan,
     ) -> Result<TokenStream, LinkedList<Diagnostic>>;
 }
 
@@ -40,7 +40,7 @@ macro_rules! create_backend {
         pub fn generate_code(
             op: $op,
             impl_name: Ident,
-            plan: &plan::LogicalPlan
+            plan: &plan::Plan
         ) -> Result<TokenStream, LinkedList<Diagnostic>> {
             match op {
                 $(
@@ -61,6 +61,6 @@ fn no_such_backend(backend_name: &Ident) -> Diagnostic {
     Diagnostic::spanned(
         backend_name.span(),
         Level::Error,
-        format!("No such backend"),
+        "No such backend".to_string(),
     )
 }

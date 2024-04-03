@@ -1,4 +1,7 @@
+//! Asserts an expression, aborting the query if it is false.
+
 use super::*;
+
 
 #[derive(Debug)]
 pub struct Assert {
@@ -11,14 +14,14 @@ impl EMQLOperator for Assert {
 
     fn build_parser() -> impl TokenParser<Self> {
         mapsuc(
-            functional_style(Self::NAME, syn(collectuntil(isempty()))),
+            functional_style(Self::NAME, setrepr(syn(collectuntil(isempty())), "<boolean expression>")),
             |(call, expr)| Assert { call, expr },
         )
     }
 
     fn build_logical(
         self,
-        lp: &mut plan::LogicalPlan,
+        lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
@@ -27,11 +30,23 @@ impl EMQLOperator for Assert {
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, expr } = self;
-        if let Some(prev) = cont {
-            let out_edge = lp.operator_edges.insert(plan::DataFlow::Null);
-            let assert_op = lp.operators.insert(plan::Operator { query: qk, kind: plan::OperatorKind::Pure(plan::PureOperator::Assert { input: prev.prev_edge, assert: expr, output: out_edge }) });
-            lp.operator_edges[out_edge] = plan::DataFlow::Incomplete { from: assert_op, with: prev.data_type.clone() };
-            Ok(StreamContext::Continue(Continue { data_type: prev.data_type, prev_edge: out_edge, last_span: call.span() }))
+        if let Some(cont) = cont {
+            linear_builder(
+                lp,
+                qk,
+                mo,
+                cont,
+                |lp, mo, prev, next_edge| {
+                    Ok(
+                        LinearBuilderState {
+                            data_out: prev.data_type,
+                            op_kind:  plan::OperatorKind::Pure(plan::PureOperator::Assert { input: prev.prev_edge, assert: expr, output: next_edge }),
+                            call_span: call.span(),
+                            update_mo: false,
+                        }
+                    )
+                }
+            )
         } else {
             Err(singlelist(errors::query_cannot_start_with_operator(&call)))
         }

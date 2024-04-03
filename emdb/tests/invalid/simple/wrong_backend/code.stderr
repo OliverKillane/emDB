@@ -1,0 +1,11 @@
+error: No such backend
+ --> tests/invalid/simple/wrong_backend/code.rs:4:10
+  |
+4 |     impl nonexistent_backend as repeated_impl;
+  |          ^^^^^^^^^^^^^^^^^^^
+
+error: No such backend
+ --> tests/invalid/simple/wrong_backend/code.rs:5:10
+  |
+5 |     impl other_missing_backend as repeated_impl;
+  |          ^^^^^^^^^^^^^^^^^^^^^

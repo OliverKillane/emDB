@@ -10,7 +10,7 @@
 
 use std::collections::HashMap;
 
-use crate::plan::{Key, LogicalPlan, Record, ScalarType, ScalarTypeConc, Table, WithPlan};
+use crate::plan::{Key, Plan, Record, ScalarType, Table, With};
 use itertools::Itertools;
 use proc_macro2::{Ident, Span};
 use proc_macro_error::{Diagnostic, Level};
@@ -23,11 +23,11 @@ const TABLE: &str = "TABLE";
 const QUERY: &str = "QUERY";
 
 fn error_name(section: &str, code: u8) -> String {
-    format!("[{}-{:03}]", section, code)
+    format!("[{section}-{code:03}]")
 }
 
 fn redefinition_error(
-    err_name: String,
+    err_name: &str,
     def_type: &str,
     def: &Ident,
     original_def: &Ident,
@@ -42,19 +42,28 @@ fn redefinition_error(
 }
 
 pub(super) fn backend_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
-    redefinition_error(error_name(BACKEND, 0), "backend", def, original_def)
+    redefinition_error(&error_name(BACKEND, 0), "backend", def, original_def)
 }
 
 pub(super) fn table_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
-    redefinition_error(error_name(TABLE, 1), "table", def, original_def)
+    redefinition_error(&error_name(TABLE, 1), "table", def, original_def)
 }
 
 pub(super) fn table_column_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
-    redefinition_error(error_name(TABLE, 2), "table column", def, original_def)
+    redefinition_error(&error_name(TABLE, 2), "table column", def, original_def)
 }
 
 pub(super) fn table_constraint_alias_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
-    redefinition_error(error_name(TABLE, 3), "constraint alias", def, original_def)
+    redefinition_error(&error_name(TABLE, 3), "constraint alias", def, original_def)
+}
+
+pub(super) fn collect_type_alias_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
+    redefinition_error(
+        &error_name("type", 1),
+        "collect type alias",
+        def,
+        original_def,
+    )
 }
 
 pub(super) fn table_constraint_duplicate_unique(
@@ -69,7 +78,7 @@ pub(super) fn table_constraint_duplicate_unique(
         format!("{err_name} Duplicate unique constraint on column `{col_name}`"),
     );
     if let Some(alias) = prev_alias {
-        diag = diag.span_note(alias.span(), format!("previously defined as {alias} here."))
+        diag = diag.span_note(alias.span(), format!("previously defined as {alias} here."));
     }
     diag
 }
@@ -88,7 +97,7 @@ pub(super) fn table_constraint_nonexistent_unique_column(
             "{err_name} Column `{col_name}` does not exist in table `{table_name}`, so cannot apply a unique constraint{} to it", if let Some(alias) = alias {
                 format!(" with alias `{alias}`")
             } else {
-                "".to_owned()
+                String::new()
             }
         ),
     ).span_help(table_name.span(), format!("Apply the unique constraint to an available column in {table_name}"))
@@ -108,7 +117,7 @@ pub(super) fn table_constraint_duplicate_limit(
             if let Some(alias) = alias {
                 format!(" with alias `{alias}`")
             } else {
-                "".to_owned()
+                String::new()
             }
         ),
     )
@@ -119,7 +128,7 @@ pub(super) fn table_constraint_duplicate_limit(
 }
 
 pub(super) fn query_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
-    redefinition_error(error_name(QUERY, 7), "query", def, original_def)
+    redefinition_error(&error_name(QUERY, 7), "query", def, original_def)
 }
 
 pub(super) fn query_multiple_returns(ret: Span, prev_ret: Span, query: &Ident) -> Diagnostic {
@@ -133,7 +142,7 @@ pub(super) fn query_multiple_returns(ret: Span, prev_ret: Span, query: &Ident) -
 }
 
 pub(super) fn query_operator_field_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
-    redefinition_error(error_name(QUERY, 9), "field", def, original_def)
+    redefinition_error(&error_name(QUERY, 9), "field", def, original_def)
 }
 
 pub(super) fn query_stream_single_connection(
@@ -208,7 +217,7 @@ pub(super) fn query_early_return(conn_span: Span, stream: bool, ret_op: Span) ->
 }
 
 pub(super) fn query_parameter_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
-    redefinition_error(error_name(QUERY, 13), "query parameter", def, original_def)
+    redefinition_error(&error_name(QUERY, 13), "query parameter", def, original_def)
 }
 
 pub(super) fn query_param_ref_table_not_found(query: &Ident, table_ref: &Ident) -> Diagnostic {
@@ -225,7 +234,7 @@ pub(super) fn query_param_ref_table_not_found(query: &Ident, table_ref: &Ident) 
 }
 
 pub(super) fn query_expected_reference_type_for_update(
-    lp: &LogicalPlan,
+    lp: &Plan,
     dt: &Key<ScalarType>,
     reference: &Ident,
 ) -> Diagnostic {
@@ -233,7 +242,7 @@ pub(super) fn query_expected_reference_type_for_update(
 
     Diagnostic::spanned(reference.span(), Level::Error, format!(
         "{err_name} Expected a reference to a table for the update in `{reference}`, but got a `{}` instead",
-        WithPlan { plan: lp, extended: dt }
+        With { plan: lp, extended: dt }
     )).help(format!("Assign a reference to {reference}, or use a different field that is a reference"))
 }
 
@@ -265,7 +274,7 @@ pub(super) fn query_update_field_not_in_table(table_name: &Ident, field: &Ident)
 }
 
 pub(super) fn query_update_reference_not_present(
-    lp: &LogicalPlan,
+    lp: &Plan,
     reference: &Ident,
     prev_span: Span,
     dt: &Key<Record>,
@@ -281,7 +290,7 @@ pub(super) fn query_update_reference_not_present(
         prev_span,
         format!(
             "The previous operator produces {}",
-            WithPlan {
+            With {
                 plan: lp,
                 extended: dt
             }
@@ -290,7 +299,7 @@ pub(super) fn query_update_reference_not_present(
 }
 
 pub(super) fn query_insert_field_rust_type_mismatch(
-    lp: &LogicalPlan,
+    lp: &Plan,
     call: &Ident,
     field: &Ident,
     passed_type: &Type,
@@ -300,13 +309,13 @@ pub(super) fn query_insert_field_rust_type_mismatch(
     let err_name = error_name(QUERY, 18);
 
     Diagnostic::spanned(call.span(), Level::Error, format!(
-        "{err_name} Field `{field}` has type `{:#?}` which does not match the expected type `{:#?}`", passed_type, expected_type
+        "{err_name} Field `{field}` has type `{passed_type:#?}` which does not match the expected type `{expected_type:#?}`"
     )).span_note(field.span(), format!("`{field}` defined here"))
     .span_note(prev_span, format!("Input to `{call}` comes from here"))
 }
 
 pub(super) fn query_insert_field_type_mismatch(
-    lp: &LogicalPlan,
+    lp: &Plan,
     call: &Ident,
     field: &Ident,
     passed_type: &Key<Record>,
@@ -316,7 +325,7 @@ pub(super) fn query_insert_field_type_mismatch(
     let err_name = error_name(QUERY, 18);
 
     Diagnostic::spanned(call.span(), Level::Error, format!(
-        "{err_name} Field `{field}` has type `{}` which does not match the expected type `{:#?}`", WithPlan{plan: lp, extended: passed_type}, expected_type
+        "{err_name} Field `{field}` has type `{}` which does not match the expected type `{:#?}`", With{plan: lp, extended: passed_type}, expected_type
     )).span_note(field.span(), format!("`{field}` defined here"))
     .span_note(prev_span, format!("Input to `{call}` comes from here"))
 }
@@ -386,7 +395,7 @@ pub(super) fn query_delete_field_not_present(call: &Ident, field: &Ident) -> Dia
 }
 
 pub(super) fn query_delete_field_not_reference(
-    lp: &LogicalPlan,
+    lp: &Plan,
     call: &Ident,
     field: &Ident,
     dt: &Key<ScalarType>,
@@ -398,7 +407,7 @@ pub(super) fn query_delete_field_not_reference(
         Level::Error,
         format!(
             "{err_name} Field `{field}` is not a reference, but a `{}`",
-            WithPlan {
+            With {
                 plan: lp,
                 extended: dt
             }
@@ -407,18 +416,18 @@ pub(super) fn query_delete_field_not_reference(
     .span_help(call.span(), format!("`{field}` "))
 }
 
-pub(super) fn query_deref_field_already_exists(named: &Ident) -> Diagnostic {
+pub(super) fn query_deref_field_already_exists(new: &Ident, existing: &Ident) -> Diagnostic {
     let err_name = error_name(QUERY, 24);
 
     Diagnostic::spanned(
-        named.span(),
+        new.span(),
         Level::Error,
-        format!("{err_name} Field `{named}` already exists",),
+        format!("{err_name} Field `{new}` already exists",),
     )
-    .span_help(
-        named.span(),
-        format!("Rename `{named}` or remove the existing `{named}` field"),
-    )
+    .span_note(existing.span(), format!("{existing} defined here"))
+    .help(format!(
+        "Rename `{new}` or remove the existing `{new}` field"
+    ))
 }
 
 pub(super) fn query_reference_field_missing(reference: &Ident) -> Diagnostic {
@@ -440,12 +449,12 @@ pub(super) fn query_deref_cannot_deref_rust_type(reference: &Ident, t: &Type) ->
     Diagnostic::spanned(
         reference.span(),
         Level::Error,
-        format!("{err_name} Cannot dereference a rust type `{:#?}`", t),
+        format!("{err_name} Cannot dereference a rust type `{t:#?}`"),
     )
 }
 
 pub(super) fn query_deref_cannot_deref_record(
-    lp: &LogicalPlan,
+    lp: &Plan,
     reference: &Ident,
     t: &Key<Record>,
 ) -> Diagnostic {
@@ -455,7 +464,7 @@ pub(super) fn query_deref_cannot_deref_record(
         Level::Error,
         format!(
             "{err_name} Cannot dereference a record `{}`",
-            WithPlan {
+            With {
                 plan: lp,
                 extended: t
             }
@@ -572,7 +581,7 @@ pub(super) fn query_let_variable_already_assigned(
 }
 
 pub(super) fn query_deref_cannot_deref_bag_type(
-    lp: &LogicalPlan,
+    lp: &Plan,
     reference: &Ident,
     t: &Key<Record>,
 ) -> Diagnostic {
@@ -582,7 +591,7 @@ pub(super) fn query_deref_cannot_deref_bag_type(
         Level::Error,
         format!(
             "{err_name} Cannot dereference a bag of records `{}`",
-            WithPlan {
+            With {
                 plan: lp,
                 extended: t
             }
@@ -597,9 +606,7 @@ pub(super) fn query_cannot_return_stream(last: Span, ret: Span) -> Diagnostic {
         format!("{err_name} Cannot return a stream from a query",),
     )
     .span_note(last, "The previous operator provides the values".to_owned())
-    .help(format!(
-        "Use a `collect` operator to convert the stream into a bag of records"
-    ))
+    .help("Use a `collect` operator to convert the stream into a bag of records".to_string())
 }
 
 pub(super) fn query_table_access_nonexisted_columns(table_name: &Ident, col: &Ident) -> Diagnostic {
@@ -613,7 +620,7 @@ pub(super) fn query_table_access_nonexisted_columns(table_name: &Ident, col: &Id
 }
 
 pub(super) fn query_invalid_record_type(
-    lp: &LogicalPlan,
+    lp: &Plan,
     op: &Ident,
     prev: Span,
     expected: &Key<Record>,
@@ -626,11 +633,11 @@ pub(super) fn query_invalid_record_type(
         Level::Error,
         format!(
             "{err_name} Data type does not match, expected {} but found {}",
-            WithPlan {
+            With {
                 plan: lp,
                 extended: expected
             },
-            WithPlan {
+            With {
                 plan: lp,
                 extended: found
             }
@@ -646,6 +653,28 @@ pub(super) fn query_no_cust_type_found(t: &Ident) -> Diagnostic {
         Level::Error,
         format!("{err_name} Cannot find type {t}"),
     )
+}
+
+pub(super) fn table_query_no_such_field(table: &Ident, t: &Ident) -> Diagnostic {
+    let err_name = error_name(QUERY, 40);
+
+    Diagnostic::spanned(
+        t.span(),
+        Level::Error,
+        format!("{err_name} no such field `{t}` in `{table}`"),
+    )
+    .span_note(table.span(), format!("`{table}` defined here"))
+}
+
+pub(super) fn query_cannot_append_to_record(new: &Ident, existing: &Ident) -> Diagnostic {
+    let err_name = error_name(QUERY, 41);
+
+    Diagnostic::spanned(
+        new.span(),
+        Level::Error,
+        format!("{err_name} cannot append new field `{new}` as it is already defined"),
+    )
+    .span_note(existing.span(), format!("{existing} defined here"))
 }
 
 pub(super) fn operator_unimplemented(call: &Ident) -> Diagnostic {

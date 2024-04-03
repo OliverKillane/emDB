@@ -10,7 +10,7 @@ impl EMQLOperator for Use {
     const NAME: &'static str = "use";
 
     fn build_parser() -> impl TokenParser<Self> {
-        mapsuc(seq(matchident("use"), getident()), |(call, var_name)| Use {
+        mapsuc(seq(matchident("use"), setrepr(getident(), "<table>")), |(call, var_name)| Use {
             call,
             var_name,
         })
@@ -18,7 +18,7 @@ impl EMQLOperator for Use {
 
     fn build_logical(
         self,
-        lp: &mut plan::LogicalPlan,
+        lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
@@ -29,11 +29,10 @@ impl EMQLOperator for Use {
         let Self { call, var_name } = self;
         if cont.is_none() {
             if let Some(table_id) = tn.get(&var_name) {
-                let table = lp.get_table(*table_id);
                 let access = plan::TableAccess::AllCols;
-                let record_type = plan::generate_access(*table_id, access.clone(), lp).unwrap();
+                let record_type = generate_access(*table_id, access.clone(), lp, None).unwrap();
                 let out_edge = lp.operator_edges.insert(plan::DataFlow::Null);
-                let use_op = lp.operators.insert(plan::Operator { query: qk, kind: plan::OperatorKind::Access { access_after: mo.clone(), op: plan::AccessOperator::Scan { access, table: *table_id, output: out_edge } } });
+                let use_op = lp.operators.insert(plan::Operator { query: qk, kind: plan::OperatorKind::Access { access_after: *mo, op: plan::AccessOperator::Scan { access, table: *table_id, output: out_edge } } });
                 *mo = Some(use_op);
                 let data_type = plan::Data { fields: record_type, stream: true };
 

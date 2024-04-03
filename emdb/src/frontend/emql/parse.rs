@@ -187,7 +187,7 @@ fn constraint_parser() -> impl TokenParser<Constraint> {
                 choice(
                     peekident("as"),
                     mapsuc(seq(matchident("as"), getident()), |(_, i)| Some(i)),
-                    mapsuc(nothing(), |_| None)
+                    mapsuc(nothing(), |()| None)
                 )
             ),
             |(method, (p, alias))| Constraint {
@@ -202,7 +202,7 @@ fn constraint_parser() -> impl TokenParser<Constraint> {
         peekident("unique") => inner("unique", mapsuc(getident(), |i| ConstraintExpr::Unique{field:i})),
         peekident("pred") => inner("pred", mapsuc(syn(collectuntil(isempty())), ConstraintExpr::Pred)),
         peekident("limit") => inner("limit", mapsuc(syn(collectuntil(isempty())), |e| ConstraintExpr::Limit{size:e})),
-        otherwise => error(getident(), |i| Diagnostic::spanned(i.span(), Level::Error, format!("expected a constraint (e.g. pred, unique) but got {}", i)))
+        otherwise => error(getident(), |i| Diagnostic::spanned(i.span(), Level::Error, format!("expected a constraint (e.g. pred, unique) but got {i}")))
     )
 }
 
@@ -228,7 +228,7 @@ fn connector_parse() -> impl TokenParser<Connector> {
                     gettoken,
                     gettoken
                 ),
-                |(t1, t2)| Diagnostic::spanned(t1.span(), Level::Error, format!("expected either ~> or |> but got {}{}", t1, t2))
+                |(t1, t2)| Diagnostic::spanned(t1.span(), Level::Error, format!("expected either ~> or |> but got {t1}{t2}"))
             )
         ),
         "Connect operators a single row passed (`~>`), or a stream of rows (`|>`)",
@@ -261,11 +261,14 @@ fn stream_parser() -> impl TokenParser<StreamExpr> {
 }
 
 pub fn type_parser(end: impl TokenParser<bool>) -> impl TokenParser<AstType> {
-    choices! {
-        peekident("ref") => mapsuc(seq(matchident("ref"), getident()), |(_, i)| AstType::TableRef(i)),
-        peekident("type") => mapsuc(seq(matchident("type"), getident()), |(_, i)| AstType::Custom(i)),
-        otherwise => mapsuc(syntopunct(end), AstType::RsType)
-    }
+    setrepr(
+        choices! {
+            peekident("ref") => mapsuc(seq(matchident("ref"), getident()), |(_, i)| AstType::TableRef(i)),
+            peekident("type") => mapsuc(seq(matchident("type"), getident()), |(_, i)| AstType::Custom(i)),
+            otherwise => mapsuc(syntopunct(end), AstType::RsType)
+        },
+        "<type>",
+    )
 }
 
 pub fn type_parser_to_punct(end: char) -> impl TokenParser<AstType> {
@@ -295,11 +298,11 @@ pub fn fields_assign() -> impl TokenParser<Vec<(Ident, (AstType, Expr))>> {
         ',',
         mapsuc(
             seqs!(
-                getident(),
+                setrepr(getident(), "<field name>"),
                 matchpunct(':'),
                 type_parser_to_punct('='),
                 matchpunct('='),
-                syntopunct(peekpunct(','))
+                setrepr(syntopunct(peekpunct(',')), "<expression>")
             ),
             |(id, (_, (t, (_, e))))| (id, (t, e)),
         ),

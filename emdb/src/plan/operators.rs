@@ -63,13 +63,13 @@ pub enum ModifyOperator {
 
 pub enum AccessOperator {
     /// Gets a unique row from a table
-    /// INV: the input_val contains a single value of the type of the unique
-    ///      field in the table
     Unique {
-        unique_field: Ident,
+        input: Key<DataFlow>,
         access: TableAccess,
-        from_expr: Expr,
+        from: Ident,
         table: Key<Table>,
+        field: Ident,
+        out: Ident,
         output: Key<DataFlow>,
     },
 
@@ -150,6 +150,13 @@ pub enum PureOperator {
     Collect {
         input: Key<DataFlow>,
         into: Ident,
+        output: Key<DataFlow>,
+    },
+
+    /// Take the top n from a stream, discarding the rest
+    Take {
+        input: Key<DataFlow>,
+        top_n: Expr,
         output: Key<DataFlow>,
     },
 }

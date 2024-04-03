@@ -10,7 +10,7 @@ impl EMQLOperator for Let {
     const NAME: &'static str = "let";
 
     fn build_parser() -> impl TokenParser<Self> {
-        mapsuc(seq(matchident("let"), getident()), |(call, var_name)| Let {
+        mapsuc(seq(matchident("let"), setrepr(getident(), "<var name>")), |(call, var_name)| Let {
             call,
             var_name,
         })
@@ -18,7 +18,7 @@ impl EMQLOperator for Let {
 
     fn build_logical(
         self,
-        lp: &mut plan::LogicalPlan,
+        lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,

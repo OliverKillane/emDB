@@ -1,7 +1,7 @@
-use emdb::database;
+use emdb::emql;
 
-database! {
-    impl graph as mydb;
+emql! {
+    impl planviz as mydb;
 
     table simple {
         a: i32,
@@ -9,3 +9,5 @@ database! {
         c: (u32, i32),
     }
 }
+
+fn main() {}

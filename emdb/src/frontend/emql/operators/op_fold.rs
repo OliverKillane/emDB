@@ -1,9 +1,5 @@
-use combi::tokens::{basic::peekpunct, derived::syntopunct};
-
-use crate::frontend::emql::parse::{type_parser, type_parser_to_punct};
-
+//! Apply a fold over a stream of values to create a single value.
 use super::*;
-
 #[derive(Debug)]
 pub struct Fold {
     call: Ident,
@@ -18,20 +14,20 @@ impl EMQLOperator for Fold {
             functional_style(
                 Self::NAME,
                 listseptrailing(',',
-    mapsuc(
-            seqs!(
-                getident(),
-                matchpunct(':'),
-                type_parser_to_punct('='),
-                matchpunct('='),
-                syntopunct(peekpunct('-')),
-                matchpunct('-'),
-                matchpunct('>'),
-                syntopunct(peekpunct(','))
-            ),
-            |(id, (_, (t, (_, (initial, (_, (_, update)))))))| (id, (t, initial, update))
-        )
-    ),
+                mapsuc(
+                        seqs!(
+                            setrepr(getident(), "<field>"),
+                            matchpunct(':'),
+                            type_parser_to_punct('='),
+                            matchpunct('='),
+                            setrepr(syntopunct(peekpunct('-')), "<initial value>"),
+                            matchpunct('-'),
+                            matchpunct('>'),
+                            setrepr(syntopunct(peekpunct(',')), "<update value>")
+                        ),
+                        |(id, (_, (t, (_, (initial, (_, (_, update)))))))| (id, (t, initial, update))
+                    )
+                ),
             ),
             |(call, fields)| Fold {
                 call,
@@ -42,7 +38,7 @@ impl EMQLOperator for Fold {
 
     fn build_logical(
         self,
-        lp: &mut plan::LogicalPlan,
+        lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
@@ -55,15 +51,7 @@ impl EMQLOperator for Fold {
             fields
         } = self;
         if let Some(Continue { data_type, prev_edge, last_span }) = cont {
-            // must input stream
-            // create output type
-            // bing chilling
-
-
-
           Err(singlelist(errors::operator_unimplemented(&call)))
-
-
         } else {
             Err(singlelist(errors::query_cannot_start_with_operator(&call)))
         }

@@ -1,8 +1,8 @@
 //! Not implemented yet
 
-use emdb::database;
+use emdb::emql;
 
-database! {
+emql! {
     
     table customers {
         forename: String,
@@ -22,3 +22,5 @@ database! {
     }
 
 }
+
+fn main() {}

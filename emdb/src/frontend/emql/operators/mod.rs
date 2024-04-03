@@ -3,24 +3,25 @@
 //!
 //! Every operator has:
 //! - A a module representing the operator, with a struct included.
-//! - Each needs to implement [EMQLOperator]   
-//! - the [create_operator] macro generates a single enumeration and
+//! - Each needs to implement [`EMQLOperator`]   
+//! - the [`create_operator`] macro generates a single enumeration and
 //!   associated parse and logical translation functions (we avoid using
-//!   `Box<dyn EMQLOperator>` by polymorphism through the [Operator] enum)
+//!   `Box<dyn EMQLOperator>` by polymorphism through the [`Operator`] enum)
 //!
-//! To create a new operator, simply add a new module and [EMQLOperator], then
-//! add it to the [create_operator] macro invocation.
+//! To create a new operator, simply add a new module and [`EMQLOperator`], then
+//! add it to the [`create_operator`] macro invocation.
 
 use crate::frontend::emql::errors;
 use combi::{
-    core::{choice, mapsuc, nothing, seq},
+    core::{choice, mapsuc, seq, setrepr},
     macros::{choices, seqs},
     tokens::{
         basic::{
-            collectuntil, getident, gettoken, isempty, matchident, matchpunct, peekident, syn,
+            collectuntil, getident, gettoken, isempty, matchident, matchpunct, peekident,
+            peekpunct, syn,
         },
-        derived::listseptrailing,
-        error::error,
+        derived::{listseptrailing, syntopunct},
+        error::{error, expectederr},
         TokenParser,
     },
 };
@@ -36,8 +37,13 @@ use crate::utils::misc::singlelist;
 
 // translation for plans
 use super::ast::AstType;
-use crate::frontend::emql::parse::{fields_assign, fields_expr, functional_style};
-use crate::frontend::emql::sem::{extract_fields, Continue, ReturnVal, StreamContext, VarState};
+use crate::frontend::emql::parse::{
+    fields_assign, fields_expr, functional_style, type_parser_to_punct,
+};
+use crate::frontend::emql::sem::{
+    ast_typeto_scalar, extract_fields, generate_access, linear_builder, update_incomplete,
+    Continue, LinearBuilderState, ReturnVal, StreamContext, VarState,
+};
 use crate::plan;
 
 trait EMQLOperator: Sized + Debug {
@@ -52,9 +58,10 @@ trait EMQLOperator: Sized + Debug {
     ///
     ///
     ///
+    #[allow(clippy::too_many_arguments)]
     fn build_logical(
         self,
-        lp: &mut plan::LogicalPlan,
+        lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
@@ -86,15 +93,16 @@ macro_rules! create_operator {
         pub fn parse_operator() -> impl TokenParser<$op> {
             choices! {
                 $(
-                    peekident($t::NAME) => mapsuc($t::build_parser(), $op::$t),
+                    peekident($t::NAME) => expectederr(mapsuc($t::build_parser(), $op::$t)),
                 )*
                 otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, format!("expected an operator but got {}", t)))
             }
         }
 
+        #[allow(clippy::too_many_arguments)]
         pub fn build_logical(
             op: $op,
-            lp: &mut plan::LogicalPlan,
+            lp: &mut plan::Plan,
             tn: &HashMap<Ident, plan::Key<plan::Table>>,
             qk: plan::Key<plan::Query>,
             vs: &mut HashMap<Ident, VarState>,
@@ -127,5 +135,6 @@ create_operator!(
     op_sort::Sort,
     op_fold::Fold,
     op_assert::Assert,
-    op_collect::Collect
+    op_collect::Collect,
+    op_take::Take
 );

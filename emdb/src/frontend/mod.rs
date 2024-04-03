@@ -5,7 +5,9 @@ use std::collections::LinkedList;
 
 use crate::backend;
 use crate::plan;
+
 pub(crate) use emql::Emql;
+
 use proc_macro2::TokenStream;
 use proc_macro_error::Diagnostic;
 
@@ -18,10 +20,10 @@ impl Diagnostics {
         Self { errs: Vec::new() }
     }
     pub(crate) fn add(&mut self, d: Diagnostic) {
-        self.errs.push(d)
+        self.errs.push(d);
     }
     pub(crate) fn emit(self) {
-        self.errs.into_iter().for_each(Diagnostic::emit)
+        self.errs.into_iter().for_each(Diagnostic::emit);
     }
 
     pub(crate) fn empty(&self) -> bool {
@@ -32,5 +34,5 @@ impl Diagnostics {
 pub(crate) trait Frontend {
     fn from_tokens(
         input: TokenStream,
-    ) -> Result<(plan::LogicalPlan, backend::Targets), LinkedList<Diagnostic>>;
+    ) -> Result<(plan::Plan, backend::Targets), LinkedList<Diagnostic>>;
 }

@@ -8,7 +8,7 @@ use crate::{
         },
         errors,
     },
-    plan,
+    plan::{self, ColSelect, DataFlow},
 };
 use proc_macro2::{Ident, Span};
 use proc_macro_error::Diagnostic;
@@ -43,9 +43,9 @@ pub fn ast_to_logical(
         tables,
         queries,
     }: Ast,
-) -> Result<(plan::LogicalPlan, backend::Targets), LinkedList<Diagnostic>> {
+) -> Result<(plan::Plan, backend::Targets), LinkedList<Diagnostic>> {
     let mut errors = LinkedList::new();
-    let mut lp = plan::LogicalPlan::new();
+    let mut lp = plan::Plan::new();
     let mut qs = HashSet::new();
     let mut tn = HashMap::new();
     let mut bks = HashMap::new();
@@ -91,7 +91,7 @@ fn add_backend(
 }
 
 fn add_table(
-    lp: &mut plan::LogicalPlan,
+    lp: &mut plan::Plan,
     tn: &mut HashMap<Ident, plan::Key<plan::Table>>,
     Table { name, cols, cons }: Table,
 ) -> LinkedList<Diagnostic> {
@@ -100,22 +100,19 @@ fn add_table(
     // Add each column, checking for duplicate names
     let mut columns: HashMap<Ident, plan::Column> = HashMap::new();
     for (col_name, col_type) in cols {
-        match columns.get_key_value(&col_name) {
-            Some((duplicate, _)) => {
-                errs.push_back(errors::table_column_redefined(&col_name, duplicate))
-            }
-            None => {
-                let type_index = lp
-                    .scalar_types
-                    .insert(plan::ConcRef::Conc(plan::ScalarTypeConc::Rust(col_type)));
-                columns.insert(
-                    col_name,
-                    plan::Column {
-                        cons: plan::ColumnConstraints { unique: None },
-                        data_type: type_index,
-                    },
-                );
-            }
+        if let Some((duplicate, _)) = columns.get_key_value(&col_name) {
+            errs.push_back(errors::table_column_redefined(&col_name, duplicate));
+        } else {
+            let type_index = lp
+                .scalar_types
+                .insert(plan::ConcRef::Conc(plan::ScalarTypeConc::Rust(col_type)));
+            columns.insert(
+                col_name,
+                plan::Column {
+                    cons: plan::ColumnConstraints { unique: None },
+                    data_type: type_index,
+                },
+            );
         }
     }
 
@@ -172,7 +169,7 @@ fn add_table(
             ConstraintExpr::Limit { size } => {
                 if let Some(plan::Constraint { alias, cons }) = &row_cons.limit {
                     errs.push_back(errors::table_constraint_duplicate_limit(
-                        &alias,
+                        alias,
                         &name,
                         method_span,
                     ));
@@ -202,7 +199,7 @@ fn add_table(
 }
 
 fn add_query(
-    lp: &mut plan::LogicalPlan,
+    lp: &mut plan::Plan,
     qs: &mut HashSet<Ident>,
     tn: &HashMap<Ident, plan::Key<plan::Table>>,
     Query {
@@ -269,11 +266,18 @@ fn add_query(
     if let Some(ret) = ret {
         lp.queries[qk].returnval = Some(ret.index);
     }
+
+    for (name, vs) in vs {
+        if let VarState::Available { created, state } = vs {
+            discard_continue(lp, qk, state);
+        }
+    }
+
     errors
 }
 
 fn build_streamexpr(
-    lp: &mut plan::LogicalPlan,
+    lp: &mut plan::Plan,
     tn: &HashMap<Ident, plan::Key<plan::Table>>,
     qk: plan::Key<plan::Query>,
     vs: &mut HashMap<Ident, VarState>,
@@ -293,8 +297,25 @@ fn build_streamexpr(
     }
 }
 
+fn discard_continue(
+    lp: &mut plan::Plan,
+    qk: plan::Key<plan::Query>,
+    Continue {
+        data_type,
+        prev_edge,
+        last_span,
+    }: Continue,
+) {
+    let discard_op = lp.operators.insert(plan::Operator {
+        query: qk,
+        kind: plan::OperatorKind::Flow(plan::FlowOperator::Discard { input: prev_edge }),
+    });
+    update_incomplete(lp.operator_edges.get_mut(prev_edge).unwrap(), discard_op);
+}
+
+#[allow(clippy::too_many_arguments)]
 fn recur_stream(
-    lp: &mut plan::LogicalPlan,
+    lp: &mut plan::Plan,
     tn: &HashMap<Ident, plan::Key<plan::Table>>,
     qk: plan::Key<plan::Query>,
     vs: &mut HashMap<Ident, VarState>,
@@ -307,7 +328,10 @@ fn recur_stream(
     match (ctx, con) {
         // No more operators (no data in, or data discarded)
         (StreamContext::Nothing { last_span }, None) => Ok(None),
-        (StreamContext::Continue { .. }, None) => Ok(None),
+        (StreamContext::Continue(cont), None) => {
+            discard_continue(lp, qk, cont);
+            Ok(None)
+        }
 
         // ReturnValing data from the query
         (StreamContext::Returned(ret), None) => Ok(Some(ret)),
@@ -413,4 +437,159 @@ pub fn ast_typeto_scalar(
             }
         }
     }
+}
+
+/// Using a [`plan::TableAccess`] select the new records.
+/// - Optionally includes fields from a previous record
+/// - generates errors of invalid accesses
+pub fn generate_access(
+    table_id: plan::Key<plan::Table>,
+    access: plan::TableAccess,
+    lp: &mut plan::Plan,
+    include_from: Option<plan::Key<plan::Record>>,
+) -> Result<plan::Key<plan::Record>, LinkedList<Diagnostic>> {
+    let new_fields = match access {
+        plan::TableAccess::Ref(id) => {
+            let ref_id =
+                lp.scalar_types
+                    .insert(plan::ConcRef::Conc(plan::ScalarTypeConc::TableRef(
+                        table_id,
+                    )));
+
+            Ok(vec![(id, ref_id)])
+        }
+        plan::TableAccess::AllCols => {
+            let table = lp.get_table(table_id);
+
+            Ok(table
+                .columns
+                .iter()
+                .map(|(id, plan::Column { cons, data_type })| (id.clone(), *data_type))
+                .collect())
+        }
+        plan::TableAccess::Selection(ids) => {
+            let table = lp.get_table(table_id);
+            let mut fields = Vec::new();
+            let mut invalid_access = LinkedList::new();
+            for ColSelect { col, select_as } in ids {
+                if let Some(plan::Column { cons, data_type }) = table.columns.get(&col) {
+                    fields.push((select_as, *data_type));
+                } else {
+                    invalid_access.push_back(errors::table_query_no_such_field(&table.name, &col));
+                }
+            }
+
+            if invalid_access.is_empty() {
+                Ok(fields)
+            } else {
+                Err(invalid_access)
+            }
+        }
+    }?;
+
+    let mut errors = LinkedList::new();
+    let mut fields = if let Some(existing) = include_from {
+        lp.get_record_type(existing).fields.clone()
+    } else {
+        HashMap::new()
+    };
+
+    // must check even if existing is empty, a user may select the same field many times
+    for (id, t) in new_fields {
+        if let Some((k, t)) = fields.get_key_value(&id) {
+            errors.push_back(errors::query_cannot_append_to_record(&id, k));
+        } else {
+            fields.insert(id, t);
+        }
+    }
+    if errors.is_empty() {
+        Ok(lp
+            .record_types
+            .insert(plan::ConcRef::Conc(plan::RecordConc { fields })))
+    } else {
+        Err(errors)
+    }
+}
+
+pub fn update_incomplete(df: &mut DataFlow, to: plan::Key<plan::Operator>) {
+    // TODO: determine better way to 'map' a member of an arena
+    *df = match df {
+        plan::DataFlow::Incomplete { from, with } => plan::DataFlow::Conn {
+            from: *from,
+            to,
+            with: with.clone(),
+        },
+        plan::DataFlow::Conn { .. } | plan::DataFlow::Null => {
+            unreachable!("Previous should be incomplete")
+        }
+    };
+}
+
+pub struct LinearBuilderState {
+    pub data_out: plan::Data,
+    pub op_kind: plan::OperatorKind,
+    pub call_span: Span,
+    pub update_mo: bool,
+}
+
+/// A helper to abstract away building linear operators and the [`Continue`].
+/// - Allows construction of a function that creates an operator with an input and output.
+/// - Updates the two relevant [`plan::DataFlow`]
+pub fn linear_builder(
+    lp: &mut plan::Plan,
+    query: plan::Key<plan::Query>,
+    mo: &mut Option<plan::Key<plan::Operator>>,
+    Continue {
+        data_type,
+        prev_edge,
+        last_span,
+    }: Continue,
+    op_creator: impl FnOnce(
+        &mut plan::Plan,
+        &Option<plan::Key<plan::Operator>>,
+        Continue,
+        plan::Key<plan::DataFlow>, // the next edge
+    ) -> Result<LinearBuilderState, LinkedList<Diagnostic>>,
+) -> Result<StreamContext, LinkedList<Diagnostic>> {
+    // prev_edge -> op_key -> out_edge
+
+    // create a new edge out of the operator
+    let out_edge = lp.operator_edges.insert(plan::DataFlow::Null);
+
+    // create the operator and returned data type
+    let result = op_creator(
+        lp,
+        mo,
+        Continue {
+            data_type,
+            prev_edge,
+            last_span,
+        },
+        out_edge,
+    )?;
+    let op_key = lp.operators.insert(plan::Operator {
+        query,
+        kind: result.op_kind,
+    });
+
+    if result.update_mo {
+        *mo = Some(op_key);
+    }
+
+    // update the edge to contain the data out and operator key
+    lp.operator_edges[out_edge] = plan::DataFlow::Incomplete {
+        from: op_key,
+        with: result.data_out.clone(),
+    };
+
+    // update the edge in to contain the operator key
+    let in_edge = lp.operator_edges.get_mut(prev_edge).unwrap();
+
+    update_incomplete(in_edge, op_key);
+
+    Ok(StreamContext::Continue(Continue {
+        data_type: result.data_out,
+        prev_edge: out_edge,
+        last_span: result.call_span,
+    }))
 }

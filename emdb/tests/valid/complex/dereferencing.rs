@@ -1,8 +1,6 @@
-//! Not implemented yet
+use emdb::emql;
 
-use emdb::database;
-
-database! {
+emql! {
 
     table cool {
         name: String,
@@ -12,7 +10,7 @@ database! {
     // returns a reference to the row updated
     query new_cool(name: String) {
         row(name: String = name, something: i32 = 0)
-            |> insert(cool)
+            |> insert(cool as ref it)
             ~> return;
     }
 
@@ -29,17 +27,15 @@ database! {
     }
 
     query collect_most_cool() {
-        ref cool
-            |> deref(it as cool_vals)
+        ref cool as cool_ref
+            |> deref(cool_ref as cool_vals)
             |> map(sort_on: i32 = cool_vals.something)
             |> sort(sort_on desc)
             |> take(10)
-            |> map(id: ref cool = it)
-            |> collect(type foo)
-            ~> map(blah: type foo = it. c: i32 = 0)
+            |> map(id: ref cool = cool_ref)
+            |> collect(it as type foo)
+            ~> map(blah: type foo = it, c: i32 = 0)
             ~> return;
-
-
     }
 
     query complex() {
@@ -51,7 +47,13 @@ database! {
         use larger_than_10
             |> fork(let x1, x2);
 
-        use x1 |> first() ~> return;
-        use x2 |> sort(x2.something desc);
+        use x1 
+            |> first() 
+            ~> return;
+
+        use x2 
+            |> sort(x2.something desc);
     }
 }
+
+fn main() {}

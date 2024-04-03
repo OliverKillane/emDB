@@ -150,7 +150,7 @@ impl Combi for PeekIdent {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, " {} ", self.ident.magenta())
+        write!(f, "{}", self.ident.magenta())
     }
 }
 

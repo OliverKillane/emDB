@@ -14,7 +14,7 @@ impl EMQLOperator for Return {
 
     fn build_logical(
         self,
-        lp: &mut plan::LogicalPlan,
+        lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
@@ -31,8 +31,9 @@ impl EMQLOperator for Return {
         {
             if data_type.stream {
                 Err(singlelist(errors::query_cannot_return_stream(last_span, call.span())))
-            } else {
+            } else {                
                 let return_op = lp.operators.insert(plan::Operator { query: qk, kind: plan::OperatorKind::Flow(plan::FlowOperator::Return { input: prev_edge }) });
+                update_incomplete(lp.operator_edges.get_mut(prev_edge).unwrap(), return_op);
     
                 Ok(StreamContext::Returned(ReturnVal {
                     span: call.span(),

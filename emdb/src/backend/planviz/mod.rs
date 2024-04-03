@@ -1,6 +1,6 @@
 use syn::spanned::Spanned;
 
-use super::*;
+use super::{Diagnostic, EMDBBackend, Ident, LinkedList, TokenStream, plan};
 use crate::utils::misc::singlelist;
 use quote::quote;
 mod errors;
@@ -17,7 +17,7 @@ impl EMDBBackend for PlanViz {
             Ok(PlanViz)
         }
     }
-    fn generate_code(self, impl_name: Ident, plan: &plan::LogicalPlan) -> Result<TokenStream, LinkedList<Diagnostic>> {
+    fn generate_code(self, impl_name: Ident, plan: &plan::Plan) -> Result<TokenStream, LinkedList<Diagnostic>> {
         Ok(quote!{
             pub fn give_graph() -> &'static str {
                 "hello there"

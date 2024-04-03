@@ -1,5 +1,5 @@
 //! # The emQL language frontend
-//! [TokenStream] -> parse -> ([AST] + errors) -> translate -> ([LogicalPlan] + errors) -> [Backend]
+//! [`TokenStream`] -> parse -> ([AST] + errors) -> translate -> ([`LogicalPlan`] + errors) -> [Backend]
 mod ast;
 mod errors;
 mod operators;
@@ -17,7 +17,7 @@ pub struct Emql;
 impl Frontend for Emql {
     fn from_tokens(
         input: TokenStream,
-    ) -> Result<(plan::LogicalPlan, backend::Targets), LinkedList<Diagnostic>> {
+    ) -> Result<(plan::Plan, backend::Targets), LinkedList<Diagnostic>> {
         sem::ast_to_logical(parse::parse(input)?)
     }
 }

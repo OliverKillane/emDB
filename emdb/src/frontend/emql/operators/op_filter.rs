@@ -1,5 +1,4 @@
-use self::plan::DataFlow;
-
+//! Apply a predicate to filter rows
 use super::*;
 
 #[derive(Debug)]
@@ -13,14 +12,14 @@ impl EMQLOperator for Filter {
 
     fn build_parser() -> impl TokenParser<Self> {
         mapsuc(
-            functional_style(Self::NAME, syn(collectuntil(isempty()))),
+            functional_style(Self::NAME, setrepr(syn(collectuntil(isempty())), "<filter predicate>")),
             |(call, filter_expr)| Filter { call, filter_expr },
         )
     }
 
     fn build_logical(
         self,
-        lp: &mut plan::LogicalPlan,
+        lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
@@ -30,12 +29,22 @@ impl EMQLOperator for Filter {
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, filter_expr } = self;
         if let Some(prev) = cont {
-            let out_edge = lp.operator_edges.insert(plan::DataFlow::Null);
-            let assert_op = lp.operators.insert(plan::Operator { query: qk, kind: plan::OperatorKind::Pure(plan::PureOperator::Filter { input: prev.prev_edge, predicate: filter_expr, output: out_edge}) });
-
-            lp.operator_edges[out_edge] = DataFlow::Incomplete { from: assert_op, with: prev.data_type.clone() };
-
-            Ok(StreamContext::Continue(Continue { data_type: prev.data_type, prev_edge: out_edge, last_span: call.span() }))
+            linear_builder(
+                lp,
+                qk,
+                mo,
+                prev,
+                |lp, mo, prev, next_edge| {
+                    Ok(
+                        LinearBuilderState {
+                            data_out: prev.data_type,
+                            op_kind: plan::OperatorKind::Pure(plan::PureOperator::Filter { input: prev.prev_edge, predicate: filter_expr, output: next_edge}),
+                            call_span: call.span(),
+                            update_mo: false,
+                        }
+                    )
+                }
+            )
         } else {
             Err(singlelist(errors::query_cannot_start_with_operator(&call)))
         }

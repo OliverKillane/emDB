@@ -1,10 +1,10 @@
 //! # Monotrait
 //! A crate for deriving enum based polymorphism.
-//! 
+//!
 //! ## Pattern
-//! Often we want to implement traits separately for each variant of a enum. 
+//! Often we want to implement traits separately for each variant of a enum.
 //! This is traditionally implemented in two ways:
-//! 
+//!
 //! ```
 //! trait Bing {
 //!     fn bonk(&self);
@@ -19,7 +19,7 @@
 //! impl Bing for Bar {
 //!     fn bonk(&self) {}
 //! }
-//! 
+//!
 //! fn method_1() {
 //!     // using runtime polymorphism, at cost
 //!     let bings: Vec<Box<dyn Bing>> = vec![Box::new(Foo()), Box::new(Bar())];
@@ -27,7 +27,7 @@
 //!         b.bonk()
 //!     }
 //! }
-//! 
+//!
 //! fn method_2() {
 //!     // using an enum, at the cost of boilerplate
 //!     enum BingVars {
@@ -43,19 +43,19 @@
 //!             }
 //!         }
 //!     }
-//! 
+//!
 //!     let bings: Vec<BingVars> = vec![BingVars::Foo(Foo()), BingVars::Bar(Bar())];
 //!     for b in bings {
 //!         b.bonk()
 //!     }
 //! }
-//! 
+//!
 //! fn main() {
 //!     method_1();
 //!     method_2();
 //! }
-//! ``` 
-//! 
+//! ```
+//!
 //! The crate removes the boilerplate from `method_2` by generating the enum and the implementation for you.
 
 #[proc_macro_attribute]

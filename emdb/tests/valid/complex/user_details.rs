@@ -1,10 +1,7 @@
-use emdb::database;
+use emdb::emql;
 
-// TODO: update for the removal of genpk
-
-database! {
-    impl graph as user_details_view;
-    impl simple as user_details;
+emql! {
+    impl planviz as user_details_view;
 
     // Reasoning:
     //  - Constraint checking required, needs to fail immediately (hybrid IVM)
@@ -27,7 +24,7 @@ database! {
     //   - Move semantics (taking ownership of data structure from outside the database)
     query new_user(username: String, prem: bool) {
         row(name: String = username, premium: bool = prem, credits: i32 = 0 )
-            ~> insert(users)
+            ~> insert(users as ref user_id)
             ~> return;
     }
 
@@ -51,7 +48,7 @@ database! {
     //    - choosing a data structure for `users` table that is good for iteration
     query get_snapshot() {
         use users
-            |> collect
+            |> collect(it as type user_t)
             ~> return;
     }
 
@@ -73,12 +70,11 @@ database! {
     //   - Iteration advantage form splitting premium users & non-premium
     //   - can be inlined to very simple iterate over &mut and increment sum
     query reward_premium(cred_bonus: f32) {
-        ref users
-            |> deref(users as it)
+        ref users as users_ref
+            |> deref(users_ref as it)
             |> filter(it.premium)
-            .map(|user| )
-            |> map(users: ref users = users, new_creds: i32 = ((it.credits as f32) * cred_bonus) as i32)
-            |> update(users use credits = new_creds)
+            |> map(users_ref: ref users = users_ref, new_creds: i32 = ((it.credits as f32) * cred_bonus) as i32)
+            |> update(users_ref use credits = new_creds)
             |> map(creds: i32 = new_creds)
             |> fold(sum: i64 = 0 -> sum + creds)
             ~> return;
@@ -97,3 +93,5 @@ database! {
             ~> return;
     }
 }
+
+fn main() {}

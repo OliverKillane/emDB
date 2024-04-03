@@ -23,13 +23,13 @@ impl EMQLOperator for Sort {
                     ',',
                     mapsuc(
                         seq(
-                            getident(),
-                            choices!(
+                            setrepr(getident(), "<field>"),
+                            setrepr(choices!(
                                 peekident("asc") => mapsuc(matchident("asc"), |t| (SortOrder::Asc, t.span())),
                                 peekident("desc") => mapsuc(matchident("desc"), |t| (SortOrder::Desc, t.span())),
                                 // TODO remplace with call to errors::
-                                otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, format!("Can only sort by `asc` or `desc`, not by {:?}", t)))
-                            ),
+                                otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, format!("Can only sort by `asc` or `desc`, not by {t:?}")))
+                            ), "<asc/desc>")
                         ),
                         |(i, (o, s))| (i, (o, s)),
                     ),
@@ -41,7 +41,7 @@ impl EMQLOperator for Sort {
 
     fn build_logical(
         self,
-        lp: &mut plan::LogicalPlan,
+        lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,

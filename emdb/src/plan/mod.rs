@@ -20,15 +20,15 @@ pub type Key<T> = Index<T, usize, NonzeroGeneration<usize>>;
 /// A wrapper type for implementing traits on components that need to use the
 /// plan for context.
 /// - for example printing types requires the logical plan for table ref types
-pub struct WithPlan<'a, A> {
-    pub plan: &'a LogicalPlan,
+pub struct With<'a, A> {
+    pub plan: &'a Plan,
     pub extended: A,
 }
 
 /// The basic logical plan
 /// - All components can be accessed via [Key]
 /// - Can be agumented with other data that uses [Key] to reference components
-pub struct LogicalPlan {
+pub struct Plan {
     pub queries: GenArena<Query>,
     pub tables: GenArena<Table>,
     pub operators: GenArena<Operator>,
@@ -37,9 +37,9 @@ pub struct LogicalPlan {
     pub record_types: GenArena<Record>,
 }
 
-impl LogicalPlan {
+impl Plan {
     pub fn new() -> Self {
-        LogicalPlan {
+        Plan {
             queries: GenArena::new(),
             tables: GenArena::new(),
             operators: GenArena::new(),

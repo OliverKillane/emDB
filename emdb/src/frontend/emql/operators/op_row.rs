@@ -1,5 +1,4 @@
 use super::*;
-use super::super::sem::ast_typeto_scalar;
 
 #[derive(Debug)]
 pub struct Row {
@@ -19,7 +18,7 @@ impl EMQLOperator for Row {
 
     fn build_logical(
         self,
-        lp: &mut plan::LogicalPlan,
+        lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
@@ -34,7 +33,7 @@ impl EMQLOperator for Row {
             let mut type_fields = HashMap::new();
             let mut expr_fields = HashMap::new();
 
-            for (field, (ast_type, expr)) in fields.into_iter() {
+            for (field, (ast_type, expr)) in fields {
                 match ast_typeto_scalar(tn, ts, ast_type, |e| errors::query_nonexistent_table(&call, e), errors::query_no_cust_type_found) {
                     Ok(t) => {
                         let t_index = lp.scalar_types.insert(t);
@@ -46,7 +45,6 @@ impl EMQLOperator for Row {
                     }
                 }
             }
-
             
             if errors.is_empty() {
                 let data = plan::Data {

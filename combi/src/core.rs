@@ -111,7 +111,7 @@ where
     }
 
     fn repr(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}{}", Repr(&self.0), Repr(&self.1))
+        write!(f, "{} {}", Repr(&self.0), Repr(&self.1))
     }
 }
 
