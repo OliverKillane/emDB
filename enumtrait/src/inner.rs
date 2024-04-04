@@ -205,11 +205,8 @@ fn generate_impl(TraitArgs { fields, enum_name }: TraitArgs, trait_item: &ItemTr
         }
     }
 
-
     quote! {
-        impl #trait_name for #enum_name {
-            #(#impls)*
-        }
+
     }
 
     todo!()
