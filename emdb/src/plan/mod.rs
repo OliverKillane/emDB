@@ -32,7 +32,7 @@ pub struct Plan {
     pub queries: GenArena<Query>,
     pub tables: GenArena<Table>,
     pub operators: GenArena<Operator>,
-    pub operator_edges: GenArena<DataFlow>,
+    pub dataflow: GenArena<DataFlow>,
     pub scalar_types: GenArena<ScalarType>,
     pub record_types: GenArena<Record>,
 }
@@ -43,7 +43,7 @@ impl Plan {
             queries: GenArena::new(),
             tables: GenArena::new(),
             operators: GenArena::new(),
-            operator_edges: GenArena::new(),
+            dataflow: GenArena::new(),
             scalar_types: GenArena::new(),
             record_types: GenArena::new(),
         }

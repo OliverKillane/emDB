@@ -58,18 +58,61 @@
 //!
 //! The crate removes the boilerplate from `method_2` by generating the enum and the implementation for you.
 
+/*
+#[enumtrait::register]
+enum Foo {
+    Var1,
+    Var2,
+}
+
+// now that we can invoke macros in attribute macros
+#[enumtrait::implement(Foo_fields!())]
+trait Bing {
+    fn bonk(&self);
+}
+
+*/
+
+use proc_macro::TokenStream;
+use proc_macro2::TokenStream as TokenStream2;
+use proc_macro_error::proc_macro_error;
+
+mod inner;
+
+/// Registers an enum as an enumtrait
+#[proc_macro_error]
 #[proc_macro_attribute]
-pub fn my_attribute_macro(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    // Parse the input function
-    let input = parse_macro_input!(item as ItemFn);
+pub fn register(attr: TokenStream, item: TokenStream) -> TokenStream {
+    match inner::register(TokenStream2::from(attr), TokenStream2::from(item)) {
+        Ok(t) => t.into(),
+        Err(es) => {
+            for e in es {
+                e.emit()
+            }
+            TokenStream::new()
+        }
+    }
+}
 
-    // Generate some new code to replace the original function
-    let new_code = quote! {
-        #input
+#[proc_macro_error]
+#[proc_macro]
+pub fn implement(input: TokenStream) -> TokenStream {
+    match inner::implement(TokenStream2::from(input)) {
+        Ok(t) => t.into(),
+        Err(es) => {
+            for e in es {
+                e.emit()
+            }
+            TokenStream::new()
+        }
+    }
+}
 
-        println!("This is a custom message from my_attribute_macro!");
-    };
-
-    // Return the new code as a TokenStream
-    TokenStream::from(new_code)
+macro_rules! interface_macro {
+    ($p:path as $name:ident) => {
+        #[proc_macro_attribute]
+        fn $name(attr: TokenStream, item: TokenStream) -> TokenStream {
+            $p (TokenStream2::from(attr), TokenStream2::from(item)).into()
+        }
+    }
 }

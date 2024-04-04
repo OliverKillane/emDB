@@ -143,7 +143,6 @@ pub fn append_field(
     }
 }
 
-// Helpers for type access
 impl Plan {
     pub fn get_scalar_type(&self, k: Key<ScalarType>) -> &ScalarTypeConc {
         self.scalar_types
@@ -159,8 +158,6 @@ impl Plan {
             .get_conc(&self.record_types)
     }
 }
-
-// boilerplate for displaying types ============================================
 
 impl<'a, 'b> Display for With<'a, &'b Key<Record>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

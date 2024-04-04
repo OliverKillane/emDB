@@ -310,7 +310,7 @@ fn discard_continue(
         query: qk,
         kind: plan::OperatorKind::Flow(plan::FlowOperator::Discard { input: prev_edge }),
     });
-    update_incomplete(lp.operator_edges.get_mut(prev_edge).unwrap(), discard_op);
+    update_incomplete(lp.get_mut_dataflow(prev_edge), discard_op);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -554,7 +554,7 @@ pub fn linear_builder(
     // prev_edge -> op_key -> out_edge
 
     // create a new edge out of the operator
-    let out_edge = lp.operator_edges.insert(plan::DataFlow::Null);
+    let out_edge = lp.dataflow.insert(plan::DataFlow::Null);
 
     // create the operator and returned data type
     let result = op_creator(
@@ -577,15 +577,13 @@ pub fn linear_builder(
     }
 
     // update the edge to contain the data out and operator key
-    lp.operator_edges[out_edge] = plan::DataFlow::Incomplete {
+    *lp.get_mut_dataflow(out_edge) = plan::DataFlow::Incomplete {
         from: op_key,
         with: result.data_out.clone(),
     };
 
     // update the edge in to contain the operator key
-    let in_edge = lp.operator_edges.get_mut(prev_edge).unwrap();
-
-    update_incomplete(in_edge, op_key);
+    update_incomplete(lp.get_mut_dataflow(prev_edge), op_key);
 
     Ok(StreamContext::Continue(Continue {
         data_type: result.data_out,

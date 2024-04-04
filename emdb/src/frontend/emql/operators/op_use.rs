@@ -31,12 +31,12 @@ impl EMQLOperator for Use {
             if let Some(table_id) = tn.get(&var_name) {
                 let access = plan::TableAccess::AllCols;
                 let record_type = generate_access(*table_id, access.clone(), lp, None).unwrap();
-                let out_edge = lp.operator_edges.insert(plan::DataFlow::Null);
+                let out_edge = lp.dataflow.insert(plan::DataFlow::Null);
                 let use_op = lp.operators.insert(plan::Operator { query: qk, kind: plan::OperatorKind::Access { access_after: *mo, op: plan::AccessOperator::Scan { access, table: *table_id, output: out_edge } } });
                 *mo = Some(use_op);
                 let data_type = plan::Data { fields: record_type, stream: true };
 
-                lp.operator_edges[out_edge] = plan::DataFlow::Incomplete {
+                *lp.get_mut_dataflow(out_edge) = plan::DataFlow::Incomplete {
                     from: use_op,
                     with: data_type.clone(),
                 };

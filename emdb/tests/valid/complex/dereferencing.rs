@@ -10,7 +10,7 @@ emql! {
     // returns a reference to the row updated
     query new_cool(name: String) {
         row(name: String = name, something: i32 = 0)
-            |> insert(cool as ref it)
+            ~> insert(cool as ref it)
             ~> return;
     }
 
@@ -42,17 +42,18 @@ emql! {
         use cool
             |> map(x: i32 = cool_val)
             |> filter(x > 10)
-            |> let large_than_10;
+            |> let larger_than_10;
 
         use larger_than_10
             |> fork(let x1, x2);
 
         use x1 
-            |> first() 
+            |> take(1)
+            |> collect(it as type foo) 
             ~> return;
 
         use x2 
-            |> sort(x2.something desc);
+            |> sort(x desc);
     }
 }
 

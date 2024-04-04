@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::{Data, Key, Query, ScalarType, Table, TableAccess};
+use super::{Data, Key, Query, ScalarType, Table, TableAccess, Plan};
 use proc_macro2::Ident;
 use syn::Expr;
 
@@ -18,11 +18,6 @@ pub enum DataFlow {
     /// (For graph construction)
     /// INV: None exist in the edges after graph construction
     Null,
-}
-
-pub enum SortOrder {
-    Asc,
-    Desc,
 }
 
 pub enum ModifyOperator {
@@ -93,6 +88,17 @@ pub enum AccessOperator {
     },
 }
 
+pub enum SortOrder {
+    Asc,
+    Desc,
+}
+
+pub struct FoldField {
+    pub data_type: Key<ScalarType>,
+    pub initial: Expr,
+    pub update: Expr
+}
+
 pub enum PureOperator {
     /// Applying a function over a stream of values
     /// INV: output fields match mapping fields
@@ -109,8 +115,7 @@ pub enum PureOperator {
     /// INV: output matches initial types
     Fold {
         input: Key<DataFlow>,
-        initial: HashMap<Ident, (Key<ScalarType>, Expr)>,
-        update: HashMap<Ident, Expr>,
+        fold_fields: HashMap<Ident, FoldField>,
         output: Key<DataFlow>,
     },
 
@@ -159,6 +164,32 @@ pub enum PureOperator {
         top_n: Expr,
         output: Key<DataFlow>,
     },
+
+    /// An n-way join of either equijoin, predicate join, > join, or cross 
+    Join {
+        // todo
+    },
+
+    /// group by a field and aggregate the results
+    GroupBy {
+        input: Key<DataFlow>,
+        group_on: Ident,
+        aggregate_start: Key<DataFlow>,
+        aggregate_end: Key<DataFlow>, 
+        output: Key<DataFlow>,
+    },
+
+    /// Given an operator output, multiply it into multiple outputs
+    Fork {
+        input: Key<DataFlow>,
+        outputs: Vec<Key<DataFlow>>,
+    },
+
+    /// Merge a number of streams into one
+    Union {
+        inputs: Vec<Key<DataFlow>>,
+        output: Key<DataFlow>,
+    },
 }
 
 pub enum FlowOperator {
@@ -168,12 +199,6 @@ pub enum FlowOperator {
     Row {
         fields: HashMap<Ident, Expr>,
         output: Key<DataFlow>,
-    },
-
-    /// Given an operator output, multiply it into multiple outputs
-    Fork {
-        input: Key<DataFlow>,
-        outputs: Vec<Key<DataFlow>>,
     },
 
     /// Return values from a query
@@ -191,13 +216,13 @@ pub struct Operator {
 pub enum OperatorKind {
     /// Used for operators that modify table state.
     /// Within a query they need to be strictly ordered (as one may read the modifications from another)
-    /// INV: [Operator::Modify.access_after] is a [Operator::Modify] or [Operator::Access]
+    /// INV: [`OperatorKind::Modify.modify_after`] is a [`OperatorKind::Modify`] or [`OperatorKind::Access`]
     Modify {
         modify_after: Option<Key<Operator>>,
         op: ModifyOperator,
     },
 
-    /// INV: `access_after` is a [Operator::Modify] or [Operator::Access]
+    /// INV: `access_after` is a [`OperatorKind::Modify`] or [`OperatorKind::Access`]
     Access {
         access_after: Option<Key<Operator>>,
         op: AccessOperator,
@@ -205,4 +230,10 @@ pub enum OperatorKind {
 
     Pure(PureOperator),
     Flow(FlowOperator),
+}
+
+impl Plan {
+    pub fn get_mut_dataflow(&mut self, k: Key<DataFlow>) -> &mut DataFlow {
+        self.dataflow.get_mut(k).unwrap()
+    } 
 }

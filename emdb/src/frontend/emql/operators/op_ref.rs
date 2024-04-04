@@ -39,13 +39,13 @@ impl EMQLOperator for Ref {
                     fields: generate_access(*table_id, access.clone(), lp, None).unwrap(),
                     stream: true
                 };
-                let out_edge = lp.operator_edges.insert(plan::DataFlow::Null);
+                let out_edge = lp.dataflow.insert(plan::DataFlow::Null);
                 let ref_op = lp.operators.insert(plan::Operator {
                     query: qk,
                     kind: plan::OperatorKind::Access { access_after: *mo, op: plan::AccessOperator::Scan { access , table: *table_id, output: out_edge } },
                 });
                 
-                lp.operator_edges[out_edge] = plan::DataFlow::Incomplete {
+                *lp.get_mut_dataflow(out_edge) = plan::DataFlow::Incomplete {
                     from: ref_op,
                     with: record_out.clone(),
                 };

@@ -677,6 +677,14 @@ pub(super) fn query_cannot_append_to_record(new: &Ident, existing: &Ident) -> Di
     .span_note(existing.span(), format!("{existing} defined here"))
 }
 
+pub(super) fn sort_field_used_twice(
+    field: &Ident,
+    dup_field: &Ident,
+) -> Diagnostic {
+    Diagnostic::spanned(field.span(), Level::Error, format!("Field `{field}` is used twice in th sort order, sorts can only sort of each field once"))
+    .span_note(dup_field.span(), format!("`{dup_field}` first used here"))
+}
+
 pub(super) fn operator_unimplemented(call: &Ident) -> Diagnostic {
     Diagnostic::spanned(
         call.span(),

@@ -47,6 +47,7 @@ impl EMQLOperator for Collect {
                         Err(singlelist(errors::collect_type_alias_redefined(&alias, orig)))
                     } else {
                         let bag_type = lp.scalar_types.insert(plan::ConcRef::Conc(plan::ScalarTypeConc::Bag(data_type.fields)));
+                        ts.insert(alias, bag_type);
                         let record_type = lp.record_types.insert(plan::ConcRef::Conc(plan::RecordConc{ fields: HashMap::from([(field.clone(), bag_type)]) } )); 
                         Ok(
                             LinearBuilderState { 

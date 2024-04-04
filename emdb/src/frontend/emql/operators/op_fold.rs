@@ -1,4 +1,8 @@
 //! Apply a fold over a stream of values to create a single value.
+//! 
+//! Semantics:
+//! <stream> |> fold(<unique field>: <type> = <initial> -> <update>, ... ) ~> <single>
+//! 
 use super::*;
 #[derive(Debug)]
 pub struct Fold {
@@ -36,6 +40,7 @@ impl EMQLOperator for Fold {
         )
     }
 
+
     fn build_logical(
         self,
         lp: &mut plan::Plan,
@@ -50,8 +55,38 @@ impl EMQLOperator for Fold {
             call,
             fields
         } = self;
-        if let Some(Continue { data_type, prev_edge, last_span }) = cont {
-          Err(singlelist(errors::operator_unimplemented(&call)))
+        if let Some(cont) = cont {
+            linear_builder(lp, qk, mo, cont, 
+            |lp, mo, prev, next_edge| {
+                    let (raw_fields, mut errors) = extract_fields(fields, errors::query_operator_field_redefined);
+                    if !prev.data_type.stream {
+                        errors.push_back(errors::query_stream_single_connection(call.span(), prev.last_span, true))
+                    }
+
+                    let mut type_fields = HashMap::new();
+                    let mut fold_fields = HashMap::new();
+
+                    for (field, (typ, initial, update)) in raw_fields {
+                        if let Some(scalar_t) = result_to_opt(ast_typeto_scalar(tn, ts, typ, |e| errors::query_nonexistent_table(&call, e), errors::query_no_cust_type_found), &mut errors) {
+                            let data_type = lp.scalar_types.insert(scalar_t);
+                            type_fields.insert(field.clone(), data_type);
+                            fold_fields.insert(field, plan::FoldField { data_type, initial, update });                        
+                        }
+                    }
+
+                    if errors.is_empty() {
+                        Ok(
+                            LinearBuilderState { 
+                                data_out: plan::Data { 
+                                    fields: lp.record_types.insert(plan::ConcRef::Conc(plan::RecordConc {fields: type_fields})), 
+                                    stream: false 
+                                }, op_kind: plan::OperatorKind::Pure(plan::PureOperator::Fold { input: prev.prev_edge, fold_fields, output: next_edge }), call_span: call.span(), update_mo: false }
+                        )
+                    } else {
+                        Err(errors)
+                    }
+                }
+            )
         } else {
             Err(singlelist(errors::query_cannot_start_with_operator(&call)))
         }

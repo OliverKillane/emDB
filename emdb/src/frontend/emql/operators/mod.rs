@@ -33,7 +33,7 @@ use std::{
 };
 use syn::Expr;
 
-use crate::utils::misc::singlelist;
+use crate::utils::misc::{singlelist, result_to_opt};
 
 // translation for plans
 use super::ast::AstType;
@@ -74,6 +74,9 @@ trait EMQLOperator: Sized + Debug {
 // Boilerplate to connect operators (defined as structs) to the enums used to contain them in the ast and combi operators
 // This will no longer be required once enum variant's are made first class types
 // - See: [RFC 1450](https://github.com/rust-lang/rfcs/pull/1450) and [RFC 2593](https://github.com/rust-lang/rfcs/pull/2593)
+// 
+// An alternative is to use a crate like [enum_dispatch](https://gitlab.com/antonok/enum_dispatch) but this uses state between 
+// macros and I want to avoid this hackiness.
 
 macro_rules! create_operator {
     ($op:ident as $($m:ident :: $t:ident),*) => {
@@ -136,5 +139,6 @@ create_operator!(
     op_fold::Fold,
     op_assert::Assert,
     op_collect::Collect,
-    op_take::Take
+    op_take::Take,
+    op_fork::Fork
 );

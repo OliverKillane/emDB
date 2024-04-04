@@ -33,7 +33,7 @@ impl EMQLOperator for Return {
                 Err(singlelist(errors::query_cannot_return_stream(last_span, call.span())))
             } else {                
                 let return_op = lp.operators.insert(plan::Operator { query: qk, kind: plan::OperatorKind::Flow(plan::FlowOperator::Return { input: prev_edge }) });
-                update_incomplete(lp.operator_edges.get_mut(prev_edge).unwrap(), return_op);
+                update_incomplete(lp.dataflow.get_mut(prev_edge).unwrap(), return_op);
     
                 Ok(StreamContext::Returned(ReturnVal {
                     span: call.span(),
