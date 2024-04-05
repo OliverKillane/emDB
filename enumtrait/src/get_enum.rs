@@ -1,3 +1,5 @@
+use std::collections::LinkedList;
+
 use proc_macro2::{Delimiter, Group, Ident, Span, TokenStream, TokenTree};
 use proc_macro_error::{Diagnostic, Level};
 use quote::quote;
@@ -6,60 +8,50 @@ use syn::{
     PathArguments, PathSegment, TypePath, Visibility,
 };
 
-use crate::passing::{extract_syn, ItemInfo, CallStore};
+use combi::{
+    core::{mapsuc, nothing, seq},
+    macros::seqs,
+    tokens::{
+        basic::{
+            collectuntil, getident, isempty, matchident, matchpunct, recovgroup, syn, terminal,
+        },
+        TokenDiagnostic, TokenIter,
+    },
+    Combi, CombiResult,
+};
 
-// Generate a macro and modified implementation
-pub fn interface(attr: TokenStream, item: TokenStream) -> Result<TokenStream, Vec<Diagnostic>> {
+use crate::passing::{extract_syn, CallStore, ItemInfo};
+
+pub fn interface(
+    attr: TokenStream,
+    item: TokenStream,
+) -> Result<TokenStream, LinkedList<Diagnostic>> {
     let macro_name = parse_attrs(attr)?;
     let enum_def = extract_syn(item, parse2::<ItemEnum>)?;
-    let enum_info = transform_enum(enum_def)?;
+    let trans_enum = transform_enum(enum_def)?;
 
-    let enum_src_tks = enum_info.0.clone();
-    let pass_tks = enum_info.store_grouped(); 
+    let enum_tks = trans_enum.clone();
+    let pass_tks = ItemInfo(trans_enum).store_grouped();
 
+    // NOTE: similar to the merge pattern discussed in the documentation, except we do
+    //        not need a second macro store (reduces the expansion depth required)
     Ok(quote! {
-        #enum_src_tks
+        #enum_tks
         macro_rules! #macro_name {
-            ($($t:tt)*) => {
-                enumtrait::get_trait_apply!( $($t)*  #pass_tks );
+            ($p:path => $($t:tt)*) => {
+                $p!( $($t)*  #pass_tks );
             }
         }
     })
 }
 
-fn parse_attrs(attr: TokenStream) -> Result<Ident, Vec<Diagnostic>> {
-    let mut attr_iter = attr.into_iter();
-    if let Some(tk) = attr_iter.next() {
-        let macro_name = match tk {
-            TokenTree::Ident(i) => Ok(i),
-            _ => Err(vec![Diagnostic::spanned(
-                tk.span(),
-                Level::Error,
-                "Expected an identifier".to_owned(),
-            )
-            .help("#[enumtrait::register(name_of_macro)]".to_owned())]),
-        }?;
-
-        if let Some(tk) = attr_iter.next() {
-            Err(vec![Diagnostic::spanned(
-                tk.span(),
-                Level::Error,
-                "No extra arguments should be provided".to_owned(),
-            )])
-        } else {
-            Ok(macro_name)
-        }
-    } else {
-        Err(vec![Diagnostic::spanned(
-            Span::call_site(),
-            Level::Error,
-            "No arguments provided".to_owned(),
-        )])
-    }
+fn parse_attrs(attr: TokenStream) -> Result<Ident, LinkedList<Diagnostic>> {
+    let (_, res) = getident().comp(TokenIter::from(attr, Span::call_site()));
+    res.to_result().map_err(TokenDiagnostic::into_list)
 }
 
-fn transform_enum(mut enum_def: ItemEnum) -> Result<ItemInfo<ItemEnum>, Vec<Diagnostic>> {
-    let mut errors = Vec::new();
+fn transform_enum(mut enum_def: ItemEnum) -> Result<ItemEnum, LinkedList<Diagnostic>> {
+    let mut errors = LinkedList::new();
 
     for variant in &mut enum_def.variants {
         if let Fields::Unit = variant.fields {
@@ -92,7 +84,7 @@ fn transform_enum(mut enum_def: ItemEnum) -> Result<ItemInfo<ItemEnum>, Vec<Diag
             })
         } else if let Fields::Unnamed(fs) = &variant.fields {
             if !fs.unnamed.len() == 1 {
-                errors.push(
+                errors.push_back(
                     Diagnostic::spanned(
                         fs.unnamed.span(),
                         Level::Error,
@@ -105,7 +97,7 @@ fn transform_enum(mut enum_def: ItemEnum) -> Result<ItemInfo<ItemEnum>, Vec<Diag
                 );
             }
         } else {
-            errors.push(
+            errors.push_back(
                 Diagnostic::spanned(
                     variant.fields.span(),
                     Level::Error,
@@ -120,7 +112,7 @@ fn transform_enum(mut enum_def: ItemEnum) -> Result<ItemInfo<ItemEnum>, Vec<Diag
     }
 
     if errors.is_empty() {
-        Ok(ItemInfo(enum_def))
+        Ok(enum_def)
     } else {
         Err(errors)
     }

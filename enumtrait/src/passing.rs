@@ -1,7 +1,9 @@
+use std::collections::LinkedList;
+
 use proc_macro2::{Delimiter, Group, Ident, TokenStream, TokenTree};
 use proc_macro_error::{Diagnostic, Level};
-use syn::{ parse2, ItemEnum, ItemImpl, ItemTrait};
 use quote::{quote, ToTokens};
+use syn::{parse2, ItemEnum, ItemImpl, ItemTrait};
 
 fn enumtrait_internal_error(msg: &str) -> ! {
     panic!("Internal error in enumtrait: {}", msg)
@@ -10,7 +12,7 @@ fn enumtrait_internal_error(msg: &str) -> ! {
 pub fn extract_syn<T>(
     tks: TokenStream,
     f: impl Fn(TokenStream) -> syn::Result<T>,
-) -> Result<T, Vec<Diagnostic>> {
+) -> Result<T, LinkedList<Diagnostic>> {
     match f(tks) {
         Ok(o) => Ok(o),
         Err(errs) => Err(errs
@@ -53,7 +55,7 @@ pub trait CallStore: Sized {
 
 #[derive(Clone)]
 pub struct ItemInfo<T: syn::parse::Parse + ToTokens + Clone>(pub T);
-impl <T: syn::parse::Parse + ToTokens + Clone> CallStore for ItemInfo<T> {
+impl<T: syn::parse::Parse + ToTokens + Clone> CallStore for ItemInfo<T> {
     fn store(self) -> TokenStream {
         self.0.into_token_stream()
     }
@@ -63,83 +65,41 @@ impl <T: syn::parse::Parse + ToTokens + Clone> CallStore for ItemInfo<T> {
     }
 }
 
-pub struct TraitInfo {
-    pub trait_macro: Ident,
-    pub trait_item: ItemInfo<ItemTrait>,
-}
+pub struct InfoPair<A: CallStore, B: CallStore>(pub A, pub B);
 
-impl CallStore for TraitInfo {
+impl<A: CallStore, B: CallStore> CallStore for InfoPair<A, B> {
     fn store(self) -> TokenStream {
-       let Self { trait_macro, trait_item } = self;
-        let trait_group =  trait_item.store_grouped();
-        quote!{
-            #trait_macro #trait_group
-        }
-    }
-
-    fn read(tks: TokenStream) -> Self {
-        let mut tokens = tks.into_iter();
-        let trait_macro_raw = tokens.next().unwrap();
-        let trait_item_raw = tokens.next().unwrap();
-        assert!(tokens.next().is_none());
-
-        Self { 
-            trait_macro: get_ident(trait_macro_raw), 
-            trait_item:  ItemInfo::read_grouped(trait_item_raw),
-        }
-    }
-}
-
-pub struct TraitEnumInfo {
-    pub trait_info: TraitInfo,
-    pub enum_info: ItemInfo<ItemEnum>,
-}
-
-impl CallStore for TraitEnumInfo {
-    fn store(self) -> TokenStream {
-        let Self { trait_info, enum_info } = self;
-        let trait_group = trait_info.store_grouped();
-        let enum_group = enum_info.store_grouped();
-        quote!{
-            #trait_group
-            #enum_group
+        let Self(a, b) = self;
+        let a_group = a.store_grouped();
+        let b_group = b.store_grouped();
+        quote! {
+            #a_group
+            #b_group
         }
     }
 
     fn read(tks: TokenStream) -> Self {
         let mut tks_iter = tks.into_iter();
-        Self { 
-            trait_info: tks_iter.next().map(TraitInfo::read_grouped).unwrap(), 
-            enum_info: tks_iter.next().map(ItemInfo::read_grouped).unwrap()
-        }
+        let data = Self(
+            tks_iter.next().map(A::read_grouped).unwrap(),
+            tks_iter.next().map(B::read_grouped).unwrap(),
+        );
+        assert!(tks_iter.next().is_none(), "Excess tokens in InfoPair");
+        data
     }
 }
 
-pub struct ImplInfo {
-    pub impl_info: ItemInfo<ItemImpl>,
-    pub trait_info: ItemInfo<ItemTrait>,
-    pub enum_info: ItemInfo<ItemEnum>,
-}
+pub struct IdentInfo(pub Ident);
 
-impl CallStore for ImplInfo {
+impl CallStore for IdentInfo {
     fn store(self) -> TokenStream {
-        let Self { impl_info, trait_info, enum_info } = self;
-        let impl_group = impl_info.store_grouped();
-        let trait_group = trait_info.store_grouped();
-        let enum_group = enum_info.store_grouped();
-        quote!{
-            #impl_group
-            #trait_group
-            #enum_group
-        }
+        self.0.into_token_stream()
     }
 
     fn read(tks: TokenStream) -> Self {
         let mut tks_iter = tks.into_iter();
-        Self { 
-            impl_info: tks_iter.next().map(ItemInfo::read_grouped).unwrap(), 
-            trait_info: tks_iter.next().map(ItemInfo::read_grouped).unwrap(), 
-            enum_info: tks_iter.next().map(ItemInfo::read_grouped).unwrap()
-        }
+        let data = Self(get_ident(tks_iter.next().unwrap()));
+        assert!(tks_iter.next().is_none(), "Excess tokens in InfoIdent");
+        data
     }
 }

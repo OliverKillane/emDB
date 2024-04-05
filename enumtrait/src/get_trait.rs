@@ -1,115 +1,82 @@
-use proc_macro2::{Ident, Span, TokenStream, TokenTree, Group};
+use std::collections::LinkedList;
+
+use crate::passing::{
+    extract_group, extract_syn, get_ident, CallStore, IdentInfo, InfoPair, ItemInfo,
+};
+use proc_macro2::{Group, Ident, Span, TokenStream, TokenTree};
 use proc_macro_error::{Diagnostic, Level};
 use quote::{quote, ToTokens};
-use syn::{
-    parse2,
-    ItemTrait,
-    FnArg,
-    spanned::Spanned,
+use syn::{parse2, spanned::Spanned, FnArg, ItemEnum, ItemTrait};
+
+use combi::{
+    core::{mapsuc, nothing, seq},
+    macros::seqs,
+    tokens::{
+        basic::{
+            collectuntil, getident, isempty, matchident, matchpunct, recovgroup, syn, terminal,
+        },
+        TokenDiagnostic, TokenIter,
+    },
+    Combi, CombiResult,
 };
-use crate::passing::{extract_group, get_ident, extract_syn, CallStore, ItemInfo, TraitInfo, TraitEnumInfo};
 
-
-pub fn interface(attrs: TokenStream, item: TokenStream) -> Result<TokenStream, Vec<Diagnostic>> {
+pub fn interface(
+    attrs: TokenStream,
+    item: TokenStream,
+) -> Result<TokenStream, LinkedList<Diagnostic>> {
     let (enum_macro, trait_macro) = parse_attrs(attrs)?;
-    let trait_item = ItemInfo(extract_syn(item.clone(), parse2::<ItemTrait>)?);
-    let info_tks = TraitInfo {
-        trait_macro,
-        trait_item,
-    }.store_grouped();
+    let info_tks = InfoPair(
+        ItemInfo(extract_syn(item.clone(), parse2::<ItemTrait>)?),
+        IdentInfo(trait_macro),
+    )
+    .store_grouped();
 
     Ok(quote! {
-        // keep the trait
         #item
-
-        // call the previous macro (that already has the enum tokens) with the trait tokens
-        #enum_macro!( #info_tks );
+        #enum_macro!( enumtrait::get_trait_apply => #info_tks );
     })
 }
 
-fn parse_attrs(attrs: TokenStream) -> Result<(Ident, Ident), Vec<Diagnostic>> {
-    let mut attrs_iter = attrs.into_iter();
+fn parse_attrs(attrs: TokenStream) -> Result<(Ident, Ident), LinkedList<Diagnostic>> {
+    let parser = mapsuc(
+        seqs!(getident(), matchpunct('='), matchpunct('>'), getident()),
+        |(enum_macro, (_, (_, trait_macro)))| (enum_macro, trait_macro),
+    );
 
-    let enum_macro = match attrs_iter.next() {
-        Some(TokenTree::Ident(i)) => Ok(i),
-        Some(other) => Err(vec![Diagnostic::spanned(
-            other.span(),
-            Level::Error,
-            "Expected the name of the output macro from enumtrait::get_enum".to_owned(),
-        ).help("#[enumtrait::get_enum(my_macro)], then use in #[enumtrait::get_trait(my_macro -> my_impl_macro)]".to_owned())]),
-        None => Err(vec![Diagnostic::spanned(
-            Span::call_site(),
-            Level::Error,
-            "Expected the name of the output macro from enumtrait::get_enum".to_owned(),
-        ).help("#[enumtrait::get_enum(my_macro)], then use in #[enumtrait::get_trait(my_macro -> my_impl_macro)]".to_owned())]),
-    }?;
-
-    match (attrs_iter.next(), attrs_iter.next()) {
-        (Some(TokenTree::Punct(p1)), Some(TokenTree::Punct(p2)))
-            if p1.as_char() == '=' && p2.as_char() == '>' =>
-        {
-            Ok(())
-        }
-        (Some(p1), _) => Err(vec![Diagnostic::spanned(
-            p1.span(),
-            Level::Error,
-            "Expected '->'".to_owned(),
-        )
-        .help("#[enumtrait::get_trait(my_enum_macro -> my_trait_macro)]".to_owned())]),
-        _ => Err(vec![Diagnostic::spanned(
-            Span::call_site(),
-            Level::Error,
-            "Expected '->'".to_owned(),
-        )
-        .help(
-            "#[enumtrait::get_trait(my_enum_macro -> my_trait_macro)]".to_owned(),
-        )]),
-    }?;
-
-    let next_macro = match attrs_iter.next() {
-        Some(TokenTree::Ident(i)) => Ok(i),
-        Some(other) => Err(vec![Diagnostic::spanned(
-            other.span(),
-            Level::Error,
-            "Expected the name of the output macro from enumtrait::get_trait".to_owned(),
-        ).help("#[enumtrait::get_trait(my_macro -> my_impl_macro)] can be used in #[enumtrait::impl_trait(my_impl_macro)]".to_owned())]),
-        None => Err(vec![Diagnostic::spanned(
-            Span::call_site(),
-            Level::Error,
-            "Expected the name of the output macro from enumtrait::get_enum".to_owned(),
-        ).help("#[enumtrait::get_trait(my_macro -> my_impl_macro)] can be used in #[enumtrait::impl_trait(my_impl_macro)]".to_owned())]),
-    }?;
-
-    if attrs_iter.next().is_some() {
-        Err(vec![Diagnostic::spanned(
-            Span::call_site(),
-            Level::Error,
-            "No extra arguments should be provided".to_owned(),
-        )])
-    } else {
-        Ok((enum_macro, next_macro))
-    }
+    let (_, res) = parser.comp(TokenIter::from(attrs, Span::call_site()));
+    res.to_result().map_err(TokenDiagnostic::into_list)
 }
 
 pub fn apply(input: TokenStream) -> Result<TokenStream, Vec<Diagnostic>> {
-    let TraitEnumInfo { trait_info, enum_info }  = TraitEnumInfo::read(input);
-    check_trait(&trait_info.trait_item.0)?;
-    let macro_name = trait_info.trait_macro.clone();
+    let InfoPair(InfoPair(ItemInfo(trait_info), IdentInfo(trait_macro)), ItemInfo(enum_info)) =
+        InfoPair::read(input);
+
+    check_trait(&trait_info)?;
+
+    let pass_tks = InfoPair(
+        ItemInfo::<ItemTrait>(trait_info),
+        ItemInfo::<ItemEnum>(enum_info),
+    )
+    .store_grouped();
 
     Ok(quote! {
-        macro_rules! #macro_name {
+        macro_rules! #trait_macro {
             ($($t:tt)*) => {
-                enumtrait::get_trait_apply!( $($t)*  #pass_tks );
+                enumtrait::impl_trait_apply!( $($t)*  #pass_tks );
             }
         }
-    })    
+    })
 }
 
 fn check_trait(trait_def: &ItemTrait) -> Result<(), Vec<Diagnostic>> {
     fn unsupported(errors: &mut Vec<Diagnostic>, span: Span, kind: &str) {
-        errors.push(Diagnostic::spanned(span, Level::Error, format!("{kind} are not supported by enumtrait")))
+        errors.push(Diagnostic::spanned(
+            span,
+            Level::Error,
+            format!("{kind} are not supported by enumtrait"),
+        ))
     }
-    
+
     let mut errors = Vec::new();
 
     for item in &trait_def.items {
@@ -122,7 +89,7 @@ fn check_trait(trait_def: &ItemTrait) -> Result<(), Vec<Diagnostic>> {
                 if !matches!(f.sig.inputs.first(), Some(&FnArg::Receiver(_))) {
                     errors.push(Diagnostic::spanned(f.sig.inputs.span(), Level::Error, "All trait functions need to start with a recieved (e.g. &self, &mut self, self)".to_owned()));
                 }
-            },
+            }
             _ => unsupported(&mut errors, Span::call_site(), "Unsupported trait item"),
         }
     }

@@ -34,10 +34,7 @@ pub(super) fn parse(ts: TokenStream) -> Result<Ast, LinkedList<Diagnostic>> {
     let (_, res) =
         mapsuc(seqdiff(parser, terminal), |(o, ())| o).comp(TokenIter::from(ts, Span::call_site()));
 
-    match res {
-        CombiResult::Suc(s) => Ok(s),
-        CombiResult::Con(es) | CombiResult::Err(es) => Err(es.into_list()),
-    }
+    res.to_result().map_err(TokenDiagnostic::into_list)
 }
 
 enum EmqlItem {

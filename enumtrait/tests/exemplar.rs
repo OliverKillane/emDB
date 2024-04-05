@@ -20,5 +20,5 @@ trait PolyTrait<'a, 'b, Z> {
     fn bong<B>(&mut self, b: B) -> &'a Z;
 }
 
-// #[enumtrait::implement(polytrait)]
-// impl<'x, 'y, J> PolyTrait<'x, 'y, J> for Poly<'x, J> {}
+#[enumtrait::impl_trait(polytrait)]
+impl<'x, 'y, J> PolyTrait<Blah, J> for Poly<'x, J> {}

@@ -22,6 +22,16 @@ pub enum CombiResult<S, C, E> {
     Err(E),
 }
 
+impl <S, E> CombiResult<S, E, E> {
+    /// When the error and continuation types are identical, we can convert a result into an regular rust [`Result`]
+    pub fn to_result(self) -> Result<S, E> {
+        match self {
+            CombiResult::Suc(s) => Ok(s),
+            CombiResult::Con(e) | CombiResult::Err(e) => Err(e),
+        }
+    }
+}
+
 /// The core trait for defining combinable computations
 #[doc=include_str!("../docs/combi_trait.drawio.svg")]
 /// Provides an interface to run computations, and get a representation of them.
