@@ -1,38 +1,39 @@
 use std::collections::LinkedList;
 
-use proc_macro2::{Delimiter, Group, Ident, Span, TokenStream, TokenTree};
-use proc_macro_error::{Diagnostic, Level};
+use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro_error::Diagnostic;
 use quote::quote;
-use syn::{
-    parse2, punctuated::Punctuated, spanned::Spanned, Expr, Field, Fields, FieldsUnnamed, ItemEnum,
-    Path, PathArguments, PathSegment, TypePath, Visibility,
-};
+use syn::{Expr, ItemEnum};
 
 use combi::{
-    core::{mapsuc, nothing, seq},
+    core::{mapsuc, seq},
     macros::seqs,
     tokens::{
-        basic::{
-            collectuntil, getident, isempty, matchident, matchpunct, recovgroup, syn, terminal,
-        },
+        basic::{collectuntil, getident, isempty, matchident, matchpunct, syn},
         TokenDiagnostic, TokenIter,
     },
-    Combi, CombiResult,
+    Combi,
 };
 
-use crate::passing::{extract_syn, CallStore, IdentInfo, InfoPair, ItemInfo};
+use crate::macro_comm::{CallStore, IdentInfo, InfoPair, ItemInfo};
 
 pub fn interface(input: TokenStream) -> Result<TokenStream, LinkedList<Diagnostic>> {
     let (enum_macro, inst_name, arg_ident, expression) = parse_input(input)?;
 
     let comm = InfoPair(
-        ItemInfo(expression),
+        ItemInfo {
+            data: expression,
+            label: Ident::new("gen_match", Span::call_site()),
+        },
         InfoPair(IdentInfo(arg_ident), IdentInfo(inst_name)),
     )
     .store_grouped();
 
     Ok(quote! {
-        #enum_macro !( enumtrait::gen_match => #comm)
+        {
+            use enumtrait::gen_match_apply;
+            #enum_macro!( expr_ctx gen_match_apply => #comm )
+        }
     })
 }
 
@@ -44,7 +45,7 @@ fn parse_input(input: TokenStream) -> Result<(Ident, Ident, Ident, Expr), Linked
             getident(),
             matchident("for"),
             getident(),
-            matchpunct('-'),
+            matchpunct('='),
             matchpunct('>'),
             syn(collectuntil(isempty()))
         ),
@@ -52,26 +53,39 @@ fn parse_input(input: TokenStream) -> Result<(Ident, Ident, Ident, Expr), Linked
             (enum_macro, inst_name, param, expression)
         },
     );
-
     let (_, res) = parser.comp(TokenIter::from(input, Span::call_site()));
-
     res.to_result().map_err(TokenDiagnostic::into_list)
 }
 
-pub fn apply(input: TokenStream) -> TokenStream {
+pub fn apply(input: TokenStream) -> Result<TokenStream, LinkedList<Diagnostic>> {
     let InfoPair(
-        InfoPair(ItemInfo(expression), InfoPair(IdentInfo(arg_ident), IdentInfo(inst_name))),
-        ItemInfo(enum_item),
-    ) = InfoPair::read(input);
-    generate_match(enum_item, inst_name, arg_ident, expression)
+        InfoPair(
+            ItemInfo {
+                data: expression,
+                label: _,
+            },
+            InfoPair(IdentInfo(arg_ident), IdentInfo(inst_name)),
+        ),
+        ItemInfo {
+            data: enum_item,
+            label: _,
+        },
+    ) = InfoPair::read(input)?;
+    Ok(generate_match(
+        enum_item,
+        &inst_name,
+        &arg_ident,
+        &expression,
+    ))
 }
 
 fn generate_match(
     enum_item: ItemEnum,
-    inst_name: Ident,
-    arg_ident: Ident,
-    expression: Expr,
+    inst_name: &Ident,
+    arg_ident: &Ident,
+    expression: &Expr,
 ) -> TokenStream {
+    let name = enum_item.ident;
     //INV: this enum was transformed by get_enum and has only `VariantName(Type)` members
     let exprs = enum_item
         .variants
@@ -79,7 +93,7 @@ fn generate_match(
         .map(|variant| {
             let cons = variant.ident;
             quote! {
-                #cons(#arg_ident) => #expression,
+                #name::#cons(#arg_ident) => #expression,
             }
         })
         .collect::<Vec<_>>();

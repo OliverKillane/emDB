@@ -1,87 +1,214 @@
-use std::collections::{HashMap, LinkedList};
+use std::collections::LinkedList;
 
-use crate::passing::{extract_group, extract_syn, get_ident, CallStore, InfoPair, ItemInfo};
-use proc_macro2::{Group, Ident, Span, TokenStream, TokenTree};
-use proc_macro_error::{Diagnostic, Level};
+use crate::macro_comm::{extract_syn, CallStore, ItemInfo, Triple};
+use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro_error::Diagnostic;
 use quote::{quote, ToTokens};
 use syn::{
-    parse2, spanned::Spanned, FnArg, GenericArgument, GenericParam, Generics, ImplItem, ImplItemFn,
-    ItemEnum, ItemImpl, ItemTrait, TraitItem, TraitItemFn, TypeParam,
+    parse2,
+    punctuated::Punctuated,
+    token::{Brace, Comma, Dot, FatArrow, Match, Paren, SelfValue},
+    Arm, Block, Expr, ExprMatch, ExprMethodCall, ExprPath, FnArg, ImplItem, ImplItemFn, ItemEnum,
+    ItemImpl, ItemTrait, Pat, PatIdent, PatTupleStruct, Path, PathSegment, Signature, Stmt,
+    TraitItem, TraitItemFn,
 };
 
 use combi::{
-    core::{mapsuc, nothing, seq},
+    core::{mapsuc, seq},
     macros::seqs,
     tokens::{
-        basic::{
-            collectuntil, getident, isempty, matchident, matchpunct, recovgroup, syn, terminal,
-        },
+        basic::{getident, matchident},
         TokenDiagnostic, TokenIter,
     },
-    Combi, CombiResult,
+    Combi,
 };
 
 pub fn interface(
     attrs: TokenStream,
     item: TokenStream,
 ) -> Result<TokenStream, LinkedList<Diagnostic>> {
-    let macro_name = parse_attrs(attrs)?;
-    let trait_item = ItemInfo(extract_syn(item.clone(), parse2::<ItemImpl>)?).store_grouped();
+    let (trait_macro_store, enum_macro_store) = parse_attrs(attrs)?;
+    let invoke_ident = Ident::new("impl_trait", Span::call_site());
+    let trait_item = ItemInfo {
+        data: extract_syn(item.clone(), &invoke_ident, parse2::<ItemImpl>)?,
+        label: invoke_ident,
+    }
+    .store_grouped();
 
-    Ok(quote! {
-        #item
-        #macro_name!( #trait_item );
-    })
+    let tks = quote! {
+        use enumtrait::impl_trait_apply;
+        #enum_macro_store!( item_ctx #trait_macro_store => item_ctx impl_trait_apply => #trait_item ) ;
+    };
+    Ok(tks)
 }
 
-fn parse_attrs(attrs: TokenStream) -> Result<Ident, LinkedList<Diagnostic>> {
-    let (_, res) = getident().comp(TokenIter::from(attrs, Span::call_site()));
+fn parse_attrs(attrs: TokenStream) -> Result<(Ident, Ident), LinkedList<Diagnostic>> {
+    let parser = mapsuc(
+        seqs!(getident(), matchident("for"), getident()),
+        |(trait_macro_store, (_, enum_macro_store))| (trait_macro_store, enum_macro_store),
+    );
+
+    let (_, res) = parser.comp(TokenIter::from(attrs, Span::call_site()));
     res.to_result().map_err(TokenDiagnostic::into_list)
 }
 
 pub fn apply(input: TokenStream) -> Result<TokenStream, LinkedList<Diagnostic>> {
-    let InfoPair(ItemInfo(impl_item), InfoPair(ItemInfo(trait_item), ItemInfo(enum_item))) =
-        InfoPair::read(input);
+    let Triple(
+        ItemInfo {
+            data: impl_item,
+            label: _,
+        },
+        ItemInfo {
+            data: enum_item,
+            label: _,
+        },
+        ItemInfo {
+            data: trait_item,
+            label: _,
+        },
+    ) = Triple::read(input)?;
 
-    Ok(generate_impl(impl_item, trait_item, enum_item)?.into_token_stream())
+    Ok(add_fn_impls(impl_item, trait_item, enum_item).into_token_stream())
 }
 
-fn generate_impl(
-    mut impl_item: ItemImpl,
-    trait_item: ItemTrait,
-    enum_item: ItemEnum,
-) -> Result<ItemImpl, LinkedList<Diagnostic>> {
-    // we should let the user define other stuff
-    if impl_item.items.is_empty() {
-        let x = &impl_item;
-        let y = &trait_item;
-
-        println!("{x:#?} \n\n\n {y:#?}");
-
-        for method in trait_item.items {
-            // todo
+fn add_fn_impls(mut impl_item: ItemImpl, trait_item: ItemTrait, enum_item: ItemEnum) -> ItemImpl {
+    for item in trait_item.items {
+        if let TraitItem::Fn(ref f_item) = item {
+            if let Some(gen_impl) = generate_fn_impl(f_item, &enum_item) {
+                impl_item.items.push(ImplItem::Fn(gen_impl));
+            }
         }
+    }
 
-        Ok(impl_item)
+    impl_item
+}
+
+fn extract_params(sig: Signature) -> Option<(SelfValue, Vec<Ident>)> {
+    let mut x = sig.inputs.into_iter();
+    if let Some(FnArg::Receiver(r)) = x.next() {
+        Some((r.self_token,
+        x.map(|arg| {
+            if let FnArg::Typed(pt) = arg{
+                if let Pat::Ident(arg_pt) = *pt.pat {
+                    arg_pt.ident
+                } else {
+                    unreachable!("Cannot have patterns in a trait argument but found {pt:?}")
+                }
+            } else {
+                unreachable!("Cannot have a receiver past the first argument in a trait function but found {arg:?}")
+            }
+        }).collect()
+        ))
     } else {
-        let mut errs = LinkedList::new();
-        errs.push_back(Diagnostic::spanned(
-            impl_item.span(),
-            Level::Error,
-            "Expected an empty impl block".to_owned(),
-        ));
-        Err(errs)
+        None
     }
 }
 
-// fn extract_impl_generics(impl_item: &ItemImpl) -> Result<impl Iterator<Item=&GenericArgument>, Vec<Diagnostic>> {
-//     todo!()
-// }
+fn generate_fn_impl(trait_fn: &TraitItemFn, enum_item: &ItemEnum) -> Option<ImplItemFn> {
+    let (self_token, args) = extract_params(trait_fn.sig.clone())?;
 
-// fn get_generic_mapping(trait_generics: &Generics, params: impl Iterator<Item=&GenericArgument>) -> Result<HashMap<&GenericParam, &GenericParam>, Vec<Diagnostic>> {
-//     todo!()
-// }
+    let pat_expr = Ident::new("it", Span::call_site());
 
-// fn generate_method() {
+    let mut args_exprs = Punctuated::new();
+    args_exprs.push(Expr::Path(ExprPath {
+        attrs: Vec::new(),
+        qself: None,
+        path: Path {
+            leading_colon: None,
+            segments: args
+                .iter()
+                .map(|arg| PathSegment {
+                    ident: arg.clone(),
+                    arguments: syn::PathArguments::None,
+                })
+                .collect(),
+        },
+    }));
 
-// }
+    let expr_match = ExprMatch {
+        attrs: Vec::new(),
+        match_token: Match {
+            span: Span::call_site(),
+        },
+        expr: Box::new(Expr::Path(ExprPath {
+            attrs: Vec::new(),
+            qself: None,
+            path: self_token.into(),
+        })),
+        brace_token: Brace::default(),
+        arms: enum_item
+            .variants
+            .iter()
+            .map(|var| {
+                let mut pat_path = Punctuated::new();
+                pat_path.push(PathSegment {
+                    ident: enum_item.ident.clone(),
+                    arguments: syn::PathArguments::None,
+                });
+                pat_path.push(PathSegment {
+                    ident: var.ident.clone(),
+                    arguments: syn::PathArguments::None,
+                });
+
+                let mut pat_elems = Punctuated::new();
+                pat_elems.push_value(Pat::Ident(PatIdent {
+                    attrs: Vec::new(),
+                    by_ref: None,
+                    mutability: None,
+                    ident: pat_expr.clone(),
+                    subpat: None,
+                }));
+
+                let mut pat_reciever = Punctuated::new();
+                pat_reciever.push_value(PathSegment {
+                    ident: pat_expr.clone(),
+                    arguments: syn::PathArguments::None,
+                });
+
+                Arm {
+                    attrs: Vec::new(),
+                    pat: Pat::TupleStruct(PatTupleStruct {
+                        attrs: Vec::new(),
+                        qself: None,
+                        path: Path {
+                            leading_colon: None,
+                            segments: pat_path,
+                        },
+                        paren_token: Paren::default(),
+                        elems: pat_elems,
+                    }),
+                    guard: None,
+                    fat_arrow_token: FatArrow::default(),
+                    body: Box::new(Expr::MethodCall(ExprMethodCall {
+                        attrs: Vec::new(),
+                        receiver: Box::new(Expr::Path(ExprPath {
+                            attrs: Vec::new(),
+                            qself: None,
+                            path: Path {
+                                leading_colon: None,
+                                segments: pat_reciever,
+                            },
+                        })),
+                        dot_token: Dot::default(),
+                        method: trait_fn.sig.ident.clone(),
+                        turbofish: None,
+                        paren_token: Paren::default(),
+                        args: args_exprs.clone(),
+                    })),
+                    comma: Some(Comma::default()),
+                }
+            })
+            .collect(),
+    };
+
+    Some(ImplItemFn {
+        attrs: Vec::new(),
+        vis: syn::Visibility::Inherited,
+        defaultness: None,
+        sig: trait_fn.sig.clone(),
+        block: Block {
+            brace_token: expr_match.brace_token,
+            stmts: vec![Stmt::Expr(Expr::Match(expr_match), None)],
+        },
+    })
+}

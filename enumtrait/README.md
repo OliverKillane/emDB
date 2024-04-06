@@ -4,60 +4,80 @@ A crate for deriving enum based polymorphism.
 ## Pattern
 Often we want to implement traits separately for each variant of a enum.
 This is traditionally implemented in two ways:
+1. By manually writing the enum of `Typename(TypeName)` variants, and implementing the trait on that enum with match statements.
+2. Using `dyn` with either references, or heap allocating (classic `Box<dyn trait>`)
 
+The former is tedious. The later can require heap allocation, and the cost of a virtual call.
+
+This crate removes the tediousness of the former.
 ```rust
-trait Bing {
-    fn bonk(&self);
-}
- 
-struct Foo();
-impl Bing for Foo {
-    fn bonk(&self) {}
-}
- 
-struct Bar();
-impl Bing for Bar {
-    fn bonk(&self) {}
+use enumtrait;
+
+struct Bar { bar_field: usize }
+struct Bing { bing_field: usize, other_field: String }
+
+#[enumtrait::quick_enum]
+#[enumtrait::store(foo_macro_store)]
+enum Foo {
+    Bar,
+    Bing,
 }
 
-fn method_1() {
-    // using runtime polymorphism, at cost
-    let bings: Vec<Box<dyn Bing>> = vec![Box::new(Foo()), Box::new(Bar())];
-    for b in bings {
-        b.bonk()
-    }
+#[enumtrait::store(foo_trait_store)]
+trait FooTrait {
+    const baz: usize;
+    fn foo(&self) -> usize;
 }
 
-fn method_2() {
-    // using an enum, at the cost of boilerplate
-    enum BingVars {
-        Foo(Foo),
-        Bar(Bar),
-    }
-    
-    impl Bing for BingVars {
-        fn bonk(&self) {
-            match self {
-                BingVars::Foo(i) => i.bonk(),
-                BingVars::Bar(i) => i.bonk(),
-            }
-        }
-    }
-
-    let bings: Vec<BingVars> = vec![BingVars::Foo(Foo()), BingVars::Bar(Bar())];
-    for b in bings {
-        b.bonk()
-    }
+impl FooTrait for Bar {
+    const baz: usize = 2;  
+    fn foo(&self) -> usize { self.bar_field }
 }
 
-fn main() {
-    method_1();
-    method_2();
+impl FooTrait for Bing {  
+    const baz: usize = 2;
+    fn foo(&self) -> usize { self.bing_field }
+}
+
+#[enumtrait::impl_trait(foo_trait_store for foo_macro_store)]
+impl FooTrait for Foo {
+    const baz: usize = 42;
+}
+
+fn check(f: Foo) -> usize {
+    f.foo()
 }
 ```
 
-The crate removes the boilerplate from `method_2` by generating the enum and the implementation for you.
-## Supported Types
+## Performance
+When comparing the cost of a virtual call, versus call through enums.
+```bash
+cargo bench
+```
+```text
+call_cost               fastest       │ slowest       │ median        │ mean          │ samples │ iters
+╰─ call_with_blackhole                │               │               │               │         │
+   ├─ Concrete                        │               │               │               │         │
+   │  ├─ 1              0.162 ns      │ 0.184 ns      │ 0.163 ns      │ 0.163 ns      │ 100     │ 819200
+   │  ├─ 16             14.71 ns      │ 15.43 ns      │ 15.35 ns      │ 15.17 ns      │ 100     │ 12800
+   │  ╰─ 268435456      75.95 ms      │ 91.18 ms      │ 80.98 ms      │ 81.65 ms      │ 100     │ 100
+   ├─ Double                          │               │               │               │         │
+   │  ├─ 1              0.094 ns      │ 1.111 ns      │ 0.095 ns      │ 0.105 ns      │ 100     │ 819200
+   │  ├─ 16             1.89 ns       │ 23.5 ns       │ 2.088 ns      │ 2.239 ns      │ 100     │ 102400
+   │  ╰─ 268435456      78.77 ms      │ 129.3 ms      │ 99.86 ms      │ 99.96 ms      │ 100     │ 100
+   ├─ ImplDyn                         │               │               │               │         │
+   │  ├─ 1              0.788 ns      │ 1.345 ns      │ 0.793 ns      │ 0.805 ns      │ 100     │ 204800
+   │  ├─ 16             16.25 ns      │ 16.37 ns      │ 16.29 ns      │ 16.3 ns       │ 100     │ 12800
+   │  ╰─ 268435456      249.2 ms      │ 288.8 ms      │ 258.9 ms      │ 261 ms        │ 100     │ 100
+   ├─ Single                          │               │               │               │         │
+   │  ├─ 1              0.15 ns       │ 1.917 ns      │ 0.18 ns       │ 0.194 ns      │ 100     │ 819200
+   │  ├─ 16             14.95 ns      │ 15.58 ns      │ 15.11 ns      │ 15.13 ns      │ 100     │ 12800
+   │  ╰─ 268435456      78.88 ms      │ 91.74 ms      │ 83.3 ms       │ 83.98 ms      │ 100     │ 100
+   ╰─ Sixteen                         │               │               │               │         │
+      ├─ 1              0.417 ns      │ 0.544 ns      │ 0.419 ns      │ 0.425 ns      │ 100     │ 409600
+      ├─ 16             22.77 ns      │ 40.55 ns      │ 23.29 ns      │ 23.42 ns      │ 100     │ 6400
+      ╰─ 268435456      73.63 ms      │ 87.76 ms      │ 77.36 ms      │ 78.1 ms       │ 100     │ 100
+```
 
 
 ## Inter-Macro Communication
@@ -79,45 +99,39 @@ I hope such a feature (e.g. crate local macro persistent state, message passing 
 *Rust macro invocations are independent.* However, macro definitions are ordered. We can 
 use changing macro definitions to force an ordered invocation of other macros.
 
-We do this by building immutable token stores from `macro_rules!` definitions.
+We do this by building immutable token stores from `macro_rules!` definitions that reapply macros that read.
 ```rust
-// store(tokens in name)
-macro_rules! name {
-    ($call:path) => { $call!(tokens); }
-}
-
-// read `tokens in name` in my_macro 
-name!(my_macro)
-```
-This gives us a tree of macro invocations, but for utility we need to be able tor ead from multiple token stores.
-To do this we apply a macro to the store that defines a new macro to collect tokens from another store.
-```rust
-// merge tokens from other stores `var_1` and `var_2`
-
-// define a macro that creates a macro definition that accepts more tokens
-// NOTE: this is non-compilable pseudocode, cannot macro_rules! inside a macro_rules!, but 
-//       we can call a procedural macro that generates a macro_rules! as output 
-macro_rules! merge {
-    ($var_1:path , $var_2:path , $call:path) => {
-
-        // define a macro to take var_1, and generate a new macro to take var_2
-        macro_rules! accumulate_outer {
-            ($(t_v1:tt)*) => {
-
-                macro_rules! accumulate_inner {
-                    ($(t_v2:tt)*) => {
-                        $call ! ( t_v1  t_v2 ) 
-                    }
-                }
-            }
-        }
-
-        $var_1 (accumulate_outer); // generate new macro with result
-        $var_2 (accumulate_inner); // call $call with both
+// we can define a basic macro we want to pass information to as
+macro_rules! my_macro {
+    ($($t:tt)*) => {
+        stringify!($($t)*)
     }
 }
 
-merge!(var_1, var_2, both); // both can then store to a new variable, or do something else
+// We then use the macro_store pattern (trademark pending😂) to store tokens 
+// in macros. This can be made into a proc_macro that produces a macro_rules, 
+// as is done for `enumtrait::store`
+macro_rules! name {
+    ($p:ident => $($t:tt)*) => {
+        $p!( $($t)* Oliver Killane ) // storing a name
+    }
+}
+macro_rules! passtime {
+    ($p:ident => $($t:tt)*) => {
+        $p!( $($t)* makes unecessarily complex macros ) 
+    }
+}
+
+// Read `tokens in name` in my_macro 
+fn use_strings() {
+    // reading from name into my_macro, with some extra tokens passable
+    let name = name!(my_macro => with some extra data); 
+    
+    // reading from two means applying (tokens get collected over `=>`)
+    let message = name!(passtime => my_macro =>); 
+
+    println!("Now we can display `{name}` and `{message}`");
+}
 ```
 With that we can now pass tokens between macros in a [DAG](https://en.wikipedia.org/wiki/Directed_acyclic_graph).
 
@@ -135,5 +149,3 @@ for identifiers with spans to be communicated between macros, allowing better er
 
 ### [eagre](https://github.com/Emoun/eager)
 Simulates eagre execution of macros generated by its own `eagre_macro_rules!` macro.
-
-Can be used to 

@@ -33,7 +33,8 @@ impl TokenIter {
     }
 
     /// Advance to the next token, and return `Some(token)` if present, otherwise return `None` and do not advance.
-    fn next(&mut self) -> Option<TokenTree> {
+    #[allow(clippy::should_implement_trait)]
+    pub fn next(&mut self) -> Option<TokenTree> {
         if let Some(ref tk) = self.next {
             self.prev_span = Some(self.curr_span);
             self.curr_span = tk.span();
@@ -49,12 +50,12 @@ impl TokenIter {
         &self.next
     }
 
-    /// The span of the last token from [Self::next].
+    /// The span of the last token from [Self::next()].
     pub fn cur_span(&self) -> &Span {
         &self.curr_span
     }
 
-    /// The span of the last, last token found from [Self::next].
+    /// The span of the last, last token found from [Self::next()].
     pub fn last_span(&self) -> &Option<Span> {
         &self.prev_span
     }
