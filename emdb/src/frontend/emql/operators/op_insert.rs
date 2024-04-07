@@ -58,10 +58,10 @@ impl EMQLOperator for Insert {
                                         fields: out_data_type,
                                         stream,
                                     },
-                                    op_kind: plan::OperatorKind::Modify { modify_after: *mo, op: plan::ModifyOperator::Insert {  input: prev_edge,
+                                    op_kind: plan::OperatorKind::Modify { modify_after: *mo, op: plan::Insert {  input: prev_edge,
                                         table: *table_id,
                                         out_ref,
-                                        output: next_edge, } },
+                                        output: next_edge, }.into() },
                                     call_span: call.span(),
                                     update_mo: true,
                                 }

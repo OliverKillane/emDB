@@ -32,7 +32,7 @@ impl EMQLOperator for Use {
                 let access = plan::TableAccess::AllCols;
                 let record_type = generate_access(*table_id, access.clone(), lp, None).unwrap();
                 let out_edge = lp.dataflow.insert(plan::DataFlow::Null);
-                let use_op = lp.operators.insert(plan::Operator { query: qk, kind: plan::OperatorKind::Access { access_after: *mo, op: plan::AccessOperator::Scan { access, table: *table_id, output: out_edge } } });
+                let use_op = lp.operators.insert(plan::Operator { query: qk, kind: plan::OperatorKind::Access { access_after: *mo, op: plan::Scan { access, table: *table_id, output: out_edge }.into() } });
                 *mo = Some(use_op);
                 let data_type = plan::Data { fields: record_type, stream: true };
 

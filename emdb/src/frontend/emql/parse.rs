@@ -26,7 +26,7 @@ use combi::{
         recovery::until,
         TokenDiagnostic, TokenIter, TokenParser,
     },
-    Combi, CombiResult,
+    Combi,
 };
 
 pub(super) fn parse(ts: TokenStream) -> Result<Ast, LinkedList<Diagnostic>> {

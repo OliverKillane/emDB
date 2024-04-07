@@ -1,3 +1,5 @@
+//! Basic token combinators.
+//! - Literals are not included as they are more complex to parse, consider using [`syn::LitStr`] instead.
 use std::marker::PhantomData;
 
 use super::{TokenDiagnostic, TokenIter};

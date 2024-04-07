@@ -6,7 +6,10 @@ use std::collections::{HashMap, LinkedList};
 
 pub trait EMDBBackend: Sized {
     const NAME: &'static str;
-    fn parse_options(options: Option<TokenStream>) -> Result<Self, LinkedList<Diagnostic>>;
+    fn parse_options(
+        backend_name: &Ident,
+        options: Option<TokenStream>,
+    ) -> Result<Self, LinkedList<Diagnostic>>;
     fn generate_code(
         self,
         impl_name: Ident,
@@ -31,7 +34,7 @@ macro_rules! create_backend {
         pub fn parse_options(backend_name: Ident, options: Option<TokenStream>) -> Result<$op, LinkedList<Diagnostic>> {
             match backend_name.to_string().as_str() {
                 $(
-                    $t::NAME => $t::parse_options(options).map(|v| $op::$t(v)),
+                    $t::NAME => $t::parse_options(&backend_name, options).map(|v| $op::$t(v)),
                 )*
                 _ => Err(singlelist(no_such_backend(&backend_name)))
             }
@@ -52,6 +55,7 @@ macro_rules! create_backend {
 }
 
 create_backend!(Backend as planviz::PlanViz);
+// create_backend!(Backend as );
 
 pub struct Targets {
     pub impls: HashMap<Ident, Backend>,

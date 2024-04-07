@@ -135,6 +135,10 @@ fn use_strings() {
 ```
 With that we can now pass tokens between macros in a [DAG](https://en.wikipedia.org/wiki/Directed_acyclic_graph).
 
+Additional modification of the `store` is required to support accessing and 
+exporting from modules, as well as the differing item and expression macro 
+contexts (trailing `;` on macro invocation).
+
 `enumtrait` passes information between macros using this method.
 
 ## Related Work

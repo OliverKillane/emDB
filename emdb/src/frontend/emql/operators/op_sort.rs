@@ -80,7 +80,7 @@ impl EMQLOperator for Sort {
                     if errors.is_empty() {
                         Ok(
                             LinearBuilderState { 
-                                data_out: prev.data_type, op_kind: plan::OperatorKind::Pure(plan::PureOperator::Sort { input: prev.prev_edge, sort_order, output: next_edge }), call_span: call.span(), update_mo: false }
+                                data_out: prev.data_type, op_kind: plan::OperatorKind::Pure(plan::Sort { input: prev.prev_edge, sort_order, output: next_edge }.into()), call_span: call.span(), update_mo: false }
                         )
                     } else {
                         Err(errors)

@@ -44,7 +44,7 @@ impl EMQLOperator for Delete {
                             Ok(
                                 LinearBuilderState { 
                                     data_out: data_type, 
-                                    op_kind: plan::OperatorKind::Modify { modify_after: *mo, op: plan::ModifyOperator::Delete { input: prev_edge, reference: field, table: *table_id, output: next_edge } }, 
+                                    op_kind: plan::OperatorKind::Modify { modify_after: *mo, op: plan::Delete { input: prev_edge, reference: field, table: *table_id, output: next_edge }.into() }, 
                                     call_span: call.span(), 
                                     update_mo: true 
                                 }

@@ -308,7 +308,7 @@ fn discard_continue(
 ) {
     let discard_op = lp.operators.insert(plan::Operator {
         query: qk,
-        kind: plan::OperatorKind::Flow(plan::FlowOperator::Discard { input: prev_edge }),
+        kind: plan::OperatorKind::Flow(plan::Discard { input: prev_edge }.into()),
     });
     update_incomplete(lp.get_mut_dataflow(prev_edge), discard_op);
 }

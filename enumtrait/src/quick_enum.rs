@@ -68,7 +68,6 @@ fn transform_enum(mut enum_def: ItemEnum) -> Result<ItemEnum, LinkedList<Diagnos
                 unnamed: punctlist,
             });
         } else if let Fields::Unnamed(fs) = &variant.fields {
-
             if fs.unnamed.len() != 1 {
                 errors.push_back(
                     Diagnostic::spanned(

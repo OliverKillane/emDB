@@ -43,7 +43,7 @@ impl EMQLOperator for Take {
                         Ok(
                             LinearBuilderState {
                                 data_out: data_type,
-                                op_kind: plan::OperatorKind::Pure(plan::PureOperator::Take { input: prev_edge, top_n: expr, output: next_edge }),
+                                op_kind: plan::OperatorKind::Pure(plan::Take { input: prev_edge, top_n: expr, output: next_edge }.into()),
                                 call_span: call.span(),
                                 update_mo: false
                             }

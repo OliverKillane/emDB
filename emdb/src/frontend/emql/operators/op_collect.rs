@@ -55,7 +55,7 @@ impl EMQLOperator for Collect {
                                     fields: record_type,
                                     stream: false,
                                 }, op_kind: plan::OperatorKind::Pure(
-                                    plan::PureOperator::Collect { input: prev_edge, into: field, output: next_edge }
+                                    plan::Collect { input: prev_edge, into: field, output: next_edge }.into()
                                 ), call_span: call.span(), update_mo: false }
                         )
                     }

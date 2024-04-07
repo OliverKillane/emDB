@@ -1,4 +1,4 @@
-use super::{Key, Operator, ScalarType};
+use super::{Key, Operator, Plan, ScalarType};
 use proc_macro2::Ident;
 use std::collections::HashMap;
 
@@ -8,4 +8,10 @@ pub struct Query {
 
     /// INV is a [LogicalOp::Return]
     pub returnval: Option<Key<Operator>>,
+}
+
+impl Plan {
+    pub fn get_query(&self, key: Key<Query>) -> &Query {
+        self.queries.get(key).unwrap()
+    }
 }

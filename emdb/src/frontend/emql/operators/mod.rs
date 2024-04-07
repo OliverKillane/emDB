@@ -11,7 +11,17 @@
 //! To create a new operator, simply add a new module and [`EMQLOperator`], then
 //! add it to the [`create_operator`] macro invocation.
 
+use super::ast::AstType;
 use crate::frontend::emql::errors;
+use crate::frontend::emql::parse::{
+    fields_assign, fields_expr, functional_style, type_parser_to_punct,
+};
+use crate::frontend::emql::sem::{
+    ast_typeto_scalar, extract_fields, generate_access, linear_builder, update_incomplete,
+    Continue, LinearBuilderState, ReturnVal, StreamContext, VarState,
+};
+use crate::plan;
+use crate::utils::misc::{result_to_opt, singlelist};
 use combi::{
     core::{choice, mapsuc, seq, setrepr},
     macros::{choices, seqs},
@@ -33,31 +43,13 @@ use std::{
 };
 use syn::Expr;
 
-use crate::utils::misc::{singlelist, result_to_opt};
-
-// translation for plans
-use super::ast::AstType;
-use crate::frontend::emql::parse::{
-    fields_assign, fields_expr, functional_style, type_parser_to_punct,
-};
-use crate::frontend::emql::sem::{
-    ast_typeto_scalar, extract_fields, generate_access, linear_builder, update_incomplete,
-    Continue, LinearBuilderState, ReturnVal, StreamContext, VarState,
-};
-use crate::plan;
-
 trait EMQLOperator: Sized + Debug {
     const NAME: &'static str;
 
     fn build_parser() -> impl TokenParser<Self>;
 
     /// Convert the operator to a logical plan node
-    ///
     /// - [tn] represents the identifier to table mapping
-    ///
-    ///
-    ///
-    ///
     #[allow(clippy::too_many_arguments)]
     fn build_logical(
         self,
@@ -74,10 +66,8 @@ trait EMQLOperator: Sized + Debug {
 // Boilerplate to connect operators (defined as structs) to the enums used to contain them in the ast and combi operators
 // This will no longer be required once enum variant's are made first class types
 // - See: [RFC 1450](https://github.com/rust-lang/rfcs/pull/1450) and [RFC 2593](https://github.com/rust-lang/rfcs/pull/2593)
-// 
-// An alternative is to use a crate like [enum_dispatch](https://gitlab.com/antonok/enum_dispatch) but this uses state between 
-// macros and I want to avoid this hackiness.
-
+//
+// Could use `enumtrait`, but here we also want to generate parse_operator, which has a pattern enum_trait cannot generate.
 macro_rules! create_operator {
     ($op:ident as $($m:ident :: $t:ident),*) => {
 

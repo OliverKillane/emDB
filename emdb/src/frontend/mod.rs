@@ -1,8 +1,8 @@
 mod emql;
 
 // TODO: add some basic implementation
-mod sql;
 mod boss;
+mod sql;
 
 use std::collections::LinkedList;
 

@@ -1,8 +1,7 @@
-#[enumtrait::store(black_hole_trait)]
+#[enumtrait::store(pub black_hole_trait)]
 trait CallBlackHole {
     fn call(&mut self);
 }
-pub(crate) use black_hole_trait;
 
 // must be separate as new takes no params, this works fine for enumtrait, but not for dyn trait objects
 trait BuildAble {
@@ -48,7 +47,7 @@ macro_rules! new_impl {
             impl CallBlackHole for $data {
             }
         }
-        use $mod_name::$data; 
+        use $mod_name::$data;
     }
 }
 
@@ -59,26 +58,38 @@ new_impl!(sixteen use Sixteen => A,B,C,D,E,F,G,H,I,J,K,L,M,N,O);
 // implementing using dyn
 struct DynInner;
 impl CallBlackHole for DynInner {
-    fn call(&mut self) { divan::black_box(self); }
+    fn call(&mut self) {
+        divan::black_box(self);
+    }
 }
 impl BuildAble for DynInner {
-    fn new() -> Self { Self }
+    fn new() -> Self {
+        Self
+    }
 }
 struct ImplDyn(Box<dyn CallBlackHole>);
 impl CallBlackHole for ImplDyn {
-    fn call(&mut self) { self.0.call(); }
+    fn call(&mut self) {
+        self.0.call();
+    }
 }
 impl BuildAble for ImplDyn {
-    fn new() -> Self { Self(Box::new(DynInner::new())) }
+    fn new() -> Self {
+        Self(Box::new(DynInner::new()))
+    }
 }
 
 // implementing as a single concrete type for baseline
 struct Concrete;
 impl CallBlackHole for Concrete {
-    fn call(&mut self) { divan::black_box(self); }
+    fn call(&mut self) {
+        divan::black_box(self);
+    }
 }
 impl BuildAble for Concrete {
-    fn new() -> Self { Self }
+    fn new() -> Self {
+        Self
+    }
 }
 
 /// Benchmarking the cost of function calls

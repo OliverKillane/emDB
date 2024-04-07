@@ -104,7 +104,7 @@ pub trait CombiErr<Con> {
 }
 
 /// A simple wrapper to allow the [Combi::repr] function to implement [Display]
-pub struct Repr<T>(T);
+pub struct Repr<T>(pub T);
 
 impl<C: Combi> Display for Repr<&C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

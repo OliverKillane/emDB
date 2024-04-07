@@ -2,22 +2,17 @@ use std::collections::LinkedList;
 
 use crate::macro_comm::{extract_syn, CallStore, ItemInfo, Triple};
 use proc_macro2::{Ident, Span, TokenStream};
-use proc_macro_error::Diagnostic;
+use proc_macro_error::{Diagnostic, Level};
 use quote::{quote, ToTokens};
 use syn::{
-    parse2,
-    punctuated::Punctuated,
-    token::{Brace, Comma, Dot, FatArrow, Match, Paren, SelfValue},
-    Arm, Block, Expr, ExprMatch, ExprMethodCall, ExprPath, FnArg, ImplItem, ImplItemFn, ItemEnum,
-    ItemImpl, ItemTrait, Pat, PatIdent, PatTupleStruct, Path, PathSegment, Signature, Stmt,
-    TraitItem, TraitItemFn,
+    parse2, punctuated::Punctuated, spanned::Spanned, token::{Brace, Comma, Dot, FatArrow, Match, Paren, SelfValue}, Arm, Block, Expr, ExprMatch, ExprMethodCall, ExprPath, FnArg, ImplItem, ImplItemFn, ItemEnum, ItemImpl, ItemTrait, Pat, PatIdent, PatTupleStruct, Path, PathSegment, Signature, Stmt, TraitItem, TraitItemFn
 };
 
 use combi::{
     core::{mapsuc, seq},
     macros::seqs,
     tokens::{
-        basic::{getident, matchident},
+        basic::{collectuntil, isempty, matchident, peekident},
         TokenDiagnostic, TokenIter,
     },
     Combi,
@@ -36,15 +31,14 @@ pub fn interface(
     .store_grouped();
 
     let tks = quote! {
-        use enumtrait::impl_trait_apply;
-        #enum_macro_store!( item_ctx #trait_macro_store => item_ctx impl_trait_apply => #trait_item ) ;
+        #enum_macro_store!( item_ctx #trait_macro_store => item_ctx enumtrait::impl_trait_apply => #trait_item ) ;
     };
     Ok(tks)
 }
 
-fn parse_attrs(attrs: TokenStream) -> Result<(Ident, Ident), LinkedList<Diagnostic>> {
+fn parse_attrs(attrs: TokenStream) -> Result<(TokenStream, TokenStream), LinkedList<Diagnostic>> {
     let parser = mapsuc(
-        seqs!(getident(), matchident("for"), getident()),
+        seqs!(collectuntil(peekident("for")), matchident("for"), collectuntil(isempty())),
         |(trait_macro_store, (_, enum_macro_store))| (trait_macro_store, enum_macro_store),
     );
 
@@ -68,19 +62,48 @@ pub fn apply(input: TokenStream) -> Result<TokenStream, LinkedList<Diagnostic>> 
         },
     ) = Triple::read(input)?;
 
-    Ok(add_fn_impls(impl_item, trait_item, enum_item).into_token_stream())
+    Ok(add_fn_impls(impl_item, trait_item, enum_item)?.into_token_stream())
 }
 
-fn add_fn_impls(mut impl_item: ItemImpl, trait_item: ItemTrait, enum_item: ItemEnum) -> ItemImpl {
+fn add_fn_impls(mut impl_item: ItemImpl, trait_item: ItemTrait, enum_item: ItemEnum) -> Result<ItemImpl, LinkedList<Diagnostic>> {
+    let qualified_name = get_path(&impl_item)?;
     for item in trait_item.items {
         if let TraitItem::Fn(ref f_item) = item {
-            if let Some(gen_impl) = generate_fn_impl(f_item, &enum_item) {
+            if let Some(gen_impl) = generate_fn_impl(f_item, &qualified_name, &enum_item) {
                 impl_item.items.push(ImplItem::Fn(gen_impl));
             }
         }
     }
 
-    impl_item
+    Ok(impl_item)
+}
+
+fn get_path(impl_item: &ItemImpl) -> Result<Path, LinkedList<Diagnostic>> {
+    match impl_item.self_ty.as_ref() {
+        syn::Type::Path(ref p) => {
+            // NOTE: as we are generating a path to use in a pattern match, we cannot allow paths 
+            //       with arguments, unless through turbofish. As these can be inferred trivially 
+            //       from `match self {..}` we can just strip them out.
+            
+            let mut path = Path {
+                leading_colon: p.path.leading_colon,
+                segments: Punctuated::new(),
+            };
+
+            for seg in p.path.segments.iter() {
+                path.segments.push(PathSegment {
+                    ident: seg.ident.clone(),
+                    arguments: syn::PathArguments::None,
+                })
+            }
+            Ok(path)
+        },
+        r => Err(LinkedList::from([Diagnostic::spanned(
+            r.span(),
+            Level::Error,
+            "Expected a qualified type".to_owned(),
+        )])),
+    }
 }
 
 fn extract_params(sig: Signature) -> Option<(SelfValue, Vec<Ident>)> {
@@ -104,7 +127,7 @@ fn extract_params(sig: Signature) -> Option<(SelfValue, Vec<Ident>)> {
     }
 }
 
-fn generate_fn_impl(trait_fn: &TraitItemFn, enum_item: &ItemEnum) -> Option<ImplItemFn> {
+fn generate_fn_impl(trait_fn: &TraitItemFn, enum_qual: &Path, enum_item: &ItemEnum) -> Option<ImplItemFn> {
     let (self_token, args) = extract_params(trait_fn.sig.clone())?;
 
     let pat_expr = Ident::new("it", Span::call_site());
@@ -140,12 +163,9 @@ fn generate_fn_impl(trait_fn: &TraitItemFn, enum_item: &ItemEnum) -> Option<Impl
             .variants
             .iter()
             .map(|var| {
-                let mut pat_path = Punctuated::new();
-                pat_path.push(PathSegment {
-                    ident: enum_item.ident.clone(),
-                    arguments: syn::PathArguments::None,
-                });
-                pat_path.push(PathSegment {
+                // pat path is Something::Name ( it )
+                let mut pat_path = enum_qual.clone();
+                pat_path.segments.push(PathSegment {
                     ident: var.ident.clone(),
                     arguments: syn::PathArguments::None,
                 });
@@ -170,10 +190,7 @@ fn generate_fn_impl(trait_fn: &TraitItemFn, enum_item: &ItemEnum) -> Option<Impl
                     pat: Pat::TupleStruct(PatTupleStruct {
                         attrs: Vec::new(),
                         qself: None,
-                        path: Path {
-                            leading_colon: None,
-                            segments: pat_path,
-                        },
+                        path: pat_path,
                         paren_token: Paren::default(),
                         elems: pat_elems,
                     }),

@@ -40,7 +40,7 @@ impl EMQLOperator for Assert {
                     Ok(
                         LinearBuilderState {
                             data_out: prev.data_type,
-                            op_kind:  plan::OperatorKind::Pure(plan::PureOperator::Assert { input: prev.prev_edge, assert: expr, output: next_edge }),
+                            op_kind:  plan::OperatorKind::Pure(plan::Assert { input: prev.prev_edge, assert: expr, output: next_edge }.into()),
                             call_span: call.span(),
                             update_mo: false,
                         }

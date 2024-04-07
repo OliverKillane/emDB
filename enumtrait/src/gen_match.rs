@@ -11,6 +11,7 @@ use combi::{
     tokens::{
         basic::{collectuntil, getident, isempty, matchident, matchpunct, syn},
         TokenDiagnostic, TokenIter,
+        error::expectederr,
     },
     Combi,
 };
@@ -38,7 +39,7 @@ pub fn interface(input: TokenStream) -> Result<TokenStream, LinkedList<Diagnosti
 }
 
 fn parse_input(input: TokenStream) -> Result<(Ident, Ident, Ident, Expr), LinkedList<Diagnostic>> {
-    let parser = mapsuc(
+    let parser = expectederr(mapsuc(
         seqs!(
             getident(),
             matchident("as"),
@@ -52,7 +53,7 @@ fn parse_input(input: TokenStream) -> Result<(Ident, Ident, Ident, Expr), Linked
         |(enum_macro, (_, (inst_name, (_, (param, (_, (_, expression)))))))| {
             (enum_macro, inst_name, param, expression)
         },
-    );
+    ));
     let (_, res) = parser.comp(TokenIter::from(input, Span::call_site()));
     res.to_result().map_err(TokenDiagnostic::into_list)
 }

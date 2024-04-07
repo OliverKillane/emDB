@@ -80,7 +80,7 @@ impl EMQLOperator for Fold {
                                 data_out: plan::Data { 
                                     fields: lp.record_types.insert(plan::ConcRef::Conc(plan::RecordConc {fields: type_fields})), 
                                     stream: false 
-                                }, op_kind: plan::OperatorKind::Pure(plan::PureOperator::Fold { input: prev.prev_edge, fold_fields, output: next_edge }), call_span: call.span(), update_mo: false }
+                                }, op_kind: plan::OperatorKind::Pure(plan::Fold { input: prev.prev_edge, fold_fields, output: next_edge }.into()), call_span: call.span(), update_mo: false }
                         )
                     } else {
                         Err(errors)

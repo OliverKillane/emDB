@@ -80,13 +80,13 @@ impl EMQLOperator for Update {
                                     data_out: prev.data_type, 
                                     op_kind: plan::OperatorKind::Modify { 
                                         modify_after: *mo, 
-                                        op: plan::ModifyOperator::Update { 
+                                        op: plan::Update { 
                                             input: prev.prev_edge,
                                             reference: reference.clone(),
                                             table: table_id,
                                             mapping: nondup_fields,
                                             output: next_edge, 
-                                        } 
+                                        }.into()
                                     }, 
                                 call_span: call.span(), 
                                 update_mo: true }

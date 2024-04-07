@@ -56,7 +56,7 @@ impl EMQLOperator for Row {
                 
                 let map_op = lp.operators.insert(plan::Operator {
                     query: qk,
-                    kind: plan::OperatorKind::Flow(plan::FlowOperator::Row { fields: expr_fields, output: out_edge  }),
+                    kind: plan::OperatorKind::Flow(plan::Row { fields: expr_fields, output: out_edge  }.into()),
                 });
                 
                 *lp.get_mut_dataflow(out_edge) = plan::DataFlow::Incomplete { from: map_op, with: data.clone() };
