@@ -1,7 +1,7 @@
 use emdb::emql;
 
 emql! {
-
+    impl mygraph as planviz {path = "cool.dot"};
     // Reasoning:
     //  - Constraint checking required, needs to fail immediately (hybrid IVM)
     //  - premium is immutable, and iterated over. So we can maintain a view of

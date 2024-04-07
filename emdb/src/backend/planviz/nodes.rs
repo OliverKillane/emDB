@@ -102,7 +102,7 @@ impl StyleableNode for plan::DataFlow {
     const ID_PREFIX: &'static str = "dataflow";
 
     fn shape<'a>(&'a self, plan: &plan::Plan) -> Option<dot::LabelText<'a>> {
-        Some(dot::LabelText::label("diamond"))
+        Some(dot::LabelText::label("box"))
     }
 
     fn label<'a>(&'a self, plan: &plan::Plan) -> dot::LabelText<'a> {
@@ -111,7 +111,7 @@ impl StyleableNode for plan::DataFlow {
             to,
             with
         } = self {
-            dot::LabelText::label(format!("data: {}", With { plan, extended: with }))
+            dot::LabelText::label(format!("{}", With { plan, extended: with }))
         } else {
             unreachable!("Only `DataFlow::Conn` edges should be present in dataflow")
         }
@@ -122,7 +122,7 @@ impl StyleableNode for plan::DataFlow {
     }
 
     fn color<'a>(&self, plan: &plan::Plan) -> Option<dot::LabelText<'a>> {
-        Some(dot::LabelText::label("chocolate1"))
+        Some(dot::LabelText::label("darkorchid1"))
     }
 }
 

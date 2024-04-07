@@ -7,8 +7,6 @@ enum RGB {
 }
 
 emql! {
-    impl planviz as mygraph;
-
     table people {
         name: String,
         age: u8,

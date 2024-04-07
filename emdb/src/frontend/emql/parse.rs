@@ -100,7 +100,7 @@ fn backend_parser() -> impl TokenParser<BackendImpl> {
             ),
             matchpunct(';'),
         ),
-        |((_, (backend_name, (_, (impl_name, options)))), _)| BackendImpl {
+        |((_, (impl_name, (_, (backend_name, options)))), _)| BackendImpl {
             impl_name,
             backend_name,
             options,

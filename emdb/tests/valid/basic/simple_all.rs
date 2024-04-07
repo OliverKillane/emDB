@@ -1,8 +1,6 @@
 use emdb::emql;
 
 emql! {
-    impl planviz as my_db_graph;
-
     table simple {
         a: i32,
         b: String,

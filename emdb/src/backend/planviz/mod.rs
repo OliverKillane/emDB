@@ -1,6 +1,6 @@
 use std::{fs::File, path::Path};
 
-use combi::{core::{mapsuc, seq}, macros::seqs, tokens::{basic::{collectuntil, isempty, matchident, matchpunct, syn}, error::expectederr, TokenDiagnostic, TokenIter}, Combi, Repr};
+use combi::{core::{mapsuc, seq, setrepr}, macros::seqs, tokens::{basic::{collectuntil, isempty, matchident, matchpunct, syn}, error::expectederr, TokenDiagnostic, TokenIter}, Combi, Repr};
 use syn::LitStr;
 use super::{Diagnostic, EMDBBackend, Ident, LinkedList, TokenStream, plan};
 use crate::utils::misc::singlelist;
@@ -12,7 +12,7 @@ mod errors;
 mod edges;
 mod nodes;
 
-use edges::{GetEdges, PlanEdge, get_dataflow};
+use edges::{GetEdges, PlanEdge, EdgeStyle};
 use nodes::{PlanNode, StyleableNode};
 
 pub struct PlanViz {
@@ -27,7 +27,7 @@ impl EMDBBackend for PlanViz {
             seqs!(
                 matchident("path"),
                 matchpunct('='),
-                syn(collectuntil(isempty()))
+                setrepr(syn(collectuntil(isempty())), "<file path>")
             ),
             |(_, (_, out_location)): (_, (_, LitStr))| PlanViz{ out_location } 
         ));
@@ -41,7 +41,7 @@ impl EMDBBackend for PlanViz {
 
     fn generate_code(self, impl_name: Ident, plan: &plan::Plan) -> Result<TokenStream, LinkedList<Diagnostic>> {
         let out_path_str = self.out_location.value();
-        match File::create_new(Path::new(&out_path_str)) {
+        match File::create(Path::new(&out_path_str)) {
             Ok(mut open_file) => {
                 match dot::render(&plan::With { plan, extended: impl_name.clone() }, &mut open_file) {
                     Ok(()) => { Ok(quote! {
@@ -98,6 +98,26 @@ impl<'a> dot::Labeller<'a, PlanNode, PlanEdge> for plan::With<'a, Ident> {
     fn node_color(&'a self, n: &PlanNode) -> Option<dot::LabelText<'a>> {
         node_call!(match self, n -> it, key => it.color(self.plan))
     }
+
+    fn edge_label(&'a self, e: &PlanEdge) -> dot::LabelText<'a> {
+        e.label()
+    }
+
+    fn edge_end_arrow(&'a self, e: &PlanEdge) -> dot::Arrow {
+        e.end_arrow()
+    }
+
+    fn edge_start_arrow(&'a self, e: &PlanEdge) -> dot::Arrow {
+        e.start_arrow()
+    }
+
+    fn edge_style(&'a self, e: &PlanEdge) -> dot::Style {
+        e.edge_style()
+    }
+
+    fn edge_color(&'a self, e: &PlanEdge) -> Option<dot::LabelText<'a>> {
+        e.edge_color()
+    }
 }
 
 fn get_iters<'a, T>(arena: &'a GenArena<T>, trans: impl Fn(plan::Key<T>) -> PlanNode + 'a) -> impl Iterator<Item = PlanNode> + 'a {
@@ -129,18 +149,10 @@ impl<'a> dot::GraphWalk<'a, PlanNode, PlanEdge> for plan::With<'a, Ident> {
     }
 
     fn source(&'a self, edge: &PlanEdge) -> PlanNode {
-        match edge {
-            PlanEdge::DataFlow { data, flow_forward, to_direction } => get_dataflow(*data, self.plan.get_dataflow(*data), *flow_forward, *to_direction, true),
-            PlanEdge::TableAccess { op, .. } | PlanEdge::QueryReturn { op, .. } | PlanEdge::ModificationOrder { op, .. } => PlanNode::Operator(*op),
-        }
+        edge.get_side(true)
     }
 
     fn target(&'a self, edge: &PlanEdge) -> PlanNode {
-        match edge {
-            PlanEdge::DataFlow { data, flow_forward, to_direction } => get_dataflow(*data, self.plan.get_dataflow(*data), *flow_forward, *to_direction, false),
-            PlanEdge::TableAccess { op, table } => PlanNode::Table(*table),
-            PlanEdge::QueryReturn { op, query } => PlanNode::Query(*query),
-            PlanEdge::ModificationOrder { op, prev } => PlanNode::Operator(*prev),
-        }
+        edge.get_side(false)
     }
 }
