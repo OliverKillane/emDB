@@ -48,7 +48,7 @@ impl StyleableNode for plan::Operator {
     const ID_PREFIX: &'static str = "operator";
 
     fn shape<'a>(&'a self, plan: &plan::Plan) -> Option<dot::LabelText<'a>> {
-        Some(dot::LabelText::label("ellipse"))
+        Some(dot::LabelText::label("box"))
     }
 
     fn label<'a>(&'a self, plan: &plan::Plan) -> dot::LabelText<'a> {
@@ -67,7 +67,7 @@ impl StyleableNode for plan::Operator {
     }
 
     fn color<'a>(&self, plan: &plan::Plan) -> Option<dot::LabelText<'a>> {
-        Some(dot::LabelText::label("beige"))
+        Some(dot::LabelText::label("chartreuse1"))
     }
 }
 
@@ -91,7 +91,15 @@ impl StyleableNode for plan::DataFlow {
     }
 
     fn style(&self, plan: &plan::Plan) -> dot::Style {
-        dot::Style::Bold
+        if let plan::DataFlow::Conn { from, to, with } = self {
+            if with.stream {
+                dot::Style::Bold
+            } else {
+                dot::Style::None
+            }
+        } else {
+            unreachable!()
+        }
     }
 
     fn color<'a>(&self, plan: &plan::Plan) -> Option<dot::LabelText<'a>> {
@@ -111,11 +119,11 @@ impl StyleableNode for plan::Query {
     }
 
     fn style(&self, plan: &plan::Plan) -> dot::Style {
-        dot::Style::Dotted
+        dot::Style::Bold
     }
 
     fn color<'a>(&self, plan: &plan::Plan) -> Option<dot::LabelText<'a>> {
-        Some(dot::LabelText::label("azure"))
+        Some(dot::LabelText::label("gold"))
     }
 }
 

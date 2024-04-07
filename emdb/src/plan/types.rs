@@ -219,12 +219,8 @@ impl<'a, 'b> Display for With<'a, &'b Data> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} of {}",
-            if self.extended.stream {
-                "stream"
-            } else {
-                "single record"
-            },
+            "{} {}",
+            if self.extended.stream { "stream" } else { "" },
             With {
                 plan: self.plan,
                 extended: &self.extended.fields

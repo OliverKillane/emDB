@@ -84,7 +84,7 @@ impl GetEdges for plan::Operator {
                 }
                 edges.push(TableAccess { op: self_key, table: op.get_table_access() }.into());
             },
-            plan::OperatorKind::Flow(plan::FlowOperator::Return(_)) => {
+            plan::OperatorKind::Flow(plan::FlowOperator::Return(_) | plan::FlowOperator::Discard(_)) => {
                 edges.push(QueryReturn { op: self_key, query: *query }.into());
             },
             _ => ()
@@ -156,9 +156,9 @@ impl EdgeStyle for PlanEdge {}
 impl EdgeStyle for DataFlow {
     fn label<'a>(&self) -> dot::LabelText<'a> {
         if let DataFlowKind::Call = self.flow {
-            dot::LabelText::label("call")
+            dot::LabelText::label("")
         } else {
-            dot::LabelText::label("data")
+            dot::LabelText::label("")
         }
     }
 
@@ -204,7 +204,7 @@ impl EdgeStyle for DataFlow {
 }
 impl EdgeStyle for TableAccess {
     fn label<'a>(&self) -> dot::LabelText<'a> {
-        dot::LabelText::label("access")
+        dot::LabelText::label("")
     }
 
     fn end_arrow(&self) -> dot::Arrow {
@@ -233,7 +233,7 @@ impl EdgeStyle for TableAccess {
 }
 impl EdgeStyle for QueryReturn {
     fn label<'a>(&self) -> dot::LabelText<'a> {
-        dot::LabelText::label("return")
+        dot::LabelText::label("")
     }
 
     fn end_arrow(&self) -> dot::Arrow {
@@ -262,7 +262,7 @@ impl EdgeStyle for QueryReturn {
 }
 impl EdgeStyle for ModificationOrder {
     fn label<'a>(&self) -> dot::LabelText<'a> {
-        dot::LabelText::label("modify after")
+        dot::LabelText::label("")
     }
 
     fn end_arrow(&self) -> dot::Arrow {
@@ -283,9 +283,9 @@ impl EdgeStyle for ModificationOrder {
 
     fn get_side(&self, source_side: bool) -> PlanNode {
         if source_side {
-            PlanNode::Operator(self.op)
-        } else {
             PlanNode::Operator(self.prev)
+        } else {
+            PlanNode::Operator(self.op)
         }
     }
 }
