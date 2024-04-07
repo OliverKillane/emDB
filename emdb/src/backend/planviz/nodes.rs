@@ -1,3 +1,4 @@
+#![allow(clippy::useless_format)] // TODO: so clippy will pass while the nodes are not labelled
 use crate::plan::{self, With};
 use dot;
 
@@ -12,7 +13,7 @@ pub enum PlanNode {
 // Wraps [`dot::Labeller`] to be implemented for graph nodes
 pub trait StyleableNode: Sized {
     const ID_PREFIX: &'static str;
-    fn id<'a>(&'a self, self_key: plan::Key<Self>) -> dot::Id<'a> {
+    fn id(&self, self_key: plan::Key<Self>) -> dot::Id<'_> {
         dot::Id::new(format!("{}_{}", Self::ID_PREFIX, self_key.arr_idx() )).unwrap()
     }
 
@@ -20,34 +21,6 @@ pub trait StyleableNode: Sized {
     fn label<'a>(&'a self, plan: &plan::Plan) -> dot::LabelText<'a>;
     fn style(&self, plan: &plan::Plan) -> dot::Style;
     fn color<'a>(&self, plan: &plan::Plan) -> Option<dot::LabelText<'a>>;
-}
-
-pub trait OperatorDescription {
-    fn description(&self, plan: &plan::Plan) -> String;
-}
-
-impl OperatorDescription for plan::PureOperator {
-    fn description(&self, plan: &plan::Plan) -> String {
-        String::from("pure")
-    }
-}
-
-impl OperatorDescription for plan::FlowOperator {
-    fn description(&self, plan: &plan::Plan) -> String {
-        String::from("flow")
-    }
-}
-
-impl OperatorDescription for plan::AccessOperator {
-    fn description(&self, plan: &plan::Plan) -> String {
-        String::from("access")
-    }
-}
-
-impl OperatorDescription for plan::ModifyOperator {
-    fn description(&self, plan: &plan::Plan) -> String {
-        String::from("modify")
-    }
 }
 
 impl StyleableNode for plan::Table {
@@ -143,5 +116,142 @@ impl StyleableNode for plan::Query {
 
     fn color<'a>(&self, plan: &plan::Plan) -> Option<dot::LabelText<'a>> {
         Some(dot::LabelText::label("azure"))
+    }
+}
+
+#[enumtrait::store(operator_description_trait)]
+pub trait OperatorDescription {
+    fn description(&self, plan: &plan::Plan) -> String;
+}
+
+#[enumtrait::impl_trait(operator_description_trait for plan::modify_operator_enum)]
+impl OperatorDescription for plan::ModifyOperator {}
+
+#[enumtrait::impl_trait(operator_description_trait for plan::access_operator_enum)]
+impl OperatorDescription for plan::AccessOperator {}
+
+#[enumtrait::impl_trait(operator_description_trait for plan::pure_operator_enum)]
+impl OperatorDescription for plan::PureOperator {}
+
+#[enumtrait::impl_trait(operator_description_trait for plan::flow_operator_enum)]
+impl OperatorDescription for plan::FlowOperator {}
+
+impl OperatorDescription for plan::Update {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Update")
+    }
+}
+
+impl OperatorDescription for plan::Insert {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Insert")
+    }
+}
+
+impl OperatorDescription for plan::Delete {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Delete")
+    }
+}
+
+impl OperatorDescription for plan::GetUnique {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("GetUnique")
+    }
+}
+
+impl OperatorDescription for plan::Scan {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Scan")
+    }
+}
+
+impl OperatorDescription for plan::DeRef {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("DeRef")
+    }
+}
+
+impl OperatorDescription for plan::Map {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Map")
+    }
+}
+
+impl OperatorDescription for plan::Fold {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Fold")
+    }
+}
+
+impl OperatorDescription for plan::Filter {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Filter")
+    }
+}
+
+impl OperatorDescription for plan::Sort {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Sort")
+    }
+}
+
+impl OperatorDescription for plan::Assert {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Assert")
+    }
+}
+
+impl OperatorDescription for plan::Collect {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Collect")
+    }
+}
+
+impl OperatorDescription for plan::Take {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Take")
+    }
+}
+
+impl OperatorDescription for plan::Join {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Join")
+    }
+}
+
+impl OperatorDescription for plan::GroupBy {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("GroupBy")
+    }
+}
+
+impl OperatorDescription for plan::Fork {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Fork")
+    }
+}
+
+impl OperatorDescription for plan::Union {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Union")
+    }
+}
+
+impl OperatorDescription for plan::Row {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Row")
+    }
+}
+
+impl OperatorDescription for plan::Return {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Return")
+    }
+}
+
+impl OperatorDescription for plan::Discard {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Discard")
     }
 }

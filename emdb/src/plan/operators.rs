@@ -223,7 +223,7 @@ pub enum AccessOperator {
 
 #[enumtrait::quick_enum]
 #[enumtrait::quick_from]
-#[enumtrait::store(pure_operator_enum)]
+#[enumtrait::store(pub pure_operator_enum)]
 pub enum PureOperator {
     Map,
     Fold,
@@ -240,7 +240,7 @@ pub enum PureOperator {
 
 #[enumtrait::quick_enum]
 #[enumtrait::quick_from]
-#[enumtrait::store(flow_operator_enum)]
+#[enumtrait::store(pub flow_operator_enum)]
 pub enum FlowOperator {
     Row,
     Return,

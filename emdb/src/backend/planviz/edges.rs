@@ -195,12 +195,10 @@ impl EdgeStyle for DataFlow {
             } else {
                 PlanNode::Dataflow(self.data)
             }
+        } else if self.to_direction {
+            PlanNode::Dataflow(self.data)
         } else {
-            if self.to_direction {
-                PlanNode::Dataflow(self.data)
-            } else {
-                PlanNode::Operator(self.op)
-            }
+            PlanNode::Operator(self.op)
         }
     }
 }
@@ -222,7 +220,7 @@ impl EdgeStyle for TableAccess {
     }
 
     fn edge_color<'a>(&self) -> Option<dot::LabelText<'a>> {
-        Some(dot::LabelText::label("darkorchid1"))
+        Some(dot::LabelText::label("aqua"))
     }
 
     fn get_side(&self, source_side: bool) -> PlanNode {
@@ -280,7 +278,7 @@ impl EdgeStyle for ModificationOrder {
     }
 
     fn edge_color<'a>(&self) -> Option<dot::LabelText<'a>> {
-        Some(dot::LabelText::label("darksalmon"))
+        Some(dot::LabelText::label("crimson"))
     }
 
     fn get_side(&self, source_side: bool) -> PlanNode {

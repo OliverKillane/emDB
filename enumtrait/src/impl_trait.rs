@@ -90,11 +90,11 @@ fn get_path(impl_item: &ItemImpl) -> Result<Path, LinkedList<Diagnostic>> {
                 segments: Punctuated::new(),
             };
 
-            for seg in p.path.segments.iter() {
+            for seg in &p.path.segments {
                 path.segments.push(PathSegment {
                     ident: seg.ident.clone(),
                     arguments: syn::PathArguments::None,
-                })
+                });
             }
             Ok(path)
         },

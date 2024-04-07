@@ -49,7 +49,7 @@ mod #impl_name {
     pub const OUT_DIRECTORY: &str = #out_path_str;
 }
                     }) }
-                    Err(e) => return Err(singlelist(errors::io_error(&impl_name, self.out_location.span(), &e)))
+                    Err(e) => Err(singlelist(errors::io_error(&impl_name, self.out_location.span(), &e)))
                 }
             },
             Err(e) => {
