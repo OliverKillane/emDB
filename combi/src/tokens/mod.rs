@@ -13,6 +13,7 @@ pub mod derived;
 pub mod error;
 pub mod matcher;
 pub mod recovery;
+
 /// A wrapper for [TokenStream] that allows for 1-token lookahead, and records the current and last [Span]s.
 pub struct TokenIter {
     next: Option<TokenTree>,
@@ -66,6 +67,7 @@ impl TokenIter {
 }
 
 /// Both an [error](Combi::Err) and [continuation](Combi::Con) that contains compiler diagnostcs.
+#[derive(Debug)]
 pub struct TokenDiagnostic {
     main: Diagnostic,
     prev: LinkedList<Diagnostic>,

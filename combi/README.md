@@ -1,21 +1,44 @@
-## Combi
+# Combi
+## What is this?
 
-### What is this?
+A simple combinator library, allowing functions that succeed, fail or can be _continued_/ignored to be composed.
 
-A small combinator library, allowing functions that succeed, fail or can be _continued_/ignored to be composed.
-
-![](./docs/combi_trait.drawio.svg)
+<img src="./docs/combi_trait.drawio.svg" alt="alt text" title="image Title" width="1500"/>
 
 Before you ask: _"Isn't this just functions with extra steps"_, no! Its monads with extra steps.
 
-The lbrary contains an implementation of a parser combinator library atop combi, for building tokenstream parsers reporting compiler diagnostics for procedural macros.
+Different specialised combinators can be built atop combi, typically parsing logic.
+- *Combi*s are similar to typical parser combinators, but the addition of continuations enable them to support multiple syntax errors, without requiring error nodes in a more complex AST
+- The *Combi*s make no assumptions about input structure, allowing them to compute on buffers (like regular parsers) but also streams (with no backtracking), or trees (such as rust [`proc_macro2::TokenTree`]s)
 
-### Things to do Better!
+This was build as part of the [emDB project](./../emdb).
 
-- [ ] The [Combi::Repr] trait is not ideal, supporting some kind of visitpor would be more ideal
-- [ ] Coloured text from the tokens library is not working
-- [ ] Span joins cause a panic on stable.
-- [ ] Improved `rustc_unimplemented` messages for tokens
-- [ ] The text parser
-- [ ] Benchmarks to track performance regressions
-- [ ] investigation of how much manual inlining is required
+## Included Specialisations
+### Tokens
+Parser combinators for tokenstreams, allowing LL(1) grammars (recursive descent, no backtracking).
+- Produce compiler diagnostics using [`proc_macro_error`]
+- Can recover from failures easily, with custom recovery logic
+
+It is implemented simply (explicit peeking for lookahead, explitit recovery), and is intended to be as close to zero-cost over a comparably features hand-rolled parser.
+
+For maximum size cases of the tokens benchmarks:
+```
+Timer precision: 15 ns
+tokens              fastest       │ slowest       │ median        │ mean          │ samples │ iters
+├─ long_sequence                  │               │               │               │         │
+│  ├─ ChumskyProc   109.2 ms      │ 162.8 ms      │ 120.3 ms      │ 123 ms        │ 100     │ 100
+│  ├─ CombiParser   36.48 ms      │ 55.93 ms      │ 42.9 ms       │ 43.44 ms      │ 100     │ 100
+│  ╰─ HandRolled    27.22 ms      │ 54.56 ms      │ 32.25 ms      │ 33.85 ms      │ 100     │ 100
+├─ parse_nothing                  │               │               │               │         │
+│  ├─ ChumskyProc   64.8 ns       │ 12.59 µs      │ 121.6 ns      │ 238.6 ns      │ 100     │ 1600
+│  ├─ CombiParser   28.82 ns      │ 28.97 ns      │ 28.9 ns       │ 28.9 ns       │ 100     │ 6400
+│  ╰─ HandRolled    7.177 ns      │ 7.22 ns       │ 7.199 ns      │ 7.199 ns      │ 100     │ 25600
+╰─ recursive_ident                │               │               │               │         │
+   ├─ ChumskyProc   83.55 µs      │ 254.3 µs      │ 87.62 µs      │ 93.95 µs      │ 100     │ 100
+   ├─ CombiParser   9.704 µs      │ 11.2 µs       │ 10.17 µs      │ 10.21 µs      │ 100     │ 100              
+   ╰─ HandRolled    4.883 µs      │ 5.794 µs      │ 5.122 µs      │ 5.127 µs      │ 100     │ 100
+```
+
+*Potential Improvements*
+- [ ] parse `seq(recovgroup(P1), P2)` in parallel (tree based data structure is naturally parallel) as `treepar(P1, P2)`
+- [ ] Optimise the `recursive` parser to remove heap allocation

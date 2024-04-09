@@ -7,7 +7,6 @@ use crate::{
     core::{seqdiff, DiffRes},
     Combi, CombiErr, CombiResult, Repr,
 };
-use colored::Colorize;
 use derive_where::derive_where;
 use proc_macro2::{Delimiter, Ident, Literal, Punct, Span, TokenStream, TokenTree};
 use proc_macro_error::{Diagnostic, Level};
@@ -25,6 +24,7 @@ impl Combi for GetIdent {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         mut input: TokenIter,
@@ -57,7 +57,7 @@ impl Combi for GetIdent {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", "<ident>".blue())
+        write!(f, "<ident>")
     }
 }
 
@@ -120,7 +120,7 @@ impl Combi for MatchIdent {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self.text.magenta())
+        write!(f, "{}", self.text)
     }
 }
 
@@ -152,7 +152,7 @@ impl Combi for PeekIdent {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self.ident.magenta())
+        write!(f, "{}", self.ident)
     }
 }
 
@@ -201,7 +201,7 @@ impl Combi for GetPunct {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", "<punct>".blue())
+        write!(f, "<punct>")
     }
 }
 
@@ -260,7 +260,7 @@ impl Combi for matchpunct {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self.0.to_string().magenta())
+        write!(f, "{}", self.0)
     }
 }
 
@@ -292,7 +292,7 @@ impl Combi for PeekPunct {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self.punct.to_string().magenta())
+        write!(f, "{}", self.punct)
     }
 }
 
@@ -340,7 +340,7 @@ impl Combi for GetLiteral {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", "<literal>".blue())
+        write!(f, "<literal>")
     }
 }
 
@@ -503,7 +503,7 @@ where
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         let (l, r) = delim_sep(self.0);
-        write!(f, "{}{}{}", l.magenta(), Repr(&self.1), r.magenta())
+        write!(f, "{l}{}{r}", Repr(&self.1))
     }
 }
 

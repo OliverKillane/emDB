@@ -4,7 +4,7 @@ use trybuild::TestCases;
 #[test]
 fn should_compile() {
     let t = TestCases::new();
-    for entry in glob("tests/valid/**/*.rs").unwrap() {
+    for entry in glob("examples/**/*.rs").unwrap() {
         t.pass(entry.unwrap());
     }
 }

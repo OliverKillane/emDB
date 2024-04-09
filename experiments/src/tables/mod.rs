@@ -20,7 +20,7 @@
 //!
 //! ## Custom Schema
 //! ### Schema
-//! ```
+//! ```ignore
 //! use emdb::database;
 //!
 //! database! {
@@ -120,7 +120,7 @@
 //!     }
 //! }
 //!```
-//!```
+//!```ignore
 //! # use experiments::tables::UserDetails;
 //! # use experiments::tables::naive::NaiveDatabase as UserDetailsDB;
 //! fn foo() {

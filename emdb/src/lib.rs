@@ -57,7 +57,8 @@ fn make_impl<F: frontend::Frontend>(tk: TokenStream) -> TokenStream {
 }
 
 macro_rules! create_frontend {
-    ($frontend:ident as $implement:path) => {
+    ($frontend:ident as $implement:path => $($t:tt)*) => {
+        $($t)*
         #[proc_macro_error]
         #[proc_macro]
         pub fn $frontend(tk: TokenStream) -> TokenStream {
@@ -66,4 +67,6 @@ macro_rules! create_frontend {
     };
 }
 
-create_frontend!(emql as frontend::Emql);
+create_frontend!(emql as frontend::Emql =>
+    /// TODO: EMQL language guide
+);

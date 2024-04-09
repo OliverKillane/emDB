@@ -1,5 +1,15 @@
 //! # The emQL language frontend
-//! [`TokenStream`] -> parse -> ([AST] + errors) -> translate -> ([`LogicalPlan`] + errors) -> [Backend]
+//! ## What is emQL
+//! 
+//! ## emQL over SQL?
+//! 
+//! ## Implementation 
+//! 
+//! ### [rustc API](https://rustc-dev-guide.rust-lang.org/rustc-driver.html) versus token passthrough
+//! 
+//! ### [Token](proc_macro2::TokenStream) parsing
+//! 
+
 mod ast;
 mod errors;
 mod operators;

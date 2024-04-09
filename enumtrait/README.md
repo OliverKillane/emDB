@@ -99,6 +99,8 @@ I hope such a feature (e.g. crate local macro persistent state, message passing 
 *Rust macro invocations are independent.* However, macro definitions are ordered. We can 
 use changing macro definitions to force an ordered invocation of other macros.
 
+*See [Little Book of Rust macros > Callbacks](https://veykril.github.io/tlborm/decl-macros/patterns/callbacks.html)*
+
 We do this by building immutable token stores from `macro_rules!` definitions that reapply macros that read.
 ```rust
 // we can define a basic macro we want to pass information to as
@@ -111,27 +113,26 @@ macro_rules! my_macro {
 // We then use the macro_store pattern (trademark pending😂) to store tokens 
 // in macros. This can be made into a proc_macro that produces a macro_rules, 
 // as is done for `enumtrait::store`
-macro_rules! name {
+macro_rules! my_name {
     ($p:ident => $($t:tt)*) => {
         $p!( $($t)* Oliver Killane ) // storing a name
     }
 }
-macro_rules! passtime {
+macro_rules! my_passtime {
     ($p:ident => $($t:tt)*) => {
         $p!( $($t)* makes unecessarily complex macros ) 
     }
 }
 
-// Read `tokens in name` in my_macro 
-fn use_strings() {
-    // reading from name into my_macro, with some extra tokens passable
-    let name = name!(my_macro => with some extra data); 
-    
-    // reading from two means applying (tokens get collected over `=>`)
-    let message = name!(passtime => my_macro =>); 
 
-    println!("Now we can display `{name}` and `{message}`");
-}
+// reading from name into my_macro, with some extra tokens passable
+let name = my_name!(my_macro => some extra data and ); 
+
+// reading from two means applying (tokens get collected over `=>`)
+let message = my_name!(my_passtime => my_macro =>); 
+
+assert_eq!(name, "some extra data and Oliver Killane");
+assert_eq!(message, "Oliver Killane makes unecessarily complex macros");
 ```
 With that we can now pass tokens between macros in a [DAG](https://en.wikipedia.org/wiki/Directed_acyclic_graph).
 

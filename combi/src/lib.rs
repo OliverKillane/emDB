@@ -8,11 +8,9 @@ pub mod core;
 pub mod derived;
 pub mod logical;
 pub mod macros;
-#[cfg(feature = "tokens")]
-pub mod tokens;
 
-#[cfg(feature = "text")]
 pub mod text;
+pub mod tokens;
 
 /// The result of [Combi] computation
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -22,7 +20,7 @@ pub enum CombiResult<S, C, E> {
     Err(E),
 }
 
-impl <S, E> CombiResult<S, E, E> {
+impl<S, E> CombiResult<S, E, E> {
     /// When the error and continuation types are identical, we can convert a result into an regular rust [`Result`]
     pub fn to_result(self) -> Result<S, E> {
         match self {

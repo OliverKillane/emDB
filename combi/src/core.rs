@@ -24,6 +24,7 @@ impl<P: Combi> Combi for id<P> {
     type Inp = P::Inp;
     type Out = P::Out;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         self.0.comp(input)
     }
@@ -49,6 +50,7 @@ impl<E, C, I> Combi for Nothing<E, C, I> {
     type Inp = I;
     type Out = I;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         (input, CombiResult::Suc(()))
     }
@@ -81,6 +83,7 @@ where
     type Inp = P1::Inp;
     type Out = P2::Out;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         let (p1_out, p1_res) = self.0.comp(input);
         match p1_res {
@@ -147,6 +150,7 @@ where
     type Inp = P1::Inp;
     type Out = DiffRes<P1::Out, P2::Out>;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         let (p1_out, p1_res) = self.0.comp(input);
         match p1_res {
@@ -201,6 +205,7 @@ where
     type Inp = P::Inp;
     type Out = P::Out;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         let (p_out, p_res) = self.0.comp(input);
         (
@@ -238,6 +243,7 @@ where
     type Inp = P::Inp;
     type Out = P::Out;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         let (p_out, p_res) = self.0.comp(input);
         (
@@ -275,6 +281,7 @@ where
     type Inp = P::Inp;
     type Out = P::Out;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         let (p_out, p_res) = self.0.comp(input);
         (
@@ -314,6 +321,7 @@ where
     type Inp = P::Inp;
     type Out = P::Out;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         let (p_out, p_res) = self.0.comp(input);
         match p_res {
@@ -355,6 +363,7 @@ where
     type Inp = CP::Inp;
     type Out = PT::Out;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         let (cp_out, cp_res) = self.0.comp(input);
         match cp_res {
@@ -399,6 +408,7 @@ where
     type Inp = CP::Inp;
     type Out = CP::Out;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         let (cp_out, cp_res) = self.0.comp(input);
         match cp_res {
@@ -455,6 +465,7 @@ where
     type Inp = SP::Inp;
     type Out = SP::Out;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         let (sp_out, sp_res) = self.0.comp(input);
         match sp_res {
@@ -514,6 +525,7 @@ where
     type Inp = I;
     type Out = O;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         let (p_out, p_res) = self.p.comp((self.func_in)(input));
         ((self.func_out)(p_out), p_res)
@@ -570,6 +582,7 @@ where
     type Inp = I;
     type Out = O;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         let (p_inp, tl) = (self.func_in)(input);
         let (p_out, p_res) = self.p.comp(p_inp);
@@ -616,6 +629,7 @@ impl<I, O, S, E, C> Combi for RecursiveHandle<I, O, S, E, C> {
     type Inp = I;
     type Out = O;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         // INV: owned by some recursive parser, ptr always upgradable as dropping that parser drops this.
         self.p.upgrade().unwrap().comp(input)
@@ -641,6 +655,7 @@ impl<I, O, S, E, C> Combi for Recursive<I, O, S, E, C> {
     type Inp = I;
     type Out = O;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         self.p.comp(input)
     }
@@ -679,6 +694,7 @@ where
     type Inp = (Vec<IP::Suc>, O);
     type Out = O;
 
+    #[inline(always)]
     fn comp(
         &self,
         (mut v, mut input): Self::Inp,
@@ -767,6 +783,7 @@ where
     type Inp = (Vec<S>, O);
     type Out = O;
 
+    #[inline(always)]
     fn comp(
         &self,
         (mut v, mut input): Self::Inp,
@@ -844,6 +861,7 @@ where
     type Inp = I;
     type Out = O;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         ((self.f)(input), CombiResult::Suc(()))
     }
@@ -879,6 +897,7 @@ where
     type Inp = CP::Inp;
     type Out = SP::Out;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         let (cp_out, cp_res) = self.0.comp(input);
         match cp_res {
@@ -910,6 +929,7 @@ where
     type Inp = P::Inp;
     type Out = P::Out;
 
+    #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         self.0.comp(input)
     }
