@@ -97,7 +97,7 @@ pub struct RecordConc {
     pub fields: HashMap<Ident, Key<ScalarType>>,
 }
 
-/// Used to describe types for [`super::OperatorEdge`] in the operator graph
+/// Used to describe types for [`super::DataFlow`] in the operator graph
 #[derive(Clone)]
 pub struct Data {
     pub fields: Key<Record>,
@@ -110,8 +110,16 @@ pub type ScalarType = ConcRef<ScalarTypeConc>;
 pub enum ScalarTypeConc {
     /// A reference to a row in a table, allows the user to interact wit row
     /// references while still allowing the backend to decide what they are.
-    /// ```ignore
-    /// ref cool_table |> collect ~> return;
+    /// ```
+    /// # use emdb::emql;
+    /// # emql! {
+    /// #     table foos { x: i32 }
+    /// #     query foo_query() {
+    /// ref foos 
+    ///     |> collect(it as type foo_row) 
+    ///     ~> return;
+    /// #     }
+    /// # }
     /// ```
     /// - Can use different types of references depending table implementation
     /// chosen (e.g. key with generation, pointer, etc)
@@ -125,11 +133,10 @@ pub enum ScalarTypeConc {
     /// # use emdb::emql;
     /// # emql! {
     /// #     table foos { x: i32 }
-    /// # 
     /// #     query foo_query() {
     /// #     use foos
-    ///         |> take(10) // with cardinality determination allocate bag for 10
-    ///         |> collect(it as type my_fixed_bag)
+    /// |> take(10) // with cardinality determination allocate bag for 10
+    /// |> collect(it as type my_fixed_bag)
     /// #         ~> return;
     /// #     }
     /// # }
@@ -139,11 +146,10 @@ pub enum ScalarTypeConc {
     /// # use emdb::emql;
     /// # emql! {
     /// #     table foos { x: i32 }
-    /// # 
     /// #     query foo_query() {
     /// #         use foos
-    ///             |> sort(x desc) // could reuse heap from sort as the bag type
-    ///             |> collect(it as type my_variable_bag)
+    /// |> sort(x desc) // could reuse heap from sort as the bag type
+    /// |> collect(it as type my_variable_bag)
     /// #             ~> return;
     /// #     }
     /// # }

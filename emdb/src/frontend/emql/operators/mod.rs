@@ -49,7 +49,7 @@ trait EMQLOperator: Sized + Debug {
     fn build_parser() -> impl TokenParser<Self>;
 
     /// Convert the operator to a logical plan node
-    /// - [tn] represents the identifier to table mapping
+    /// - `tn` represents the identifier to table mapping
     #[allow(clippy::too_many_arguments)]
     fn build_logical(
         self,
@@ -111,6 +111,10 @@ macro_rules! create_operator {
         }
     };
 }
+
+// Import to make available to private docs
+#[allow(unused_imports)]
+pub(crate) use create_operator;
 
 create_operator!(
     Operator as op_return::Return,

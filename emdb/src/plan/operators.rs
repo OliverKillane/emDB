@@ -143,7 +143,7 @@ pub struct Assert {
 /// A fold that outputs a collection of all data input, included here to allow
 /// the optimiser to reason more easily about the data structure size & type
 /// given many queries collect multiple rows.
-/// - Generates the [ScalarType::Bag] types
+/// - Generates the [`super::ScalarTypeConc::Bag`] types
 /// - Could technically be implemented as a fold, but more difficult to reason
 ///   about folds generally, and we want the backend to determine the bag's type
 pub struct Collect {

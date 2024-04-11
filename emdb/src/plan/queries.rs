@@ -6,7 +6,7 @@ pub struct Query {
     pub name: Ident,
     pub params: HashMap<Ident, Key<ScalarType>>,
 
-    /// INV is a [LogicalOp::Return]
+    /// INV is a [super::FlowOperator::Return]
     pub returnval: Option<Key<Operator>>,
 }
 
