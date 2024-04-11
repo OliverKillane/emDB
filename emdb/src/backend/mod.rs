@@ -36,7 +36,7 @@ macro_rules! create_backend {
                 $(
                     $t::NAME => $t::parse_options(&backend_name, options).map(|v| $op::$t(v)),
                 )*
-                _ => Err(singlelist(no_such_backend(&backend_name)))
+                _ => Err(singlelist(no_such_backend(&backend_name, &[$($t::NAME,)*])))
             }
         }
 
@@ -55,16 +55,15 @@ macro_rules! create_backend {
 }
 
 create_backend!(Backend as planviz::PlanViz);
-// create_backend!(Backend as );
 
 pub struct Targets {
     pub impls: HashMap<Ident, Backend>,
 }
 
-fn no_such_backend(backend_name: &Ident) -> Diagnostic {
+fn no_such_backend(backend_name: &Ident, names: &[&'static str;1]) -> Diagnostic {
     Diagnostic::spanned(
         backend_name.span(),
         Level::Error,
-        "No such backend".to_string(),
+        format!("No such backend, available are: {}", names.join(", ")),
     )
 }

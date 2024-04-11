@@ -1,5 +1,5 @@
 //! Basic token combinators.
-//! - Literals are not included as they are more complex to parse, consider using [`syn::LitStr`] instead.
+//! - Literals are not included as they are more complex to parse, consider using [`struct@syn::LitStr`] instead.
 use std::marker::PhantomData;
 
 use super::{TokenDiagnostic, TokenIter};
@@ -75,6 +75,7 @@ impl Combi for MatchIdent {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         mut input: TokenIter,
@@ -138,6 +139,7 @@ impl Combi for PeekIdent {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         input: TokenIter,
@@ -169,6 +171,7 @@ impl Combi for GetPunct {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         mut input: TokenIter,
@@ -215,6 +218,7 @@ impl Combi for matchpunct {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         mut input: TokenIter,
@@ -278,6 +282,7 @@ impl Combi for PeekPunct {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         input: TokenIter,
@@ -308,6 +313,7 @@ impl Combi for GetLiteral {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         mut input: TokenIter,
@@ -356,6 +362,7 @@ impl Combi for IsEmpty {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         input: TokenIter,
@@ -422,6 +429,17 @@ where
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    // NOTE: "Why" I hear you say, "why is recovgroup not inlined, this is trivially done, seems 
+    //       arbitrary to given the decision for the other combis here". And I agree with you!
+    //       
+    //       However on rustc 1.79.0-nightly (ab5bda1aa 2024-04-08) uncommenting the below 
+    //       attribute causes a segfault, I suspect it has something to do with a stack overflow, 
+    //       but honestly have not the time to investigate.
+    //       
+    //       emdb compiles, but segfaults when a query is parsed.
+    //
+    //       still, `error: rustc interrupted by SIGSEGV, printing backtrace` is pretty funny.
+    // #[inline(always)]  // <- satanic runes here
     fn comp(
         &self,
         mut input: TokenIter,
@@ -535,6 +553,7 @@ where
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         mut input: TokenIter,
@@ -623,6 +642,7 @@ where
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         input: TokenIter,
@@ -682,6 +702,7 @@ impl Combi for gettoken {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         mut input: TokenIter,
@@ -720,15 +741,18 @@ impl Combi for terminal {
     type Inp = TokenIter;
     type Out = ();
 
+    #[inline(always)]
     fn comp(
         &self,
         mut input: Self::Inp,
     ) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         if let Some(tt) = input.next() {
-            // BUG: will fail on non-nightly due to `a.join` retuning None
-            let big_span = input
+            // NOTE: `a.join` returns None on Stable, and always Some on nightly.
+            let big_span = if cfg!(nightly) {input
                 .extract_iter()
-                .fold(tt.span(), |a, s| a.join(s.span()).unwrap());
+                .fold(tt.span(), |a, s| a.join(s.span()).unwrap())} else {
+                    TokenStream::from_iter(input.iter).span()
+                };
             (
                 (),
                 CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(

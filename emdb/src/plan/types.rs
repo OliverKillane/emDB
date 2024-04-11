@@ -1,4 +1,59 @@
-//! Types for the logical plan.
+//! #Types for the logical plan.
+//! 
+//! ## Type System
+//! ### Supported Types
+//! Records are supported as the main data type wrapper (expressions have the 
+//! context of the record type they are in)
+//! 
+//! Types supported include rust types, ref types (backend decides implementation) 
+//! and wrappers such as [`ScalarTypeConc::Record`], and [`ScalarTypeConc::Bag`]
+//! 
+//! It is important to allow all rust types to be supported, to allow frontends 
+//! maximum flexibility in the types they use.
+//! 
+//! ### Equality & [Coercion](coerce_record_type)
+//! Types are defined through a graph of concrete types, and references to other 
+//! types (using [`ConcRef`]).
+//! 
+//! The logical plan, and consuming backends need to be able to reason about 
+//! two properties of types:
+//! 
+//! 1. Logical Type Equality (used for semantic analysis) asks: is there an 
+//!    implementation of these types for which they are equal? 
+//!    - two different bags of an equal type are equal (use the same bag data structure)
+//!    - two references to the same table are equal (use the same reference type)
+//!    - two records with the same fields are equal (use the same wrapping record data structure)
+//!    This is the type of equality we use for semantic analysis.   
+//! 
+//! 2. Implementation Type Equality (used for code generation) asks: do the 
+//!    implementations of these types *have* to be the same?
+//!    - two bags of the same type, that are in streams never unioned, can be 
+//!      implemented with different wrapper (e.g. one is a fixed size bag, the 
+//!      other a vector)
+//!    - two records of the same type could be separately optimised
+//! 
+//! Implementation Equality implies Type equality (but not the reverse).
+//! 
+//! Some special rules are also considered:
+//! - [`ScalarTypeConc::TableRef`] is actually just another kind of Ref (as in 
+//!   [`ConcRef`]), but to a table. Backends need to choose the same type for 
+//!   all references to the same table as users can return and send refs as 
+//!   parameters.
+//! - backends implementations of [`ScalarTypeConc::Rust`] need to ensure they 
+//!   comply with expressions written using these types (e.g. wrap, but unwrap 
+//!   to let users access inside expressions).  
+//! 
+//! We use the [`coerce_record_type`] and [`coerce_scalar_type`] functions to 
+//! coerce logically equal types for operators such as union.
+//! 
+//! ## Debugging
+//! Using the [`Planviz`](crate::backend) backend with types displayed 
+//! shows the type graph.
+//! - Unused references are legal (cause no harm, no point in garbage collecting), 
+//!   caused by coersion where an inner scalar type is coerced, but is not actually 
+//!   used anywhere, or when a type is used by an operator that is removed.
+//! - Cycles are *very bad*, avoid at all cost. Can cause stackoverflow on 
+//!   compilation, [`ConcRef`] are assumed to be non-cyclic.
 
 use super::{GenArena, Key, Plan, Table, With};
 use proc_macro2::Ident;
@@ -15,7 +70,7 @@ pub enum ConcRef<A: Clone> {
 
     /// A reference to another record/type
     /// - Used coalescing different records of the same type to point to the same concrete record
-    /// INV: Not self-referential / no recursive types
+    /// INV: Not self-referential / no recursive types / no cycles
     Ref(Key<ConcRef<A>>),
 }
 
@@ -26,6 +81,13 @@ impl<A: Clone> ConcRef<A> {
             ConcRef::Ref(r) => arena.get(*r).unwrap().get_conc(arena),
         }
     }
+}
+
+fn get_conc_index<A: Clone>(arena: &GenArena<ConcRef<A>>, mut key: Key<ConcRef<A>>) -> Key<ConcRef<A>> {
+    while let ConcRef::Ref(r) = arena.get(key).unwrap() {
+        key = *r;
+    }
+    key
 }
 
 pub type Record = ConcRef<RecordConc>;
@@ -83,9 +145,8 @@ pub enum ScalarTypeConc {
     Rust(Type),
 }
 
-// TODO: parameterise the types so that we can reason about temporarily
-// equal types -> i.e the concretes are parameterised by the record type
-
+/// Check two record types are equal.
+/// - The indicies in the types arenas (in [`Plan`]) may be different, if you want to coerse, use [`coerce_record_type`]
 pub fn record_type_eq(lp: &Plan, r1: &Key<Record>, r2: &Key<Record>) -> bool {
     if r1 == r2 {
         return true;
@@ -108,6 +169,8 @@ pub fn record_type_eq(lp: &Plan, r1: &Key<Record>, r2: &Key<Record>) -> bool {
     fields.is_empty()
 }
 
+/// Check two scalar types are equal.
+/// - The indicies in the types arenas (in [`Plan`]) may be different, if you want to coerse, use [`coerce_scalar_type`]
 pub fn scalar_type_eq(lp: &Plan, t1: &Key<ScalarType>, t2: &Key<ScalarType>) -> bool {
     if t1 == t2 {
         return true;
@@ -124,6 +187,49 @@ pub fn scalar_type_eq(lp: &Plan, t1: &Key<ScalarType>, t2: &Key<ScalarType>) -> 
         ) => record_type_eq(lp, r1, r2),
         (ScalarTypeConc::Rust(rt1), ScalarTypeConc::Rust(rt2)) => rt1 == rt2,
         _ => false,
+    }
+}
+
+/// Coerce two scalar types for equality -> same index
+pub fn coerce_scalar_type(lp: &mut Plan, conform_to: Key<ScalarType>, change: Key<ScalarType>) {
+    let conform_index = get_conc_index(&lp.scalar_types, conform_to);
+    let conforming_index = get_conc_index(&lp.scalar_types, change);
+
+    if conform_index != conforming_index {
+        let conform_scalar = lp.get_scalar_type(conform_index);
+        let conforming_scalar = lp.get_scalar_type(conforming_index);
+
+        if let (ScalarTypeConc::Bag(r1), ScalarTypeConc::Bag(r2)) | (ScalarTypeConc::Record(r1), ScalarTypeConc::Record(r2)) = (conform_scalar, conforming_scalar) {
+            coerce_record_type(lp, *r1, *r2);
+        }
+        *lp.scalar_types.get_mut(conforming_index).unwrap() = ConcRef::Ref(conform_index);
+    }
+}
+
+/// Coerce two scalar record for equality -> same index
+/// 
+/// We do this to merge dataflows of the same type, and have those types be [`Key`] equal.
+/// - Thus a backend can decide how to implement a bag, or record, and all references to the same types are updated.
+/// - Other types in the plan may be equal, but if they are not the same index, backends can choose different concrete implementations.
+/// - This is more efficient than just constantly re-checking names for types, and exposing said names to the backend.
+/// 
+/// be very careful however:
+/// - cycles are bad, to debug cycles, disable printing of operator nodes in the [`Planviz`](`crate::backend`) backend, 
+///   and check for cycles in the grpah.
+/// - cycles can affect debug printing of [`Data`] types, which can cause segfaults to occur on stack overflow.
+pub fn coerce_record_type(lp: &mut Plan, conform_to: Key<Record>, change: Key<Record>) {
+    let conform_index = get_conc_index(&lp.record_types, conform_to);
+    let conforming_index = get_conc_index(&lp.record_types, change);
+
+    if conform_index != conforming_index {
+        let conform_record = lp.get_record_type(conform_index);
+        let conforming_record = lp.get_record_type(conforming_index);
+
+        let conform_fields = conform_record.fields.iter().map(|(field, ty)|  (*ty, *conforming_record.fields.get(&field).unwrap())).collect::<Vec<_>>();
+        for (to, from) in &conform_fields {
+            coerce_scalar_type(lp, *to, *from);   
+        }
+        *lp.record_types.get_mut(conforming_index).unwrap() = ConcRef::Ref(conform_index);
     }
 }
 

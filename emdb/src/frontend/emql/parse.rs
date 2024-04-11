@@ -33,7 +33,6 @@ pub(super) fn parse(ts: TokenStream) -> Result<Ast, LinkedList<Diagnostic>> {
     let parser = emql_parser();
     let (_, res) =
         mapsuc(seqdiff(parser, terminal), |(o, ())| o).comp(TokenIter::from(ts, Span::call_site()));
-
     res.to_result().map_err(TokenDiagnostic::into_list)
 }
 

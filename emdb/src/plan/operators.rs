@@ -161,7 +161,7 @@ pub struct Take {
 
 /// An n-way join of either equijoin, predicate join, > join, or cross
 pub struct Join {
-    // TODO
+    // TODO: Implement join
 }
 
 /// group by a field and aggregate the results
@@ -180,6 +180,7 @@ pub struct Fork {
 }
 
 /// Merge a number of streams into one
+/// INV: All incomping dataflows are streams with the same type index
 pub struct Union {
     pub inputs: Vec<Key<DataFlow>>,
     pub output: Key<DataFlow>,

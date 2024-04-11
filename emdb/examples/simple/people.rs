@@ -1,5 +1,6 @@
 use emdb::emql;
 
+#[allow(dead_code)]
 enum RGB {
     Red,
     Blue,

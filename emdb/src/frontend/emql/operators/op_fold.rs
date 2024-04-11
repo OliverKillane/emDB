@@ -1,8 +1,9 @@
 //! Apply a fold over a stream of values to create a single value.
 //! 
 //! Semantics:
+//! ```ignore
 //! <stream> |> fold(<unique field>: <type> = <initial> -> <update>, ... ) ~> <single>
-//! 
+//! ```
 use super::*;
 #[derive(Debug)]
 pub struct Fold {

@@ -1,8 +1,9 @@
 use std::{fs::File, path::Path};
 
-use combi::{core::{mapsuc, seq, setrepr}, macros::seqs, tokens::{basic::{collectuntil, isempty, matchident, matchpunct, syn}, error::expectederr, TokenDiagnostic, TokenIter}, Combi, Repr};
+use combi::{core::{mapsuc, seq, setrepr, choice}, macros::{seqs, choices}, tokens::{error::error, basic::{collectuntil, gettoken, matchident, peekident, matchpunct, peekpunct, syn}, error::expectederr, TokenDiagnostic, TokenIter}, Combi, Repr};
 use syn::LitStr;
-use super::{Diagnostic, EMDBBackend, Ident, LinkedList, TokenStream, plan};
+use super::{EMDBBackend, Ident, LinkedList, TokenStream, plan};
+use proc_macro_error::{Diagnostic, Level};
 use crate::utils::misc::singlelist;
 use quote::quote;
 use typed_generational_arena::{StandardArena as GenArena};
@@ -12,24 +13,37 @@ mod errors;
 mod edges;
 mod nodes;
 
-use edges::{GetEdges, PlanEdge, EdgeStyle};
-use nodes::{PlanNode, StyleableNode};
+use edges::{PlanEdge, EdgeStyle, get_edges};
+use nodes::{PlanNode, StyleableNode, node_call, get_nodes};
 
 pub struct PlanViz {
-    out_location: LitStr
+    out_location: LitStr,
+    config: DisplayConfig
+}
+
+pub struct DisplayConfig {
+    display_types: bool,
 }
 
 impl EMDBBackend for PlanViz {
-    const NAME: &'static str = "planviz";
+    const NAME: &'static str = "Planviz";
 
     fn parse_options(backend_name: &Ident, options: Option<TokenStream>) -> Result<Self, LinkedList<Diagnostic>> {
         let parser = expectederr(mapsuc(
             seqs!(
                 matchident("path"),
                 matchpunct('='),
-                setrepr(syn(collectuntil(isempty())), "<file path>")
+                setrepr(syn(collectuntil(peekpunct(','))), "<file path>"),
+                matchpunct(','),
+                matchident("types"),
+                matchpunct('='),
+                choices!(
+                    peekident("on") => mapsuc(matchident("on"), |_| true),
+                    peekident("off") => mapsuc(matchident("off"), |_| false),
+                    otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, "Expected `on` or `off`".to_owned()))
+                )
             ),
-            |(_, (_, out_location)): (_, (_, LitStr))| PlanViz{ out_location } 
+            |(_, (_, (out_location, (_, (_, (_, display_types)))))): (_, (_, (LitStr, _)))| PlanViz{ out_location, config: DisplayConfig{display_types} } 
         ));
         if let Some(opts) = options {
             let (_, res) = parser.comp(TokenIter::from(opts, backend_name.span()));
@@ -43,7 +57,7 @@ impl EMDBBackend for PlanViz {
         let out_path_str = self.out_location.value();
         match File::create(Path::new(&out_path_str)) {
             Ok(mut open_file) => {
-                match dot::render(&plan::With { plan, extended: impl_name.clone() }, &mut open_file) {
+                match dot::render(&plan::With { plan, extended: (impl_name.clone(), self.config) }, &mut open_file) {
                     Ok(()) => { Ok(quote! {
 mod #impl_name {
     pub const OUT_DIRECTORY: &str = #out_path_str;
@@ -60,23 +74,18 @@ mod #impl_name {
     }
 }
 
-// NOTE: complex but eliminates boilerplate
-//       - match by query type, then apply the method
-//       - variable names need to be passed (hygenic macro)
-macro_rules! node_call {
-    (match $self_id:ident , $node_id:ident -> $it:ident, $key:ident => $($tk:tt)*) => {
-        match $node_id {
-            PlanNode::Table($key) => {let $it = $self_id.plan.get_table(*$key); $($tk)* },
-            PlanNode::Operator($key) => {let $it = $self_id.plan.get_operator(*$key); $($tk)* },
-            PlanNode::Dataflow($key) => {let $it = $self_id.plan.get_dataflow(*$key); $($tk)* },
-            PlanNode::Query($key) => {let $it = $self_id.plan.get_query(*$key); $($tk)* },
+trait GetFeature<T>: Sized {
+    fn get_all(edges: &mut Vec<T>, arena: &GenArena<Self>, config: &DisplayConfig) {
+        for (key, node) in arena.iter() {
+            node.get_features(key, edges, config);
         }
     }
+    fn get_features(&self, self_key: plan::Key<Self>, edges: &mut Vec<T>, config: &DisplayConfig);
 }
 
-impl<'a> dot::Labeller<'a, PlanNode, PlanEdge> for plan::With<'a, Ident> {
+impl<'a> dot::Labeller<'a, PlanNode, PlanEdge> for plan::With<'a, (Ident, DisplayConfig)> {
     fn graph_id(&'a self) -> dot::Id<'a> {
-        dot::Id::new(self.extended.to_string()).unwrap()
+        dot::Id::new(self.extended.0.to_string()).unwrap()
     }
 
     fn node_id(&'a self, n: &PlanNode) -> dot::Id<'a> {
@@ -120,17 +129,9 @@ impl<'a> dot::Labeller<'a, PlanNode, PlanEdge> for plan::With<'a, Ident> {
     }
 }
 
-fn get_iters<'a, T>(arena: &'a GenArena<T>, trans: impl Fn(plan::Key<T>) -> PlanNode + 'a) -> impl Iterator<Item = PlanNode> + 'a {
-    arena.iter().map(move |(index, _)| trans(index))
-}
-
-impl<'a> dot::GraphWalk<'a, PlanNode, PlanEdge> for plan::With<'a, Ident> {
+impl<'a> dot::GraphWalk<'a, PlanNode, PlanEdge> for plan::With<'a, (Ident, DisplayConfig)> {
     fn nodes(&'a self) -> dot::Nodes<'a, PlanNode> {
-        let dfs = get_iters(&self.plan.dataflow, PlanNode::Dataflow);
-        let tables = get_iters(&self.plan.tables, PlanNode::Table);
-        let operators = get_iters(&self.plan.operators, PlanNode::Operator);
-        let queries = get_iters(&self.plan.queries, PlanNode::Query);
-        dfs.chain(tables).chain(operators).chain(queries).collect()
+        get_nodes(&self.plan, &self.extended.1).into()
     }
 
     fn edges(&'a self) -> dot::Edges<'a, PlanEdge> {
@@ -138,14 +139,7 @@ impl<'a> dot::GraphWalk<'a, PlanNode, PlanEdge> for plan::With<'a, Ident> {
         //       - coroutines are currently on nightly, but not stable
         //       - libraries like [remit](https://docs.rs/remit/latest/remit/) can be used, but I want to
         //         reduce dependencies
-        let mut edges = Vec::new();
-        for (index, dataflow) in self.plan.dataflow.iter() {
-            dataflow.get_edges(index, &mut edges);
-        }
-        for (index, operator) in self.plan.operators.iter() {
-            operator.get_edges(index, &mut edges);
-        }
-        edges.into()
+        get_edges(&self.plan, &self.extended.1).into()
     }
 
     fn source(&'a self, edge: &PlanEdge) -> PlanNode {

@@ -1,7 +1,7 @@
-use super::super::{LongSequence, Nothing, Parse, RecursiveIdent};
+use super::super::{LongSequence, Nothing, Parse, RecursiveIdent, LargeGroups};
 use chumsky::prelude::*;
 use chumsky_proc::prelude::*;
-use proc_macro2::Delimiter;
+use proc_macro2::{Delimiter, Punct};
 pub struct ChumskyProc;
 
 fn recur_ident_parser(
@@ -51,6 +51,28 @@ fn nothing_parser() -> impl Parser<RustToken, Nothing, Error = Simple<RustToken,
 impl Parse<Nothing> for ChumskyProc {
     fn parse(input: proc_macro2::TokenStream) -> Nothing {
         nothing_parser()
+            .parse(stream_from_tokens(input.into()))
+            .unwrap()
+    }
+}
+
+fn large_group_parser() -> impl Parser<RustToken, LargeGroups, Error = Simple<RustToken, RustSpan>> {
+    recursive(|r| 
+        filter_map(RustToken::filter_punct).repeated().at_least(1).map(|ps| LargeGroups::Puncts(ps.iter().map(Punct::as_char).collect())).delimited_by(
+            just(RustToken::StartDelim(Delimiter::Parenthesis)),
+            just(RustToken::EndDelim(Delimiter::Parenthesis))
+        ).or(
+            r.delimited_by(
+                just(RustToken::StartDelim(Delimiter::Brace)), 
+                just(RustToken::EndDelim(Delimiter::Brace))
+            )
+        ).repeated().at_least(1).map(|gs| if gs.len() == 1 { gs[0].clone()} else {LargeGroups::Groups(gs)})
+    )
+}
+
+impl Parse<LargeGroups> for ChumskyProc {
+    fn parse(input: proc_macro2::TokenStream) -> LargeGroups {
+        large_group_parser()
             .parse(stream_from_tokens(input.into()))
             .unwrap()
     }

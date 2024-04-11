@@ -68,5 +68,5 @@ macro_rules! create_frontend {
 }
 
 create_frontend!(emql as frontend::Emql =>
-    /// TODO: EMQL language guide
+    /// The `emql` language frontend for [emdb](crate).
 );

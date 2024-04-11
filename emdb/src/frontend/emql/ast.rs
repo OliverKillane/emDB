@@ -1,4 +1,3 @@
-// TODO: parameterize by span type (want to go to resolved AST spanned by types)
 use super::operators::Operator;
 use proc_macro2::{Ident, Span, TokenStream};
 use syn::{Expr, Type};

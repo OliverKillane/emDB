@@ -1,14 +1,79 @@
 #![allow(clippy::useless_format)] // TODO: so clippy will pass while the nodes are not labelled
-use crate::plan::{self, With};
+use crate::plan;
+use super::{DisplayConfig, GetFeature};
 use dot;
+use quote::ToTokens;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum PlanNode {
     Table(plan::Key<plan::Table>),
     Operator(plan::Key<plan::Operator>),
     Dataflow(plan::Key<plan::DataFlow>),
     Query(plan::Key<plan::Query>),
+    RecordType(plan::Key<plan::Record>),
+    ScalarType(plan::Key<plan::ScalarType>),
 }
+
+// NOTE: complex but eliminates boilerplate
+//       - match by query type, then apply the method
+//       - variable names need to be passed (hygenic macro)
+macro_rules! node_call {
+    (match $self_id:ident , $node_id:ident -> $it:ident, $key:ident => $($tk:tt)*) => {
+        match $node_id {
+            PlanNode::Table($key) => {let $it = $self_id.plan.get_table(*$key); $($tk)* },
+            PlanNode::Operator($key) => {let $it = $self_id.plan.get_operator(*$key); $($tk)* },
+            PlanNode::Dataflow($key) => {let $it = $self_id.plan.get_dataflow(*$key); $($tk)* },
+            PlanNode::Query($key) => {let $it = $self_id.plan.get_query(*$key); $($tk)* },
+            PlanNode::RecordType($key) => {let $it = $self_id.plan.record_types.get(*$key).unwrap(); $($tk)* },
+            PlanNode::ScalarType($key) => {let $it = $self_id.plan.scalar_types.get(*$key).unwrap(); $($tk)* },
+        }
+    }
+}
+pub(crate) use node_call;
+
+impl GetFeature<PlanNode> for plan::DataFlow {
+    fn get_features(&self, self_key: plan::Key<Self>, edges: &mut Vec<PlanNode>, config: &DisplayConfig) {
+        edges.push(PlanNode::Dataflow(self_key));
+    }
+}
+impl GetFeature<PlanNode> for plan::Table {
+    fn get_features(&self, self_key: plan::Key<Self>, edges: &mut Vec<PlanNode>, config: &DisplayConfig) {
+        edges.push(PlanNode::Table(self_key));
+    }
+}
+impl GetFeature<PlanNode> for plan::Query {
+    fn get_features(&self, self_key: plan::Key<Self>, edges: &mut Vec<PlanNode>, config: &DisplayConfig) {
+        edges.push(PlanNode::Query(self_key));
+    }
+}
+impl GetFeature<PlanNode> for plan::Operator {
+    fn get_features(&self, self_key: plan::Key<Self>, edges: &mut Vec<PlanNode>, config: &DisplayConfig) {
+        edges.push(PlanNode::Operator(self_key));
+    }
+}
+impl GetFeature<PlanNode> for plan::Record {
+    fn get_features(&self, self_key: plan::Key<Self>, edges: &mut Vec<PlanNode>, config: &DisplayConfig) {
+        if config.display_types {edges.push(PlanNode::RecordType(self_key))};
+    }
+}
+impl GetFeature<PlanNode> for plan::ScalarType {
+    fn get_features(&self, self_key: plan::Key<Self>, edges: &mut Vec<PlanNode>, config: &DisplayConfig) {
+        if config.display_types {edges.push(PlanNode::ScalarType(self_key))};
+    }
+}
+
+pub fn get_nodes<'a>(lp: &'a plan::Plan, config: &'a DisplayConfig) -> dot::Nodes<'a, PlanNode> {
+    let mut nodes = Vec::new();
+
+    GetFeature::get_all(&mut nodes, &lp.queries, config);
+    GetFeature::get_all(&mut nodes, &lp.tables, config);
+    GetFeature::get_all(&mut nodes, &lp.operators, config);
+    GetFeature::get_all(&mut nodes, &lp.dataflow, config);
+    GetFeature::get_all(&mut nodes, &lp.scalar_types, config);
+    GetFeature::get_all(&mut nodes, &lp.record_types, config);
+    nodes.into()
+}
+
 
 // Wraps [`dot::Labeller`] to be implemented for graph nodes
 pub trait StyleableNode: Sized {
@@ -21,6 +86,63 @@ pub trait StyleableNode: Sized {
     fn label<'a>(&'a self, plan: &plan::Plan) -> dot::LabelText<'a>;
     fn style(&self, plan: &plan::Plan) -> dot::Style;
     fn color<'a>(&self, plan: &plan::Plan) -> Option<dot::LabelText<'a>>;
+}
+
+impl StyleableNode for plan::Record {
+    const ID_PREFIX: &'static str = "recordtype";
+
+    fn shape<'a>(&'a self, plan: &plan::Plan) -> Option<dot::LabelText<'a>> {
+        Some(match self {
+            plan::ConcRef::Conc(_) => dot::LabelText::label("circle"),
+            plan::ConcRef::Ref(_) => dot::LabelText::label("point"),
+        })
+    }
+
+    fn label<'a>(&'a self, plan: &plan::Plan) -> dot::LabelText<'a> {
+        match self {
+            plan::ConcRef::Conc(_) => dot::LabelText::label("{ .. }"),
+            plan::ConcRef::Ref(_) => dot::LabelText::label(""),
+        } 
+    }
+
+    fn style(&self, plan: &plan::Plan) -> dot::Style {
+        dot::Style::None
+    }
+
+    fn color<'a>(&self, plan: &plan::Plan) -> Option<dot::LabelText<'a>> {
+        Some(dot::LabelText::label("darkslategray1"))
+    }
+}
+
+impl StyleableNode for plan::ScalarType {
+    const ID_PREFIX: &'static str = "scalartype";
+
+    fn shape<'a>(&'a self, plan: &plan::Plan) -> Option<dot::LabelText<'a>> {
+        Some(match self {
+            plan::ConcRef::Conc(_) => dot::LabelText::label("circle"),
+            plan::ConcRef::Ref(_) => dot::LabelText::label("point"),
+        })
+    }
+
+    fn label<'a>(&'a self, plan: &plan::Plan) -> dot::LabelText<'a> {
+        match self {
+            plan::ConcRef::Conc(c) => dot::LabelText::label(match c {
+                plan::ScalarTypeConc::TableRef(r) => "ref".to_owned(),
+                plan::ScalarTypeConc::Bag(_) => "bag".to_owned(),
+                plan::ScalarTypeConc::Record(_) => "rec".to_owned(),
+                plan::ScalarTypeConc::Rust(t) => format!("{}", t.to_token_stream()),
+            }),
+            plan::ConcRef::Ref(_) => dot::LabelText::label(""),
+        }
+    }
+
+    fn style(&self, plan: &plan::Plan) -> dot::Style {
+        dot::Style::None
+    }
+
+    fn color<'a>(&self, plan: &plan::Plan) -> Option<dot::LabelText<'a>> {
+        Some(dot::LabelText::label("darkslategray1"))
+    }
 }
 
 impl StyleableNode for plan::Table {
@@ -84,7 +206,11 @@ impl StyleableNode for plan::DataFlow {
             to,
             with
         } = self {
-            dot::LabelText::label(format!("{}", With { plan, extended: with }))
+            // NOTE: we opt not to show the type information here, as that would 
+            //       require a graph traversal.
+            //       Planviz is for debugging, if the type graph was cyclical 
+            //       (bug) this would crash the planviz backend
+            dot::LabelText::label(if with.stream { "stream" } else {"single"} )
         } else {
             unreachable!("Only `DataFlow::Conn` edges should be present in dataflow")
         }

@@ -130,5 +130,6 @@ create_operator!(
     op_assert::Assert,
     op_collect::Collect,
     op_take::Take,
-    op_fork::Fork
+    op_fork::Fork,
+    op_union::Union
 );

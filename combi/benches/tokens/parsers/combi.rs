@@ -4,11 +4,12 @@ use combi::{
     logical::not,
     macros::choices,
     tokens::{
-        basic::{getident, isempty, matchpunct, peekpunct, recovgroup},
-        TokenIter, TokenParser,
+        basic::{getident, getpunct, isempty, matchpunct, peekpunct, recovgroup}, matcher::matcher, TokenIter, TokenParser
     },
 };
-use proc_macro2::{Delimiter, Span, TokenStream};
+use proc_macro2::{Delimiter, Span, TokenStream, TokenTree};
+
+use crate::cases::large_groups::LargeGroups;
 
 use super::super::{LongSequence, Nothing, Parse, RecursiveIdent};
 
@@ -48,6 +49,17 @@ impl Parse<LongSequence> for CombiParser {
 impl Parse<Nothing> for CombiParser {
     fn parse(input: TokenStream) -> Nothing {
         let parser = mapsuc(nothing(), |()| Nothing);
+        quick_parse(parser, input)
+    }
+}
+
+impl Parse<LargeGroups> for CombiParser {
+    fn parse(input: TokenStream) -> LargeGroups {
+        let parser = recursive(|r| choice(
+            matcher::<true, _>(|tk| matches!(tk, TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis), ""),
+            mapsuc(recovgroup(Delimiter::Parenthesis, many0(not(isempty()), getpunct())), |ps| LargeGroups::Puncts(ps.iter().map(|p| p.as_char()).collect())),
+            mapsuc(recovgroup(Delimiter::Brace, many0(not(isempty()), r.clone())), |gs| LargeGroups::Groups(gs)),
+        ));
         quick_parse(parser, input)
     }
 }

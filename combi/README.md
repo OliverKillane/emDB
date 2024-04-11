@@ -25,6 +25,10 @@ For maximum size cases of the tokens benchmarks:
 ```
 Timer precision: 15 ns
 tokens              fastest       │ slowest       │ median        │ mean          │ samples │ iters
+├─ large_groups                   │               │               │               │         │
+│  ├─ ChumskyProc   268.3 ms      │ 336.1 ms      │ 284.2 ms      │ 287.1 ms      │ 100     │ 100
+│  ├─ CombiParser   42.38 ms      │ 54.22 ms      │ 45.18 ms      │ 45.44 ms      │ 100     │ 100
+│  ╰─ HandRolled    13.54 ms      │ 18.11 ms      │ 15.16 ms      │ 15.49 ms      │ 100     │ 100
 ├─ long_sequence                  │               │               │               │         │
 │  ├─ ChumskyProc   109.2 ms      │ 162.8 ms      │ 120.3 ms      │ 123 ms        │ 100     │ 100
 │  ├─ CombiParser   36.48 ms      │ 55.93 ms      │ 42.9 ms       │ 43.44 ms      │ 100     │ 100
@@ -39,6 +43,6 @@ tokens              fastest       │ slowest       │ median        │ mean  
    ╰─ HandRolled    4.883 µs      │ 5.794 µs      │ 5.122 µs      │ 5.127 µs      │ 100     │ 100
 ```
 
-*Potential Improvements*
-- [ ] parse `seq(recovgroup(P1), P2)` in parallel (tree based data structure is naturally parallel) as `treepar(P1, P2)`
+## Potential Improvements
+- [ ] parse `seq(recovgroup(P1), P2)` in parallel (tree based data structure is naturally parallel) as `treepar(P1, P2)`, need to get around issues with TokenStream being `!Send` and `!Sync`
 - [ ] Optimise the `recursive` parser to remove heap allocation

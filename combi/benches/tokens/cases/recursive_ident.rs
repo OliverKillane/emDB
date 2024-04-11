@@ -1,7 +1,7 @@
 use proc_macro2::{Ident, Punct, Spacing, Span, TokenStream};
 use quote::quote;
 
-use super::Parseable;
+use super::super::Parseable;
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum RecursiveIdent {
@@ -37,41 +37,5 @@ impl Parseable for RecursiveIdent {
                 quote! { #p }
             }
         }
-    }
-}
-
-#[derive(PartialEq, Eq, Debug)]
-pub struct LongSequence {
-    pub ids: Vec<Ident>,
-}
-impl Parseable for LongSequence {
-    type Param = usize;
-
-    fn generate_case(param: Self::Param) -> Self {
-        let mut ids = Vec::new();
-        for i in 0..param {
-            ids.push(Ident::new(&format!("id{}", i), Span::call_site()));
-        }
-        LongSequence { ids }
-    }
-
-    fn generate_tokens(&self) -> TokenStream {
-        let ids = &self.ids;
-        quote! { #(#ids)* }
-    }
-}
-
-#[derive(PartialEq, Eq, Debug)]
-pub struct Nothing;
-
-impl Parseable for Nothing {
-    type Param = ();
-
-    fn generate_case((): Self::Param) -> Self {
-        Nothing
-    }
-
-    fn generate_tokens(&self) -> TokenStream {
-        TokenStream::new()
     }
 }

@@ -1,6 +1,6 @@
 use proc_macro2::{Delimiter, TokenStream, TokenTree};
 
-use super::super::{LongSequence, Nothing, Parse, RecursiveIdent};
+use super::super::{LongSequence, Nothing, Parse, RecursiveIdent, LargeGroups};
 
 pub struct HandRolled;
 
@@ -43,5 +43,41 @@ impl Parse<Nothing> for HandRolled {
     fn parse(tks: TokenStream) -> Nothing {
         assert!(tks.is_empty());
         Nothing
+    }
+}
+
+impl Parse<LargeGroups> for HandRolled {
+    fn parse(input: TokenStream) -> LargeGroups {
+        fn parse_token(tkt: TokenTree) -> LargeGroups {
+            match tkt {
+                TokenTree::Group(g) => {
+                    if g.delimiter() == Delimiter::Parenthesis {
+                        let mut puncts = Vec::new();
+                        for tk in g.stream() {
+                            match tk {
+                                TokenTree::Punct(p) => puncts.push(p.as_char()),
+                                _ => unreachable!("assumes correct input"),
+                            }
+                        }
+                        LargeGroups::Puncts(puncts)
+                    } else if g.delimiter() == Delimiter::Brace  {
+                        let mut groups = Vec::new();
+                        for tk in g.stream() {
+                            groups.push(parse_token(tk));
+                        }
+                        LargeGroups::Groups(groups)
+                    } else {
+                        unreachable!("assumes correct input")
+                    }
+                },
+                _ => unreachable!("assumes correct input"),
+            }
+        }
+
+        let mut tkiter = input.into_iter();
+        let first = tkiter.next().unwrap();
+        let g = parse_token(first);
+        assert!(tkiter.next().is_none());
+        g
     }
 }

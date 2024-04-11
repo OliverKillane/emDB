@@ -10,7 +10,7 @@
 
 use std::collections::HashMap;
 
-use crate::plan::{Key, Plan, Record, ScalarType, Table, With};
+use crate::plan::{self, Key, Plan, Record, ScalarType, Table, With};
 use itertools::Itertools;
 use proc_macro2::{Ident, Span};
 use proc_macro_error::{Diagnostic, Level};
@@ -680,6 +680,22 @@ pub(super) fn query_cannot_append_to_record(new: &Ident, existing: &Ident) -> Di
 pub(super) fn sort_field_used_twice(field: &Ident, dup_field: &Ident) -> Diagnostic {
     Diagnostic::spanned(field.span(), Level::Error, format!("Field `{field}` is used twice in th sort order, sorts can only sort of each field once"))
     .span_note(dup_field.span(), format!("`{dup_field}` first used here"))
+}
+
+pub(super) fn union_requires_at_least_one_input(call: &Ident) -> Diagnostic {
+    Diagnostic::spanned(call.span(), Level::Error, format!("`{call}` requires at least one input"))
+}
+
+pub(super) fn union_requires_streams(call: &Ident, var: &Ident) -> Diagnostic {
+    Diagnostic::spanned(var.span(), Level::Error, format!("`{call}` inputs must be streams, but `{var}` is not a stream"))
+}
+
+pub(super) fn union_not_same_type(lp: &plan::Plan, call: &Ident, var: &Ident, data_type: &plan::Key<plan::Record>, other_var: &Ident, other_data_type: &plan::Key<plan::Record>) -> Diagnostic {
+    Diagnostic::spanned(
+        other_var.span(),
+        Level::Error,
+        format!("`{other_var}` has type `{}` but union requires all inputs to be of the same type `{}` (from `{var}`)", plan::With { plan: lp, extended: other_data_type }, plan::With { plan: lp, extended: data_type })
+    )
 }
 
 pub(super) fn operator_unimplemented(call: &Ident) -> Diagnostic {

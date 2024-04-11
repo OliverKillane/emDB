@@ -11,7 +11,7 @@ use proc_macro2::TokenStream;
 use std::fmt::Debug;
 
 mod cases;
-use cases::{LongSequence, Nothing, RecursiveIdent};
+use cases::{long_sequence::LongSequence, nothing::Nothing, recursive_ident::RecursiveIdent, large_groups::{LargeGroups, Size as LargeGroupsSize}};
 mod parsers;
 use parsers::{chumsky_proc::ChumskyProc, combi::CombiParser, handrolled::HandRolled};
 
@@ -48,7 +48,8 @@ macro_rules! impl_cases {
 impl_cases! {
     RecursiveIdent as recursive_ident for [1,2,64],
     LongSequence as long_sequence for [0, 100, 1000000],
-    Nothing as parse_nothing for [()] // redundant here, const param ignored
+    Nothing as parse_nothing for [()], // redundant here, const param ignored
+    LargeGroups as large_groups for [LargeGroupsSize{ depth: 16, branch_width: 2, leaf_width: 1 }, LargeGroupsSize{ depth: 4, branch_width: 4, leaf_width: 8096 }]
 }
 
 fn main() {
