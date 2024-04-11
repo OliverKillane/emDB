@@ -1,10 +1,10 @@
-error: No such backend
+error: No such backend, available are: Planviz
  --> tests/invalid/simple_wrong_backend.rs:4:33
   |
 4 |     impl nonexistent_backend as repeated_impl;
   |                                 ^^^^^^^^^^^^^
 
-error: No such backend
+error: No such backend, available are: Planviz
  --> tests/invalid/simple_wrong_backend.rs:5:35
   |
 5 |     impl other_missing_backend as repeated_impl;

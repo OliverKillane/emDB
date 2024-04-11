@@ -121,17 +121,32 @@ pub enum ScalarTypeConc {
     /// backend. Allows the plan to express the type, without specifying its
     /// implementation.
     ///
-    /// ```ignore
-    ///  |> take(10) // with cardinality determination allocate bag for 10
-    ///  |> collect(it as type my_fixed_bag)
-    ///  ~> return;
+    /// ```
+    /// # use emdb::emql;
+    /// # emql! {
+    /// #     table foos { x: i32 }
+    /// # 
+    /// #     query foo_query() {
+    /// #     use foos
+    ///         |> take(10) // with cardinality determination allocate bag for 10
+    ///         |> collect(it as type my_fixed_bag)
+    /// #         ~> return;
+    /// #     }
+    /// # }
     /// ```
     ///
-    /// ```ignore
-    /// use table_a
-    ///  |> sort(it desc) // could reuse heap from sort as the bag type
-    ///  |> collect(it as type my_variable_bag)
-    ///  ~> return;
+    /// ```
+    /// # use emdb::emql;
+    /// # emql! {
+    /// #     table foos { x: i32 }
+    /// # 
+    /// #     query foo_query() {
+    /// #         use foos
+    ///             |> sort(x desc) // could reuse heap from sort as the bag type
+    ///             |> collect(it as type my_variable_bag)
+    /// #             ~> return;
+    /// #     }
+    /// # }
     /// ```
     Bag(Key<Record>),
 

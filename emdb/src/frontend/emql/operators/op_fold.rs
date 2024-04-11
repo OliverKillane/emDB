@@ -1,7 +1,7 @@
 //! Apply a fold over a stream of values to create a single value.
 //! 
 //! Semantics:
-//! ```ignore
+//! ```text
 //! <stream> |> fold(<unique field>: <type> = <initial> -> <update>, ... ) ~> <single>
 //! ```
 use super::*;
