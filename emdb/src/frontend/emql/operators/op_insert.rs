@@ -30,7 +30,7 @@ impl EMQLOperator for Insert {
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-        mo: &mut Option<plan::Key<plan::Operator>>,
+        op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, table_name, out_ref } = self;
@@ -38,7 +38,7 @@ impl EMQLOperator for Insert {
             linear_builder(
                 lp,
                 qk,
-                mo,
+                op_ctx,
                 cont,
                 |lp, mo, Continue {
                     data_type: plan::Data { fields, stream },
@@ -58,12 +58,11 @@ impl EMQLOperator for Insert {
                                         fields: out_data_type,
                                         stream,
                                     },
-                                    op_kind: plan::OperatorKind::Modify { modify_after: *mo, op: plan::Insert {  input: prev_edge,
+                                    op: plan::Operator::Modify (plan::Insert {  input: prev_edge,
                                         table: *table_id,
                                         out_ref,
-                                        output: next_edge, }.into() },
-                                    call_span: call.span(),
-                                    update_mo: true,
+                                        output: next_edge, }.into() ),
+                                    call_span: call.span()
                                 }
                             )
                         } else {

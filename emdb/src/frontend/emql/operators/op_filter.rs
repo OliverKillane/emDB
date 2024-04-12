@@ -24,7 +24,7 @@ impl EMQLOperator for Filter {
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-        mo: &mut Option<plan::Key<plan::Operator>>,
+        op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, filter_expr } = self;
@@ -32,15 +32,14 @@ impl EMQLOperator for Filter {
             linear_builder(
                 lp,
                 qk,
-                mo,
+                op_ctx,
                 prev,
                 |lp, mo, prev, next_edge| {
                     Ok(
                         LinearBuilderState {
                             data_out: prev.data_type,
-                            op_kind: plan::OperatorKind::Pure(plan::Filter { input: prev.prev_edge, predicate: filter_expr, output: next_edge}.into()),
-                            call_span: call.span(),
-                            update_mo: false,
+                            op: plan::Operator::Pure(plan::Filter { input: prev.prev_edge, predicate: filter_expr, output: next_edge}.into()),
+                            call_span: call.span()
                         }
                     )
                 }

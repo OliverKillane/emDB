@@ -30,7 +30,7 @@ impl EMQLOperator for Fork {
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-        mo: &mut Option<plan::Key<plan::Operator>>,
+        op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, vars } = self;
@@ -66,10 +66,7 @@ impl EMQLOperator for Fork {
                 ).collect();
 
                 let fork_op = lp.operators.insert(
-                    plan::Operator {
-                        query: qk,
-                        kind: plan::OperatorKind::Pure(plan::Fork { input: cont.prev_edge, outputs: var_edges.clone() }.into()),
-                    }
+                    plan::Operator::Pure(plan::Fork { input: cont.prev_edge, outputs: var_edges.clone() }.into()),
                 );
 
                 for edge in var_edges {
@@ -77,6 +74,7 @@ impl EMQLOperator for Fork {
                 }
 
                 update_incomplete(lp.get_mut_dataflow(cont.prev_edge), fork_op);
+                lp.get_mut_context(op_ctx).add_operator(fork_op);
 
                 Ok(StreamContext::Nothing { last_span: call.span() }) 
 

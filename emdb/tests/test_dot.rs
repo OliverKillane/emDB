@@ -8,7 +8,7 @@ enum RGB {
 }
 
 emql! {
-    impl my_db as Planviz{path = "cool.dot", types = off};
+    impl my_db as Planviz{path = "cool.dot", display_types = on, display_ctx_ops = on, display_control = on};
 
     table cool {
         name: String,

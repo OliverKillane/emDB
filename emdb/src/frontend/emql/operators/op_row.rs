@@ -23,7 +23,7 @@ impl EMQLOperator for Row {
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-        mo: &mut Option<plan::Key<plan::Operator>>,
+        op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, fields } = self;
@@ -53,14 +53,10 @@ impl EMQLOperator for Row {
                 };
 
                 let out_edge = lp.dataflow.insert(plan::DataFlow::Null);
+                let row_op = lp.operators.insert(plan::Operator::Flow(plan::Row { fields: expr_fields, output: out_edge  }.into()));
                 
-                let map_op = lp.operators.insert(plan::Operator {
-                    query: qk,
-                    kind: plan::OperatorKind::Flow(plan::Row { fields: expr_fields, output: out_edge  }.into()),
-                });
-                
-                *lp.get_mut_dataflow(out_edge) = plan::DataFlow::Incomplete { from: map_op, with: data.clone() };
-
+                *lp.get_mut_dataflow(out_edge) = plan::DataFlow::Incomplete { from: row_op, with: data.clone() };
+                lp.get_mut_context(op_ctx).add_operator(row_op);
                 Ok(
                     StreamContext::Continue(Continue {
                         data_type: data,

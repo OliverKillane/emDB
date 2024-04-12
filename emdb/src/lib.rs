@@ -14,6 +14,8 @@ extern crate proc_macro;
 
 mod backend;
 mod frontend;
+mod analysis;
+mod optimise;
 mod plan;
 mod utils;
 

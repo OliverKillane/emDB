@@ -1,4 +1,4 @@
-use super::{Data, Key, Plan, Query, ScalarType, Table, TableAccess};
+use super::{Data, Key, Plan, ScalarType, Table, TableAccess};
 use proc_macro2::Ident;
 use std::collections::HashMap;
 use syn::Expr;
@@ -207,7 +207,7 @@ pub struct Discard {
 #[enumtrait::quick_enum]
 #[enumtrait::quick_from]
 #[enumtrait::store(pub modify_operator_enum)]
-pub enum ModifyOperator {
+pub enum Modify {
     Update,
     Insert,
     Delete,
@@ -216,7 +216,7 @@ pub enum ModifyOperator {
 #[enumtrait::quick_enum]
 #[enumtrait::quick_from]
 #[enumtrait::store(pub access_operator_enum)]
-pub enum AccessOperator {
+pub enum Access {
     GetUnique,
     Scan,
     DeRef,
@@ -225,7 +225,7 @@ pub enum AccessOperator {
 #[enumtrait::quick_enum]
 #[enumtrait::quick_from]
 #[enumtrait::store(pub pure_operator_enum)]
-pub enum PureOperator {
+pub enum Pure {
     Map,
     Fold,
     Filter,
@@ -242,35 +242,20 @@ pub enum PureOperator {
 #[enumtrait::quick_enum]
 #[enumtrait::quick_from]
 #[enumtrait::store(pub flow_operator_enum)]
-pub enum FlowOperator {
+pub enum Flow {
     Row,
     Return,
     Discard,
 }
 
-pub struct Operator {
-    pub query: Key<Query>,
-    pub kind: OperatorKind,
-}
-
 #[enumtrait::quick_from]
-pub enum OperatorKind {
-    /// Used for operators that modify table state.
-    /// Within a query they need to be strictly ordered (as one may read the modifications from another)
-    /// INV: [`OperatorKind::Modify.modify_after`] is a [`OperatorKind::Modify`] or [`OperatorKind::Access`]
-    Modify {
-        modify_after: Option<Key<Operator>>,
-        op: ModifyOperator,
-    },
-
-    /// INV: `access_after` is a [`OperatorKind::Modify`] or [`OperatorKind::Access`]
-    Access {
-        access_after: Option<Key<Operator>>,
-        op: AccessOperator,
-    },
-
-    Pure(PureOperator),
-    Flow(FlowOperator),
+#[enumtrait::quick_enum]
+#[enumtrait::store(pub operator_enum)]
+pub enum Operator {
+    Modify,
+    Access,
+    Pure,
+    Flow,
 }
 
 impl Plan {

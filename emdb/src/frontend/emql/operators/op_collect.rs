@@ -32,7 +32,7 @@ impl EMQLOperator for Collect {
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-        mo: &mut Option<plan::Key<plan::Operator>>,
+        op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self {call, field, alias } = self;
@@ -40,7 +40,7 @@ impl EMQLOperator for Collect {
             linear_builder(
                 lp,
                 qk,
-                mo,
+                op_ctx,
                 cont,
                 |lp, mo, Continue { data_type, prev_edge, last_span }, next_edge| {
                     if let Some((orig, _)) = ts.get_key_value(&alias) {
@@ -54,9 +54,9 @@ impl EMQLOperator for Collect {
                                 data_out: plan::Data {
                                     fields: record_type,
                                     stream: false,
-                                }, op_kind: plan::OperatorKind::Pure(
+                                }, op: plan::Operator::Pure(
                                     plan::Collect { input: prev_edge, into: field, output: next_edge }.into()
-                                ), call_span: call.span(), update_mo: false }
+                                ), call_span: call.span()}
                         )
                     }
                 }

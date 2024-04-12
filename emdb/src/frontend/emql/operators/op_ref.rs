@@ -28,7 +28,7 @@ impl EMQLOperator for Ref {
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-        mo: &mut Option<plan::Key<plan::Operator>>,
+        op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, table_name, out_as: out_ref } = self;
@@ -40,15 +40,14 @@ impl EMQLOperator for Ref {
                     stream: true
                 };
                 let out_edge = lp.dataflow.insert(plan::DataFlow::Null);
-                let ref_op = lp.operators.insert(plan::Operator {
-                    query: qk,
-                    kind: plan::OperatorKind::Access { access_after: *mo, op: plan::Scan { access , table: *table_id, output: out_edge }.into() },
-                });
+                let ref_op = lp.operators.insert(plan::Operator::Access ( plan::Scan { access , table: *table_id, output: out_edge }.into() ));
                 
                 *lp.get_mut_dataflow(out_edge) = plan::DataFlow::Incomplete {
                     from: ref_op,
                     with: record_out.clone(),
                 };
+
+                lp.get_mut_context(op_ctx).add_operator(ref_op);
 
                 Ok(StreamContext::Continue(Continue {
                     data_type: record_out,

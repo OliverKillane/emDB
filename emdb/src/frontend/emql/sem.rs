@@ -8,7 +8,7 @@ use crate::{
         },
         errors,
     },
-    plan::{self, ColSelect, DataFlow},
+    plan::{self, ColSelect, Context, DataFlow},
 };
 use proc_macro2::{Ident, Span};
 use proc_macro_error::Diagnostic;
@@ -210,7 +210,6 @@ fn add_query(
 ) -> LinkedList<Diagnostic> {
     let mut vs = HashMap::new();
     let mut ts = HashMap::new();
-    let mut mo = None;
     let mut ret: Option<ReturnVal> = None;
     let (raw_params, mut errors) = extract_fields(params, errors::query_parameter_redefined);
 
@@ -237,17 +236,16 @@ fn add_query(
                     None
                 }
             }
-        })
-        .collect();
+        });
 
+    let op_ctx = lp.contexts.insert(Context::from_params(params));
     let qk = lp.queries.insert(plan::Query {
         name: name.clone(),
-        params,
-        returnval: None,
+        ctx: op_ctx
     });
 
     for stream in streams {
-        match build_streamexpr(lp, tn, qk, &mut vs, &mut ts, &mut mo, stream) {
+        match build_streamexpr(lp, tn, qk, &mut vs, &mut ts, op_ctx, stream) {
             Ok(r) => match (&mut ret, r) {
                 (Some(prev_ret), Some(new_ret)) => {
                     errors.push_back(errors::query_multiple_returns(
@@ -264,12 +262,12 @@ fn add_query(
     }
 
     if let Some(ret) = ret {
-        lp.queries[qk].returnval = Some(ret.index);
+        lp.contexts[lp.queries[qk].ctx].set_return(ret.index);
     }
 
     for (name, vs) in vs {
         if let VarState::Available { created, state } = vs {
-            discard_continue(lp, qk, state);
+            discard_continue(lp, qk, op_ctx, state);
         }
     }
 
@@ -282,13 +280,13 @@ fn build_streamexpr(
     qk: plan::Key<plan::Query>,
     vs: &mut HashMap<Ident, VarState>,
     ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-    mo: &mut Option<plan::Key<plan::Operator>>,
+    op_ctx: plan::Key<plan::Context>,
     StreamExpr { op, con }: StreamExpr,
 ) -> Result<Option<ReturnVal>, LinkedList<Diagnostic>> {
-    match build_logical(op, lp, tn, qk, vs, ts, mo, None) {
+    match build_logical(op, lp, tn, qk, vs, ts, op_ctx, None) {
         Ok(ctx) => {
             let mut errors = LinkedList::new();
-            match recur_stream(lp, tn, qk, vs, ts, mo, ctx, &mut errors, con) {
+            match recur_stream(lp, tn, qk, vs, ts, op_ctx, ctx, &mut errors, con) {
                 Ok(res) if errors.is_empty() => Ok(res),
                 _ => Err(errors),
             }
@@ -300,17 +298,17 @@ fn build_streamexpr(
 fn discard_continue(
     lp: &mut plan::Plan,
     qk: plan::Key<plan::Query>,
+    ctx: plan::Key<plan::Context>,
     Continue {
         data_type,
         prev_edge,
         last_span,
     }: Continue,
 ) {
-    let discard_op = lp.operators.insert(plan::Operator {
-        query: qk,
-        kind: plan::OperatorKind::Flow(plan::Discard { input: prev_edge }.into()),
-    });
+    let discard_op = lp.operators.insert(plan::Operator::Flow(plan::Discard { input: prev_edge }.into()));
     update_incomplete(lp.get_mut_dataflow(prev_edge), discard_op);
+    lp.get_mut_context(ctx).add_operator(discard_op);
+    lp.get_mut_context(ctx).add_discard(discard_op);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -320,7 +318,7 @@ fn recur_stream(
     qk: plan::Key<plan::Query>,
     vs: &mut HashMap<Ident, VarState>,
     ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-    mo: &mut Option<plan::Key<plan::Operator>>,
+    op_ctx: plan::Key<plan::Context>,
     ctx: StreamContext,
     errs: &mut LinkedList<Diagnostic>, // TODO: thunkify or convert to loop. We mutate a passed list to make tail-call elimination easier (but rust has no TCO yet)
     con: Option<(Connector, Box<StreamExpr>)>,
@@ -329,7 +327,7 @@ fn recur_stream(
         // No more operators (no data in, or data discarded)
         (StreamContext::Nothing { last_span }, None) => Ok(None),
         (StreamContext::Continue(cont), None) => {
-            discard_continue(lp, qk, cont);
+            discard_continue(lp, qk, op_ctx, cont);
             Ok(None)
         }
 
@@ -362,14 +360,14 @@ fn recur_stream(
                 qk,
                 vs,
                 ts,
-                mo,
+                op_ctx,
                 Some(Continue {
                     data_type,
                     prev_edge,
                     last_span,
                 }),
             ) {
-                Ok(new_ctx) => recur_stream(lp, tn, qk, vs, ts, mo, new_ctx, errs, con),
+                Ok(new_ctx) => recur_stream(lp, tn, qk, vs, ts, op_ctx, new_ctx, errs, con),
                 Err(mut es) => {
                     errs.append(&mut es);
                     Err(())
@@ -527,9 +525,8 @@ pub fn update_incomplete(df: &mut DataFlow, to: plan::Key<plan::Operator>) {
 
 pub struct LinearBuilderState {
     pub data_out: plan::Data,
-    pub op_kind: plan::OperatorKind,
+    pub op: plan::Operator,
     pub call_span: Span,
-    pub update_mo: bool,
 }
 
 /// A helper to abstract away building linear operators and the [`Continue`].
@@ -538,7 +535,7 @@ pub struct LinearBuilderState {
 pub fn linear_builder(
     lp: &mut plan::Plan,
     query: plan::Key<plan::Query>,
-    mo: &mut Option<plan::Key<plan::Operator>>,
+    op_ctx: plan::Key<plan::Context>,
     Continue {
         data_type,
         prev_edge,
@@ -546,7 +543,7 @@ pub fn linear_builder(
     }: Continue,
     op_creator: impl FnOnce(
         &mut plan::Plan,
-        &Option<plan::Key<plan::Operator>>,
+        plan::Key<plan::Context>,
         Continue,
         plan::Key<plan::DataFlow>, // the next edge
     ) -> Result<LinearBuilderState, LinkedList<Diagnostic>>,
@@ -559,7 +556,7 @@ pub fn linear_builder(
     // create the operator and returned data type
     let result = op_creator(
         lp,
-        mo,
+        op_ctx,
         Continue {
             data_type,
             prev_edge,
@@ -567,14 +564,9 @@ pub fn linear_builder(
         },
         out_edge,
     )?;
-    let op_key = lp.operators.insert(plan::Operator {
-        query,
-        kind: result.op_kind,
-    });
+    let op_key = lp.operators.insert(result.op);
 
-    if result.update_mo {
-        *mo = Some(op_key);
-    }
+    lp.get_mut_context(op_ctx).add_operator(op_key);
 
     // update the edge to contain the data out and operator key
     *lp.get_mut_dataflow(out_edge) = plan::DataFlow::Incomplete {

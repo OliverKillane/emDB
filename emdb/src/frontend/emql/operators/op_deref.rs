@@ -32,7 +32,7 @@ impl EMQLOperator for DeRef {
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-        mo: &mut Option<plan::Key<plan::Operator>>,
+        op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self {
@@ -46,7 +46,7 @@ impl EMQLOperator for DeRef {
             linear_builder(
                 lp,
                 qk,
-                mo,
+                op_ctx,
                 cont,
                 |lp, mo, Continue {
                     data_type,
@@ -86,10 +86,9 @@ impl EMQLOperator for DeRef {
                                 Ok(
                                     LinearBuilderState { 
                                         data_out: new_type, 
-                                        op_kind: plan::OperatorKind::Access { access_after: *mo, op: plan::DeRef { 
-                                            input: prev_edge, reference, access , named, table: table_id_copy, output: next_edge }.into() }, 
-                                        call_span: call.span(), 
-                                        update_mo: true
+                                        op: plan::Operator::Access (plan::DeRef { 
+                                            input: prev_edge, reference, access , named, table: table_id_copy, output: next_edge }.into() ), 
+                                        call_span: call.span()
                                     }
                                 )
                             }

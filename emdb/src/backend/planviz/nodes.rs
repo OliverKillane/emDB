@@ -12,6 +12,7 @@ pub enum PlanNode {
     Query(plan::Key<plan::Query>),
     RecordType(plan::Key<plan::Record>),
     ScalarType(plan::Key<plan::ScalarType>),
+    Context(plan::Key<plan::Context>),
 }
 
 // NOTE: complex but eliminates boilerplate
@@ -26,6 +27,7 @@ macro_rules! node_call {
             PlanNode::Query($key) => {let $it = $self_id.plan.get_query(*$key); $($tk)* },
             PlanNode::RecordType($key) => {let $it = $self_id.plan.record_types.get(*$key).unwrap(); $($tk)* },
             PlanNode::ScalarType($key) => {let $it = $self_id.plan.scalar_types.get(*$key).unwrap(); $($tk)* },
+            PlanNode::Context($key) => {let $it = $self_id.plan.get_context(*$key); $($tk)* },
         }
     }
 }
@@ -44,6 +46,11 @@ impl GetFeature<PlanNode> for plan::Table {
 impl GetFeature<PlanNode> for plan::Query {
     fn get_features(&self, self_key: plan::Key<Self>, edges: &mut Vec<PlanNode>, config: &DisplayConfig) {
         edges.push(PlanNode::Query(self_key));
+    }
+}
+impl GetFeature<PlanNode> for plan::Context {
+    fn get_features(&self, self_key: plan::Key<Self>, edges: &mut Vec<PlanNode>, config: &DisplayConfig) {
+        edges.push(PlanNode::Context(self_key));
     }
 }
 impl GetFeature<PlanNode> for plan::Operator {
@@ -66,6 +73,7 @@ pub fn get_nodes<'a>(lp: &'a plan::Plan, config: &'a DisplayConfig) -> dot::Node
     let mut nodes = Vec::new();
 
     GetFeature::get_all(&mut nodes, &lp.queries, config);
+    GetFeature::get_all(&mut nodes, &lp.contexts, config);
     GetFeature::get_all(&mut nodes, &lp.tables, config);
     GetFeature::get_all(&mut nodes, &lp.operators, config);
     GetFeature::get_all(&mut nodes, &lp.dataflow, config);
@@ -174,14 +182,7 @@ impl StyleableNode for plan::Operator {
     }
 
     fn label<'a>(&'a self, plan: &plan::Plan) -> dot::LabelText<'a> {
-        let description = match &self.kind {
-            plan::OperatorKind::Modify { modify_after, op } => op.description(plan),
-            plan::OperatorKind::Access { access_after, op } => op.description(plan),
-            plan::OperatorKind::Pure(op) => op.description(plan),
-            plan::OperatorKind::Flow(op) => op.description(plan),
-        };
-
-        dot::LabelText::label(description)
+        dot::LabelText::label(self.description(plan))
     }
 
     fn style(&self, plan: &plan::Plan) -> dot::Style {
@@ -197,7 +198,7 @@ impl StyleableNode for plan::DataFlow {
     const ID_PREFIX: &'static str = "dataflow";
 
     fn shape<'a>(&'a self, plan: &plan::Plan) -> Option<dot::LabelText<'a>> {
-        Some(dot::LabelText::label("box"))
+        Some(dot::LabelText::label("ellipse"))
     }
 
     fn label<'a>(&'a self, plan: &plan::Plan) -> dot::LabelText<'a> {
@@ -237,11 +238,31 @@ impl StyleableNode for plan::Query {
     const ID_PREFIX: &'static str = "query";
 
     fn shape<'a>(&'a self, plan: &plan::Plan) -> Option<dot::LabelText<'a>> {
-        Some(dot::LabelText::label("invhouse"))
+        Some(dot::LabelText::label("box"))
     }
 
     fn label<'a>(&'a self, plan: &plan::Plan) -> dot::LabelText<'a> {
         dot::LabelText::label(format!("query: {}", self.name))
+    }
+
+    fn style(&self, plan: &plan::Plan) -> dot::Style {
+        dot::Style::Bold
+    }
+
+    fn color<'a>(&self, plan: &plan::Plan) -> Option<dot::LabelText<'a>> {
+        Some(dot::LabelText::label("gold"))
+    }
+}
+
+impl StyleableNode for plan::Context {
+    const ID_PREFIX: &'static str = "context";
+
+    fn shape<'a>(&'a self, plan: &plan::Plan) -> Option<dot::LabelText<'a>> {
+        Some(dot::LabelText::label("invhouse"))
+    }
+
+    fn label<'a>(&'a self, plan: &plan::Plan) -> dot::LabelText<'a> {
+        dot::LabelText::label("context")
     }
 
     fn style(&self, plan: &plan::Plan) -> dot::Style {
@@ -258,17 +279,20 @@ pub trait OperatorDescription {
     fn description(&self, plan: &plan::Plan) -> String;
 }
 
+#[enumtrait::impl_trait(operator_description_trait for plan::operator_enum)]
+impl OperatorDescription for plan::Operator {}
+
 #[enumtrait::impl_trait(operator_description_trait for plan::modify_operator_enum)]
-impl OperatorDescription for plan::ModifyOperator {}
+impl OperatorDescription for plan::Modify {}
 
 #[enumtrait::impl_trait(operator_description_trait for plan::access_operator_enum)]
-impl OperatorDescription for plan::AccessOperator {}
+impl OperatorDescription for plan::Access {}
 
 #[enumtrait::impl_trait(operator_description_trait for plan::pure_operator_enum)]
-impl OperatorDescription for plan::PureOperator {}
+impl OperatorDescription for plan::Pure {}
 
 #[enumtrait::impl_trait(operator_description_trait for plan::flow_operator_enum)]
-impl OperatorDescription for plan::FlowOperator {}
+impl OperatorDescription for plan::Flow {}
 
 impl OperatorDescription for plan::Update {
     fn description(&self,plan: &plan::Plan) -> String {

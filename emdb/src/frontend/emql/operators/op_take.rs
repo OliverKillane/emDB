@@ -27,25 +27,23 @@ impl EMQLOperator for Take {
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-        mo: &mut Option<plan::Key<plan::Operator>>,
+        op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, expr } = self;
         if let Some(cont) = cont {
-
             linear_builder(
                 lp,
                 qk,
-                mo,
+                op_ctx,
                 cont,
                 |lp, mo, Continue { data_type, prev_edge, last_span }, next_edge| {
                     if data_type.stream {
                         Ok(
                             LinearBuilderState {
                                 data_out: data_type,
-                                op_kind: plan::OperatorKind::Pure(plan::Take { input: prev_edge, top_n: expr, output: next_edge }.into()),
-                                call_span: call.span(),
-                                update_mo: false
+                                op: plan::Operator::Pure(plan::Take { input: prev_edge, top_n: expr, output: next_edge }.into()),
+                                call_span: call.span()
                             }
                         )
                     } else {

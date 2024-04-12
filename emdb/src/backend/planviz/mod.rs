@@ -1,6 +1,6 @@
 use std::{fs::File, path::Path};
 
-use combi::{core::{mapsuc, seq, setrepr, choice}, macros::{seqs, choices}, tokens::{error::error, basic::{collectuntil, gettoken, matchident, peekident, matchpunct, peekpunct, syn}, error::expectederr, TokenDiagnostic, TokenIter}, Combi, Repr};
+use combi::{core::{choice, mapsuc, seq, setrepr}, macros::{choices, seqs}, tokens::{basic::{collectuntil, gettoken, matchident, matchpunct, peekident, peekpunct, syn}, error::{error, expectederr}, TokenDiagnostic, TokenIter, TokenParser}, Combi, Repr};
 use syn::LitStr;
 use super::{EMDBBackend, Ident, LinkedList, TokenStream, plan};
 use proc_macro_error::{Diagnostic, Level};
@@ -23,27 +23,36 @@ pub struct PlanViz {
 
 pub struct DisplayConfig {
     display_types: bool,
+    display_ctx_ops: bool,
+    display_control: bool
 }
 
 impl EMDBBackend for PlanViz {
     const NAME: &'static str = "Planviz";
 
     fn parse_options(backend_name: &Ident, options: Option<TokenStream>) -> Result<Self, LinkedList<Diagnostic>> {
-        let parser = expectederr(mapsuc(
-            seqs!(
-                matchident("path"),
-                matchpunct('='),
-                setrepr(syn(collectuntil(peekpunct(','))), "<file path>"),
+        fn on_off(name: &'static str) -> impl TokenParser<bool> {
+            mapsuc(seqs!(
                 matchpunct(','),
-                matchident("types"),
+                matchident(name),
                 matchpunct('='),
                 choices!(
                     peekident("on") => mapsuc(matchident("on"), |_| true),
                     peekident("off") => mapsuc(matchident("off"), |_| false),
                     otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, "Expected `on` or `off`".to_owned()))
                 )
-            ),
-            |(_, (_, (out_location, (_, (_, (_, display_types)))))): (_, (_, (LitStr, _)))| PlanViz{ out_location, config: DisplayConfig{display_types} } 
+            ), |(_, (_, (_, opt)))| opt)
+        }
+        let parser = expectederr(mapsuc(
+            expectederr(seqs!(
+                matchident("path"),
+                matchpunct('='),
+                setrepr(syn(collectuntil(peekpunct(','))), "<file path>"),
+                on_off("display_types"),
+                on_off("display_ctx_ops"),
+                on_off("display_control")
+            )),
+            |(_, (_, (out_location, (display_types, (display_ctx_ops, display_control))))): (_, (_, (LitStr, _)))| PlanViz{ out_location, config: DisplayConfig{display_types,display_ctx_ops, display_control} } 
         ));
         if let Some(opts) = options {
             let (_, res) = parser.comp(TokenIter::from(opts, backend_name.span()));

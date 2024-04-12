@@ -23,15 +23,34 @@ pub struct TableAccess {
 }
 
 #[derive(Clone, Debug)]
-pub struct QueryReturn { 
+pub struct OperatorOrder { 
     pub op: plan::Key<plan::Operator>, 
-    pub query: plan::Key<plan::Query> 
+    pub prev: plan::Key<plan::Operator> 
 }
 
 #[derive(Clone, Debug)]
-pub struct ModificationOrder { 
-    pub op: plan::Key<plan::Operator>, 
-    pub prev: plan::Key<plan::Operator> 
+pub struct ContextToOperator { 
+    pub context: plan::Key<plan::Context>, 
+    pub operator: plan::Key<plan::Operator>, 
+}
+
+#[derive(Clone, Debug)]
+pub struct QueryToContext { 
+    pub query: plan::Key<plan::Query>,
+    pub context: plan::Key<plan::Context>, 
+}
+
+#[derive(Clone, Debug)]
+pub struct ContextToType { 
+    pub context: plan::Key<plan::Context>, 
+    pub dt: plan::Key<plan::ScalarType>,
+    pub name: String, 
+}
+
+#[derive(Clone, Debug)]
+pub struct ContextReturn { 
+    pub context: plan::Key<plan::Context>, 
+    pub return_operator: plan::Key<plan::Operator> 
 }
 
 /// DataFlow -> fields type
@@ -79,30 +98,38 @@ pub struct TableToScalar {
     pub to: plan::Key<plan::ScalarType>,
 }
 
-#[derive(Clone, Debug)]
-pub struct QueryToScalar {
-    pub query: plan::Key<plan::Query>,
-    pub param: String,
-    pub to: plan::Key<plan::ScalarType>,
-}
-
 #[enumtrait::quick_enum]
 #[enumtrait::quick_from]
 #[derive(Clone, Debug)]
 #[enumtrait::store(plan_edge_enum)]
 pub enum PlanEdge {
+    // inter-operator connections
     DataFlow,
-    TableAccess,
-    QueryReturn,
-    ModificationOrder,
+    
+    // from contexts
+    OperatorOrder,
+    ContextToOperator,
+    ContextToType,
+    ContextReturn,
+
+    // For queries
+    QueryToContext,
+    
+    // from dataflow
     DataFlowToType,
+
+    // record types
     RecordTypeToScalar,
+    
+    // scalar types
     ScalarToRecord,
     ScalarToTable,
     ScalarToScalar,
     RecordToRecord,
+    
+    // tables
+    TableAccess,
     TableToScalar,
-    QueryToScalar
 }
 
 pub fn get_edges<'a>(lp: &'a plan::Plan, config: &'a DisplayConfig) -> dot::Edges<'a, PlanEdge> {
@@ -117,6 +144,7 @@ pub fn get_edges<'a>(lp: &'a plan::Plan, config: &'a DisplayConfig) -> dot::Edge
     GetFeature::get_all(&mut edges, &lp.tables, config);
     GetFeature::get_all(&mut edges, &lp.operators, config);
     GetFeature::get_all(&mut edges, &lp.queries, config);
+    GetFeature::get_all(&mut edges, &lp.contexts, config);
     edges.into()
 }
 
@@ -130,9 +158,11 @@ impl GetFeature<PlanEdge> for plan::DataFlow {
                 DataFlowKind::Single
             };
             edges.push(DataFlow { data: self_key, op: *from, to_direction: true, flow: stream.clone()  }.into());
-            edges.push(DataFlow { data: self_key, op: *from, to_direction: false, flow: DataFlowKind::Call  }.into());
             edges.push(DataFlow { data: self_key, op: *to, to_direction: false, flow: stream  }.into());
-            edges.push(DataFlow { data: self_key, op: *to, to_direction: true, flow: DataFlowKind::Call  }.into());
+            if config.display_control {
+                edges.push(DataFlow { data: self_key, op: *from, to_direction: false, flow: DataFlowKind::Call  }.into());
+                edges.push(DataFlow { data: self_key, op: *to, to_direction: true, flow: DataFlowKind::Call  }.into());
+            }
 
             if config.display_types {
                 edges.push(DataFlowToType { df: self_key, ty: with.fields }.into())
@@ -145,22 +175,12 @@ impl GetFeature<PlanEdge> for plan::DataFlow {
 
 impl GetFeature<PlanEdge> for plan::Operator {
     fn get_features(&self, self_key: plan::Key<Self>, edges: &mut Vec<PlanEdge>, config: &DisplayConfig) {
-        let Self {query, kind} = self;
-        match kind {
-            plan::OperatorKind::Modify { modify_after, op } => {
-                if let Some(after) = modify_after {
-                    edges.push(ModificationOrder { op: self_key, prev: *after }.into());
-                }
+        match self {
+            plan::Operator::Modify (op) => {
                 edges.push(TableAccess { op: self_key, table: op.get_table_access() }.into());
             },
-            plan::OperatorKind::Access { access_after, op } => {
-                if let Some(after) = access_after {
-                    edges.push(ModificationOrder { op: self_key, prev: *after }.into());
-                }
+            plan::Operator::Access(op) => {
                 edges.push(TableAccess { op: self_key, table: op.get_table_access() }.into());
-            },
-            plan::OperatorKind::Flow(plan::FlowOperator::Return(_) | plan::FlowOperator::Discard(_)) => {
-                edges.push(QueryReturn { op: self_key, query: *query }.into());
             },
             _ => ()
         }
@@ -211,10 +231,36 @@ impl GetFeature<PlanEdge> for plan::Table {
 
 impl GetFeature<PlanEdge> for plan::Query {
     fn get_features(&self, self_key: plan::Key<Self>, edges: &mut Vec<PlanEdge>, config: &DisplayConfig) {
+        edges.push(QueryToContext { query: self_key, context: self.ctx }.into())
+    }
+}
+
+impl GetFeature<PlanEdge> for plan::Context {
+    fn get_features(&self, self_key: plan::Key<Self>, edges: &mut Vec<PlanEdge>, config: &DisplayConfig) {
         if config.display_types {
-            for (param, ty) in self.params.iter() {
-                edges.push(QueryToScalar { query: self_key, param: param.to_string(), to: *ty }.into());
+            for (name, ty) in self.params.iter() {
+                edges.push(ContextToType { context: self_key, dt: *ty, name: name.to_string() }.into());
             }
+        }
+        if config.display_ctx_ops {
+            for op in &self.ordering {
+                edges.push(ContextToOperator {context: self_key, operator: *op}.into());
+            }
+        }
+        if config.display_control {
+            let mut ops = self.ordering.iter();
+            if let Some(mut prev) = ops.next() {
+                for next in ops {
+                    edges.push(OperatorOrder {op: *next, prev: *prev}.into());
+                    prev = next;
+                }
+            }
+        }
+        if let Some(return_operator) = self.returnflow {
+            edges.push(ContextReturn { context: self_key, return_operator }.into());
+        }
+        for op in &self.discards {
+            edges.push(ContextReturn { context: self_key, return_operator: *op }.into());
         }
     }
 }
@@ -261,10 +307,10 @@ impl GetTableAccess for plan::DeRef {
 }
 
 #[enumtrait::impl_trait(get_access_trait for plan::modify_operator_enum)]
-impl GetTableAccess for plan::ModifyOperator {}
+impl GetTableAccess for plan::Modify {}
 
 #[enumtrait::impl_trait(get_access_trait for plan::access_operator_enum)]
-impl GetTableAccess for plan::AccessOperator {}
+impl GetTableAccess for plan::Access {}
 
 // Wraps [`dot::Labeller`] to be implemented for graph nodes
 #[enumtrait::store(edge_style_trait)]
@@ -356,7 +402,7 @@ impl EdgeStyle for TableAccess {
         }
     }
 }
-impl EdgeStyle for QueryReturn {
+impl EdgeStyle for ContextReturn {
 
     fn end_arrow(&self) -> dot::Arrow {
         dot::Arrow::normal()
@@ -376,13 +422,13 @@ impl EdgeStyle for QueryReturn {
 
     fn get_side(&self, source_side: bool) -> PlanNode {
         if source_side {
-            PlanNode::Operator(self.op)
+            PlanNode::Operator(self.return_operator)
         } else {
-            PlanNode::Query(self.query)
+            PlanNode::Context(self.context)
         }
     }
 }
-impl EdgeStyle for ModificationOrder {
+impl EdgeStyle for OperatorOrder {
 
     fn end_arrow(&self) -> dot::Arrow {
         dot::Arrow::from_arrow(dot::ArrowShape::vee())
@@ -597,9 +643,9 @@ impl EdgeStyle for TableToScalar {
     }
 }
 
-impl EdgeStyle for QueryToScalar {
+impl EdgeStyle for ContextToType {
     fn label<'a>(&self) -> dot::LabelText<'a> {
-        dot::LabelText::label(self.param.clone())
+        dot::LabelText::label(self.name.clone())
     }
 
     fn end_arrow(&self) -> dot::Arrow {
@@ -620,9 +666,61 @@ impl EdgeStyle for QueryToScalar {
     
     fn get_side(&self,source_side:bool) -> PlanNode {
         if source_side {
+            PlanNode::Context(self.context)
+        } else {
+            PlanNode::ScalarType(self.dt)
+        }
+    }
+}
+
+impl EdgeStyle for QueryToContext {
+    fn end_arrow(&self) -> dot::Arrow {
+        dot::Arrow::normal()
+    }
+
+    fn start_arrow(&self) -> dot::Arrow {
+        dot::Arrow::none()
+    }
+
+    fn edge_style(&self) -> dot::Style {
+        dot::Style::None
+    }
+
+    fn edge_color<'a>(&self) -> Option<dot::LabelText<'a>> {
+        Some(dot::LabelText::label("black"))
+    }
+
+    fn get_side(&self,source_side:bool) -> PlanNode {
+        if source_side {
             PlanNode::Query(self.query)
         } else {
-            PlanNode::ScalarType(self.to)
+            PlanNode::Context(self.context)
+        }
+    }
+}
+
+impl EdgeStyle for ContextToOperator {
+    fn end_arrow(&self) -> dot::Arrow {
+        dot::Arrow::normal()
+    }
+
+    fn start_arrow(&self) -> dot::Arrow {
+        dot::Arrow::none()
+    }
+
+    fn edge_style(&self) -> dot::Style {
+        dot::Style::None
+    }
+
+    fn edge_color<'a>(&self) -> Option<dot::LabelText<'a>> {
+        Some(dot::LabelText::label("black"))
+    }
+
+    fn get_side(&self,source_side:bool) -> PlanNode {
+        if source_side {
+            PlanNode::Context(self.context)
+        } else {
+            PlanNode::Operator(self.operator)
         }
     }
 }

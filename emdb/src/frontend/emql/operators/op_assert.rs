@@ -26,7 +26,7 @@ impl EMQLOperator for Assert {
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-        mo: &mut Option<plan::Key<plan::Operator>>,
+        op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, expr } = self;
@@ -34,15 +34,14 @@ impl EMQLOperator for Assert {
             linear_builder(
                 lp,
                 qk,
-                mo,
+                op_ctx,
                 cont,
                 |lp, mo, prev, next_edge| {
                     Ok(
                         LinearBuilderState {
                             data_out: prev.data_type,
-                            op_kind:  plan::OperatorKind::Pure(plan::Assert { input: prev.prev_edge, assert: expr, output: next_edge }.into()),
+                            op:  plan::Operator::Pure(plan::Assert { input: prev.prev_edge, assert: expr, output: next_edge }.into()),
                             call_span: call.span(),
-                            update_mo: false,
                         }
                     )
                 }

@@ -596,12 +596,28 @@ where
 
 /// The recursion combinator.
 ///
-/// //TODO: fix
-/// ```ignore
-/// # use combi::{Combi, CombiResult, core::{Seq, Recursive, Nothing}};
-///
-/// // an infinite combi:
-/// let (r, _): (i32, CombiResult<(),(),()>) = Recursive(|r| Seq(Nothing(), r.clone())).comp(3);
+/// Note there are no checks against stack overflows, as below
+/// ```should_panic
+/// # use combi::{Combi, CombiErr, CombiCon, CombiResult, core::{mapsuc, seq, recursive, nothing}};
+/// # struct NothingErr;
+/// # impl CombiErr<NothingErr> for NothingErr {
+/// #     fn inherit_con(self, con: NothingErr) -> Self {
+/// #        NothingErr
+/// #    } 
+/// #    fn catch_con(con: NothingErr) -> Self {
+/// #        NothingErr
+/// #    }
+/// # }
+/// # impl<S> CombiCon<S, NothingErr> for NothingErr {
+/// #     fn combine_suc(self, _: S) -> Self {
+/// #        NothingErr
+/// #    }
+/// #    fn combine_con(self, con: NothingErr) -> Self {
+/// #        NothingErr
+/// #    }
+/// # }
+/// // unbound recursion -> stack overflow
+/// let (r, _): (i32, CombiResult<(),NothingErr,NothingErr>) = recursive(|r| mapsuc(seq(nothing(), r.clone()), |((),())| ())).comp(3);
 /// ```
 pub fn recursive<I, O, S, E, C, P, F>(f: F) -> Recursive<I, O, S, E, C>
 where

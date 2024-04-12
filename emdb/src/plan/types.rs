@@ -115,7 +115,7 @@ pub enum ScalarTypeConc {
     /// # emql! {
     /// #     table foos { x: i32 }
     /// #     query foo_query() {
-    /// ref foos 
+    /// ref foos as foo_ref
     ///     |> collect(it as type foo_row) 
     ///     ~> return;
     /// #     }

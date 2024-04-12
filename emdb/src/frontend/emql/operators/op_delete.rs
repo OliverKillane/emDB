@@ -23,7 +23,7 @@ impl EMQLOperator for Delete {
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-        mo: &mut Option<plan::Key<plan::Operator>>,
+        op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, field } = self;
@@ -32,7 +32,7 @@ impl EMQLOperator for Delete {
             linear_builder(
                 lp,
                 qk,
-                mo,
+                op_ctx,
                 cont,
                 |lp, mo, Continue {
                     data_type,
@@ -44,9 +44,8 @@ impl EMQLOperator for Delete {
                             Ok(
                                 LinearBuilderState { 
                                     data_out: data_type, 
-                                    op_kind: plan::OperatorKind::Modify { modify_after: *mo, op: plan::Delete { input: prev_edge, reference: field, table: *table_id, output: next_edge }.into() }, 
-                                    call_span: call.span(), 
-                                    update_mo: true 
+                                    op: plan::Operator::Modify ( plan::Delete { input: prev_edge, reference: field, table: *table_id, output: next_edge }.into() ), 
+                                    call_span: call.span()
                                 }
                             )
                         } else {

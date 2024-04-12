@@ -58,7 +58,7 @@ trait EMQLOperator: Sized + Debug {
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-        mo: &mut Option<plan::Key<plan::Operator>>,
+        op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>>;
 }
@@ -100,12 +100,12 @@ macro_rules! create_operator {
             qk: plan::Key<plan::Query>,
             vs: &mut HashMap<Ident, VarState>,
             ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-            mo: &mut Option<plan::Key<plan::Operator>>,
+            op_ctx: plan::Key<plan::Context>,
             cont: Option<Continue>,
         ) -> Result<StreamContext, LinkedList<Diagnostic>> {
             match op {
                 $(
-                    $op::$t(i) => i.build_logical(lp, tn, qk, vs, ts, mo, cont),
+                    $op::$t(i) => i.build_logical(lp, tn, qk, vs, ts, op_ctx, cont),
                 )*
             }
         }

@@ -44,7 +44,7 @@ impl EMQLOperator for Unique {
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-        mo: &mut Option<plan::Key<plan::Operator>>,
+        op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self {
@@ -60,9 +60,9 @@ impl EMQLOperator for Unique {
             linear_builder(
                 lp,
                 qk,
-                mo,
+                op_ctx,
                 cont,
-                |lp, mo, Continue { data_type, prev_edge, last_span }, next_edge| {
+                |lp, op_ctx, Continue { data_type, prev_edge, last_span }, next_edge| {
                     if let Some(table_id) = tn.get(&table) {
                         let table = lp.get_table(*table_id);
                         if let Some(using_col) = table.columns.get(&field) {
@@ -73,10 +73,9 @@ impl EMQLOperator for Unique {
                                 Ok(
                                     LinearBuilderState { 
                                         data_out: plan::Data{ fields: record_type, stream: false }, 
-                                        op_kind: plan::OperatorKind::Access { access_after: *mo, op: plan::GetUnique { 
-                                            input: prev_edge, access, from, table: *table_id, field, out, output: next_edge }.into() }, 
-                                        call_span: call.span(), 
-                                        update_mo: true 
+                                        op: plan::Operator::Access (plan::GetUnique { 
+                                            input: prev_edge, access, from, table: *table_id, field, out, output: next_edge }.into() ), 
+                                        call_span: call.span()
                                     }
                                 )
 

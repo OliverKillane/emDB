@@ -25,7 +25,7 @@ impl EMQLOperator for Union {
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-        mo: &mut Option<plan::Key<plan::Operator>>,
+        op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, vars } = self;
@@ -88,18 +88,16 @@ impl EMQLOperator for Union {
                             plan::coerce_record_type(lp, out_data_type, in_type);
                         }
                         let out_edge = lp.dataflow.insert(plan::DataFlow::Null);
-                        let union_op = lp.operators.insert(plan::Operator {
-                            query: qk,
-                            kind: plan::OperatorKind::Pure(plan::Union {
+                        let union_op = lp.operators.insert(plan::Operator::Pure(plan::Union {
                                 inputs: in_edges.clone(),
                                 output: out_edge,
-                            }.into()),
-                        });
+                            }.into()));
                         for in_edge in in_edges {
                             update_incomplete(lp.get_mut_dataflow(in_edge), union_op);
                         }
                         let data_t =  plan::Data { fields: out_data_type, stream: true };
                         *lp.get_mut_dataflow(out_edge) = plan::DataFlow::Incomplete { from: union_op, with: data_t.clone() };
+                        lp.get_mut_context(op_ctx).add_operator(union_op);
                         return Ok(StreamContext::Continue(Continue { data_type: data_t, prev_edge: out_edge, last_span: call.span() }));
                     }
                 } else {

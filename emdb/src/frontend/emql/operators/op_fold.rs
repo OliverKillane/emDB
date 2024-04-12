@@ -49,7 +49,7 @@ impl EMQLOperator for Fold {
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-        mo: &mut Option<plan::Key<plan::Operator>>,
+        op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self {
@@ -57,7 +57,7 @@ impl EMQLOperator for Fold {
             fields
         } = self;
         if let Some(cont) = cont {
-            linear_builder(lp, qk, mo, cont, 
+            linear_builder(lp, qk, op_ctx, cont, 
             |lp, mo, prev, next_edge| {
                     let (raw_fields, mut errors) = extract_fields(fields, errors::query_operator_field_redefined);
                     if !prev.data_type.stream {
@@ -81,7 +81,9 @@ impl EMQLOperator for Fold {
                                 data_out: plan::Data { 
                                     fields: lp.record_types.insert(plan::ConcRef::Conc(plan::RecordConc {fields: type_fields})), 
                                     stream: false 
-                                }, op_kind: plan::OperatorKind::Pure(plan::Fold { input: prev.prev_edge, fold_fields, output: next_edge }.into()), call_span: call.span(), update_mo: false }
+                                },
+                                op: plan::Operator::Pure(plan::Fold { input: prev.prev_edge, fold_fields, output: next_edge }.into()), 
+                                call_span: call.span()}
                         )
                     } else {
                         Err(errors)

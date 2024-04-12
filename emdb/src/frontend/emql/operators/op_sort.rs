@@ -46,7 +46,7 @@ impl EMQLOperator for Sort {
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-        mo: &mut Option<plan::Key<plan::Operator>>,
+        op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, fields } = self;
@@ -59,9 +59,9 @@ impl EMQLOperator for Sort {
             linear_builder(
                 lp, 
                 qk, 
-                mo, 
+                op_ctx, 
                 cont, 
-                |lp, mo, prev, next_edge| {
+                |lp, op_ctx, prev, next_edge| {
                     let rec_type = lp.get_record_type(prev.data_type.fields);
                     let (raw_fields, mut errors) = extract_fields(fields, errors::sort_field_used_twice);
                     let mut sort_order = Vec::new();
@@ -80,7 +80,10 @@ impl EMQLOperator for Sort {
                     if errors.is_empty() {
                         Ok(
                             LinearBuilderState { 
-                                data_out: prev.data_type, op_kind: plan::OperatorKind::Pure(plan::Sort { input: prev.prev_edge, sort_order, output: next_edge }.into()), call_span: call.span(), update_mo: false }
+                                data_out: prev.data_type, 
+                                op: plan::Operator::Pure(plan::Sort { input: prev.prev_edge, sort_order, output: next_edge }.into()), 
+                                call_span: call.span() 
+                            }
                         )
                     } else {
                         Err(errors)

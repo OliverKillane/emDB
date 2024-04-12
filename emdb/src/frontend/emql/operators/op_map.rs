@@ -23,7 +23,7 @@ impl EMQLOperator for Map {
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-        mo: &mut Option<plan::Key<plan::Operator>>,
+        op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, new_fields } = self;
@@ -31,9 +31,9 @@ impl EMQLOperator for Map {
             linear_builder(
                 lp,
                 qk,
-                mo,
+                op_ctx,
                 cont,
-                |lp, mo, Continue { data_type, prev_edge, last_span }, next_edge| {
+                |lp, op_ctx, Continue { data_type, prev_edge, last_span }, next_edge| {
                     let (fields, mut errors) = extract_fields(new_fields, errors::query_operator_field_redefined);
                     let mut type_fields = HashMap::new();
                     let mut expr_fields = HashMap::new();
@@ -58,9 +58,8 @@ impl EMQLOperator for Map {
                                     fields: lp.record_types.insert(plan::ConcRef::Conc(plan::RecordConc { fields: type_fields })),
                                     stream: data_type.stream,
                                 },
-                                op_kind: plan::OperatorKind::Pure(plan::Map { input: prev_edge, mapping: expr_fields, output: next_edge  }.into()),
-                                call_span: call.span(),
-                                update_mo: false
+                                op: plan::Operator::Pure(plan::Map { input: prev_edge, mapping: expr_fields, output: next_edge  }.into()),
+                                call_span: call.span()
                             }
                         )
                     } else {

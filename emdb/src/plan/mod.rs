@@ -30,6 +30,7 @@ pub struct With<'a, A> {
 /// - Can be agumented with other data that uses [Key] to reference components
 pub struct Plan {
     pub queries: GenArena<Query>,
+    pub contexts: GenArena<Context>,
     pub tables: GenArena<Table>,
     pub operators: GenArena<Operator>,
     pub dataflow: GenArena<DataFlow>,
@@ -41,6 +42,7 @@ impl Plan {
     pub fn new() -> Self {
         Plan {
             queries: GenArena::new(),
+            contexts:  GenArena::new(),
             tables: GenArena::new(),
             operators: GenArena::new(),
             dataflow: GenArena::new(),

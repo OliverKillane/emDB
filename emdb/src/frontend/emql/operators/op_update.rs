@@ -31,7 +31,7 @@ impl EMQLOperator for Update {
         qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
-        mo: &mut Option<plan::Key<plan::Operator>>,
+        op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self {
@@ -43,9 +43,9 @@ impl EMQLOperator for Update {
             linear_builder(
                 lp,
                 qk,
-                mo,
+                op_ctx,
                 cont,
-                |lp, mo, prev, next_edge| {
+                |lp, op_ctx, prev, next_edge| {
                     let (raw_fields, mut errors) = extract_fields(fields, errors::query_operator_field_redefined);
                     
                     let raw_table_id = if let Some(sk) = lp.get_record_type(prev.data_type.fields).fields.get(&reference) {
@@ -78,18 +78,15 @@ impl EMQLOperator for Update {
                             Ok(
                                 LinearBuilderState { 
                                     data_out: prev.data_type, 
-                                    op_kind: plan::OperatorKind::Modify { 
-                                        modify_after: *mo, 
-                                        op: plan::Update { 
+                                    op: plan::Operator::Modify (plan::Update { 
                                             input: prev.prev_edge,
                                             reference: reference.clone(),
                                             table: table_id,
                                             mapping: nondup_fields,
                                             output: next_edge, 
                                         }.into()
-                                    }, 
-                                call_span: call.span(), 
-                                update_mo: true }
+                                    ), 
+                                call_span: call.span()}
                             )
                         } else {
                             Err(errors)
