@@ -1,3 +1,5 @@
+/// Use is a significant syntactic sugar
+/// - Allows for `scanref <table> |> deref |> expand` to be written as `use <table>`
 use super::*;
 
 #[derive(Debug)]
@@ -29,23 +31,52 @@ impl EMQLOperator for Use {
         let Self { call, var_name } = self;
         if cont.is_none() {
             if let Some(table_id) = tn.get(&var_name) {
-                let access = plan::TableAccess::AllCols;
-                let record_type = generate_access(*table_id, access.clone(), lp, None).unwrap();
-                let out_edge = lp.dataflow.insert(plan::DataFlow::Null);
-                let use_op = lp.operators.insert(plan::Operator::Access (plan::Scan { access, table: *table_id, output: out_edge }.into()));
-                let data_type = plan::Data { fields: record_type, stream: true };
 
-                *lp.get_mut_dataflow(out_edge) = plan::DataFlow::Incomplete {
-                    from: use_op,
-                    with: data_type.clone(),
-                };
-                lp.get_mut_context(op_ctx).add_operator(use_op);
+                let ref_field = plan::RecordField::Internal(0);
+                let rec_field = plan::RecordField::Internal(1);
 
-                Ok(StreamContext::Continue(Continue {
+                let table_fields_type = lp.record_types.insert(get_all_cols(lp, *table_id).into());
+                let table_fields_scalar_type = lp.scalar_types.insert(plan::ScalarTypeConc::Record(table_fields_type).into());
+
+                let scanref_cont = create_scanref(lp, op_ctx, *table_id, ref_field.clone(), call.span());
+                
+                let deref_access = valid_linear_builder(lp, qk, op_ctx, scanref_cont, 
+                    |lp, op_ctx, Continue {
+                        data_type,
+                        prev_edge,
+                        last_span,
+                    }, next_edge| {
+                        LinearBuilderState {
+                            data_out: plan::Data {
+                                fields: lp.record_types.insert(plan::RecordConc{ fields: HashMap::from([(rec_field.clone(), table_fields_scalar_type)]) }.into()),
+                                stream: true,
+                            },
+                            op: plan::DeRef { input: prev_edge, reference: ref_field, named: rec_field.clone(), table: *table_id, output: next_edge }.into(),
+                            call_span: call.span(),
+                        }
+                    }
+                );
+
+                let expand_access = valid_linear_builder(lp, qk, op_ctx, deref_access, |lp, op_ctx, Continue {
                     data_type,
-                    prev_edge: out_edge,
-                    last_span: call.span(),
-                }))
+                    prev_edge,
+                    last_span,
+                }, next_edge| {
+                    LinearBuilderState {
+                        data_out: plan::Data {
+                            fields: table_fields_type,
+                            stream: true,
+                        },
+                        op: plan::Expand {
+                            input: prev_edge,
+                            field: rec_field,
+                            output: next_edge,
+                        }.into(),
+                        call_span: call.span(),
+                    }
+                });
+                
+                Ok(StreamContext::Continue(expand_access))
             } else if let Some(var) = vs.get_mut(&var_name) {
                 match var {
                     VarState::Used { created, used } => Err(singlelist(

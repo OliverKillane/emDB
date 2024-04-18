@@ -70,8 +70,8 @@ impl EMQLOperator for Fold {
                     for (field, (typ, initial, update)) in raw_fields {
                         if let Some(scalar_t) = result_to_opt(ast_typeto_scalar(tn, ts, typ, |e| errors::query_nonexistent_table(&call, e), errors::query_no_cust_type_found), &mut errors) {
                             let data_type = lp.scalar_types.insert(scalar_t);
-                            type_fields.insert(field.clone(), data_type);
-                            fold_fields.insert(field, plan::FoldField { data_type, initial, update });                        
+                            type_fields.insert(field.clone().into(), data_type);
+                            fold_fields.insert(field.into(), plan::FoldField { data_type, initial, update });                        
                         }
                     }
 
@@ -82,7 +82,7 @@ impl EMQLOperator for Fold {
                                     fields: lp.record_types.insert(plan::ConcRef::Conc(plan::RecordConc {fields: type_fields})), 
                                     stream: false 
                                 },
-                                op: plan::Operator::Pure(plan::Fold { input: prev.prev_edge, fold_fields, output: next_edge }.into()), 
+                                op: plan::Fold { input: prev.prev_edge, fold_fields, output: next_edge }.into(), 
                                 call_span: call.span()}
                         )
                     } else {

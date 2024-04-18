@@ -39,23 +39,24 @@ impl EMQLOperator for Delete {
                     prev_edge,
                     last_span,
                 }, next_edge| {
-                    if let Some(ts) = lp.get_record_type(data_type.fields).fields.get(&field) {
+                    let rec_field = field.into();
+                    if let Some(ts) = lp.get_record_type(data_type.fields).fields.get(&rec_field) {
                         if let plan::ScalarTypeConc::TableRef(table_id) = lp.get_scalar_type(*ts) {
                             Ok(
                                 LinearBuilderState { 
                                     data_out: data_type, 
-                                    op: plan::Operator::Modify ( plan::Delete { input: prev_edge, reference: field, table: *table_id, output: next_edge }.into() ), 
+                                    op: plan::Delete { input: prev_edge, reference: rec_field, table: *table_id, output: next_edge }.into(), 
                                     call_span: call.span()
                                 }
                             )
                         } else {
                             Err(singlelist(errors::query_delete_field_not_reference(
-                                lp, &call, &field, ts,
+                                lp, &call, rec_field.get_field(), ts,
                             )))
                         }
                     } else {
                         Err(singlelist(errors::query_delete_field_not_present(
-                            &call, &field,
+                            &call, rec_field.get_field(),
                         )))
                     }
                 }

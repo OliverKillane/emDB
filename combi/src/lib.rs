@@ -95,7 +95,7 @@ pub trait CombiCon<Suc, Con> {
 /// # impl CombiErr<NothingCont> for NothingErr {
 /// #     fn inherit_con(self, con: NothingCont) -> Self {
 /// #        NothingErr
-/// #    } 
+/// #    }
 /// #    fn catch_con(con: NothingCont) -> Self {
 /// #        NothingErr
 /// #    }

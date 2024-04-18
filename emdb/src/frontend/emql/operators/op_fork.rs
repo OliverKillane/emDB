@@ -66,7 +66,7 @@ impl EMQLOperator for Fork {
                 ).collect();
 
                 let fork_op = lp.operators.insert(
-                    plan::Operator::Pure(plan::Fork { input: cont.prev_edge, outputs: var_edges.clone() }.into()),
+                    plan::Fork { input: cont.prev_edge, outputs: var_edges.clone() }.into(),
                 );
 
                 for edge in var_edges {

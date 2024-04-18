@@ -88,10 +88,10 @@ impl EMQLOperator for Union {
                             plan::coerce_record_type(lp, out_data_type, in_type);
                         }
                         let out_edge = lp.dataflow.insert(plan::DataFlow::Null);
-                        let union_op = lp.operators.insert(plan::Operator::Pure(plan::Union {
+                        let union_op = lp.operators.insert(plan::Union {
                                 inputs: in_edges.clone(),
                                 output: out_edge,
-                            }.into()));
+                            }.into());
                         for in_edge in in_edges {
                             update_incomplete(lp.get_mut_dataflow(in_edge), union_op);
                         }

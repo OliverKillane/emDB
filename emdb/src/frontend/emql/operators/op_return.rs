@@ -32,7 +32,7 @@ impl EMQLOperator for Return {
             if data_type.stream {
                 Err(singlelist(errors::query_cannot_return_stream(last_span, call.span())))
             } else {                
-                let return_op = lp.operators.insert(plan::Operator::Flow(plan::Return { input: prev_edge }.into()));
+                let return_op = lp.operators.insert(plan::Return { input: prev_edge }.into());
                 update_incomplete(lp.dataflow.get_mut(prev_edge).unwrap(), return_op);
                 lp.get_mut_context(op_ctx).add_operator(return_op);
                 // Node the return is set in super::super::sem, once it has checked for the duplicate returns

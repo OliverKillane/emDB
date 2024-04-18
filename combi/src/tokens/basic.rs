@@ -429,13 +429,13 @@ where
     type Inp = TokenIter;
     type Out = TokenIter;
 
-    // NOTE: "Why" I hear you say, "why is recovgroup not inlined, this is trivially done, seems 
+    // NOTE: "Why" I hear you say, "why is recovgroup not inlined, this is trivially done, seems
     //       arbitrary to given the decision for the other combis here". And I agree with you!
-    //       
-    //       However on rustc 1.79.0-nightly (ab5bda1aa 2024-04-08) uncommenting the below 
-    //       attribute causes a segfault, I suspect it has something to do with a stack overflow, 
+    //
+    //       However on rustc 1.79.0-nightly (ab5bda1aa 2024-04-08) uncommenting the below
+    //       attribute causes a segfault, I suspect it has something to do with a stack overflow,
     //       but honestly have not the time to investigate.
-    //       
+    //
     //       emdb compiles, but segfaults when a query is parsed.
     //
     //       still, `error: rustc interrupted by SIGSEGV, printing backtrace` is pretty funny.
@@ -748,11 +748,13 @@ impl Combi for terminal {
     ) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         if let Some(tt) = input.next() {
             // NOTE: `a.join` returns None on Stable, and always Some on nightly.
-            let big_span = if cfg!(nightly) {input
-                .extract_iter()
-                .fold(tt.span(), |a, s| a.join(s.span()).unwrap())} else {
-                    TokenStream::from_iter(input.iter).span()
-                };
+            let big_span = if cfg!(nightly) {
+                input
+                    .extract_iter()
+                    .fold(tt.span(), |a, s| a.join(s.span()).unwrap())
+            } else {
+                TokenStream::from_iter(input.iter).span()
+            };
             (
                 (),
                 CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(

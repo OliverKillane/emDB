@@ -37,8 +37,8 @@ impl EMQLOperator for Row {
                 match ast_typeto_scalar(tn, ts, ast_type, |e| errors::query_nonexistent_table(&call, e), errors::query_no_cust_type_found) {
                     Ok(t) => {
                         let t_index = lp.scalar_types.insert(t);
-                        type_fields.insert(field.clone(), t_index);
-                        expr_fields.insert(field, expr);
+                        type_fields.insert(field.clone().into(), t_index);
+                        expr_fields.insert(field.into(), expr);
                     },
                     Err(e) => {
                         errors.push_back(e);
@@ -53,7 +53,7 @@ impl EMQLOperator for Row {
                 };
 
                 let out_edge = lp.dataflow.insert(plan::DataFlow::Null);
-                let row_op = lp.operators.insert(plan::Operator::Flow(plan::Row { fields: expr_fields, output: out_edge  }.into()));
+                let row_op = lp.operators.insert(plan::Row { fields: expr_fields, output: out_edge  }.into());
                 
                 *lp.get_mut_dataflow(out_edge) = plan::DataFlow::Incomplete { from: row_op, with: data.clone() };
                 lp.get_mut_context(op_ctx).add_operator(row_op);
@@ -64,12 +64,9 @@ impl EMQLOperator for Row {
                         last_span: call.span(),
                     })
                 )
-
             } else {
                 Err(errors)
             }
-            
-
         } else {
             Err(singlelist(errors::query_operator_cannot_come_first(&call)))
         }

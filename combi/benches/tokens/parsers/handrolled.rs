@@ -1,6 +1,6 @@
 use proc_macro2::{Delimiter, TokenStream, TokenTree};
 
-use super::super::{LongSequence, Nothing, Parse, RecursiveIdent, LargeGroups};
+use super::super::{LargeGroups, LongSequence, Nothing, Parse, RecursiveIdent};
 
 pub struct HandRolled;
 
@@ -60,7 +60,7 @@ impl Parse<LargeGroups> for HandRolled {
                             }
                         }
                         LargeGroups::Puncts(puncts)
-                    } else if g.delimiter() == Delimiter::Brace  {
+                    } else if g.delimiter() == Delimiter::Brace {
                         let mut groups = Vec::new();
                         for tk in g.stream() {
                             groups.push(parse_token(tk));
@@ -69,7 +69,7 @@ impl Parse<LargeGroups> for HandRolled {
                     } else {
                         unreachable!("assumes correct input")
                     }
-                },
+                }
                 _ => unreachable!("assumes correct input"),
             }
         }

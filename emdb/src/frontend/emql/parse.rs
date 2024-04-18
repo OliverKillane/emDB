@@ -241,19 +241,26 @@ fn operator_parse(
 }
 
 fn stream_parser() -> impl TokenParser<StreamExpr> {
-    recover(recursive(|r| {
-        mapsuc(
-            seq(
-                operator_parse(r.clone()),
-                choice(
-                    peekpunct(';'),
-                    mapsuc(matchpunct(';'), |_| None),
-                    mapsuc(seq(connector_parse(), r), |(c, s)| Some((c, Box::new(s)))),
+    recover(
+        recursive(|r| {
+            mapsuc(
+                seq(
+                    operator_parse(r.clone()),
+                    choice(
+                        peekpunct(';'),
+                        mapsuc(matchpunct(';'), |_| None),
+                        mapsuc(seq(connector_parse(), r), |(c, s)| Some((c, Box::new(s)))),
+                    ),
                 ),
-            ),
-            |(op, con)| StreamExpr { op, con },
-        )
-    }), until(choice(peekpunct(';'), mapsuc(matchpunct(';'), |_| true), mapsuc(nothing(), |()| false))))
+                |(op, con)| StreamExpr { op, con },
+            )
+        }),
+        until(choice(
+            peekpunct(';'),
+            mapsuc(matchpunct(';'), |_| true),
+            mapsuc(nothing(), |()| false),
+        )),
+    )
 }
 
 pub fn type_parser(end: impl TokenParser<bool>) -> impl TokenParser<AstType> {

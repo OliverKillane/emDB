@@ -48,16 +48,17 @@ impl EMQLOperator for DeRef {
                 qk,
                 op_ctx,
                 cont,
-                |lp, mo, Continue {
+                |lp, op_ctx, Continue {
                     data_type,
                     prev_edge,
                     last_span,
                 }, next_edge| {
                     let rec_fields = &lp.get_record_type(data_type.fields).fields;
-                    if let Some((existing, _)) = rec_fields.get_key_value(&named) {
-                        // TODO: use append_field
-                        Err(singlelist(errors::query_deref_field_already_exists(&named, existing)))
-                    } else if let Some(field_type) = rec_fields.get(&reference) {
+                    let rec_reference = reference.clone().into();
+                    let rec_named = named.clone().into();
+                    if let Some((existing, _)) = rec_fields.get_key_value(&rec_named) {
+                        Err(singlelist(errors::query_deref_field_already_exists(&named, existing.get_field())))
+                    } else if let Some(field_type) = rec_fields.get(&rec_reference) {
                         match lp.get_scalar_type(*field_type) {
                             plan::ScalarTypeConc::Record(r) => Err(singlelist(
                                 errors::query_deref_cannot_deref_record(lp, &reference, r),
@@ -69,25 +70,16 @@ impl EMQLOperator for DeRef {
                                 errors::query_deref_cannot_deref_bag_type(lp, &reference, b),
                             )),
                             plan::ScalarTypeConc::TableRef(table_id) => {
-                                
                                 let table_id_copy = *table_id;
-                                let access = plan::TableAccess::AllCols;
                                 let table_name = lp.get_table(*table_id).name.clone();
-                                let dt = generate_access(*table_id, access.clone(), lp, None)?;                                
-                                let plan::RecordConc {mut fields} = lp.get_record_type(data_type.fields).clone();
-                                let scalar_t = lp.scalar_types.insert(plan::ConcRef::Conc(plan::ScalarTypeConc::Record(dt)));
-                                
-                                fields.insert(named.clone(), scalar_t);
-        
-                                let new_type = plan::Data { fields: lp.record_types.insert(plan::ConcRef::Conc(
-                                    plan::RecordConc { fields }
-                                )), stream: data_type.stream } ;
+                                let dt = generate_access::dereference(*table_id, lp, named, data_type.fields)?;                                
+                                let new_type = plan::Data { fields: dt, stream: data_type.stream };
     
                                 Ok(
-                                    LinearBuilderState { 
+                                    LinearBuilderState {
                                         data_out: new_type, 
-                                        op: plan::Operator::Access (plan::DeRef { 
-                                            input: prev_edge, reference, access , named, table: table_id_copy, output: next_edge }.into() ), 
+                                        op: plan::DeRef { 
+                                            input: prev_edge, reference: rec_reference, named: rec_named, table: table_id_copy, output: next_edge }.into(), 
                                         call_span: call.span()
                                     }
                                 )

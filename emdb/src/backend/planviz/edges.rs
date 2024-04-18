@@ -57,12 +57,12 @@ pub struct ContextReturn {
 #[derive(Clone, Debug)]
 pub struct DataFlowToType {
     pub df: plan::Key<plan::DataFlow>,
-    pub ty: plan::Key<plan::Record>
+    pub ty: plan::Key<plan::RecordType>
 }
 
 #[derive(Clone, Debug)]
 pub struct RecordTypeToScalar {
-    pub record: plan::Key<plan::Record>,
+    pub record: plan::Key<plan::RecordType>,
     pub scalar: plan::Key<plan::ScalarType>,
     pub field_name: String,
 }
@@ -70,7 +70,7 @@ pub struct RecordTypeToScalar {
 #[derive(Clone, Debug)]
 pub struct ScalarToRecord {
     pub scalar: plan::Key<plan::ScalarType>,
-    pub record: plan::Key<plan::Record>,
+    pub record: plan::Key<plan::RecordType>,
 }
 
 #[derive(Clone, Debug)]
@@ -87,8 +87,8 @@ pub struct ScalarToScalar {
 
 #[derive(Clone, Debug)]
 pub struct RecordToRecord {
-    pub from: plan::Key<plan::Record>,
-    pub to: plan::Key<plan::Record>,
+    pub from: plan::Key<plan::RecordType>,
+    pub to: plan::Key<plan::RecordType>,
 }
 
 #[derive(Clone, Debug)]
@@ -151,43 +151,34 @@ pub fn get_edges<'a>(lp: &'a plan::Plan, config: &'a DisplayConfig) -> dot::Edge
 
 impl GetFeature<PlanEdge> for plan::DataFlow {
     fn get_features(&self, self_key: plan::Key<Self>, edges: &mut Vec<PlanEdge>, config: &DisplayConfig) {
-        if let plan::DataFlow::Conn { from, to, with } = self {
-            let stream = if with.stream {
-                DataFlowKind::Stream
-            } else {
-                DataFlowKind::Single
-            };
-            edges.push(DataFlow { data: self_key, op: *from, to_direction: true, flow: stream.clone()  }.into());
-            edges.push(DataFlow { data: self_key, op: *to, to_direction: false, flow: stream  }.into());
-            if config.display_control {
-                edges.push(DataFlow { data: self_key, op: *from, to_direction: false, flow: DataFlowKind::Call  }.into());
-                edges.push(DataFlow { data: self_key, op: *to, to_direction: true, flow: DataFlowKind::Call  }.into());
-            }
-
-            if config.display_types {
-                edges.push(DataFlowToType { df: self_key, ty: with.fields }.into())
-            }
+        let plan::DataFlowConn{ from, to, with } = self.get_conn(); 
+        let stream = if with.stream {
+            DataFlowKind::Stream
         } else {
-            unreachable!("Only `DataFlow::Conn` edges should be present in dataflow")
+            DataFlowKind::Single
+        };
+        edges.push(DataFlow { data: self_key, op: *from, to_direction: true, flow: stream.clone()  }.into());
+        edges.push(DataFlow { data: self_key, op: *to, to_direction: false, flow: stream  }.into());
+        if config.display_control {
+            edges.push(DataFlow { data: self_key, op: *from, to_direction: false, flow: DataFlowKind::Call  }.into());
+            edges.push(DataFlow { data: self_key, op: *to, to_direction: true, flow: DataFlowKind::Call  }.into());
+        }
+
+        if config.display_types {
+            edges.push(DataFlowToType { df: self_key, ty: with.fields }.into())
         }
     }
 }
 
 impl GetFeature<PlanEdge> for plan::Operator {
     fn get_features(&self, self_key: plan::Key<Self>, edges: &mut Vec<PlanEdge>, config: &DisplayConfig) {
-        match self {
-            plan::Operator::Modify (op) => {
-                edges.push(TableAccess { op: self_key, table: op.get_table_access() }.into());
-            },
-            plan::Operator::Access(op) => {
-                edges.push(TableAccess { op: self_key, table: op.get_table_access() }.into());
-            },
-            _ => ()
+        if let Some(table) = self.get_table_access() {
+            edges.push(TableAccess { op: self_key, table }.into());
         }
     }
 }
 
-impl GetFeature<PlanEdge> for plan::Record {
+impl GetFeature<PlanEdge> for plan::RecordType {
     fn get_features(&self, self_key: plan::Key<Self>, edges: &mut Vec<PlanEdge>, config: &DisplayConfig) {
         if config.display_types {
             match self {
@@ -267,50 +258,64 @@ impl GetFeature<PlanEdge> for plan::Context {
 
 #[enumtrait::store(get_access_trait)]
 trait GetTableAccess {
-    fn get_table_access(&self) -> plan::Key<plan::Table>;
+    fn get_table_access(&self) -> Option<plan::Key<plan::Table>> { None }
 }
 
+#[enumtrait::impl_trait(get_access_trait for plan::operator_enum)]
+impl GetTableAccess for plan::Operator {}
+
 impl GetTableAccess for plan::Update {
-    fn get_table_access(&self) -> plan::Key<plan::Table> {
-        self.table
+    fn get_table_access(&self) -> Option<plan::Key<plan::Table>> {
+        Some(self.table)
     }
 }
 
 impl GetTableAccess for plan::Insert {
-    fn get_table_access(&self) -> plan::Key<plan::Table> {
-        self.table
+    fn get_table_access(&self) -> Option<plan::Key<plan::Table>> {
+        Some(self.table)
     }
 }
 
 impl GetTableAccess for plan::Delete {
-    fn get_table_access(&self) -> plan::Key<plan::Table> {
-        self.table
+    fn get_table_access(&self) -> Option<plan::Key<plan::Table>> {
+        Some(self.table)
     }
 }
 
 impl GetTableAccess for plan::GetUnique {
-    fn get_table_access(&self) -> plan::Key<plan::Table> {
-        self.table
+    fn get_table_access(&self) -> Option<plan::Key<plan::Table>> {
+        Some(self.table)
     }
 }
 
-impl GetTableAccess for plan::Scan {
-    fn get_table_access(&self) -> plan::Key<plan::Table> {
-        self.table
+impl GetTableAccess for plan::ScanRefs {
+    fn get_table_access(&self) -> Option<plan::Key<plan::Table>> {
+        Some(self.table)
     }
 }
 
 impl GetTableAccess for plan::DeRef {
-    fn get_table_access(&self) -> plan::Key<plan::Table> {
-        self.table
+    fn get_table_access(&self) -> Option<plan::Key<plan::Table>> {
+        Some(self.table)
     }
 }
 
-#[enumtrait::impl_trait(get_access_trait for plan::modify_operator_enum)]
-impl GetTableAccess for plan::Modify {}
+impl GetTableAccess for plan::Map {}
+impl GetTableAccess for plan::Expand {}
+impl GetTableAccess for plan::Fold {}
+impl GetTableAccess for plan::Filter {}
+impl GetTableAccess for plan::Sort {}
+impl GetTableAccess for plan::Assert {}
+impl GetTableAccess for plan::Collect {}
+impl GetTableAccess for plan::Take {}
+impl GetTableAccess for plan::Join {}
+impl GetTableAccess for plan::GroupBy {}
+impl GetTableAccess for plan::Fork {}
+impl GetTableAccess for plan::Union {}
+impl GetTableAccess for plan::Row {}
+impl GetTableAccess for plan::Return {}
+impl GetTableAccess for plan::Discard {}
 
-#[enumtrait::impl_trait(get_access_trait for plan::access_operator_enum)]
-impl GetTableAccess for plan::Access {}
 
 // Wraps [`dot::Labeller`] to be implemented for graph nodes
 #[enumtrait::store(edge_style_trait)]

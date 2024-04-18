@@ -1,12 +1,12 @@
 //! # [emDB](crate) frontends
-//! 
+//!
 //! ## What is a frontend?
-//! 
+//!
 //! ## [Diagnostics API](proc_macro_error::Diagnostic)
-//! 
+//!
 
-mod emql;
 mod boss;
+mod emql;
 mod sql;
 
 use std::collections::LinkedList;

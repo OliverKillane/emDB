@@ -1,4 +1,4 @@
-use super::super::{LongSequence, Nothing, Parse, RecursiveIdent, LargeGroups};
+use super::super::{LargeGroups, LongSequence, Nothing, Parse, RecursiveIdent};
 use chumsky::prelude::*;
 use chumsky_proc::prelude::*;
 use proc_macro2::{Delimiter, Punct};
@@ -56,18 +56,31 @@ impl Parse<Nothing> for ChumskyProc {
     }
 }
 
-fn large_group_parser() -> impl Parser<RustToken, LargeGroups, Error = Simple<RustToken, RustSpan>> {
-    recursive(|r| 
-        filter_map(RustToken::filter_punct).repeated().at_least(1).map(|ps| LargeGroups::Puncts(ps.iter().map(Punct::as_char).collect())).delimited_by(
-            just(RustToken::StartDelim(Delimiter::Parenthesis)),
-            just(RustToken::EndDelim(Delimiter::Parenthesis))
-        ).or(
-            r.delimited_by(
-                just(RustToken::StartDelim(Delimiter::Brace)), 
-                just(RustToken::EndDelim(Delimiter::Brace))
+fn large_group_parser() -> impl Parser<RustToken, LargeGroups, Error = Simple<RustToken, RustSpan>>
+{
+    recursive(|r| {
+        filter_map(RustToken::filter_punct)
+            .repeated()
+            .at_least(1)
+            .map(|ps| LargeGroups::Puncts(ps.iter().map(Punct::as_char).collect()))
+            .delimited_by(
+                just(RustToken::StartDelim(Delimiter::Parenthesis)),
+                just(RustToken::EndDelim(Delimiter::Parenthesis)),
             )
-        ).repeated().at_least(1).map(|gs| if gs.len() == 1 { gs[0].clone()} else {LargeGroups::Groups(gs)})
-    )
+            .or(r.delimited_by(
+                just(RustToken::StartDelim(Delimiter::Brace)),
+                just(RustToken::EndDelim(Delimiter::Brace)),
+            ))
+            .repeated()
+            .at_least(1)
+            .map(|gs| {
+                if gs.len() == 1 {
+                    gs[0].clone()
+                } else {
+                    LargeGroups::Groups(gs)
+                }
+            })
+    })
 }
 
 impl Parse<LargeGroups> for ChumskyProc {

@@ -48,15 +48,15 @@ impl EMQLOperator for Collect {
                     } else {
                         let bag_type = lp.scalar_types.insert(plan::ConcRef::Conc(plan::ScalarTypeConc::Bag(data_type.fields)));
                         ts.insert(alias, bag_type);
-                        let record_type = lp.record_types.insert(plan::ConcRef::Conc(plan::RecordConc{ fields: HashMap::from([(field.clone(), bag_type)]) } )); 
+                        let record_type = lp.record_types.insert(plan::ConcRef::Conc(plan::RecordConc{ fields: HashMap::from([(field.clone().into(), bag_type)]) } )); 
                         Ok(
                             LinearBuilderState { 
                                 data_out: plan::Data {
                                     fields: record_type,
                                     stream: false,
-                                }, op: plan::Operator::Pure(
-                                    plan::Collect { input: prev_edge, into: field, output: next_edge }.into()
-                                ), call_span: call.span()}
+                                }, op: 
+                                    plan::Collect { input: prev_edge, into: field.into(), output: next_edge }.into()
+                                , call_span: call.span()}
                         )
                     }
                 }

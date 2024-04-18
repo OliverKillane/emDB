@@ -47,10 +47,10 @@ impl EMQLOperator for Insert {
                 }, next_edge | {
                     if let Some(table_id) = tn.get(&table_name) {
                         let table = lp.get_table(*table_id);
-                        let insert_access = generate_access(*table_id, plan::TableAccess::AllCols, lp, None).unwrap();
+                        let insert_access = generate_access::insert(*table_id, lp);
                         if plan::record_type_eq(lp, &insert_access, &fields) {
                             let table_ref_t = lp.scalar_types.insert(plan::ConcRef::Conc(plan::ScalarTypeConc::TableRef(*table_id)));
-                            let out_data_type = lp.record_types.insert(plan::ConcRef::Conc(plan::RecordConc {fields: HashMap::from([(out_ref.clone(), table_ref_t)])}));
+                            let out_data_type = lp.record_types.insert(plan::ConcRef::Conc(plan::RecordConc {fields: HashMap::from([(out_ref.clone().into(), table_ref_t)])}));
                             let out_data = plan::Data {fields: out_data_type, stream };
                             Ok(
                                 LinearBuilderState {
@@ -58,10 +58,10 @@ impl EMQLOperator for Insert {
                                         fields: out_data_type,
                                         stream,
                                     },
-                                    op: plan::Operator::Modify (plan::Insert {  input: prev_edge,
+                                    op: plan::Insert {  input: prev_edge,
                                         table: *table_id,
-                                        out_ref,
-                                        output: next_edge, }.into() ),
+                                        out_ref: out_ref.into(),
+                                        output: next_edge, }.into(),
                                     call_span: call.span()
                                 }
                             )

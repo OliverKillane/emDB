@@ -42,8 +42,8 @@ impl EMQLOperator for Map {
                         match ast_typeto_scalar(tn, ts, ast_type, |e| errors::query_nonexistent_table(&call, e), errors::query_no_cust_type_found) {
                             Ok(t) => {
                                 let t_index = lp.scalar_types.insert(t);
-                                type_fields.insert(field.clone(), t_index);
-                                expr_fields.insert(field, expr);
+                                type_fields.insert(field.clone().into(), t_index);
+                                expr_fields.insert(field.into(), expr);
                             },
                             Err(e) => {
                                 errors.push_back(e);
@@ -58,7 +58,7 @@ impl EMQLOperator for Map {
                                     fields: lp.record_types.insert(plan::ConcRef::Conc(plan::RecordConc { fields: type_fields })),
                                     stream: data_type.stream,
                                 },
-                                op: plan::Operator::Pure(plan::Map { input: prev_edge, mapping: expr_fields, output: next_edge  }.into()),
+                                op: (plan::Map { input: prev_edge, mapping: expr_fields, output: next_edge  }.into()),
                                 call_span: call.span()
                             }
                         )

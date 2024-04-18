@@ -8,7 +8,7 @@ enum RGB {
 }
 
 emql! {
-    impl my_db as Planviz{path = "cool.dot", display_types = on, display_ctx_ops = on, display_control = on};
+    impl my_db as Planviz{path = "cool.dot", display_types = off, display_ctx_ops = off, display_control = off};
 
     table cool {
         name: String,
@@ -34,17 +34,17 @@ emql! {
             ~> return;
     }
 
-    query collect_most_cool() {
-        ref cool as cool_ref
-            |> deref(cool_ref as cool_vals)
-            |> map(sort_on: i32 = cool_vals.something)
-            |> sort(sort_on desc)
-            |> take(10)
-            |> map(id: ref cool = cool_ref)
-            |> collect(it as type foo)
-            ~> map(blah: type foo = it, c: i32 = 0)
-            ~> return;
-    }
+    // query collect_most_cool() {
+    //     ref cool as cool_ref
+    //         |> deref(cool_ref as cool_vals)
+    //         |> map(sort_on: i32 = cool_vals.something)
+    //         |> sort(sort_on desc)
+    //         |> take(10)
+    //         |> map(id: ref cool = cool_ref)
+    //         |> collect(it as type foo)
+    //         ~> map(blah: type foo = it, c: i32 = 0)
+    //         ~> return;
+    // }
 
     query complex() {
         use cool
@@ -55,12 +55,12 @@ emql! {
         use larger_than_10
             |> fork(let x1, x2);
 
-        use x1 
+        use x1
             |> take(1)
-            |> collect(it as type foo) 
+            |> collect(it as type foo)
             ~> return;
 
-        use x2 
+        use x2
             |> sort(x desc)
             |> fork(let z1, z2);
 

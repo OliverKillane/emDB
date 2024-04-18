@@ -603,7 +603,7 @@ where
 /// # impl CombiErr<NothingErr> for NothingErr {
 /// #     fn inherit_con(self, con: NothingErr) -> Self {
 /// #        NothingErr
-/// #    } 
+/// #    }
 /// #    fn catch_con(con: NothingErr) -> Self {
 /// #        NothingErr
 /// #    }

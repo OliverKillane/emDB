@@ -12,9 +12,9 @@ use quote::quote;
 
 extern crate proc_macro;
 
+mod analysis;
 mod backend;
 mod frontend;
-mod analysis;
 mod optimise;
 mod plan;
 mod utils;

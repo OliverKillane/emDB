@@ -1,33 +1,52 @@
-use super::{Data, Key, Plan, ScalarType, Table, TableAccess};
-use proc_macro2::Ident;
+use super::{Data, Key, Plan, RecordField, ScalarType, Table};
 use std::collections::HashMap;
 use syn::Expr;
 
+/// A complete data flow connection (only type allowed for valid, constructed plans)
+pub struct DataFlowConn {
+    pub from: Key<Operator>,
+    pub to: Key<Operator>,
+    pub with: Data,
+}
+
 pub enum DataFlow {
-    Conn {
-        from: Key<Operator>,
-        to: Key<Operator>,
-        with: Data,
-    },
+    Conn(DataFlowConn),
 
     /// (For graph construction)
     /// INV: None exist in the edges after graph construction
-    Incomplete { from: Key<Operator>, with: Data },
+    Incomplete {
+        from: Key<Operator>,
+        with: Data,
+    },
 
     /// (For graph construction)
     /// INV: None exist in the edges after graph construction
     Null,
 }
 
-/// Apply a series of updates from a stream, the updated rows are propagated
+impl DataFlow {
+    pub fn get_conn(&self) -> &DataFlowConn {
+        match self {
+            DataFlow::Conn(c) => c,
+            _ => panic!("Attempted to get connection from non-connection dataflow"),
+        }
+    }
+}
+
+/// Apply write to specific columns in a table.
 /// INV: mapping and output have the same fields
 /// INV: mapping expressions only contain fields from input and globals
 /// INV: mapping assignment only contains fields from referenced table
 pub struct Update {
     pub input: Key<DataFlow>,
-    pub reference: Ident,
+
+    /// The field and table referenced
+    pub reference: RecordField, //
     pub table: Key<Table>,
-    pub mapping: HashMap<Ident, Expr>,
+
+    // the expressions for the output type
+    pub mapping: HashMap<RecordField, Expr>,
+
     pub output: Key<DataFlow>,
 }
 
@@ -38,7 +57,7 @@ pub struct Update {
 pub struct Insert {
     pub input: Key<DataFlow>,
     pub table: Key<Table>,
-    pub out_ref: Ident,
+    pub out_ref: RecordField,
     pub output: Key<DataFlow>,
 }
 
@@ -48,7 +67,7 @@ pub struct Insert {
 /// INV: output contains the tuple of removed values, same fields as table
 pub struct Delete {
     pub input: Key<DataFlow>,
-    pub reference: Ident,
+    pub reference: RecordField,
     pub table: Key<Table>,
     pub output: Key<DataFlow>,
 }
@@ -56,19 +75,19 @@ pub struct Delete {
 /// Gets a unique row from a table
 pub struct GetUnique {
     pub input: Key<DataFlow>,
-    pub access: TableAccess,
-    pub from: Ident,
+
+    pub from: RecordField,
     pub table: Key<Table>,
-    pub field: Ident,
-    pub out: Ident,
+    pub field: RecordField,
+    pub out: RecordField,
+
     pub output: Key<DataFlow>,
 }
 
-/// Scan a table to generate a stream (optionally of references)
-/// INV: if refs then output is a record of ref.
-pub struct Scan {
-    pub access: TableAccess,
+/// Scan a table to generate a stream of table references
+pub struct ScanRefs {
     pub table: Key<Table>,
+    pub out_ref: RecordField,
     pub output: Key<DataFlow>,
 }
 
@@ -76,9 +95,8 @@ pub struct Scan {
 /// INV: the 'named' not present in the input record
 pub struct DeRef {
     pub input: Key<DataFlow>,
-    pub reference: Ident,
-    pub access: TableAccess,
-    pub named: Ident,
+    pub reference: RecordField,
+    pub named: RecordField,
     pub table: Key<Table>,
     pub output: Key<DataFlow>,
 }
@@ -99,7 +117,14 @@ pub struct FoldField {
 /// INV: mapping expressions only contain fields from input and globals
 pub struct Map {
     pub input: Key<DataFlow>,
-    pub mapping: HashMap<Ident, Expr>,
+    pub mapping: HashMap<RecordField, Expr>,
+    pub output: Key<DataFlow>,
+}
+
+/// Expand a single record field and discard the other fields.
+pub struct Expand {
+    pub input: Key<DataFlow>,
+    pub field: RecordField,
     pub output: Key<DataFlow>,
 }
 
@@ -109,7 +134,7 @@ pub struct Map {
 /// INV: output matches initial types
 pub struct Fold {
     pub input: Key<DataFlow>,
-    pub fold_fields: HashMap<Ident, FoldField>,
+    pub fold_fields: HashMap<RecordField, FoldField>,
     pub output: Key<DataFlow>,
 }
 
@@ -127,7 +152,7 @@ pub struct Filter {
 /// INV: The identified fields must exist in the input
 pub struct Sort {
     pub input: Key<DataFlow>,
-    pub sort_order: Vec<(Ident, SortOrder)>,
+    pub sort_order: Vec<(RecordField, SortOrder)>,
     pub output: Key<DataFlow>,
 }
 
@@ -148,7 +173,7 @@ pub struct Assert {
 ///   about folds generally, and we want the backend to determine the bag's type
 pub struct Collect {
     pub input: Key<DataFlow>,
-    pub into: Ident,
+    pub into: RecordField,
     pub output: Key<DataFlow>,
 }
 
@@ -167,7 +192,7 @@ pub struct Join {
 /// group by a field and aggregate the results
 pub struct GroupBy {
     pub input: Key<DataFlow>,
-    pub group_on: Ident,
+    pub group_on: RecordField,
     pub aggregate_start: Key<DataFlow>,
     pub aggregate_end: Key<DataFlow>,
     pub output: Key<DataFlow>,
@@ -190,7 +215,7 @@ pub struct Union {
 /// INV: output matches fields
 /// INV: output is a single
 pub struct Row {
-    pub fields: HashMap<Ident, Expr>,
+    pub fields: HashMap<RecordField, Expr>,
     pub output: Key<DataFlow>,
 }
 
@@ -206,27 +231,16 @@ pub struct Discard {
 
 #[enumtrait::quick_enum]
 #[enumtrait::quick_from]
-#[enumtrait::store(pub modify_operator_enum)]
-pub enum Modify {
+#[enumtrait::store(pub operator_enum)]
+pub enum Operator {
     Update,
     Insert,
     Delete,
-}
-
-#[enumtrait::quick_enum]
-#[enumtrait::quick_from]
-#[enumtrait::store(pub access_operator_enum)]
-pub enum Access {
     GetUnique,
-    Scan,
+    ScanRefs,
     DeRef,
-}
-
-#[enumtrait::quick_enum]
-#[enumtrait::quick_from]
-#[enumtrait::store(pub pure_operator_enum)]
-pub enum Pure {
     Map,
+    Expand,
     Fold,
     Filter,
     Sort,
@@ -237,25 +251,9 @@ pub enum Pure {
     GroupBy,
     Fork,
     Union,
-}
-
-#[enumtrait::quick_enum]
-#[enumtrait::quick_from]
-#[enumtrait::store(pub flow_operator_enum)]
-pub enum Flow {
     Row,
     Return,
     Discard,
-}
-
-#[enumtrait::quick_from]
-#[enumtrait::quick_enum]
-#[enumtrait::store(pub operator_enum)]
-pub enum Operator {
-    Modify,
-    Access,
-    Pure,
-    Flow,
 }
 
 impl Plan {

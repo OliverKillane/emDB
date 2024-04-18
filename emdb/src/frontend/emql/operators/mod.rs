@@ -17,8 +17,9 @@ use crate::frontend::emql::parse::{
     fields_assign, fields_expr, functional_style, type_parser_to_punct,
 };
 use crate::frontend::emql::sem::{
-    ast_typeto_scalar, extract_fields, generate_access, linear_builder, update_incomplete,
-    Continue, LinearBuilderState, ReturnVal, StreamContext, VarState,
+    ast_typeto_scalar, create_scanref, extract_fields, generate_access, get_all_cols,
+    linear_builder, update_incomplete, valid_linear_builder, Continue, LinearBuilderState,
+    ReturnVal, StreamContext, VarState,
 };
 use crate::plan;
 use crate::utils::misc::{result_to_opt, singlelist};

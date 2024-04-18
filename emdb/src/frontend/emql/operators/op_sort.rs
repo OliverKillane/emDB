@@ -66,8 +66,9 @@ impl EMQLOperator for Sort {
                     let (raw_fields, mut errors) = extract_fields(fields, errors::sort_field_used_twice);
                     let mut sort_order = Vec::new();
                     for (field, (ordering, _)) in raw_fields {
-                        if rec_type.fields.contains_key(&field) {
-                            sort_order.push((field, convert_ordering(ordering)));
+                        let rec_field = field.clone().into();
+                        if rec_type.fields.contains_key(&rec_field) {
+                            sort_order.push((rec_field, convert_ordering(ordering)));
                         } else {
                             errors.push_back(errors::query_reference_field_missing(&field));
                         }
@@ -81,7 +82,7 @@ impl EMQLOperator for Sort {
                         Ok(
                             LinearBuilderState { 
                                 data_out: prev.data_type, 
-                                op: plan::Operator::Pure(plan::Sort { input: prev.prev_edge, sort_order, output: next_edge }.into()), 
+                                op: (plan::Sort { input: prev.prev_edge, sort_order, output: next_edge }.into()), 
                                 call_span: call.span() 
                             }
                         )

@@ -44,13 +44,6 @@ pub struct ColSelect {
     pub select_as: Ident,
 }
 
-#[derive(Clone)]
-pub enum TableAccess {
-    Ref(Ident),
-    AllCols,
-    Selection(Vec<ColSelect>),
-}
-
 impl Plan {
     pub fn get_table(&self, k: Key<Table>) -> &Table {
         self.tables.get(k).unwrap()

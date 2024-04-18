@@ -3,7 +3,7 @@ use proc_macro2::Ident;
 
 pub struct Query {
     pub name: Ident,
-    pub ctx: Key<Context>
+    pub ctx: Key<Context>,
 }
 
 /// A context represents a section of a logical plan, with some available variables.
@@ -21,17 +21,20 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn from_params(params: impl Iterator<Item=(Ident, Key<ScalarType>)>) -> Self {
+    pub fn from_params(params: impl Iterator<Item = (Ident, Key<ScalarType>)>) -> Self {
         Context {
             ordering: Vec::new(),
             params: params.collect(),
             returnflow: None,
-            discards: Vec::new()
+            discards: Vec::new(),
         }
     }
 
     pub fn set_return(&mut self, returnflow: Key<Operator>) {
-        assert!(self.returnflow.is_none(), "Cannot set the return of a context twice");
+        assert!(
+            self.returnflow.is_none(),
+            "Cannot set the return of a context twice"
+        );
         self.returnflow = Some(returnflow);
     }
 

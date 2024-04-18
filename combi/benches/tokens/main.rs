@@ -11,7 +11,12 @@ use proc_macro2::TokenStream;
 use std::fmt::Debug;
 
 mod cases;
-use cases::{long_sequence::LongSequence, nothing::Nothing, recursive_ident::RecursiveIdent, large_groups::{LargeGroups, Size as LargeGroupsSize}};
+use cases::{
+    large_groups::{LargeGroups, Size as LargeGroupsSize},
+    long_sequence::LongSequence,
+    nothing::Nothing,
+    recursive_ident::RecursiveIdent,
+};
 mod parsers;
 use parsers::{chumsky_proc::ChumskyProc, combi::CombiParser, handrolled::HandRolled};
 

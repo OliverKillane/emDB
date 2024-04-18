@@ -10,7 +10,7 @@ pub enum PlanNode {
     Operator(plan::Key<plan::Operator>),
     Dataflow(plan::Key<plan::DataFlow>),
     Query(plan::Key<plan::Query>),
-    RecordType(plan::Key<plan::Record>),
+    RecordType(plan::Key<plan::RecordType>),
     ScalarType(plan::Key<plan::ScalarType>),
     Context(plan::Key<plan::Context>),
 }
@@ -58,7 +58,7 @@ impl GetFeature<PlanNode> for plan::Operator {
         edges.push(PlanNode::Operator(self_key));
     }
 }
-impl GetFeature<PlanNode> for plan::Record {
+impl GetFeature<PlanNode> for plan::RecordType {
     fn get_features(&self, self_key: plan::Key<Self>, edges: &mut Vec<PlanNode>, config: &DisplayConfig) {
         if config.display_types {edges.push(PlanNode::RecordType(self_key))};
     }
@@ -96,7 +96,7 @@ pub trait StyleableNode: Sized {
     fn color<'a>(&self, plan: &plan::Plan) -> Option<dot::LabelText<'a>>;
 }
 
-impl StyleableNode for plan::Record {
+impl StyleableNode for plan::RecordType {
     const ID_PREFIX: &'static str = "recordtype";
 
     fn shape<'a>(&'a self, plan: &plan::Plan) -> Option<dot::LabelText<'a>> {
@@ -202,30 +202,30 @@ impl StyleableNode for plan::DataFlow {
     }
 
     fn label<'a>(&'a self, plan: &plan::Plan) -> dot::LabelText<'a> {
-        if let plan::DataFlow::Conn {
+        
+        let plan::DataFlowConn {
             from,
             to,
             with
-        } = self {
-            // NOTE: we opt not to show the type information here, as that would 
-            //       require a graph traversal.
-            //       Planviz is for debugging, if the type graph was cyclical 
-            //       (bug) this would crash the planviz backend
-            dot::LabelText::label(if with.stream { "stream" } else {"single"} )
-        } else {
-            unreachable!("Only `DataFlow::Conn` edges should be present in dataflow")
-        }
+        } = self.get_conn();
+
+        // NOTE: we opt not to show the type information here, as that would 
+        //       require a graph traversal.
+        //       Planviz is for debugging, if the type graph was cyclical 
+        //       (bug) this would crash the planviz backend
+        dot::LabelText::label(if with.stream { "stream" } else {"single"} )
     }
 
     fn style(&self, plan: &plan::Plan) -> dot::Style {
-        if let plan::DataFlow::Conn { from, to, with } = self {
-            if with.stream {
-                dot::Style::Bold
-            } else {
-                dot::Style::None
-            }
+        let plan::DataFlowConn {
+            from,
+            to,
+            with
+        } = self.get_conn();
+        if with.stream {
+            dot::Style::Bold
         } else {
-            unreachable!()
+            dot::Style::None
         }
     }
 
@@ -282,18 +282,6 @@ pub trait OperatorDescription {
 #[enumtrait::impl_trait(operator_description_trait for plan::operator_enum)]
 impl OperatorDescription for plan::Operator {}
 
-#[enumtrait::impl_trait(operator_description_trait for plan::modify_operator_enum)]
-impl OperatorDescription for plan::Modify {}
-
-#[enumtrait::impl_trait(operator_description_trait for plan::access_operator_enum)]
-impl OperatorDescription for plan::Access {}
-
-#[enumtrait::impl_trait(operator_description_trait for plan::pure_operator_enum)]
-impl OperatorDescription for plan::Pure {}
-
-#[enumtrait::impl_trait(operator_description_trait for plan::flow_operator_enum)]
-impl OperatorDescription for plan::Flow {}
-
 impl OperatorDescription for plan::Update {
     fn description(&self,plan: &plan::Plan) -> String {
         format!("Update")
@@ -318,7 +306,7 @@ impl OperatorDescription for plan::GetUnique {
     }
 }
 
-impl OperatorDescription for plan::Scan {
+impl OperatorDescription for plan::ScanRefs {
     fn description(&self,plan: &plan::Plan) -> String {
         format!("Scan")
     }
@@ -331,6 +319,12 @@ impl OperatorDescription for plan::DeRef {
 }
 
 impl OperatorDescription for plan::Map {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Map")
+    }
+}
+
+impl OperatorDescription for plan::Expand {
     fn description(&self,plan: &plan::Plan) -> String {
         format!("Map")
     }

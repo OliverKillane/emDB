@@ -54,13 +54,13 @@ macro_rules! create_backend {
     };
 }
 
-create_backend!(Backend as planviz::PlanViz, semcheck::SemCheck );
+create_backend!(Backend as planviz::PlanViz, semcheck::SemCheck);
 
 pub struct Targets {
     pub impls: HashMap<Ident, Backend>,
 }
 
-fn no_such_backend(backend_name: &Ident, names: &[&'static str;2]) -> Diagnostic {
+fn no_such_backend(backend_name: &Ident, names: &[&'static str; 2]) -> Diagnostic {
     Diagnostic::spanned(
         backend_name.span(),
         Level::Error,

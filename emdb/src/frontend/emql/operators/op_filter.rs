@@ -38,7 +38,7 @@ impl EMQLOperator for Filter {
                     Ok(
                         LinearBuilderState {
                             data_out: prev.data_type,
-                            op: plan::Operator::Pure(plan::Filter { input: prev.prev_edge, predicate: filter_expr, output: next_edge}.into()),
+                            op: plan::Filter { input: prev.prev_edge, predicate: filter_expr, output: next_edge}.into(),
                             call_span: call.span()
                         }
                     )

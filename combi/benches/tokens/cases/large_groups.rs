@@ -1,11 +1,11 @@
-use proc_macro2::{Punct, Spacing, TokenStream, TokenTree, Delimiter, Group};
-use quote::quote;
 use super::super::Parseable;
+use proc_macro2::{Delimiter, Group, Punct, Spacing, TokenStream, TokenTree};
+use quote::quote;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum LargeGroups {
     Groups(Vec<LargeGroups>),
-    Puncts(Vec<char>)
+    Puncts(Vec<char>),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -18,7 +18,13 @@ pub struct Size {
 impl Parseable for LargeGroups {
     type Param = Size;
 
-    fn generate_case(Size { depth, branch_width, leaf_width }: Self::Param) -> Self {
+    fn generate_case(
+        Size {
+            depth,
+            branch_width,
+            leaf_width,
+        }: Self::Param,
+    ) -> Self {
         if depth == 0 {
             LargeGroups::Puncts(vec!['!'; leaf_width])
         } else {
@@ -47,4 +53,3 @@ impl Parseable for LargeGroups {
         }
     }
 }
-

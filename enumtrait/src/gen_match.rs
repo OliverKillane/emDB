@@ -10,8 +10,8 @@ use combi::{
     macros::seqs,
     tokens::{
         basic::{collectuntil, getident, isempty, matchident, matchpunct, syn},
-        TokenDiagnostic, TokenIter,
         error::expectederr,
+        TokenDiagnostic, TokenIter,
     },
     Combi,
 };

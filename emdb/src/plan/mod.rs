@@ -35,14 +35,14 @@ pub struct Plan {
     pub operators: GenArena<Operator>,
     pub dataflow: GenArena<DataFlow>,
     pub scalar_types: GenArena<ScalarType>,
-    pub record_types: GenArena<Record>,
+    pub record_types: GenArena<RecordType>,
 }
 
 impl Plan {
     pub fn new() -> Self {
         Plan {
             queries: GenArena::new(),
-            contexts:  GenArena::new(),
+            contexts: GenArena::new(),
             tables: GenArena::new(),
             operators: GenArena::new(),
             dataflow: GenArena::new(),

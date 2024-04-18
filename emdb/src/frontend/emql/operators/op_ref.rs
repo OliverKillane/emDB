@@ -34,26 +34,7 @@ impl EMQLOperator for Ref {
         let Self { call, table_name, out_as: out_ref } = self;
         if cont.is_none() {
             if let Some(table_id) = tn.get(&table_name) {
-                let access = plan::TableAccess::Ref(out_ref.clone());
-                let record_out = plan::Data {
-                    fields: generate_access(*table_id, access.clone(), lp, None).unwrap(),
-                    stream: true
-                };
-                let out_edge = lp.dataflow.insert(plan::DataFlow::Null);
-                let ref_op = lp.operators.insert(plan::Operator::Access ( plan::Scan { access , table: *table_id, output: out_edge }.into() ));
-                
-                *lp.get_mut_dataflow(out_edge) = plan::DataFlow::Incomplete {
-                    from: ref_op,
-                    with: record_out.clone(),
-                };
-
-                lp.get_mut_context(op_ctx).add_operator(ref_op);
-
-                Ok(StreamContext::Continue(Continue {
-                    data_type: record_out,
-                    prev_edge: out_edge,
-                    last_span: call.span(),
-                }))
+                Ok(StreamContext::Continue(create_scanref(lp, op_ctx, *table_id, out_ref.into(), call.span())))
             } else {
                 Err(singlelist(errors::query_nonexistent_table(
                     &call,

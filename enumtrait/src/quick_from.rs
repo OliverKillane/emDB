@@ -2,7 +2,7 @@ use proc_macro2::{Ident, Span, TokenStream};
 use proc_macro_error::{Diagnostic, Level};
 use quote::quote;
 use std::collections::LinkedList;
-use syn::{parse2, spanned::Spanned, Fields, ItemEnum, Type, Variant};
+use syn::{parse2, spanned::Spanned, Fields, Generics, ItemEnum, Type, Variant};
 
 use crate::macro_comm::extract_syn;
 
@@ -46,6 +46,14 @@ fn get_var_name_type(var: &Variant) -> Option<(Ident, Type)> {
     None
 }
 
+fn strip_generic_constraints(gens: &Generics) -> Generics {
+    let mut new_gens = gens.clone();
+    new_gens.type_params_mut().for_each(|param| {
+        param.bounds.clear();
+    });
+    new_gens
+}
+
 fn impl_from(enum_def: &ItemEnum) -> TokenStream {
     let enum_name = &enum_def.ident;
     let from_impls = enum_def
@@ -54,8 +62,9 @@ fn impl_from(enum_def: &ItemEnum) -> TokenStream {
         .filter_map(|var| {
             if let Some((name, dt)) = get_var_name_type(var) {
                 let enum_generic = enum_def.generics.clone();
+                let stripped_gens = strip_generic_constraints(&enum_generic);
                 Some(quote! {
-                    impl #enum_generic From<#dt> for #enum_name #enum_generic {
+                    impl #enum_generic From<#dt> for #enum_name #stripped_gens {
                         fn from(it: #dt) -> Self {
                             Self::#name(it)
                         }

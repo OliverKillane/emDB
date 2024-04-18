@@ -140,7 +140,7 @@ impl<'a> dot::Labeller<'a, PlanNode, PlanEdge> for plan::With<'a, (Ident, Displa
 
 impl<'a> dot::GraphWalk<'a, PlanNode, PlanEdge> for plan::With<'a, (Ident, DisplayConfig)> {
     fn nodes(&'a self) -> dot::Nodes<'a, PlanNode> {
-        get_nodes(&self.plan, &self.extended.1).into()
+        get_nodes(self.plan, &self.extended.1)
     }
 
     fn edges(&'a self) -> dot::Edges<'a, PlanEdge> {
@@ -148,7 +148,7 @@ impl<'a> dot::GraphWalk<'a, PlanNode, PlanEdge> for plan::With<'a, (Ident, Displ
         //       - coroutines are currently on nightly, but not stable
         //       - libraries like [remit](https://docs.rs/remit/latest/remit/) can be used, but I want to
         //         reduce dependencies
-        get_edges(&self.plan, &self.extended.1).into()
+        get_edges(self.plan, &self.extended.1)
     }
 
     fn source(&'a self, edge: &PlanEdge) -> PlanNode {

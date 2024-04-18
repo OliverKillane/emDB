@@ -8,7 +8,7 @@ use crate::{
         },
         errors,
     },
-    plan::{self, ColSelect, Context, DataFlow},
+    plan::{self, Context, DataFlow},
 };
 use proc_macro2::{Ident, Span};
 use proc_macro_error::Diagnostic;
@@ -220,28 +220,26 @@ fn add_query(
         qs.insert(name.clone());
     }
 
-    let params = raw_params
-        .into_iter()
-        .filter_map(|(name, data_type)| {
-            match ast_typeto_scalar(
-                tn,
-                &mut ts,
-                data_type,
-                |e| errors::query_param_ref_table_not_found(&name, e),
-                errors::query_no_cust_type_found,
-            ) {
-                Ok(t) => Some((name, lp.scalar_types.insert(t))),
-                Err(e) => {
-                    errors.push_back(e);
-                    None
-                }
+    let params = raw_params.into_iter().filter_map(|(name, data_type)| {
+        match ast_typeto_scalar(
+            tn,
+            &mut ts,
+            data_type,
+            |e| errors::query_param_ref_table_not_found(&name, e),
+            errors::query_no_cust_type_found,
+        ) {
+            Ok(t) => Some((name, lp.scalar_types.insert(t))),
+            Err(e) => {
+                errors.push_back(e);
+                None
             }
-        });
+        }
+    });
 
     let op_ctx = lp.contexts.insert(Context::from_params(params));
     let qk = lp.queries.insert(plan::Query {
         name: name.clone(),
-        ctx: op_ctx
+        ctx: op_ctx,
     });
 
     for stream in streams {
@@ -305,7 +303,9 @@ fn discard_continue(
         last_span,
     }: Continue,
 ) {
-    let discard_op = lp.operators.insert(plan::Operator::Flow(plan::Discard { input: prev_edge }.into()));
+    let discard_op = lp
+        .operators
+        .insert(plan::Discard { input: prev_edge }.into());
     update_incomplete(lp.get_mut_dataflow(prev_edge), discard_op);
     lp.get_mut_context(ctx).add_operator(discard_op);
     lp.get_mut_context(ctx).add_discard(discard_op);
@@ -437,67 +437,36 @@ pub fn ast_typeto_scalar(
     }
 }
 
-/// Using a [`plan::TableAccess`] select the new records.
-/// - Optionally includes fields from a previous record
-/// - generates errors of invalid accesses
-pub fn generate_access(
-    table_id: plan::Key<plan::Table>,
-    access: plan::TableAccess,
+impl plan::RecordField {
+    /// Used for conflicts, where this *should* only possible between user generated types
+    pub fn get_field(&self) -> &Ident {
+        match self {
+            plan::RecordField::User(id) => id,
+            plan::RecordField::Internal(_) => {
+                unreachable!("Attempted to get field, but was an internal id, this is a bug")
+            }
+        }
+    }
+}
+
+fn append_fields(
     lp: &mut plan::Plan,
-    include_from: Option<plan::Key<plan::Record>>,
-) -> Result<plan::Key<plan::Record>, LinkedList<Diagnostic>> {
-    let new_fields = match access {
-        plan::TableAccess::Ref(id) => {
-            let ref_id =
-                lp.scalar_types
-                    .insert(plan::ConcRef::Conc(plan::ScalarTypeConc::TableRef(
-                        table_id,
-                    )));
-
-            Ok(vec![(id, ref_id)])
-        }
-        plan::TableAccess::AllCols => {
-            let table = lp.get_table(table_id);
-
-            Ok(table
-                .columns
-                .iter()
-                .map(|(id, plan::Column { cons, data_type })| (id.clone(), *data_type))
-                .collect())
-        }
-        plan::TableAccess::Selection(ids) => {
-            let table = lp.get_table(table_id);
-            let mut fields = Vec::new();
-            let mut invalid_access = LinkedList::new();
-            for ColSelect { col, select_as } in ids {
-                if let Some(plan::Column { cons, data_type }) = table.columns.get(&col) {
-                    fields.push((select_as, *data_type));
-                } else {
-                    invalid_access.push_back(errors::table_query_no_such_field(&table.name, &col));
-                }
-            }
-
-            if invalid_access.is_empty() {
-                Ok(fields)
-            } else {
-                Err(invalid_access)
-            }
-        }
-    }?;
-
+    new_fields: Vec<(Ident, plan::Key<plan::ScalarType>)>,
+    existing_fields: plan::Key<plan::RecordType>,
+) -> Result<plan::Key<plan::RecordType>, LinkedList<Diagnostic>> {
     let mut errors = LinkedList::new();
-    let mut fields = if let Some(existing) = include_from {
-        lp.get_record_type(existing).fields.clone()
-    } else {
-        HashMap::new()
-    };
+    let mut fields = lp.get_record_type(existing_fields).fields.clone();
 
     // must check even if existing is empty, a user may select the same field many times
     for (id, t) in new_fields {
-        if let Some((k, t)) = fields.get_key_value(&id) {
-            errors.push_back(errors::query_cannot_append_to_record(&id, k));
+        let rec_id = id.into();
+        if let Some((k, t)) = fields.get_key_value(&rec_id) {
+            errors.push_back(errors::query_cannot_append_to_record(
+                rec_id.get_field(),
+                k.get_field(),
+            ));
         } else {
-            fields.insert(id, t);
+            fields.insert(rec_id, t);
         }
     }
     if errors.is_empty() {
@@ -509,14 +478,120 @@ pub fn generate_access(
     }
 }
 
+/// Generate a node that scans references from a given table
+/// Used in both [`super::operators::Ref`] and [`super::operators::Use`]
+pub fn create_scanref(
+    lp: &mut plan::Plan,
+    op_ctx: plan::Key<plan::Context>,
+    table_id: plan::Key<plan::Table>,
+    out_ref: plan::RecordField,
+    call_span: Span,
+) -> Continue {
+    let record_out = plan::Data {
+        fields: generate_access::reference(table_id, out_ref.clone(), lp),
+        stream: true,
+    };
+    let out_edge = lp.dataflow.insert(plan::DataFlow::Null);
+    let ref_op = lp.operators.insert(
+        plan::ScanRefs {
+            table: table_id,
+            out_ref,
+            output: out_edge,
+        }
+        .into(),
+    );
+
+    *lp.get_mut_dataflow(out_edge) = plan::DataFlow::Incomplete {
+        from: ref_op,
+        with: record_out.clone(),
+    };
+
+    lp.get_mut_context(op_ctx).add_operator(ref_op);
+
+    Continue {
+        data_type: record_out,
+        prev_edge: out_edge,
+        last_span: call_span,
+    }
+}
+
+pub fn get_all_cols(lp: &plan::Plan, table_id: plan::Key<plan::Table>) -> plan::RecordConc {
+    let table = lp.get_table(table_id);
+    plan::RecordConc {
+        fields: table
+            .columns
+            .iter()
+            .map(|(id, plan::Column { cons, data_type })| (id.clone().into(), *data_type))
+            .collect(),
+    }
+}
+
+pub mod generate_access {
+    use super::*;
+
+    pub fn reference(
+        table_id: plan::Key<plan::Table>,
+        id: plan::RecordField,
+        lp: &mut plan::Plan,
+    ) -> plan::Key<plan::RecordType> {
+        let ref_id = lp
+            .scalar_types
+            .insert(plan::ConcRef::Conc(plan::ScalarTypeConc::TableRef(
+                table_id,
+            )));
+        lp.record_types.insert(
+            plan::RecordConc {
+                fields: HashMap::from([(id, ref_id)]),
+            }
+            .into(),
+        )
+    }
+
+    pub fn dereference(
+        table_id: plan::Key<plan::Table>,
+        lp: &mut plan::Plan,
+        new_field: Ident,
+        include_from: plan::Key<plan::RecordType>,
+    ) -> Result<plan::Key<plan::RecordType>, LinkedList<Diagnostic>> {
+        let inner_record = lp.record_types.insert(get_all_cols(lp, table_id).into());
+        let scalar_t = lp
+            .scalar_types
+            .insert(plan::ConcRef::Conc(plan::ScalarTypeConc::Record(
+                inner_record,
+            )));
+        append_fields(lp, vec![(new_field, scalar_t)], include_from)
+    }
+
+    pub fn insert(
+        table_id: plan::Key<plan::Table>,
+        lp: &mut plan::Plan,
+    ) -> plan::Key<plan::RecordType> {
+        lp.record_types.insert(get_all_cols(lp, table_id).into())
+    }
+
+    pub fn unique(
+        table_id: plan::Key<plan::Table>,
+        id: Ident,
+        lp: &mut plan::Plan,
+        include_from: plan::Key<plan::RecordType>,
+    ) -> Result<plan::Key<plan::RecordType>, LinkedList<Diagnostic>> {
+        let ref_id = lp
+            .scalar_types
+            .insert(plan::ConcRef::Conc(plan::ScalarTypeConc::TableRef(
+                table_id,
+            )));
+        append_fields(lp, vec![(id, ref_id)], include_from)
+    }
+}
+
 pub fn update_incomplete(df: &mut DataFlow, to: plan::Key<plan::Operator>) {
     // TODO: determine better way to 'map' a member of an arena
     *df = match df {
-        plan::DataFlow::Incomplete { from, with } => plan::DataFlow::Conn {
+        plan::DataFlow::Incomplete { from, with } => plan::DataFlow::Conn(plan::DataFlowConn {
             from: *from,
             to,
             with: with.clone(),
-        },
+        }),
         plan::DataFlow::Conn { .. } | plan::DataFlow::Null => {
             unreachable!("Previous should be incomplete")
         }
@@ -582,4 +657,56 @@ pub fn linear_builder(
         prev_edge: out_edge,
         last_span: result.call_span,
     }))
+}
+
+pub fn valid_linear_builder(
+    lp: &mut plan::Plan,
+    query: plan::Key<plan::Query>,
+    op_ctx: plan::Key<plan::Context>,
+    Continue {
+        data_type,
+        prev_edge,
+        last_span,
+    }: Continue,
+    op_creator: impl FnOnce(
+        &mut plan::Plan,
+        plan::Key<plan::Context>,
+        Continue,
+        plan::Key<plan::DataFlow>, // the next edge
+    ) -> LinearBuilderState,
+) -> Continue {
+    // prev_edge -> op_key -> out_edge
+
+    // create a new edge out of the operator
+    let out_edge = lp.dataflow.insert(plan::DataFlow::Null);
+
+    // create the operator and returned data type
+    let result = op_creator(
+        lp,
+        op_ctx,
+        Continue {
+            data_type,
+            prev_edge,
+            last_span,
+        },
+        out_edge,
+    );
+    let op_key = lp.operators.insert(result.op);
+
+    lp.get_mut_context(op_ctx).add_operator(op_key);
+
+    // update the edge to contain the data out and operator key
+    *lp.get_mut_dataflow(out_edge) = plan::DataFlow::Incomplete {
+        from: op_key,
+        with: result.data_out.clone(),
+    };
+
+    // update the edge in to contain the operator key
+    update_incomplete(lp.get_mut_dataflow(prev_edge), op_key);
+
+    Continue {
+        data_type: result.data_out,
+        prev_edge: out_edge,
+        last_span: result.call_span,
+    }
 }

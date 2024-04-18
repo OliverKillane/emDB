@@ -10,7 +10,7 @@
 
 use std::collections::HashMap;
 
-use crate::plan::{self, Key, Plan, Record, ScalarType, Table, With};
+use crate::plan::{self, Key, Plan, RecordType, ScalarType, Table, With};
 use itertools::Itertools;
 use proc_macro2::{Ident, Span};
 use proc_macro_error::{Diagnostic, Level};
@@ -277,7 +277,7 @@ pub(super) fn query_update_reference_not_present(
     lp: &Plan,
     reference: &Ident,
     prev_span: Span,
-    dt: &Key<Record>,
+    dt: &Key<RecordType>,
 ) -> Diagnostic {
     let err_name = error_name(QUERY, 17);
 
@@ -318,7 +318,7 @@ pub(super) fn query_insert_field_type_mismatch(
     lp: &Plan,
     call: &Ident,
     field: &Ident,
-    passed_type: &Key<Record>,
+    passed_type: &Key<RecordType>,
     expected_type: &Type,
     prev_span: Span,
 ) -> Diagnostic {
@@ -456,7 +456,7 @@ pub(super) fn query_deref_cannot_deref_rust_type(reference: &Ident, t: &Type) ->
 pub(super) fn query_deref_cannot_deref_record(
     lp: &Plan,
     reference: &Ident,
-    t: &Key<Record>,
+    t: &Key<RecordType>,
 ) -> Diagnostic {
     let err_name = error_name(QUERY, 27);
     Diagnostic::spanned(
@@ -583,7 +583,7 @@ pub(super) fn query_let_variable_already_assigned(
 pub(super) fn query_deref_cannot_deref_bag_type(
     lp: &Plan,
     reference: &Ident,
-    t: &Key<Record>,
+    t: &Key<RecordType>,
 ) -> Diagnostic {
     let err_name = error_name(QUERY, 35);
     Diagnostic::spanned(
@@ -623,8 +623,8 @@ pub(super) fn query_invalid_record_type(
     lp: &Plan,
     op: &Ident,
     prev: Span,
-    expected: &Key<Record>,
-    found: &Key<Record>,
+    expected: &Key<RecordType>,
+    found: &Key<RecordType>,
 ) -> Diagnostic {
     let err_name = error_name(QUERY, 38);
 
@@ -683,14 +683,29 @@ pub(super) fn sort_field_used_twice(field: &Ident, dup_field: &Ident) -> Diagnos
 }
 
 pub(super) fn union_requires_at_least_one_input(call: &Ident) -> Diagnostic {
-    Diagnostic::spanned(call.span(), Level::Error, format!("`{call}` requires at least one input"))
+    Diagnostic::spanned(
+        call.span(),
+        Level::Error,
+        format!("`{call}` requires at least one input"),
+    )
 }
 
 pub(super) fn union_requires_streams(call: &Ident, var: &Ident) -> Diagnostic {
-    Diagnostic::spanned(var.span(), Level::Error, format!("`{call}` inputs must be streams, but `{var}` is not a stream"))
+    Diagnostic::spanned(
+        var.span(),
+        Level::Error,
+        format!("`{call}` inputs must be streams, but `{var}` is not a stream"),
+    )
 }
 
-pub(super) fn union_not_same_type(lp: &plan::Plan, call: &Ident, var: &Ident, data_type: &plan::Key<plan::Record>, other_var: &Ident, other_data_type: &plan::Key<plan::Record>) -> Diagnostic {
+pub(super) fn union_not_same_type(
+    lp: &plan::Plan,
+    call: &Ident,
+    var: &Ident,
+    data_type: &plan::Key<plan::RecordType>,
+    other_var: &Ident,
+    other_data_type: &plan::Key<plan::RecordType>,
+) -> Diagnostic {
     Diagnostic::spanned(
         other_var.span(),
         Level::Error,

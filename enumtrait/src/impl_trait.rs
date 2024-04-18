@@ -5,7 +5,13 @@ use proc_macro2::{Ident, Span, TokenStream};
 use proc_macro_error::{Diagnostic, Level};
 use quote::{quote, ToTokens};
 use syn::{
-    parse2, punctuated::Punctuated, spanned::Spanned, token::{Brace, Comma, Dot, FatArrow, Match, Paren, SelfValue}, Arm, Block, Expr, ExprMatch, ExprMethodCall, ExprPath, FnArg, ImplItem, ImplItemFn, ItemEnum, ItemImpl, ItemTrait, Pat, PatIdent, PatTupleStruct, Path, PathSegment, Signature, Stmt, TraitItem, TraitItemFn
+    parse2,
+    punctuated::Punctuated,
+    spanned::Spanned,
+    token::{Brace, Comma, Dot, FatArrow, Match, Paren, SelfValue},
+    Arm, Block, Expr, ExprMatch, ExprMethodCall, ExprPath, FnArg, ImplItem, ImplItemFn, ItemEnum,
+    ItemImpl, ItemTrait, Pat, PatIdent, PatTupleStruct, Path, PathSegment, Signature, Stmt,
+    TraitItem, TraitItemFn,
 };
 
 use combi::{
@@ -38,7 +44,11 @@ pub fn interface(
 
 fn parse_attrs(attrs: TokenStream) -> Result<(TokenStream, TokenStream), LinkedList<Diagnostic>> {
     let parser = mapsuc(
-        seqs!(collectuntil(peekident("for")), matchident("for"), collectuntil(isempty())),
+        seqs!(
+            collectuntil(peekident("for")),
+            matchident("for"),
+            collectuntil(isempty())
+        ),
         |(trait_macro_store, (_, enum_macro_store))| (trait_macro_store, enum_macro_store),
     );
 
@@ -65,7 +75,11 @@ pub fn apply(input: TokenStream) -> Result<TokenStream, LinkedList<Diagnostic>> 
     Ok(add_fn_impls(impl_item, trait_item, enum_item)?.into_token_stream())
 }
 
-fn add_fn_impls(mut impl_item: ItemImpl, trait_item: ItemTrait, enum_item: ItemEnum) -> Result<ItemImpl, LinkedList<Diagnostic>> {
+fn add_fn_impls(
+    mut impl_item: ItemImpl,
+    trait_item: ItemTrait,
+    enum_item: ItemEnum,
+) -> Result<ItemImpl, LinkedList<Diagnostic>> {
     let qualified_name = get_path(&impl_item)?;
     for item in trait_item.items {
         if let TraitItem::Fn(ref f_item) = item {
@@ -81,10 +95,10 @@ fn add_fn_impls(mut impl_item: ItemImpl, trait_item: ItemTrait, enum_item: ItemE
 fn get_path(impl_item: &ItemImpl) -> Result<Path, LinkedList<Diagnostic>> {
     match impl_item.self_ty.as_ref() {
         syn::Type::Path(ref p) => {
-            // NOTE: as we are generating a path to use in a pattern match, we cannot allow paths 
-            //       with arguments, unless through turbofish. As these can be inferred trivially 
+            // NOTE: as we are generating a path to use in a pattern match, we cannot allow paths
+            //       with arguments, unless through turbofish. As these can be inferred trivially
             //       from `match self {..}` we can just strip them out.
-            
+
             let mut path = Path {
                 leading_colon: p.path.leading_colon,
                 segments: Punctuated::new(),
@@ -97,7 +111,7 @@ fn get_path(impl_item: &ItemImpl) -> Result<Path, LinkedList<Diagnostic>> {
                 });
             }
             Ok(path)
-        },
+        }
         r => Err(LinkedList::from([Diagnostic::spanned(
             r.span(),
             Level::Error,
@@ -127,7 +141,11 @@ fn extract_params(sig: Signature) -> Option<(SelfValue, Vec<Ident>)> {
     }
 }
 
-fn generate_fn_impl(trait_fn: &TraitItemFn, enum_qual: &Path, enum_item: &ItemEnum) -> Option<ImplItemFn> {
+fn generate_fn_impl(
+    trait_fn: &TraitItemFn,
+    enum_qual: &Path,
+    enum_item: &ItemEnum,
+) -> Option<ImplItemFn> {
     let (self_token, args) = extract_params(trait_fn.sig.clone())?;
 
     let pat_expr = Ident::new("it", Span::call_site());
