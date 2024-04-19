@@ -36,10 +36,9 @@ pub fn interface(
     }
     .store_grouped();
 
-    let tks = quote! {
+    Ok(quote! {
         #enum_macro_store!( item_ctx #trait_macro_store => item_ctx enumtrait::impl_trait_apply => #trait_item ) ;
-    };
-    Ok(tks)
+    })
 }
 
 fn parse_attrs(attrs: TokenStream) -> Result<(TokenStream, TokenStream), LinkedList<Diagnostic>> {
@@ -71,7 +70,7 @@ pub fn apply(input: TokenStream) -> Result<TokenStream, LinkedList<Diagnostic>> 
             label: _,
         },
     ) = Triple::read(input)?;
-
+    
     Ok(add_fn_impls(impl_item, trait_item, enum_item)?.into_token_stream())
 }
 
@@ -151,20 +150,23 @@ fn generate_fn_impl(
     let pat_expr = Ident::new("it", Span::call_site());
 
     let mut args_exprs = Punctuated::new();
-    args_exprs.push(Expr::Path(ExprPath {
-        attrs: Vec::new(),
-        qself: None,
-        path: Path {
-            leading_colon: None,
-            segments: args
-                .iter()
-                .map(|arg| PathSegment {
-                    ident: arg.clone(),
-                    arguments: syn::PathArguments::None,
-                })
-                .collect(),
-        },
-    }));
+    for arg in args {
+        let mut arg_expr = Punctuated::new();
+        arg_expr.push(
+            PathSegment {
+                ident: arg,
+                arguments: syn::PathArguments::None,
+            }
+        );
+        args_exprs.push(Expr::Path(ExprPath {
+            attrs: Vec::new(),
+            qself: None,
+            path: Path {
+                leading_colon: None,
+                segments: arg_expr,
+            },
+        }));
+    }
 
     let expr_match = ExprMatch {
         attrs: Vec::new(),
