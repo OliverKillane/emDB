@@ -9,7 +9,7 @@ pub struct Map {
 impl EMQLOperator for Map {
     const NAME: &'static str = "map";
 
-    fn build_parser() -> impl TokenParser<Self> {
+    fn build_parser(ctx_recur: ContextRecurHandle) -> impl TokenParser<Self> {
         mapsuc(
             functional_style(Self::NAME, fields_assign()),
             |(call, new_fields)| Map { call, new_fields },
@@ -20,7 +20,6 @@ impl EMQLOperator for Map {
         self,
         lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
-        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
         op_ctx: plan::Key<plan::Context>,
@@ -30,7 +29,6 @@ impl EMQLOperator for Map {
         if let Some(cont) = cont {
             linear_builder(
                 lp,
-                qk,
                 op_ctx,
                 cont,
                 |lp, op_ctx, Continue { data_type, prev_edge, last_span }, next_edge| {

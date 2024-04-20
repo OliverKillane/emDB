@@ -11,7 +11,7 @@ pub struct Fork {
 impl EMQLOperator for Fork {
     const NAME: &'static str = "fork";
 
-    fn build_parser() -> impl TokenParser<Self> {
+    fn build_parser(ctx_recur: ContextRecurHandle) -> impl TokenParser<Self> {
         mapsuc(
             functional_style(Self::NAME, 
                 seq(
@@ -27,7 +27,6 @@ impl EMQLOperator for Fork {
         self,
         lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
-        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
         op_ctx: plan::Key<plan::Context>,

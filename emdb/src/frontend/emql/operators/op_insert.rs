@@ -11,7 +11,7 @@ pub struct Insert {
 impl EMQLOperator for Insert {
     const NAME: &'static str = "insert";
 
-    fn build_parser() -> impl TokenParser<Self> {
+    fn build_parser(ctx_recur: ContextRecurHandle) -> impl TokenParser<Self> {
         mapsuc(
             functional_style(Self::NAME, seqs!(
                 setrepr(getident(), "<table to insert into>"),
@@ -27,7 +27,6 @@ impl EMQLOperator for Insert {
         self,
         lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
-        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
         op_ctx: plan::Key<plan::Context>,
@@ -37,7 +36,6 @@ impl EMQLOperator for Insert {
         if let Some(cont) = cont {
             linear_builder(
                 lp,
-                qk,
                 op_ctx,
                 cont,
                 |lp, mo, Continue {

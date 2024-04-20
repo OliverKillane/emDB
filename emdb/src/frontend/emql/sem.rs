@@ -1,4 +1,4 @@
-use super::operators::build_logical;
+use super::{ast::Context, operators::build_logical};
 use crate::{
     backend,
     frontend::emql::{
@@ -8,7 +8,7 @@ use crate::{
         },
         errors,
     },
-    plan::{self, Context, DataFlow},
+    plan,
 };
 use proc_macro2::{Ident, Span};
 use proc_macro_error::Diagnostic;
@@ -198,32 +198,25 @@ fn add_table(
     errs
 }
 
-fn add_query(
+fn add_context(
     lp: &mut plan::Plan,
-    qs: &mut HashSet<Ident>,
     tn: &HashMap<Ident, plan::Key<plan::Table>>,
-    Query {
-        name,
-        params,
-        streams,
-    }: Query,
-) -> LinkedList<Diagnostic> {
-    let mut vs = HashMap::new();
-    let mut ts = HashMap::new();
-    let mut ret: Option<ReturnVal> = None;
-    let (raw_params, mut errors) = extract_fields(params, errors::query_parameter_redefined);
 
-    // if the name is duplicated, we can still analyse the query & add to the logical plan
-    if let Some(other_q) = qs.get(&name) {
-        errors.push_back(errors::query_redefined(&name, other_q));
-    } else {
-        qs.insert(name.clone());
-    }
+    // types are per-query, contexts can introduce new types to outer, outer passes through to inner
+    ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
+
+    // each context gets its own variables, including being able to use some provided (e.g. [`plan::Foreach`], [`plan::GroupBy`] streams)
+    mut vs: HashMap<Ident, VarState>,
+    Context { params, streams }: Context,
+    context_name: &Ident,
+) -> Result<plan::Key<plan::Context>, LinkedList<Diagnostic>> {
+    // Analyse the query parameters
+    let (raw_params, mut errors) = extract_fields(params, errors::query_parameter_redefined);
 
     let params = raw_params.into_iter().filter_map(|(name, data_type)| {
         match ast_typeto_scalar(
             tn,
-            &mut ts,
+            ts,
             data_type,
             |e| errors::query_param_ref_table_not_found(&name, e),
             errors::query_no_cust_type_found,
@@ -236,20 +229,20 @@ fn add_query(
         }
     });
 
-    let op_ctx = lp.contexts.insert(Context::from_params(params));
-    let qk = lp.queries.insert(plan::Query {
-        name: name.clone(),
-        ctx: op_ctx,
-    });
+    let mut ret: Option<ReturnVal> = None;
+
+    let op_ctx = lp
+        .contexts
+        .insert(plan::Context::from_params(params.collect()));
 
     for stream in streams {
-        match build_streamexpr(lp, tn, qk, &mut vs, &mut ts, op_ctx, stream) {
+        match build_streamexpr(lp, tn, &mut vs, ts, op_ctx, stream) {
             Ok(r) => match (&mut ret, r) {
                 (Some(prev_ret), Some(new_ret)) => {
                     errors.push_back(errors::query_multiple_returns(
                         new_ret.span,
                         prev_ret.span,
-                        &name,
+                        context_name,
                     ));
                 }
                 (Some(_), None) => (),
@@ -260,31 +253,55 @@ fn add_query(
     }
 
     if let Some(ret) = ret {
-        lp.contexts[lp.queries[qk].ctx].set_return(ret.index);
+        lp.contexts[op_ctx].set_return(ret.index);
     }
 
     for (name, vs) in vs {
         if let VarState::Available { created, state } = vs {
-            discard_continue(lp, qk, op_ctx, state);
+            discard_continue(lp, op_ctx, state);
         }
     }
 
-    errors
+    if errors.is_empty() {
+        Ok(op_ctx)
+    } else {
+        Err(errors)
+    }
+}
+
+fn add_query(
+    lp: &mut plan::Plan,
+    qs: &mut HashSet<Ident>,
+    tn: &HashMap<Ident, plan::Key<plan::Table>>,
+    Query { name, context }: Query,
+) -> LinkedList<Diagnostic> {
+    let vs = HashMap::new();
+    let mut ts = HashMap::new();
+
+    match add_context(lp, tn, &mut ts, vs, context, &name) {
+        Ok(ctx) => {
+            lp.queries.insert(plan::Query {
+                name: name.clone(),
+                ctx,
+            });
+            LinkedList::new()
+        }
+        Err(es) => es,
+    }
 }
 
 fn build_streamexpr(
     lp: &mut plan::Plan,
     tn: &HashMap<Ident, plan::Key<plan::Table>>,
-    qk: plan::Key<plan::Query>,
     vs: &mut HashMap<Ident, VarState>,
     ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
     op_ctx: plan::Key<plan::Context>,
     StreamExpr { op, con }: StreamExpr,
 ) -> Result<Option<ReturnVal>, LinkedList<Diagnostic>> {
-    match build_logical(op, lp, tn, qk, vs, ts, op_ctx, None) {
+    match build_logical(op, lp, tn, vs, ts, op_ctx, None) {
         Ok(ctx) => {
             let mut errors = LinkedList::new();
-            match recur_stream(lp, tn, qk, vs, ts, op_ctx, ctx, &mut errors, con) {
+            match recur_stream(lp, tn, vs, ts, op_ctx, ctx, &mut errors, con) {
                 Ok(res) if errors.is_empty() => Ok(res),
                 _ => Err(errors),
             }
@@ -295,7 +312,6 @@ fn build_streamexpr(
 
 fn discard_continue(
     lp: &mut plan::Plan,
-    qk: plan::Key<plan::Query>,
     ctx: plan::Key<plan::Context>,
     Continue {
         data_type,
@@ -315,7 +331,6 @@ fn discard_continue(
 fn recur_stream(
     lp: &mut plan::Plan,
     tn: &HashMap<Ident, plan::Key<plan::Table>>,
-    qk: plan::Key<plan::Query>,
     vs: &mut HashMap<Ident, VarState>,
     ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
     op_ctx: plan::Key<plan::Context>,
@@ -327,7 +342,7 @@ fn recur_stream(
         // No more operators (no data in, or data discarded)
         (StreamContext::Nothing { last_span }, None) => Ok(None),
         (StreamContext::Continue(cont), None) => {
-            discard_continue(lp, qk, op_ctx, cont);
+            discard_continue(lp, op_ctx, cont);
             Ok(None)
         }
 
@@ -357,7 +372,6 @@ fn recur_stream(
                 op,
                 lp,
                 tn,
-                qk,
                 vs,
                 ts,
                 op_ctx,
@@ -367,7 +381,7 @@ fn recur_stream(
                     last_span,
                 }),
             ) {
-                Ok(new_ctx) => recur_stream(lp, tn, qk, vs, ts, op_ctx, new_ctx, errs, con),
+                Ok(new_ctx) => recur_stream(lp, tn, vs, ts, op_ctx, new_ctx, errs, con),
                 Err(mut es) => {
                     errs.append(&mut es);
                     Err(())
@@ -584,7 +598,7 @@ pub mod generate_access {
     }
 }
 
-pub fn update_incomplete(df: &mut DataFlow, to: plan::Key<plan::Operator>) {
+pub fn update_incomplete(df: &mut plan::DataFlow, to: plan::Key<plan::Operator>) {
     // TODO: determine better way to 'map' a member of an arena
     *df = match df {
         plan::DataFlow::Incomplete { from, with } => plan::DataFlow::Conn(plan::DataFlowConn {
@@ -609,7 +623,6 @@ pub struct LinearBuilderState {
 /// - Updates the two relevant [`plan::DataFlow`]
 pub fn linear_builder(
     lp: &mut plan::Plan,
-    query: plan::Key<plan::Query>,
     op_ctx: plan::Key<plan::Context>,
     Continue {
         data_type,
@@ -661,7 +674,6 @@ pub fn linear_builder(
 
 pub fn valid_linear_builder(
     lp: &mut plan::Plan,
-    query: plan::Key<plan::Query>,
     op_ctx: plan::Key<plan::Context>,
     Continue {
         data_type,

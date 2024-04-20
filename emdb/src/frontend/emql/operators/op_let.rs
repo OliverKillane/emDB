@@ -9,7 +9,7 @@ pub struct Let {
 impl EMQLOperator for Let {
     const NAME: &'static str = "let";
 
-    fn build_parser() -> impl TokenParser<Self> {
+    fn build_parser(ctx_recur: ContextRecurHandle) -> impl TokenParser<Self> {
         mapsuc(seq(matchident("let"), setrepr(getident(), "<var name>")), |(call, var_name)| Let {
             call,
             var_name,
@@ -20,7 +20,6 @@ impl EMQLOperator for Let {
         self,
         lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
-        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
         op_ctx: plan::Key<plan::Context>,

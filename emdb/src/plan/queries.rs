@@ -21,10 +21,10 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn from_params(params: impl Iterator<Item = (Ident, Key<ScalarType>)>) -> Self {
+    pub fn from_params(params: Vec<(Ident, Key<ScalarType>)>) -> Self {
         Context {
             ordering: Vec::new(),
-            params: params.collect(),
+            params,
             returnflow: None,
             discards: Vec::new(),
         }

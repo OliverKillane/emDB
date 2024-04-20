@@ -6,9 +6,10 @@ use syn::{Expr, Type};
 
 use super::{
     ast::{
-        Ast, AstType, BackendImpl, Connector, Constraint, ConstraintExpr, Query, StreamExpr, Table,
+        Ast, AstType, BackendImpl, Connector, Constraint, ConstraintExpr, Context, Query,
+        StreamExpr, Table,
     },
-    operators::{parse_operator, Operator},
+    operators::parse_operator,
 };
 
 use combi::{
@@ -107,18 +108,50 @@ fn backend_parser() -> impl TokenParser<BackendImpl> {
     )
 }
 
+pub type ContextRecurHandle =
+    RecursiveHandle<TokenIter, TokenIter, Vec<StreamExpr>, TokenDiagnostic, TokenDiagnostic>;
+
+fn context_parser() -> impl TokenParser<Vec<StreamExpr>> {
+    recursive(|context_recur: ContextRecurHandle| {
+        many0(
+            not(isempty()),
+            recover(
+                recursive(|operator_recur| {
+                    mapsuc(
+                        seq(
+                            parse_operator(context_recur.clone()),
+                            choice(
+                                peekpunct(';'),
+                                mapsuc(matchpunct(';'), |_| None),
+                                mapsuc(seq(connector_parse(), operator_recur), |(c, s)| {
+                                    Some((c, Box::new(s)))
+                                }),
+                            ),
+                        ),
+                        |(op, con)| StreamExpr { op, con },
+                    )
+                }),
+                until(choice(
+                    peekpunct(';'),
+                    mapsuc(matchpunct(';'), |_| true),
+                    mapsuc(nothing(), |()| false),
+                )),
+            ),
+        )
+    })
+}
+
 fn query_parser() -> impl TokenParser<Query> {
     mapsuc(
         seqs!(
             matchident("query"),
             getident(),
             recovgroup(Delimiter::Parenthesis, query_param_list_parser()),
-            recovgroup(Delimiter::Brace, many0(not(isempty()), stream_parser()))
+            recovgroup(Delimiter::Brace, context_parser())
         ),
         |(_, (name, (params, streams)))| Query {
             name,
-            params,
-            streams,
+            context: Context { params, streams },
         },
     )
 }
@@ -228,38 +261,6 @@ fn connector_parse() -> impl TokenParser<Connector> {
             )
         ),
         "Connect operators a single row passed (`~>`), or a stream of rows (`|>`)",
-    )
-}
-
-type RecursiveExpr =
-    RecursiveHandle<TokenIter, TokenIter, StreamExpr, TokenDiagnostic, TokenDiagnostic>;
-
-fn operator_parse(
-    r: RecursiveExpr, // TODO: make operators recursive (for groupby and join)
-) -> impl TokenParser<Operator> {
-    parse_operator()
-}
-
-fn stream_parser() -> impl TokenParser<StreamExpr> {
-    recover(
-        recursive(|r| {
-            mapsuc(
-                seq(
-                    operator_parse(r.clone()),
-                    choice(
-                        peekpunct(';'),
-                        mapsuc(matchpunct(';'), |_| None),
-                        mapsuc(seq(connector_parse(), r), |(c, s)| Some((c, Box::new(s)))),
-                    ),
-                ),
-                |(op, con)| StreamExpr { op, con },
-            )
-        }),
-        until(choice(
-            peekpunct(';'),
-            mapsuc(matchpunct(';'), |_| true),
-            mapsuc(nothing(), |()| false),
-        )),
     )
 }
 

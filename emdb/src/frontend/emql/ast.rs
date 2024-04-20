@@ -44,10 +44,15 @@ pub(super) struct Table {
 }
 
 #[derive(Debug)]
-pub(super) struct Query {
-    pub name: Ident,
+pub struct Context {
     pub params: Vec<(Ident, AstType)>,
     pub streams: Vec<StreamExpr>,
+}
+
+#[derive(Debug)]
+pub(super) struct Query {
+    pub name: Ident,
+    pub context: Context,
 }
 
 #[derive(Debug)]

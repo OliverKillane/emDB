@@ -14,7 +14,7 @@
 use super::ast::AstType;
 use crate::frontend::emql::errors;
 use crate::frontend::emql::parse::{
-    fields_assign, fields_expr, functional_style, type_parser_to_punct,
+    fields_assign, fields_expr, functional_style, type_parser_to_punct, ContextRecurHandle,
 };
 use crate::frontend::emql::sem::{
     ast_typeto_scalar, create_scanref, extract_fields, generate_access, get_all_cols,
@@ -47,7 +47,7 @@ use syn::Expr;
 trait EMQLOperator: Sized + Debug {
     const NAME: &'static str;
 
-    fn build_parser() -> impl TokenParser<Self>;
+    fn build_parser(ctx_recur: ContextRecurHandle) -> impl TokenParser<Self>;
 
     /// Convert the operator to a logical plan node
     /// - `tn` represents the identifier to table mapping
@@ -56,7 +56,6 @@ trait EMQLOperator: Sized + Debug {
         self,
         lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
-        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
         op_ctx: plan::Key<plan::Context>,
@@ -84,10 +83,10 @@ macro_rules! create_operator {
             )*
         }
 
-        pub fn parse_operator() -> impl TokenParser<$op> {
+        pub fn parse_operator(ctx_recur: ContextRecurHandle) -> impl TokenParser<$op> {
             choices! {
                 $(
-                    peekident($t::NAME) => expectederr(mapsuc($t::build_parser(), $op::$t)),
+                    peekident($t::NAME) => expectederr(mapsuc($t::build_parser(ctx_recur.clone()), $op::$t)),
                 )*
                 otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, format!("expected an operator but got {}", t)))
             }
@@ -98,7 +97,6 @@ macro_rules! create_operator {
             op: $op,
             lp: &mut plan::Plan,
             tn: &HashMap<Ident, plan::Key<plan::Table>>,
-            qk: plan::Key<plan::Query>,
             vs: &mut HashMap<Ident, VarState>,
             ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
             op_ctx: plan::Key<plan::Context>,
@@ -106,7 +104,7 @@ macro_rules! create_operator {
         ) -> Result<StreamContext, LinkedList<Diagnostic>> {
             match op {
                 $(
-                    $op::$t(i) => i.build_logical(lp, tn, qk, vs, ts, op_ctx, cont),
+                    $op::$t(i) => i.build_logical(lp, tn, vs, ts, op_ctx, cont),
                 )*
             }
         }

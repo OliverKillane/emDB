@@ -9,7 +9,7 @@ pub struct Row {
 impl EMQLOperator for Row {
     const NAME: &'static str = "row";
 
-    fn build_parser() -> impl TokenParser<Self> {
+    fn build_parser(ctx_recur: ContextRecurHandle) -> impl TokenParser<Self> {
         mapsuc(
             functional_style(Self::NAME, fields_assign()),
             |(call, fields)| Row { call, fields },
@@ -20,7 +20,6 @@ impl EMQLOperator for Row {
         self,
         lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
-        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
         op_ctx: plan::Key<plan::Context>,

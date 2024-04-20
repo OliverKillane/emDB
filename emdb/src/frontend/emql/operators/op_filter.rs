@@ -10,7 +10,7 @@ pub struct Filter {
 impl EMQLOperator for Filter {
     const NAME: &'static str = "filter";
 
-    fn build_parser() -> impl TokenParser<Self> {
+    fn build_parser(ctx_recur: ContextRecurHandle) -> impl TokenParser<Self> {
         mapsuc(
             functional_style(Self::NAME, setrepr(syn(collectuntil(isempty())), "<filter predicate>")),
             |(call, filter_expr)| Filter { call, filter_expr },
@@ -21,7 +21,6 @@ impl EMQLOperator for Filter {
         self,
         lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
-        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
         op_ctx: plan::Key<plan::Context>,
@@ -31,7 +30,6 @@ impl EMQLOperator for Filter {
         if let Some(prev) = cont {
             linear_builder(
                 lp,
-                qk,
                 op_ctx,
                 prev,
                 |lp, mo, prev, next_edge| {

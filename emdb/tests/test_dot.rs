@@ -34,17 +34,17 @@ emql! {
             ~> return;
     }
 
-    // query collect_most_cool() {
-    //     ref cool as cool_ref
-    //         |> deref(cool_ref as cool_vals)
-    //         |> map(sort_on: i32 = cool_vals.something)
-    //         |> sort(sort_on desc)
-    //         |> take(10)
-    //         |> map(id: ref cool = cool_ref)
-    //         |> collect(it as type foo)
-    //         ~> map(blah: type foo = it, c: i32 = 0)
-    //         ~> return;
-    // }
+    query collect_most_cool() {
+        ref cool as cool_ref
+            |> deref(cool_ref as cool_vals)
+            |> map(sort_on: i32 = cool_vals.something)
+            |> sort(sort_on desc)
+            |> take(10)
+            |> map(id: ref cool = cool_ref)
+            |> collect(it as type foo)
+            ~> map(blah: type foo = it, c: i32 = 0)
+            ~> return;
+    }
 
     query complex() {
         use cool
@@ -77,3 +77,22 @@ emql! {
 }
 
 fn main() {}
+
+/*
+
+use table1
+    |> map(values)
+    |> foreach(let x for {
+        use x
+            |> something
+            |> collect()
+            |> return;
+    })
+    |> collect()
+    |> groupby(field_foo in let x for {
+        use x
+            |> something
+            |> collect()
+            |> return;
+    } )
+*/

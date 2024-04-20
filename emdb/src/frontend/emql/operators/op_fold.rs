@@ -14,7 +14,7 @@ pub struct Fold {
 impl EMQLOperator for Fold {
     const NAME: &'static str = "fold";
 
-    fn build_parser() -> impl TokenParser<Self> {
+    fn build_parser(ctx_recur: ContextRecurHandle) -> impl TokenParser<Self> {
         mapsuc(
             functional_style(
                 Self::NAME,
@@ -46,7 +46,6 @@ impl EMQLOperator for Fold {
         self,
         lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
-        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
         op_ctx: plan::Key<plan::Context>,
@@ -57,7 +56,7 @@ impl EMQLOperator for Fold {
             fields
         } = self;
         if let Some(cont) = cont {
-            linear_builder(lp, qk, op_ctx, cont, 
+            linear_builder(lp,  op_ctx, cont, 
             |lp, mo, prev, next_edge| {
                     let (raw_fields, mut errors) = extract_fields(fields, errors::query_operator_field_redefined);
                     if !prev.data_type.stream {

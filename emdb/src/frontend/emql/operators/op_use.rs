@@ -11,7 +11,7 @@ pub struct Use {
 impl EMQLOperator for Use {
     const NAME: &'static str = "use";
 
-    fn build_parser() -> impl TokenParser<Self> {
+    fn build_parser(ctx_recur: ContextRecurHandle) -> impl TokenParser<Self> {
         mapsuc(seq(matchident("use"), setrepr(getident(), "<table>")), |(call, var_name)| Use {
             call,
             var_name,
@@ -22,7 +22,6 @@ impl EMQLOperator for Use {
         self,
         lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
-        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
         op_ctx: plan::Key<plan::Context>,
@@ -40,7 +39,7 @@ impl EMQLOperator for Use {
 
                 let scanref_cont = create_scanref(lp, op_ctx, *table_id, ref_field.clone(), call.span());
                 
-                let deref_access = valid_linear_builder(lp, qk, op_ctx, scanref_cont, 
+                let deref_access = valid_linear_builder(lp,  op_ctx, scanref_cont, 
                     |lp, op_ctx, Continue {
                         data_type,
                         prev_edge,
@@ -57,7 +56,7 @@ impl EMQLOperator for Use {
                     }
                 );
 
-                let expand_access = valid_linear_builder(lp, qk, op_ctx, deref_access, |lp, op_ctx, Continue {
+                let expand_access = valid_linear_builder(lp,  op_ctx, deref_access, |lp, op_ctx, Continue {
                     data_type,
                     prev_edge,
                     last_span,

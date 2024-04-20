@@ -10,7 +10,7 @@ pub struct Ref {
 impl EMQLOperator for Ref {
     const NAME: &'static str = "ref";
 
-    fn build_parser() -> impl TokenParser<Self> {
+    fn build_parser(ctx_recur: ContextRecurHandle) -> impl TokenParser<Self> {
         mapsuc(seqs!(
             matchident("ref"), 
             getident(),
@@ -25,7 +25,6 @@ impl EMQLOperator for Ref {
         self,
         lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
-        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
         op_ctx: plan::Key<plan::Context>,

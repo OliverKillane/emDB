@@ -11,7 +11,7 @@ pub struct Union {
 impl EMQLOperator for Union {
     const NAME: &'static str = "union";
 
-    fn build_parser() -> impl TokenParser<Self> {
+    fn build_parser(ctx_recur: ContextRecurHandle) -> impl TokenParser<Self> {
         mapsuc(functional_style(Self::NAME, seq(
             matchident("use"),
             listsep(',', setrepr(getident(), "<variable>"))
@@ -22,7 +22,6 @@ impl EMQLOperator for Union {
         self,
         lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
-        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
         op_ctx: plan::Key<plan::Context>,

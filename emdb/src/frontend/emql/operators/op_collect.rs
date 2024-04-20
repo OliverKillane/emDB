@@ -13,7 +13,7 @@ pub struct Collect {
 impl EMQLOperator for Collect {
     const NAME: &'static str = "collect";
 
-    fn build_parser() -> impl TokenParser<Self> {
+    fn build_parser(ctx_recur: ContextRecurHandle) -> impl TokenParser<Self> {
         mapsuc(
             functional_style(Self::NAME, seqs!(
                 setrepr(getident(), "<field to collect to>"),
@@ -29,7 +29,6 @@ impl EMQLOperator for Collect {
         self,
         lp: &mut plan::Plan,
         tn: &HashMap<Ident, plan::Key<plan::Table>>,
-        qk: plan::Key<plan::Query>,
         vs: &mut HashMap<Ident, VarState>,
         ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
         op_ctx: plan::Key<plan::Context>,
@@ -39,7 +38,6 @@ impl EMQLOperator for Collect {
         if let Some(cont) = cont {
             linear_builder(
                 lp,
-                qk,
                 op_ctx,
                 cont,
                 |lp, mo, Continue { data_type, prev_edge, last_span }, next_edge| {
