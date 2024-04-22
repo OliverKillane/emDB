@@ -4,12 +4,20 @@ version = "0.2.0"
 edition = "2021"
 build = "build.rs"
 
+readme = "README.md"
+description = "A combinators library with an included rust token parsing implementation"
+keywords = ["parser", "combinator", "parsing"]
+categories = ["parser-implementations", "parsing", "compilers"]
+
+repository.workspace = true
+homepage.workspace = true
+license-file.workspace = true
+
 [build-dependencies]
 rustc_version = "0.4"
 
 [dependencies]
 derive-where = "1.2.7"
-
 proc-macro2 = { version = "1.0"}
 proc-macro-error = { version = "1.0.4"}
 quote = { version = "1.0.33"}
@@ -22,6 +30,7 @@ syn = { version = "2.0.45", features = [
 divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }
 chumsky-proc = { git = "https://github.com/OliverKillane/chumsky-proc.git", branch = "mitigation/avoiding-cargo-examples-bug" }
 chumsky = "0.9.3"
+
 [features]
 # To enable better diagnostics 
 nightly = []

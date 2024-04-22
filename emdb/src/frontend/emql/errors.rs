@@ -233,6 +233,17 @@ pub(super) fn query_param_ref_table_not_found(query: &Ident, table_ref: &Ident) 
     ))
 }
 
+pub(super) fn access_field_missing(call: &Ident, field: &Ident, fields: Vec<&Ident>) -> Diagnostic {
+    Diagnostic::spanned(
+        field.span(),
+        Level::Error,
+        format!(
+            "`{call}` field `{field}` is not found, the available fields are {}",
+            fields.iter().join(", ")
+        ),
+    )
+}
+
 pub(super) fn query_expected_reference_type_for_update(
     lp: &Plan,
     dt: &Key<ScalarType>,
@@ -561,6 +572,29 @@ pub(super) fn query_invalid_use(
     ))
 }
 
+pub(super) fn query_invalid_variable_use(
+    usage: &Ident,
+    vs: &HashMap<Ident, VarState>,
+) -> Diagnostic {
+    let err_name = error_name(QUERY, 33);
+    let vars = vs
+        .iter()
+        .filter_map(|(var, state)| {
+            if matches!(state, VarState::Available { .. }) {
+                Some(var)
+            } else {
+                None
+            }
+        })
+        .join(", ");
+    Diagnostic::spanned(
+        usage.span(),
+        Level::Error,
+        format!("{err_name} Invalid use of variable `{usage}`",),
+    )
+    .help(format!("Currently available variables are {vars}"))
+}
+
 pub(super) fn query_let_variable_already_assigned(
     assign: &Ident,
     created: Span,
@@ -690,11 +724,27 @@ pub(super) fn union_requires_at_least_one_input(call: &Ident) -> Diagnostic {
     )
 }
 
-pub(super) fn union_requires_streams(call: &Ident, var: &Ident) -> Diagnostic {
+pub(super) fn operator_requires_streams(call: &Ident, var: &Ident) -> Diagnostic {
     Diagnostic::spanned(
         var.span(),
         Level::Error,
         format!("`{call}` inputs must be streams, but `{var}` is not a stream"),
+    )
+}
+
+pub(super) fn operator_requires_streams2(call: &Ident) -> Diagnostic {
+    Diagnostic::spanned(
+        call.span(),
+        Level::Error,
+        format!("`{call}` input must be a stream"),
+    )
+}
+
+pub(super) fn no_return_in_context(call: &Ident) -> Diagnostic {
+    Diagnostic::spanned(
+        call.span(),
+        Level::Error,
+        format!("No return from `{call}` is present, needed for the output of `{call}`"),
     )
 }
 

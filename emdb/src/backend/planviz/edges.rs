@@ -35,6 +35,12 @@ pub struct ContextToOperator {
 }
 
 #[derive(Clone, Debug)]
+pub struct OperatorToContext { 
+    pub context: plan::Key<plan::Context>, 
+    pub operator: plan::Key<plan::Operator>, 
+}
+
+#[derive(Clone, Debug)]
 pub struct QueryToContext { 
     pub query: plan::Key<plan::Query>,
     pub context: plan::Key<plan::Context>, 
@@ -109,6 +115,7 @@ pub enum PlanEdge {
     // from contexts
     OperatorOrder,
     ContextToOperator,
+    OperatorToContext,
     ContextToType,
     ContextReturn,
 
@@ -172,9 +179,7 @@ impl GetFeature<PlanEdge> for plan::DataFlow {
 
 impl GetFeature<PlanEdge> for plan::Operator {
     fn get_features(&self, self_key: plan::Key<Self>, edges: &mut Vec<PlanEdge>, config: &DisplayConfig) {
-        if let Some(table) = self.get_table_access() {
-            edges.push(TableAccess { op: self_key, table }.into());
-        }
+        self.get_extra_features(self_key, edges, config);
     }
 }
 
@@ -257,64 +262,75 @@ impl GetFeature<PlanEdge> for plan::Context {
 }
 
 #[enumtrait::store(get_access_trait)]
-trait GetTableAccess {
-    fn get_table_access(&self) -> Option<plan::Key<plan::Table>> { None }
+trait GetExtraNodeEdges {
+    fn get_extra_features(&self, self_key: plan::Key<plan::Operator>, edges: &mut Vec<PlanEdge>, config: &DisplayConfig) { }
 }
 
 #[enumtrait::impl_trait(get_access_trait for plan::operator_enum)]
-impl GetTableAccess for plan::Operator {}
+impl GetExtraNodeEdges for plan::Operator {}
 
-impl GetTableAccess for plan::Update {
-    fn get_table_access(&self) -> Option<plan::Key<plan::Table>> {
-        Some(self.table)
+impl GetExtraNodeEdges for plan::Update {
+    fn get_extra_features(&self, self_key: plan::Key<plan::Operator>, edges: &mut Vec<PlanEdge>, config: &DisplayConfig) {
+        edges.push(TableAccess { op: self_key, table: self.table }.into());
     }
 }
 
-impl GetTableAccess for plan::Insert {
-    fn get_table_access(&self) -> Option<plan::Key<plan::Table>> {
-        Some(self.table)
+impl GetExtraNodeEdges for plan::Insert {
+    fn get_extra_features(&self, self_key: plan::Key<plan::Operator>, edges: &mut Vec<PlanEdge>, config: &DisplayConfig) {
+        edges.push(TableAccess { op: self_key, table: self.table }.into());
     }
 }
 
-impl GetTableAccess for plan::Delete {
-    fn get_table_access(&self) -> Option<plan::Key<plan::Table>> {
-        Some(self.table)
+impl GetExtraNodeEdges for plan::Delete {
+    fn get_extra_features(&self, self_key: plan::Key<plan::Operator>, edges: &mut Vec<PlanEdge>, config: &DisplayConfig) {
+        edges.push(TableAccess { op: self_key, table: self.table }.into());
     }
 }
 
-impl GetTableAccess for plan::GetUnique {
-    fn get_table_access(&self) -> Option<plan::Key<plan::Table>> {
-        Some(self.table)
+impl GetExtraNodeEdges for plan::UniqueRef {
+    fn get_extra_features(&self, self_key: plan::Key<plan::Operator>, edges: &mut Vec<PlanEdge>, config: &DisplayConfig) {
+        edges.push(TableAccess { op: self_key, table: self.table }.into());
     }
 }
 
-impl GetTableAccess for plan::ScanRefs {
-    fn get_table_access(&self) -> Option<plan::Key<plan::Table>> {
-        Some(self.table)
+impl GetExtraNodeEdges for plan::ScanRefs {
+    fn get_extra_features(&self, self_key: plan::Key<plan::Operator>, edges: &mut Vec<PlanEdge>, config: &DisplayConfig) {
+        edges.push(TableAccess { op: self_key, table: self.table }.into());
     }
 }
 
-impl GetTableAccess for plan::DeRef {
-    fn get_table_access(&self) -> Option<plan::Key<plan::Table>> {
-        Some(self.table)
+impl GetExtraNodeEdges for plan::DeRef {
+    fn get_extra_features(&self, self_key: plan::Key<plan::Operator>, edges: &mut Vec<PlanEdge>, config: &DisplayConfig) {
+        edges.push(TableAccess { op: self_key, table: self.table }.into());
     }
 }
 
-impl GetTableAccess for plan::Map {}
-impl GetTableAccess for plan::Expand {}
-impl GetTableAccess for plan::Fold {}
-impl GetTableAccess for plan::Filter {}
-impl GetTableAccess for plan::Sort {}
-impl GetTableAccess for plan::Assert {}
-impl GetTableAccess for plan::Collect {}
-impl GetTableAccess for plan::Take {}
-impl GetTableAccess for plan::Join {}
-impl GetTableAccess for plan::GroupBy {}
-impl GetTableAccess for plan::Fork {}
-impl GetTableAccess for plan::Union {}
-impl GetTableAccess for plan::Row {}
-impl GetTableAccess for plan::Return {}
-impl GetTableAccess for plan::Discard {}
+impl GetExtraNodeEdges for plan::ForEach {
+    fn get_extra_features(&self, self_key: plan::Key<plan::Operator>, edges: &mut Vec<PlanEdge>, config: &DisplayConfig) {
+        edges.push(OperatorToContext{ context: self.inner_ctx, operator: self_key}.into());
+    }
+}
+
+impl GetExtraNodeEdges for plan::GroupBy {
+    fn get_extra_features(&self, self_key: plan::Key<plan::Operator>, edges: &mut Vec<PlanEdge>, config: &DisplayConfig) {
+        edges.push(OperatorToContext{ context: self.inner_ctx, operator: self_key}.into());
+    }
+}
+
+impl GetExtraNodeEdges for plan::Map {}
+impl GetExtraNodeEdges for plan::Expand {}
+impl GetExtraNodeEdges for plan::Fold {}
+impl GetExtraNodeEdges for plan::Filter {}
+impl GetExtraNodeEdges for plan::Sort {}
+impl GetExtraNodeEdges for plan::Assert {}
+impl GetExtraNodeEdges for plan::Collect {}
+impl GetExtraNodeEdges for plan::Take {}
+impl GetExtraNodeEdges for plan::Join {}
+impl GetExtraNodeEdges for plan::Fork {}
+impl GetExtraNodeEdges for plan::Union {}
+impl GetExtraNodeEdges for plan::Row {}
+impl GetExtraNodeEdges for plan::Return {}
+impl GetExtraNodeEdges for plan::Discard {}
 
 
 // Wraps [`dot::Labeller`] to be implemented for graph nodes
@@ -726,6 +742,32 @@ impl EdgeStyle for ContextToOperator {
             PlanNode::Context(self.context)
         } else {
             PlanNode::Operator(self.operator)
+        }
+    }
+}
+
+impl EdgeStyle for OperatorToContext {
+    fn end_arrow(&self) -> dot::Arrow {
+        dot::Arrow::normal()
+    }
+
+    fn start_arrow(&self) -> dot::Arrow {
+        dot::Arrow::none()
+    }
+
+    fn edge_style(&self) -> dot::Style {
+        dot::Style::None
+    }
+
+    fn edge_color<'a>(&self) -> Option<dot::LabelText<'a>> {
+        Some(dot::LabelText::label("black"))
+    }
+
+    fn get_side(&self,source_side:bool) -> PlanNode {
+        if source_side {
+            PlanNode::Operator(self.operator)
+        } else {
+            PlanNode::Context(self.context)
         }
     }
 }

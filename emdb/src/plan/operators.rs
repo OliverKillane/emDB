@@ -1,4 +1,4 @@
-use super::{Data, Key, Plan, RecordField, ScalarType, Table};
+use super::{Context, Data, Key, Plan, RecordField, ScalarType, Table};
 use std::collections::HashMap;
 use syn::Expr;
 
@@ -73,7 +73,7 @@ pub struct Delete {
 }
 
 /// Gets a unique row from a table
-pub struct GetUnique {
+pub struct UniqueRef {
     pub input: Key<DataFlow>,
 
     pub from: RecordField,
@@ -184,17 +184,46 @@ pub struct Take {
     pub output: Key<DataFlow>,
 }
 
-/// An n-way join of either equijoin, predicate join, > join, or cross
+pub enum MatchKind {
+    Cross,
+    Pred(Expr),
+    Equi {
+        left_field: RecordField,
+        right_field: RecordField,
+    },
+}
+
+pub enum JoinKind {
+    Inner,
+    Left, // right is same as left, so we ignore
+    Outer,
+}
+
 pub struct Join {
-    // TODO: Implement join
+    pub left: Key<DataFlow>,
+    pub right: Key<DataFlow>,
+    pub match_kind: MatchKind,
+    pub join_kind: JoinKind,
+    pub output: Key<DataFlow>,
 }
 
 /// group by a field and aggregate the results
 pub struct GroupBy {
     pub input: Key<DataFlow>,
-    pub group_on: RecordField,
-    pub aggregate_start: Key<DataFlow>,
-    pub aggregate_end: Key<DataFlow>,
+
+    pub group_by: RecordField,
+    pub stream_in: Key<DataFlow>,
+    pub inner_ctx: Key<Context>,
+
+    pub output: Key<DataFlow>,
+}
+
+pub struct ForEach {
+    pub input: Key<DataFlow>,
+
+    pub stream_in: Key<DataFlow>,
+    pub inner_ctx: Key<Context>,
+
     pub output: Key<DataFlow>,
 }
 
@@ -233,24 +262,40 @@ pub struct Discard {
 #[enumtrait::quick_from]
 #[enumtrait::store(pub operator_enum)]
 pub enum Operator {
+    // get references
+    UniqueRef,
+    ScanRefs,
+
+    // read operator
+    DeRef,
+
+    // write operators
     Update,
     Insert,
     Delete,
-    GetUnique,
-    ScanRefs,
-    DeRef,
+
+    // pure operators
     Map,
     Expand,
     Fold,
     Filter,
     Sort,
     Assert,
-    Collect,
+
+    // cardinality set
     Take,
-    Join,
+    Collect,
+
+    // nested contexts
     GroupBy,
+    ForEach,
+
+    // stream join & split
+    Join,
     Fork,
     Union,
+
+    // control Flow
     Row,
     Return,
     Discard,

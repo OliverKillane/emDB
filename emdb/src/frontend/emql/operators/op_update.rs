@@ -14,7 +14,7 @@ impl EMQLOperator for Update {
         mapsuc(
             functional_style(
                 Self::NAME,
-                seqs!(setrepr(getident(), "<table>"), matchident("use"), fields_expr()),
+                seqs!(setrepr(getident(), "<table ref>"), matchident("use"), fields_expr()),
             ),
             |(call, (reference, (_, fields)))| Update {
                 call,

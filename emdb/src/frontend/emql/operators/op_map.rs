@@ -56,7 +56,7 @@ impl EMQLOperator for Map {
                                     fields: lp.record_types.insert(plan::ConcRef::Conc(plan::RecordConc { fields: type_fields })),
                                     stream: data_type.stream,
                                 },
-                                op: (plan::Map { input: prev_edge, mapping: expr_fields, output: next_edge  }.into()),
+                                op: plan::Map { input: prev_edge, mapping: expr_fields, output: next_edge  }.into(),
                                 call_span: call.span()
                             }
                         )

@@ -60,7 +60,7 @@ impl EMQLOperator for Union {
 
                     for (other_var, other_type) in var_info {
                         if !other_type.data_type.stream {
-                            other_errors.push_back(errors::union_requires_streams(&call, &other_var));
+                            other_errors.push_back(errors::operator_requires_streams(&call, &other_var));
                         }
 
                         if plan::record_type_eq(lp, &out_data_type, &other_type.data_type.fields) {
@@ -100,7 +100,7 @@ impl EMQLOperator for Union {
                         return Ok(StreamContext::Continue(Continue { data_type: data_t, prev_edge: out_edge, last_span: call.span() }));
                     }
                 } else {
-                    errors.push_back(errors::union_requires_streams(&call, &var_name));
+                    errors.push_back(errors::operator_requires_streams(&call, &var_name));
                 }
             } else {
                 errors.push_back(errors::union_requires_at_least_one_input(&call));

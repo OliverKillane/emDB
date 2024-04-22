@@ -198,7 +198,8 @@ fn add_table(
     errs
 }
 
-fn add_context(
+#[allow(clippy::too_many_arguments)]
+pub fn add_streams_to_context(
     lp: &mut plan::Plan,
     tn: &HashMap<Ident, plan::Key<plan::Table>>,
 
@@ -206,37 +207,18 @@ fn add_context(
     ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
 
     // each context gets its own variables, including being able to use some provided (e.g. [`plan::Foreach`], [`plan::GroupBy`] streams)
-    mut vs: HashMap<Ident, VarState>,
-    Context { params, streams }: Context,
+    vs: &mut HashMap<Ident, VarState>,
+
+    op_ctx: plan::Key<plan::Context>,
+    streams: Vec<StreamExpr>,
     context_name: &Ident,
-) -> Result<plan::Key<plan::Context>, LinkedList<Diagnostic>> {
-    // Analyse the query parameters
-    let (raw_params, mut errors) = extract_fields(params, errors::query_parameter_redefined);
 
-    let params = raw_params.into_iter().filter_map(|(name, data_type)| {
-        match ast_typeto_scalar(
-            tn,
-            ts,
-            data_type,
-            |e| errors::query_param_ref_table_not_found(&name, e),
-            errors::query_no_cust_type_found,
-        ) {
-            Ok(t) => Some((name, lp.scalar_types.insert(t))),
-            Err(e) => {
-                errors.push_back(e);
-                None
-            }
-        }
-    });
-
+    errors: &mut LinkedList<Diagnostic>,
+) {
     let mut ret: Option<ReturnVal> = None;
 
-    let op_ctx = lp
-        .contexts
-        .insert(plan::Context::from_params(params.collect()));
-
     for stream in streams {
-        match build_streamexpr(lp, tn, &mut vs, ts, op_ctx, stream) {
+        match build_streamexpr(lp, tn, vs, ts, op_ctx, stream) {
             Ok(r) => match (&mut ret, r) {
                 (Some(prev_ret), Some(new_ret)) => {
                     errors.push_back(errors::query_multiple_returns(
@@ -255,17 +237,17 @@ fn add_context(
     if let Some(ret) = ret {
         lp.contexts[op_ctx].set_return(ret.index);
     }
+}
 
+pub fn discard_ends(
+    lp: &mut plan::Plan,
+    op_ctx: plan::Key<plan::Context>,
+    vs: HashMap<Ident, VarState>,
+) {
     for (name, vs) in vs {
         if let VarState::Available { created, state } = vs {
             discard_continue(lp, op_ctx, state);
         }
-    }
-
-    if errors.is_empty() {
-        Ok(op_ctx)
-    } else {
-        Err(errors)
     }
 }
 
@@ -273,21 +255,55 @@ fn add_query(
     lp: &mut plan::Plan,
     qs: &mut HashSet<Ident>,
     tn: &HashMap<Ident, plan::Key<plan::Table>>,
-    Query { name, context }: Query,
+    Query {
+        name,
+        context: Context { params, streams },
+    }: Query,
 ) -> LinkedList<Diagnostic> {
-    let vs = HashMap::new();
+    let mut vs = HashMap::new();
     let mut ts = HashMap::new();
 
-    match add_context(lp, tn, &mut ts, vs, context, &name) {
-        Ok(ctx) => {
-            lp.queries.insert(plan::Query {
-                name: name.clone(),
-                ctx,
-            });
-            LinkedList::new()
+    // Analyse the query parameters
+    let (raw_params, mut errors) = extract_fields(params, errors::query_parameter_redefined);
+
+    let params = raw_params.into_iter().filter_map(|(name, data_type)| {
+        match ast_typeto_scalar(
+            tn,
+            &mut ts,
+            data_type,
+            |e| errors::query_param_ref_table_not_found(&name, e),
+            errors::query_no_cust_type_found,
+        ) {
+            Ok(t) => Some((name, lp.scalar_types.insert(t))),
+            Err(e) => {
+                errors.push_back(e);
+                None
+            }
         }
-        Err(es) => es,
-    }
+    });
+
+    let op_ctx = lp
+        .contexts
+        .insert(plan::Context::from_params(params.collect()));
+
+    lp.queries.insert(plan::Query {
+        name: name.clone(),
+        ctx: op_ctx,
+    });
+
+    add_streams_to_context(
+        lp,
+        tn,
+        &mut ts,
+        &mut vs,
+        op_ctx,
+        streams,
+        &name,
+        &mut errors,
+    );
+
+    discard_ends(lp, op_ctx, vs);
+    errors
 }
 
 fn build_streamexpr(
@@ -323,7 +339,6 @@ fn discard_continue(
         .operators
         .insert(plan::Discard { input: prev_edge }.into());
     update_incomplete(lp.get_mut_dataflow(prev_edge), discard_op);
-    lp.get_mut_context(ctx).add_operator(discard_op);
     lp.get_mut_context(ctx).add_discard(discard_op);
 }
 
@@ -610,6 +625,19 @@ pub fn update_incomplete(df: &mut plan::DataFlow, to: plan::Key<plan::Operator>)
             unreachable!("Previous should be incomplete")
         }
     };
+}
+
+pub fn get_user_fields(rec: &plan::RecordConc) -> Vec<&Ident> {
+    rec.fields
+        .iter()
+        .filter_map(|(k, _)| {
+            if let plan::RecordField::User(id) = k {
+                Some(id)
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 pub struct LinearBuilderState {

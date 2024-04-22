@@ -3,6 +3,15 @@ name = "enumtrait"
 version = "0.1.0"
 edition = "2021"
 
+readme = "README.md"
+description = "A library of macros for polymorphism using enums"
+keywords = ["performance", "traits"]
+categories = ["rust-patterns"]
+
+repository.workspace = true
+homepage.workspace = true
+license-file.workspace = true
+
 [lib]
 proc-macro = true
 

@@ -300,15 +300,15 @@ impl OperatorDescription for plan::Delete {
     }
 }
 
-impl OperatorDescription for plan::GetUnique {
+impl OperatorDescription for plan::UniqueRef {
     fn description(&self,plan: &plan::Plan) -> String {
-        format!("GetUnique")
+        format!("UniqueRef")
     }
 }
 
 impl OperatorDescription for plan::ScanRefs {
     fn description(&self,plan: &plan::Plan) -> String {
-        format!("Scan")
+        format!("ScanRef")
     }
 }
 
@@ -326,7 +326,7 @@ impl OperatorDescription for plan::Map {
 
 impl OperatorDescription for plan::Expand {
     fn description(&self,plan: &plan::Plan) -> String {
-        format!("Map")
+        format!("Expand")
     }
 }
 
@@ -375,6 +375,12 @@ impl OperatorDescription for plan::Join {
 impl OperatorDescription for plan::GroupBy {
     fn description(&self,plan: &plan::Plan) -> String {
         format!("GroupBy")
+    }
+}
+
+impl OperatorDescription for plan::ForEach {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("ForEach")
     }
 }
 

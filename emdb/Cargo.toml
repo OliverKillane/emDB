@@ -3,6 +3,15 @@ name = "emdb"
 version = "0.1.0"
 edition = "2021"
 
+readme = "README.md"
+description = "A fast embedded database"
+keywords = ["embedded-database"]
+categories = ["compilers", "database"]
+
+repository.workspace = true
+homepage.workspace = true
+license-file.workspace = true
+
 [lib]
 proc-macro = true
 

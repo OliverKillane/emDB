@@ -749,6 +749,8 @@ impl Combi for terminal {
         if let Some(tt) = input.next() {
             // NOTE: `a.join` returns None on Stable, and always Some on nightly.
             let big_span = if cfg!(nightly) {
+                // INV: On nightly the result of the join is always Some(..)
+                #[allow(clippy::unwrap_used)]
                 input
                     .extract_iter()
                     .fold(tt.span(), |a, s| a.join(s.span()).unwrap())

@@ -648,6 +648,7 @@ impl<I, O, S, E, C> Combi for RecursiveHandle<I, O, S, E, C> {
     #[inline(always)]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         // INV: owned by some recursive parser, ptr always upgradable as dropping that parser drops this.
+        #[allow(clippy::unwrap_used)]
         self.p.upgrade().unwrap().comp(input)
     }
 

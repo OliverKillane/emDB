@@ -29,7 +29,7 @@ impl TokenIter {
             next: iter.next(),
             iter,
             curr_span: start_span,
-            prev_span: None,
+            prev_span: Some(start_span),
         }
     }
 

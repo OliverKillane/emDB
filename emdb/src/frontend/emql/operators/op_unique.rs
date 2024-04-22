@@ -72,7 +72,7 @@ impl EMQLOperator for Unique {
                                 Ok(
                                     LinearBuilderState {
                                         data_out: plan::Data{ fields: record_type, stream: false }, 
-                                        op: plan::GetUnique { 
+                                        op: plan::UniqueRef { 
                                             input: prev_edge, from: rec_from, table: *table_id, field: rec_field, out: rec_out, output: next_edge }.into(), 
                                         call_span: call.span()
                                     }

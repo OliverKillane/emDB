@@ -11,15 +11,15 @@
 //! To create a new operator, simply add a new module and [`EMQLOperator`], then
 //! add it to the [`create_operator`] macro invocation.
 
-use super::ast::AstType;
+use super::ast::{AstType, StreamExpr};
 use crate::frontend::emql::errors;
 use crate::frontend::emql::parse::{
     fields_assign, fields_expr, functional_style, type_parser_to_punct, ContextRecurHandle,
 };
 use crate::frontend::emql::sem::{
-    ast_typeto_scalar, create_scanref, extract_fields, generate_access, get_all_cols,
-    linear_builder, update_incomplete, valid_linear_builder, Continue, LinearBuilderState,
-    ReturnVal, StreamContext, VarState,
+    add_streams_to_context, ast_typeto_scalar, create_scanref, discard_ends, extract_fields,
+    generate_access, get_all_cols, get_user_fields, linear_builder, update_incomplete,
+    valid_linear_builder, Continue, LinearBuilderState, ReturnVal, StreamContext, VarState,
 };
 use crate::plan;
 use crate::utils::misc::{result_to_opt, singlelist};
@@ -29,14 +29,14 @@ use combi::{
     tokens::{
         basic::{
             collectuntil, getident, gettoken, isempty, matchident, matchpunct, peekident,
-            peekpunct, syn,
+            peekpunct, recovgroup, syn,
         },
         derived::{listseptrailing, syntopunct},
         error::{error, expectederr},
         TokenParser,
     },
 };
-use proc_macro2::{Ident, Span};
+use proc_macro2::{Delimiter, Ident, Span};
 use proc_macro_error::{Diagnostic, Level};
 use std::{
     collections::{HashMap, LinkedList},
@@ -134,5 +134,8 @@ create_operator!(
     op_collect::Collect,
     op_take::Take,
     op_fork::Fork,
-    op_union::Union
+    op_union::Union,
+    op_foreach::ForEach,
+    op_groupby::GroupBy,
+    op_join::Join
 );
