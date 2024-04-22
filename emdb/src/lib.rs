@@ -5,6 +5,8 @@
 #![allow(unused_variables)]
 use std::collections::LinkedList;
 
+// TODO: check readme by including as documentation (needs readme to compile first)
+
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro_error::proc_macro_error;
