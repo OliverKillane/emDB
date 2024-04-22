@@ -1,3 +1,15 @@
+//! # Planviz
+//! The debugging plan graph view for emDB.
+//! 
+//! Given the complexity of the [`plan::Plan`], [`crate::analysis`] and 
+//! [`crate::optimise`] it is necessary to explore plans graphically.
+//! 
+//! ## Live Debugging
+//! It is recommended to work in a scratch file, with Planviz implemented.
+//! - If using vscode, the [graphviz interactive preview extension](vscode:extension/tintinweb.graphviz-interactive-preview)
+//!   is recommended (open dots file, save in scratch rust file and watch preview 
+//!   automatically update live).
+
 use std::{fs::File, path::Path};
 
 use combi::{core::{choice, mapsuc, seq, setrepr}, macros::{choices, seqs}, tokens::{basic::{collectuntil, gettoken, matchident, matchpunct, peekident, peekpunct, syn}, error::{error, expectederr}, TokenDiagnostic, TokenIter, TokenParser}, Combi, Repr};
@@ -6,7 +18,7 @@ use super::{EMDBBackend, Ident, LinkedList, TokenStream, plan};
 use proc_macro_error::{Diagnostic, Level};
 use crate::utils::misc::singlelist;
 use quote::quote;
-use typed_generational_arena::{StandardArena as GenArena};
+use typed_generational_arena::StandardArena as GenArena;
 use dot;
 
 mod errors;

@@ -1,3 +1,6 @@
+//! # emDB Logical Plan
+//! Describes the schema, tables, expressions and operations.
+
 use typed_generational_arena::{Index, NonzeroGeneration, StandardArena as GenArena};
 
 mod operators;

@@ -1,3 +1,11 @@
+//! # Semantic Analysis
+//! ## Structure
+//! This module contains the translation from [`super::ast`] to [`crate::plan`].
+//!
+//! Queries, Tables and Backends are added by mutating an initially empty plan.
+//! - Tracking of emql concepts such as types & type aliases are managed here.
+//! - Complex or reused analysis for the operators is included in theis module.
+
 use super::{ast::Context, operators::build_logical};
 use crate::{
     backend,
@@ -14,11 +22,15 @@ use proc_macro2::{Ident, Span};
 use proc_macro_error::Diagnostic;
 use std::collections::{HashMap, HashSet, LinkedList};
 
+/// The return value of a [`Context`], including the [`ReturnVal::span`] for multiple
+/// return errors.
 pub(super) struct ReturnVal {
     pub span: Span,
     pub index: plan::Key<plan::Operator>,
 }
 
+/// The output stream from a [`plan::Operator`] to allow it to be used by the
+/// analysis for the next operator.
 #[derive(Clone)]
 pub(super) struct Continue {
     pub data_type: plan::Data,
@@ -26,17 +38,23 @@ pub(super) struct Continue {
     pub last_span: Span,
 }
 
+/// The possible outputs for an operator
 pub(super) enum StreamContext {
+    /// The operator consumes, but no output is provided
     Nothing { last_span: Span },
+    /// [`plan::Return`] operators
     Returned(ReturnVal),
+    /// Any [`plan::Operator`] with a single output.
     Continue(Continue),
 }
 
+/// State of en emql variable, can only be created, and used once.
 pub(super) enum VarState {
     Used { created: Span, used: Span },
     Available { created: Span, state: Continue },
 }
 
+/// Convert an [`Ast`] to a [`plan::Plan`] and [`backend::Targets`]
 pub fn ast_to_logical(
     Ast {
         backends,
@@ -69,6 +87,9 @@ pub fn ast_to_logical(
     }
 }
 
+/// Add a new backend
+/// - Each has a unique name
+/// - Each backend needs to parse its own options
 fn add_backend(
     bks: &mut HashMap<Ident, backend::Backend>,
     BackendImpl {
@@ -90,6 +111,11 @@ fn add_backend(
     errors
 }
 
+/// Add a table to a [`plan::Plan`]
+/// - Table must be unique
+/// - Constraint names must be unique
+/// - Some constraints are not redefinable (e.g. unique cannot be used multiple
+///   times of one column)
 fn add_table(
     lp: &mut plan::Plan,
     tn: &mut HashMap<Ident, plan::Key<plan::Table>>,
@@ -198,6 +224,64 @@ fn add_table(
     errs
 }
 
+/// Add a query to a [`plan::Plan`], using [`add_streams_to_context`].
+fn add_query(
+    lp: &mut plan::Plan,
+    qs: &mut HashSet<Ident>,
+    tn: &HashMap<Ident, plan::Key<plan::Table>>,
+    Query {
+        name,
+        context: Context { params, streams },
+    }: Query,
+) -> LinkedList<Diagnostic> {
+    let mut vs = HashMap::new();
+    let mut ts = HashMap::new();
+
+    // Analyse the query parameters
+    let (raw_params, mut errors) = extract_fields(params, errors::query_parameter_redefined);
+    let params = raw_params.into_iter().filter_map(|(name, data_type)| {
+        match ast_typeto_scalar(
+            tn,
+            &mut ts,
+            data_type,
+            |e| errors::query_param_ref_table_not_found(&name, e),
+            errors::query_no_cust_type_found,
+        ) {
+            Ok(t) => Some((name, lp.scalar_types.insert(t))),
+            Err(e) => {
+                errors.push_back(e);
+                None
+            }
+        }
+    });
+
+    // Create and populate the query context
+    let op_ctx = lp
+        .contexts
+        .insert(plan::Context::from_params(params.collect()));
+    lp.queries.insert(plan::Query {
+        name: name.clone(),
+        ctx: op_ctx,
+    });
+    add_streams_to_context(
+        lp,
+        tn,
+        &mut ts,
+        &mut vs,
+        op_ctx,
+        streams,
+        &name,
+        &mut errors,
+    );
+
+    // discard the unused variables of the context
+    discard_ends(lp, op_ctx, vs);
+
+    errors
+}
+
+/// Add a collection of streams to a context (e.g. a [`Query`], or the inside of
+/// a [`plan::ForEach`])
 #[allow(clippy::too_many_arguments)]
 pub fn add_streams_to_context(
     lp: &mut plan::Plan,
@@ -239,6 +323,7 @@ pub fn add_streams_to_context(
     }
 }
 
+/// Discard the unused variables (using [`plan::Discard`])
 pub fn discard_ends(
     lp: &mut plan::Plan,
     op_ctx: plan::Key<plan::Context>,
@@ -249,61 +334,6 @@ pub fn discard_ends(
             discard_continue(lp, op_ctx, state);
         }
     }
-}
-
-fn add_query(
-    lp: &mut plan::Plan,
-    qs: &mut HashSet<Ident>,
-    tn: &HashMap<Ident, plan::Key<plan::Table>>,
-    Query {
-        name,
-        context: Context { params, streams },
-    }: Query,
-) -> LinkedList<Diagnostic> {
-    let mut vs = HashMap::new();
-    let mut ts = HashMap::new();
-
-    // Analyse the query parameters
-    let (raw_params, mut errors) = extract_fields(params, errors::query_parameter_redefined);
-
-    let params = raw_params.into_iter().filter_map(|(name, data_type)| {
-        match ast_typeto_scalar(
-            tn,
-            &mut ts,
-            data_type,
-            |e| errors::query_param_ref_table_not_found(&name, e),
-            errors::query_no_cust_type_found,
-        ) {
-            Ok(t) => Some((name, lp.scalar_types.insert(t))),
-            Err(e) => {
-                errors.push_back(e);
-                None
-            }
-        }
-    });
-
-    let op_ctx = lp
-        .contexts
-        .insert(plan::Context::from_params(params.collect()));
-
-    lp.queries.insert(plan::Query {
-        name: name.clone(),
-        ctx: op_ctx,
-    });
-
-    add_streams_to_context(
-        lp,
-        tn,
-        &mut ts,
-        &mut vs,
-        op_ctx,
-        streams,
-        &name,
-        &mut errors,
-    );
-
-    discard_ends(lp, op_ctx, vs);
-    errors
 }
 
 fn build_streamexpr(
@@ -380,9 +410,7 @@ fn recur_stream(
                     data_type.stream,
                 ));
             }
-
             let StreamExpr { op, con } = *nxt;
-
             match build_logical(
                 op,
                 lp,
@@ -508,7 +536,7 @@ fn append_fields(
 }
 
 /// Generate a node that scans references from a given table
-/// Used in both [`super::operators::Ref`] and [`super::operators::Use`]
+/// Used in both `ref .. as ..` and `use ...`
 pub fn create_scanref(
     lp: &mut plan::Plan,
     op_ctx: plan::Key<plan::Context>,
@@ -555,6 +583,8 @@ pub fn get_all_cols(lp: &plan::Plan, table_id: plan::Key<plan::Table>) -> plan::
     }
 }
 
+/// Generating the types for different kinds of accesses, as used in the access
+/// operators such as [`plan::UniqueRef`] or [`plan::DeRef`]
 pub mod generate_access {
     use super::*;
 
@@ -700,6 +730,8 @@ pub fn linear_builder(
     }))
 }
 
+/// Like [`linear_builder`] but for use internally, when semantic errors are not
+/// possible.
 pub fn valid_linear_builder(
     lp: &mut plan::Plan,
     op_ctx: plan::Key<plan::Context>,

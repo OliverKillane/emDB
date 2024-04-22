@@ -1,17 +1,21 @@
-use std::collections::LinkedList;
+//! # Parsing
+//! The main parser for the emql language
+//! - Operator parsers are defined in [`super::operators`]
+//! - Common parsing utilities are defined here
+//! - The main [`emql_parser`] to invoke for emql through [`parse`].
+//!
+//! ## Design
+//! Language design is discussed in [emql](super).
+//!
+//! These parsers rely on 1 token lookahead, this results in the language having
+//! - heavy use of initialiser keywords
+//! - uncomplex/simple grammar, with no ambiguity
+//!
+//! ## Potential Improvements
+//! ### Parallel Parsing
+//! Relying on changes to [combi] and the `!Send + !Sync` properties of [`TokenStream`].
 
-use proc_macro2::{Delimiter, Ident, Span, TokenStream};
-use proc_macro_error::{Diagnostic, Level};
-use syn::{Expr, Type};
-
-use super::{
-    ast::{
-        Ast, AstType, BackendImpl, Connector, Constraint, ConstraintExpr, Context, Query,
-        StreamExpr, Table,
-    },
-    operators::parse_operator,
-};
-
+use super::{ast, operators::parse_operator};
 use combi::{
     core::{choice, mapsuc, nothing, recover, recursive, seq, seqdiff, setrepr, RecursiveHandle},
     derived::many0,
@@ -29,8 +33,12 @@ use combi::{
     },
     Combi,
 };
+use proc_macro2::{Delimiter, Ident, Span, TokenStream};
+use proc_macro_error::{Diagnostic, Level};
+use std::collections::LinkedList;
+use syn::{Expr, Type};
 
-pub(super) fn parse(ts: TokenStream) -> Result<Ast, LinkedList<Diagnostic>> {
+pub(super) fn parse(ts: TokenStream) -> Result<ast::Ast, LinkedList<Diagnostic>> {
     let parser = emql_parser();
     let (_, res) =
         mapsuc(seqdiff(parser, terminal), |(o, ())| o).comp(TokenIter::from(ts, Span::call_site()));
@@ -38,12 +46,12 @@ pub(super) fn parse(ts: TokenStream) -> Result<Ast, LinkedList<Diagnostic>> {
 }
 
 enum EmqlItem {
-    Query(Query),
-    Table(Table),
-    Backend(BackendImpl),
+    Query(ast::Query),
+    Table(ast::Table),
+    Backend(ast::BackendImpl),
 }
 
-fn emql_parser() -> impl TokenParser<Ast> {
+fn emql_parser() -> impl TokenParser<ast::Ast> {
     mapsuc(
         many0(
             not(isempty()),
@@ -73,7 +81,7 @@ fn emql_parser() -> impl TokenParser<Ast> {
                     EmqlItem::Backend(b) => backends.push(b),
                 }
             }
-            Ast {
+            ast::Ast {
                 backends,
                 tables,
                 queries,
@@ -82,7 +90,7 @@ fn emql_parser() -> impl TokenParser<Ast> {
     )
 }
 
-fn backend_parser() -> impl TokenParser<BackendImpl> {
+fn backend_parser() -> impl TokenParser<ast::BackendImpl> {
     mapsuc(
         seq(
             recover(
@@ -100,7 +108,7 @@ fn backend_parser() -> impl TokenParser<BackendImpl> {
             ),
             matchpunct(';'),
         ),
-        |((_, (impl_name, (_, (backend_name, options)))), _)| BackendImpl {
+        |((_, (impl_name, (_, (backend_name, options)))), _)| ast::BackendImpl {
             impl_name,
             backend_name,
             options,
@@ -109,9 +117,9 @@ fn backend_parser() -> impl TokenParser<BackendImpl> {
 }
 
 pub type ContextRecurHandle =
-    RecursiveHandle<TokenIter, TokenIter, Vec<StreamExpr>, TokenDiagnostic, TokenDiagnostic>;
+    RecursiveHandle<TokenIter, TokenIter, Vec<ast::StreamExpr>, TokenDiagnostic, TokenDiagnostic>;
 
-fn context_parser() -> impl TokenParser<Vec<StreamExpr>> {
+fn context_parser() -> impl TokenParser<Vec<ast::StreamExpr>> {
     recursive(|context_recur: ContextRecurHandle| {
         many0(
             not(isempty()),
@@ -128,7 +136,7 @@ fn context_parser() -> impl TokenParser<Vec<StreamExpr>> {
                                 }),
                             ),
                         ),
-                        |(op, con)| StreamExpr { op, con },
+                        |(op, con)| ast::StreamExpr { op, con },
                     )
                 }),
                 until(choice(
@@ -141,7 +149,7 @@ fn context_parser() -> impl TokenParser<Vec<StreamExpr>> {
     })
 }
 
-fn query_parser() -> impl TokenParser<Query> {
+fn query_parser() -> impl TokenParser<ast::Query> {
     mapsuc(
         seqs!(
             matchident("query"),
@@ -149,14 +157,14 @@ fn query_parser() -> impl TokenParser<Query> {
             recovgroup(Delimiter::Parenthesis, query_param_list_parser()),
             recovgroup(Delimiter::Brace, context_parser())
         ),
-        |(_, (name, (params, streams)))| Query {
+        |(_, (name, (params, streams)))| ast::Query {
             name,
-            context: Context { params, streams },
+            context: ast::Context { params, streams },
         },
     )
 }
 
-fn table_parser() -> impl TokenParser<Table> {
+fn table_parser() -> impl TokenParser<ast::Table> {
     mapsuc(
         seqs!(
             matchident("table"),
@@ -177,7 +185,7 @@ fn table_parser() -> impl TokenParser<Table> {
                 mapsuc(nothing(), |()| vec![])
             )
         ),
-        |(_, (name, (cols, cons)))| Table { name, cols, cons },
+        |(_, (name, (cols, cons)))| ast::Table { name, cols, cons },
     )
 }
 
@@ -191,7 +199,7 @@ fn member_list_parser() -> impl TokenParser<Vec<(Ident, Type)>> {
     )
 }
 
-fn query_param_list_parser() -> impl TokenParser<Vec<(Ident, AstType)>> {
+fn query_param_list_parser() -> impl TokenParser<Vec<(Ident, ast::AstType)>> {
     setrepr(
         listseptrailing(
             ',',
@@ -204,11 +212,11 @@ fn query_param_list_parser() -> impl TokenParser<Vec<(Ident, AstType)>> {
     )
 }
 
-fn constraint_parser() -> impl TokenParser<Constraint> {
+fn constraint_parser() -> impl TokenParser<ast::Constraint> {
     fn inner(
         name: &'static str,
-        p: impl TokenParser<ConstraintExpr>,
-    ) -> impl TokenParser<Constraint> {
+        p: impl TokenParser<ast::ConstraintExpr>,
+    ) -> impl TokenParser<ast::Constraint> {
         mapsuc(
             seqs!(
                 matchident(name),
@@ -219,7 +227,7 @@ fn constraint_parser() -> impl TokenParser<Constraint> {
                     mapsuc(nothing(), |()| None)
                 )
             ),
-            |(method, (p, alias))| Constraint {
+            |(method, (p, alias))| ast::Constraint {
                 alias,
                 method_span: method.span(),
                 expr: p,
@@ -228,14 +236,14 @@ fn constraint_parser() -> impl TokenParser<Constraint> {
     }
 
     choices!(
-        peekident("unique") => inner("unique", mapsuc(getident(), |i| ConstraintExpr::Unique{field:i})),
-        peekident("pred") => inner("pred", mapsuc(syn(collectuntil(isempty())), ConstraintExpr::Pred)),
-        peekident("limit") => inner("limit", mapsuc(syn(collectuntil(isempty())), |e| ConstraintExpr::Limit{size:e})),
+        peekident("unique") => inner("unique", mapsuc(getident(), |i| ast::ConstraintExpr::Unique{field:i})),
+        peekident("pred") => inner("pred", mapsuc(syn(collectuntil(isempty())), ast::ConstraintExpr::Pred)),
+        peekident("limit") => inner("limit", mapsuc(syn(collectuntil(isempty())), |e| ast::ConstraintExpr::Limit{size:e})),
         otherwise => error(getident(), |i| Diagnostic::spanned(i.span(), Level::Error, format!("expected a constraint (e.g. pred, unique) but got {i}")))
     )
 }
 
-fn connector_parse() -> impl TokenParser<Connector> {
+fn connector_parse() -> impl TokenParser<ast::Connector> {
     embelisherr(
         choices!(
             peekpunct('~') => mapsuc(
@@ -243,14 +251,14 @@ fn connector_parse() -> impl TokenParser<Connector> {
                     matchpunct('~'),
                     matchpunct('>')
                 ),
-                |(t1, _)| Connector{stream: false, span: t1.span()}
+                |(t1, _)| ast::Connector{stream: false, span: t1.span()}
             ),
             peekpunct('|') => mapsuc(
                 seq(
                     matchpunct('|'),
                     matchpunct('>')
                 ),
-                |(t1, _)| Connector{stream: true, span: t1.span()}
+                |(t1, _)| ast::Connector{stream: true, span: t1.span()}
             ),
             otherwise => error(
                 seq(
@@ -264,18 +272,18 @@ fn connector_parse() -> impl TokenParser<Connector> {
     )
 }
 
-pub fn type_parser(end: impl TokenParser<bool>) -> impl TokenParser<AstType> {
+pub fn type_parser(end: impl TokenParser<bool>) -> impl TokenParser<ast::AstType> {
     setrepr(
         choices! {
-            peekident("ref") => mapsuc(seq(matchident("ref"), getident()), |(_, i)| AstType::TableRef(i)),
-            peekident("type") => mapsuc(seq(matchident("type"), getident()), |(_, i)| AstType::Custom(i)),
-            otherwise => mapsuc(syntopunct(end), AstType::RsType)
+            peekident("ref") => mapsuc(seq(matchident("ref"), getident()), |(_, i)| ast::AstType::TableRef(i)),
+            peekident("type") => mapsuc(seq(matchident("type"), getident()), |(_, i)| ast::AstType::Custom(i)),
+            otherwise => mapsuc(syntopunct(end), ast::AstType::RsType)
         },
         "<type>",
     )
 }
 
-pub fn type_parser_to_punct(end: char) -> impl TokenParser<AstType> {
+pub fn type_parser_to_punct(end: char) -> impl TokenParser<ast::AstType> {
     type_parser(peekpunct(end))
 }
 
@@ -297,7 +305,7 @@ pub fn fields_expr() -> impl TokenParser<Vec<(Ident, Expr)>> {
     )
 }
 
-pub fn fields_assign() -> impl TokenParser<Vec<(Ident, (AstType, Expr))>> {
+pub fn fields_assign() -> impl TokenParser<Vec<(Ident, (ast::AstType, Expr))>> {
     listseptrailing(
         ',',
         mapsuc(

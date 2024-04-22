@@ -2,9 +2,9 @@ use emdb::emql;
 
 emql! {
     impl my_db as Planviz {
-        path = "scratch.dot", 
-        display_types = off, 
-        display_ctx_ops = off, 
+        path = "scratch.dot",
+        display_types = off,
+        display_ctx_ops = off,
         display_control = off
     };
 
@@ -16,15 +16,17 @@ emql! {
     query get_friendships() {
         use people |> fork(let person, friend);
 
-        join(use person (left pred(
-            if let Some(friend_name) = person.friend {
-                friend_name == friend.name
-            } else {
-                false
+        join(use person [
+            left pred {
+                if let Some(friend_name) = person.friend {
+                    friend_name == friend.name
+                } else {
+                    false
+                }
             }
-        )) use friend)
+        ] use friend)
             |> map(peep: String = person.name, buddy: String = friend.name)
-            |> collect(friends as type friendship)
+            |> collect(friends)
             ~> return;
     }
 }

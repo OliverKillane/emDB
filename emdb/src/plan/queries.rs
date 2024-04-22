@@ -15,7 +15,7 @@ pub struct Context {
     /// The parameters for the context
     pub params: Vec<(Ident, Key<ScalarType>)>,
     /// if the context returns a value, then the return value operator
-    /// INV is a [super::FlowOperator::Return]
+    /// INV is a [super::Return]
     pub returnflow: Option<Key<Operator>>,
     pub discards: Vec<Key<Operator>>,
 }

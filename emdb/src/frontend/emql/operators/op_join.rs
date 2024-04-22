@@ -50,7 +50,7 @@ impl EMQLOperator for Join {
                 ), |(_, (l, (_, r)))| MatchKind::Equi{left_field: l, right_field: r}),
                 peekident("pred") => mapsuc(seq(
                     matchident("pred"),
-                    recovgroup(Delimiter::Parenthesis, syn(collectuntil(isempty())))
+                    recovgroup(Delimiter::Brace, syn(collectuntil(isempty())))
                     ), |(_, e)| MatchKind::Pred(e)
                 ),
                 peekident("cross") => mapsuc(matchident("cross"), |_| MatchKind::Cross),
@@ -62,7 +62,7 @@ impl EMQLOperator for Join {
             functional_style(Self::NAME, seqs!(
                     matchident("use"),
                     getident(),
-                    recovgroup(Delimiter::Parenthesis, seq(kind_parser(), match_parser())),
+                    recovgroup(Delimiter::Bracket, seq(kind_parser(), match_parser())),
                     matchident("use"),
                     getident()
                 )

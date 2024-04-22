@@ -1,3 +1,6 @@
+//! # emQL Abstract Syntax Tree
+//! A basic AST, without error nodes. Includes spans required for [`super::sem`] to create [`super::errors`].
+
 use super::operators::Operator;
 use proc_macro2::{Ident, Span, TokenStream};
 use syn::{Expr, Type};

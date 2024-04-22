@@ -1,9 +1,12 @@
 //! # [emDB](crate) frontends
 //!
 //! ## What is a frontend?
+//! A parser that takes tokens, and generated an [`plan::Plan`] and [`backend::Targets`].
 //!
 //! ## [Diagnostics API](proc_macro_error::Diagnostic)
-//!
+//! Used to generate errors to be emitted by the rust compiler.
+//! - Allows use of the unstable diagnostics API on stable with more limited
+//!   errors produced
 
 mod boss;
 mod emql;

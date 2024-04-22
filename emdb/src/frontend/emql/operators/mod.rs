@@ -7,6 +7,7 @@
 //! - the [`create_operator`] macro generates a single enumeration and
 //!   associated parse and logical translation functions (we avoid using
 //!   `Box<dyn EMQLOperator>` by polymorphism through the [`Operator`] enum)
+//!   (similar to [enumtrait]).
 //!
 //! To create a new operator, simply add a new module and [`EMQLOperator`], then
 //! add it to the [`create_operator`] macro invocation.
@@ -24,7 +25,7 @@ use crate::frontend::emql::sem::{
 use crate::plan;
 use crate::utils::misc::{result_to_opt, singlelist};
 use combi::{
-    core::{choice, mapsuc, seq, setrepr},
+    core::{choice, mapsuc, nothing, seq, setrepr},
     macros::{choices, seqs},
     tokens::{
         basic::{
@@ -88,7 +89,10 @@ macro_rules! create_operator {
                 $(
                     peekident($t::NAME) => expectederr(mapsuc($t::build_parser(ctx_recur.clone()), $op::$t)),
                 )*
-                otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, format!("expected an operator but got {}", t)))
+                otherwise => error(gettoken, |t|
+                    Diagnostic::spanned(t.span(), Level::Error, format!("expected an operator but got {t}"))
+                        .help(format!("Availabe operators are {}", [$($t::NAME,)*].join(", ")))
+                )
             }
         }
 

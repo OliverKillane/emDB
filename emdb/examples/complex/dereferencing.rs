@@ -1,7 +1,6 @@
 use emdb::emql;
 
 emql! {
-
     table cool {
         name: String,
         something: i32,
@@ -49,7 +48,7 @@ emql! {
 
         use x1 
             |> take(1)
-            |> collect(it as type foo) 
+            |> collect(it) 
             ~> return;
 
         use x2 

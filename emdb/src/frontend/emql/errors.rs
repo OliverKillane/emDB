@@ -1,69 +1,54 @@
-//! Errors to be displayed by the parser and semantic analysis
-//!
-//! ```text
-//! [PARSE-001] Expected a dodo but found a dada
-//!
-//!
-//!
-//! ```
-//!
+//! # EmQL Error Messages
+//! The general error messages produced by emql's semantic analysis (from [`super::sem`] and [`super::operators`])
+//! - Each error has a code identified (for easy communication/bug reports)
 
-use std::collections::HashMap;
-
+use super::sem::VarState;
 use crate::plan::{self, Key, Plan, RecordType, ScalarType, Table, With};
 use itertools::Itertools;
 use proc_macro2::{Ident, Span};
 use proc_macro_error::{Diagnostic, Level};
+use std::collections::HashMap;
 use syn::Type;
 
-use super::sem::VarState;
+type ErrCode = usize;
 
-const BACKEND: &str = "TABLE";
-const TABLE: &str = "TABLE";
-const QUERY: &str = "QUERY";
-
-fn error_name(section: &str, code: u8) -> String {
-    format!("[{section}-{code:03}]")
+fn emql_error(code: ErrCode, span: Span, message: String) -> Diagnostic {
+    Diagnostic::spanned(span, Level::Error, format!("[EMQL-{code}] {message}"))
 }
 
 fn redefinition_error(
-    err_name: &str,
+    err_code: ErrCode,
     def_type: &str,
     def: &Ident,
     original_def: &Ident,
 ) -> Diagnostic {
-    Diagnostic::spanned(
+    emql_error(
+        err_code,
         def.span(),
-        Level::Error,
-        format!("{err_name} Redefinition of {def_type} `{def}`"),
+        format!("Redefinition of {def_type} `{def}`"),
     )
-    .span_note(original_def.span(), "Originally defined here".to_owned())
+    .span_note(original_def.span(), "Originally defined here".to_string())
     .help(format!("Each {def_type} must have a unique name"))
 }
 
 pub(super) fn backend_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
-    redefinition_error(&error_name(BACKEND, 0), "backend", def, original_def)
+    redefinition_error(0, "backend", def, original_def)
 }
 
 pub(super) fn table_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
-    redefinition_error(&error_name(TABLE, 1), "table", def, original_def)
+    redefinition_error(1, "table", def, original_def)
 }
 
 pub(super) fn table_column_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
-    redefinition_error(&error_name(TABLE, 2), "table column", def, original_def)
+    redefinition_error(2, "table column", def, original_def)
 }
 
 pub(super) fn table_constraint_alias_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
-    redefinition_error(&error_name(TABLE, 3), "constraint alias", def, original_def)
+    redefinition_error(3, "constraint alias", def, original_def)
 }
 
 pub(super) fn collect_type_alias_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
-    redefinition_error(
-        &error_name("type", 1),
-        "collect type alias",
-        def,
-        original_def,
-    )
+    redefinition_error(4, "collect type alias", def, original_def)
 }
 
 pub(super) fn table_constraint_duplicate_unique(
@@ -71,11 +56,10 @@ pub(super) fn table_constraint_duplicate_unique(
     method_span: Span,
     prev_alias: &Option<Ident>,
 ) -> Diagnostic {
-    let err_name = error_name(TABLE, 4);
-    let mut diag = Diagnostic::spanned(
+    let mut diag = emql_error(
+        5,
         method_span,
-        Level::Error,
-        format!("{err_name} Duplicate unique constraint on column `{col_name}`"),
+        format!("Duplicate unique constraint on column `{col_name}`"),
     );
     if let Some(alias) = prev_alias {
         diag = diag.span_note(alias.span(), format!("previously defined as {alias} here."));
@@ -89,18 +73,13 @@ pub(super) fn table_constraint_nonexistent_unique_column(
     table_name: &Ident,
     method_span: Span,
 ) -> Diagnostic {
-    let err_name = error_name(TABLE, 5);
-    Diagnostic::spanned(
-        method_span,
-        Level::Error,
-        format!(
-            "{err_name} Column `{col_name}` does not exist in table `{table_name}`, so cannot apply a unique constraint{} to it", if let Some(alias) = alias {
-                format!(" with alias `{alias}`")
-            } else {
-                String::new()
-            }
-        ),
-    ).span_help(table_name.span(), format!("Apply the unique constraint to an available column in {table_name}"))
+    emql_error(6, method_span, format!(
+        "Column `{col_name}` does not exist in table `{table_name}`, so cannot apply a unique constraint{} to it", if let Some(alias) = alias {
+            format!(" with alias `{alias}`")
+        } else {
+            String::new()
+        }
+    )).span_help(table_name.span(), format!("Apply the unique constraint to an available column in {table_name}"))
 }
 
 pub(super) fn table_constraint_duplicate_limit(
@@ -108,12 +87,11 @@ pub(super) fn table_constraint_duplicate_limit(
     table_name: &Ident,
     method_span: Span,
 ) -> Diagnostic {
-    let err_name = error_name(TABLE, 6);
-    Diagnostic::spanned(
+    emql_error(
+        7,
         method_span,
-        Level::Error,
         format!(
-            "{err_name} Duplicate limit constraint{} on table `{table_name}`",
+            "Duplicate limit constraint{} on table `{table_name}`",
             if let Some(alias) = alias {
                 format!(" with alias `{alias}`")
             } else {
@@ -123,26 +101,25 @@ pub(super) fn table_constraint_duplicate_limit(
     )
     .span_help(
         table_name.span(),
-        "Limit constraints can only be applied once".to_owned(),
+        "Limit constraints can only be applied once".to_string(),
     )
 }
 
 pub(super) fn query_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
-    redefinition_error(&error_name(QUERY, 7), "query", def, original_def)
+    redefinition_error(8, "query", def, original_def)
 }
 
 pub(super) fn query_multiple_returns(ret: Span, prev_ret: Span, query: &Ident) -> Diagnostic {
-    let err_name = error_name(QUERY, 8);
-    Diagnostic::spanned(
+    emql_error(
+        9,
         ret,
-        Level::Error,
-        format!("{err_name} Multiple return statements in query `{query}`",),
+        format!("Multiple return statements in query `{query}`"),
     )
-    .span_help(prev_ret, "Previously returned value here".to_owned())
+    .span_help(prev_ret, "Previously returned value here".to_string())
 }
 
 pub(super) fn query_operator_field_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
-    redefinition_error(&error_name(QUERY, 9), "field", def, original_def)
+    redefinition_error(10, "field", def, original_def)
 }
 
 pub(super) fn query_stream_single_connection(
@@ -150,22 +127,18 @@ pub(super) fn query_stream_single_connection(
     last_span: Span,
     stream: bool,
 ) -> Diagnostic {
-    let err_name = error_name(QUERY, 10);
-    Diagnostic::spanned(
+    emql_error(
+        11,
         span,
-        Level::Error,
-        format!(
-            "{err_name} {}",
-            if stream {
-                "Expected a stream, but found a single connector"
-            } else {
-                "Expected a single, but found a stream connector"
-            }
-        ),
+        String::from(if stream {
+            "Expected a stream, but found a single connector"
+        } else {
+            "Expected a single, but found a stream connector"
+        }),
     )
     .span_note(
         last_span,
-        "The previous operator provides the values".to_owned(),
+        "The previous operator provides the values".to_string(),
     )
     .help(
         if stream {
@@ -173,7 +146,7 @@ pub(super) fn query_stream_single_connection(
         } else {
             "Use a single connector `~>` instead of stream `|>`"
         }
-        .to_owned(),
+        .to_string(),
     )
 }
 
@@ -182,11 +155,10 @@ pub(super) fn query_no_data_for_next_operator(
     stream: bool,
     prev_op: Span,
 ) -> Diagnostic {
-    let err_name = error_name(QUERY, 11);
-    Diagnostic::spanned(
+    emql_error(
+        12,
         prev_op,
-        Level::Error,
-        "No output data provided for next operator".to_owned(),
+        "No output data provided for next operator".to_string(),
     )
     .span_note(
         conn_span,
@@ -202,8 +174,7 @@ pub(super) fn query_no_data_for_next_operator(
 }
 
 pub(super) fn query_early_return(conn_span: Span, stream: bool, ret_op: Span) -> Diagnostic {
-    let err_name = error_name(QUERY, 12);
-    Diagnostic::spanned(ret_op, Level::Error, "Early return statement".to_owned()).span_note(
+    emql_error(13, ret_op, "Early return statement".to_string()).span_note(
         conn_span,
         format!(
             "Expected a {} out here",
@@ -217,16 +188,14 @@ pub(super) fn query_early_return(conn_span: Span, stream: bool, ret_op: Span) ->
 }
 
 pub(super) fn query_parameter_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
-    redefinition_error(&error_name(QUERY, 13), "query parameter", def, original_def)
+    redefinition_error(14, "query parameter", def, original_def)
 }
 
 pub(super) fn query_param_ref_table_not_found(query: &Ident, table_ref: &Ident) -> Diagnostic {
-    let err_name = error_name(QUERY, 13);
-
-    Diagnostic::spanned(
+    emql_error(
+        15,
         table_ref.span(),
-        Level::Error,
-        format!("{err_name} Table `{table_ref}` not found in query `{query}`",),
+        format!("Table `{table_ref}` not found in query `{query}`"),
     )
     .help(format!(
         "Either use a `ref <other table>` or create `table {table_ref} {{...}} @ [...]"
@@ -234,9 +203,9 @@ pub(super) fn query_param_ref_table_not_found(query: &Ident, table_ref: &Ident) 
 }
 
 pub(super) fn access_field_missing(call: &Ident, field: &Ident, fields: Vec<&Ident>) -> Diagnostic {
-    Diagnostic::spanned(
+    emql_error(
+        16,
         field.span(),
-        Level::Error,
         format!(
             "`{call}` field `{field}` is not found, the available fields are {}",
             fields.iter().join(", ")
@@ -249,34 +218,33 @@ pub(super) fn query_expected_reference_type_for_update(
     dt: &Key<ScalarType>,
     reference: &Ident,
 ) -> Diagnostic {
-    let err_name = error_name(QUERY, 14);
-
-    Diagnostic::spanned(reference.span(), Level::Error, format!(
-        "{err_name} Expected a reference to a table for the update in `{reference}`, but got a `{}` instead",
+    emql_error(
+        17,
+        reference.span(),
+        format!(
+        "Expected a reference to a table for the update in `{reference}`, but got a `{}` instead",
         With { plan: lp, extended: dt }
-    )).help(format!("Assign a reference to {reference}, or use a different field that is a reference"))
+    ),
+    )
+    .help(format!(
+        "Assign a reference to {reference}, or use a different field that is a reference"
+    ))
 }
 
 pub(super) fn query_cannot_start_with_operator(op: &Ident) -> Diagnostic {
-    let err_name = error_name(QUERY, 15);
-
-    Diagnostic::spanned(
+    emql_error(
+        18,
         op.span(),
-        Level::Error,
-        format!("{err_name} Cannot start a query expression with operator `{op}`"),
+        format!("Cannot start a query expression with operator `{op}`"),
     )
-    .help("Instead use operators such as `use ..`, `ref ..`, or `unique(..)`".to_owned())
+    .help("Instead use operators such as `use ..`, `ref ..`, or `unique(..)`".to_string())
 }
 
 pub(super) fn query_update_field_not_in_table(table_name: &Ident, field: &Ident) -> Diagnostic {
-    let err_name = error_name(QUERY, 16);
-
-    Diagnostic::spanned(
+    emql_error(
+        19,
         field.span(),
-        Level::Error,
-        format!(
-        "{err_name} Field `{field}` not found in table `{table_name}` and hence cannot be updated",
-    ),
+        format!("Field `{field}` not found in table `{table_name}` and hence cannot be updated",),
     )
     .span_note(
         table_name.span(),
@@ -290,12 +258,10 @@ pub(super) fn query_update_reference_not_present(
     prev_span: Span,
     dt: &Key<RecordType>,
 ) -> Diagnostic {
-    let err_name = error_name(QUERY, 17);
-
-    Diagnostic::spanned(
+    emql_error(
+        20,
         reference.span(),
-        Level::Error,
-        format!("{err_name} Reference `{reference}` not found in the query",),
+        format!("Reference `{reference}` not found in the query"),
     )
     .span_note(
         prev_span,
@@ -317,10 +283,8 @@ pub(super) fn query_insert_field_rust_type_mismatch(
     expected_type: &Type,
     prev_span: Span,
 ) -> Diagnostic {
-    let err_name = error_name(QUERY, 18);
-
-    Diagnostic::spanned(call.span(), Level::Error, format!(
-        "{err_name} Field `{field}` has type `{passed_type:#?}` which does not match the expected type `{expected_type:#?}`"
+    emql_error(21, call.span(), format!(
+        "Field `{field}` has type `{passed_type:#?}` which does not match the expected type `{expected_type:#?}`"
     )).span_note(field.span(), format!("`{field}` defined here"))
     .span_note(prev_span, format!("Input to `{call}` comes from here"))
 }
@@ -333,11 +297,19 @@ pub(super) fn query_insert_field_type_mismatch(
     expected_type: &Type,
     prev_span: Span,
 ) -> Diagnostic {
-    let err_name = error_name(QUERY, 18);
-
-    Diagnostic::spanned(call.span(), Level::Error, format!(
-        "{err_name} Field `{field}` has type `{}` which does not match the expected type `{:#?}`", With{plan: lp, extended: passed_type}, expected_type
-    )).span_note(field.span(), format!("`{field}` defined here"))
+    emql_error(
+        22,
+        call.span(),
+        format!(
+            "Field `{field}` has type `{}` which does not match the expected type `{:#?}`",
+            With {
+                plan: lp,
+                extended: passed_type
+            },
+            expected_type
+        ),
+    )
+    .span_note(field.span(), format!("`{field}` defined here"))
     .span_note(prev_span, format!("Input to `{call}` comes from here"))
 }
 
@@ -347,12 +319,10 @@ pub(super) fn query_insert_field_missing(
     field: &Ident,
     last_span: Span,
 ) -> Diagnostic {
-    let err_name = error_name(QUERY, 19);
-
-    Diagnostic::spanned(
+    emql_error(
+        23,
         call.span(),
-        Level::Error,
-        format!("{err_name} Field `{field}` is missing from the insert into table `{table_name}`",),
+        format!("Field `{field}` is missing from the insert into table `{table_name}`"),
     )
     .span_note(field.span(), format!("`{field}` defined here"))
     .span_error(
@@ -366,38 +336,28 @@ pub(super) fn query_insert_extra_field(
     field: &Ident,
     table_name: &Ident,
 ) -> Diagnostic {
-    let err_name = error_name(QUERY, 20);
-
-    Diagnostic::spanned(
+    emql_error(
+        24,
         call.span(),
-        Level::Error,
-        format!("{err_name} Field `{field}` is not a valid field for table `{table_name}`",),
+        format!("Field `{field}` is not a valid field for table `{table_name}`"),
     )
     .span_note(field.span(), format!("`{field}` defined here"))
     .span_note(table_name.span(), format!("`{table_name}` defined here"))
 }
 
 pub(super) fn query_nonexistent_table(call: &Ident, table_used: &Ident) -> Diagnostic {
-    let err_name = error_name(QUERY, 21);
-
-    Diagnostic::spanned(
-        table_used.span(),
-        Level::Error,
-        format!(
-            "{err_name} Table `{table_used}` does not exist in the query so cannot be accessed through `{call}`",
-        ),
-    ).help(format!(
+    emql_error(25, table_used.span(), format!(
+        "Table `{table_used}` does not exist in the query so cannot be accessed through `{call}`",
+    )).help(format!(
         "Either define a `table {table_used} {{...}} @ [...]` or use a different table in `insert(..)`", 
     ))
 }
 
 pub(super) fn query_delete_field_not_present(call: &Ident, field: &Ident) -> Diagnostic {
-    let err_name = error_name(QUERY, 22);
-
-    Diagnostic::spanned(
+    emql_error(
+        26,
         field.span(),
-        Level::Error,
-        format!("{err_name} Field `{field}` not found in the available data",),
+        format!("Field `{field}` not found in the available data"),
     )
     .span_help(
         call.span(),
@@ -411,13 +371,11 @@ pub(super) fn query_delete_field_not_reference(
     field: &Ident,
     dt: &Key<ScalarType>,
 ) -> Diagnostic {
-    let err_name = error_name(QUERY, 23);
-
-    Diagnostic::spanned(
+    emql_error(
+        27,
         field.span(),
-        Level::Error,
         format!(
-            "{err_name} Field `{field}` is not a reference, but a `{}`",
+            "Field `{field}` is not a reference, but a `{}`",
             With {
                 plan: lp,
                 extended: dt
@@ -428,26 +386,18 @@ pub(super) fn query_delete_field_not_reference(
 }
 
 pub(super) fn query_deref_field_already_exists(new: &Ident, existing: &Ident) -> Diagnostic {
-    let err_name = error_name(QUERY, 24);
-
-    Diagnostic::spanned(
-        new.span(),
-        Level::Error,
-        format!("{err_name} Field `{new}` already exists",),
-    )
-    .span_note(existing.span(), format!("{existing} defined here"))
-    .help(format!(
-        "Rename `{new}` or remove the existing `{new}` field"
-    ))
+    emql_error(28, new.span(), format!("Field `{new}` already exists"))
+        .span_note(existing.span(), format!("{existing} defined here"))
+        .help(format!(
+            "Rename `{new}` or remove the existing `{new}` field"
+        ))
 }
 
 pub(super) fn query_reference_field_missing(reference: &Ident) -> Diagnostic {
-    let err_name = error_name(QUERY, 25);
-
-    Diagnostic::spanned(
+    emql_error(
+        29,
         reference.span(),
-        Level::Error,
-        format!("{err_name} Field `{reference}` not found in the available data",),
+        format!("Field `{reference}` not found in the available data"),
     )
     .span_help(
         reference.span(),
@@ -456,11 +406,10 @@ pub(super) fn query_reference_field_missing(reference: &Ident) -> Diagnostic {
 }
 
 pub(super) fn query_deref_cannot_deref_rust_type(reference: &Ident, t: &Type) -> Diagnostic {
-    let err_name = error_name(QUERY, 26);
-    Diagnostic::spanned(
+    emql_error(
+        30,
         reference.span(),
-        Level::Error,
-        format!("{err_name} Cannot dereference a rust type `{t:#?}`"),
+        format!("Cannot dereference a rust type `{t:#?}`"),
     )
 }
 
@@ -469,12 +418,11 @@ pub(super) fn query_deref_cannot_deref_record(
     reference: &Ident,
     t: &Key<RecordType>,
 ) -> Diagnostic {
-    let err_name = error_name(QUERY, 27);
-    Diagnostic::spanned(
+    emql_error(
+        31,
         reference.span(),
-        Level::Error,
         format!(
-            "{err_name} Cannot dereference a record `{}`",
+            "Cannot dereference a record `{}`",
             With {
                 plan: lp,
                 extended: t
@@ -484,20 +432,18 @@ pub(super) fn query_deref_cannot_deref_record(
 }
 
 pub(super) fn query_operator_cannot_come_first(call: &Ident) -> Diagnostic {
-    let err_name = error_name(QUERY, 28);
-    Diagnostic::spanned(
+    emql_error(
+        32,
         call.span(),
-        Level::Error,
-        format!("{err_name} Operator `{call}` cannot be the first operator in a query",),
+        format!("Operator `{call}` cannot be the first operator in a query"),
     )
 }
 
 pub(super) fn query_unique_table_not_found(table: &Ident) -> Diagnostic {
-    let err_name = error_name(QUERY, 29);
-    Diagnostic::spanned(
+    emql_error(
+        33,
         table.span(),
-        Level::Error,
-        format!("{err_name} Table `{table}` not found in the query",),
+        format!("Table `{table}` not found in the query"),
     )
     .help(format!(
         "Either define a `table {table} {{...}} @ [...]` or use a different table in `unique(..)`",
@@ -505,11 +451,10 @@ pub(super) fn query_unique_table_not_found(table: &Ident) -> Diagnostic {
 }
 
 pub(super) fn query_unique_no_field_in_table(field: &Ident, table_name: &Ident) -> Diagnostic {
-    let err_name = error_name(QUERY, 30);
-    Diagnostic::spanned(
+    emql_error(
+        34,
         field.span(),
-        Level::Error,
-        format!("{err_name} Field `{field}` not found in table `{table_name}`",),
+        format!("Field `{field}` not found in table `{table_name}`"),
     )
     .span_help(
         table_name.span(),
@@ -518,17 +463,12 @@ pub(super) fn query_unique_no_field_in_table(field: &Ident, table_name: &Ident) 
 }
 
 pub(super) fn query_unique_field_is_not_unique(field: &Ident, table_name: &Ident) -> Diagnostic {
-    let err_name = error_name(QUERY, 31);
-    Diagnostic::spanned(
-        field.span(),
-        Level::Error,
-        format!("{err_name} Field `{field}` is not unique in table `{table_name}`",),
-    )
+    emql_error(35, field.span(), format!("Field `{field}` is not unique in table `{table_name}`"))
     .span_help(
         table_name.span(),
         format!(
-        "Add a unique constraint to `{field}` in {table_name} `@ [ ... unique({field}) as ... ]`"
-    ),
+            "Add a unique constraint to `{field}` in {table_name} `@ [ ... unique({field}) as ... ]`"
+        ),
     )
 }
 
@@ -537,14 +477,13 @@ pub(super) fn query_use_variable_already_used(
     created: Span,
     used: Span,
 ) -> Diagnostic {
-    let err_name = error_name(QUERY, 32);
-    Diagnostic::spanned(
+    emql_error(
+        36,
         usage.span(),
-        Level::Error,
-        format!("{err_name} Variable `{usage}` has already been used",),
+        format!("Variable `{usage}` has already been used"),
     )
-    .span_error(created, "Was created here".to_owned())
-    .span_error(used, "And consumed here".to_owned())
+    .span_error(created, "Was created here".to_string())
+    .span_error(used, "And consumed here".to_string())
 }
 
 pub(super) fn query_invalid_use(
@@ -552,7 +491,6 @@ pub(super) fn query_invalid_use(
     tn: &HashMap<Ident, Key<Table>>,
     vs: &HashMap<Ident, VarState>,
 ) -> Diagnostic {
-    let err_name = error_name(QUERY, 33);
     let vars = vs
         .iter()
         .filter_map(|(var, state)| {
@@ -564,9 +502,8 @@ pub(super) fn query_invalid_use(
         })
         .join(", ");
     let tables = tn.keys().join(", ");
-    Diagnostic::spanned(usage.span(), Level::Error, format!(
-        "{err_name} Invalid use of variable `{usage}`",
-    )).help(format!("Currently available variables are {vars}, and tables {tables}"  ))
+    emql_error(37,usage.span(), format!("Invalid use of variable `{usage}`",))
+    .help(format!("Currently available variables are {vars}, and tables {tables}"  ))
     .help(format!(
         "To introduce a new `{usage}` make a new table `table {usage} {{ ... }} @ [ ... ]` or a new variable ` ... |> let {usage}`"
     ))
@@ -576,7 +513,6 @@ pub(super) fn query_invalid_variable_use(
     usage: &Ident,
     vs: &HashMap<Ident, VarState>,
 ) -> Diagnostic {
-    let err_name = error_name(QUERY, 33);
     let vars = vs
         .iter()
         .filter_map(|(var, state)| {
@@ -587,10 +523,10 @@ pub(super) fn query_invalid_variable_use(
             }
         })
         .join(", ");
-    Diagnostic::spanned(
+    emql_error(
+        38,
         usage.span(),
-        Level::Error,
-        format!("{err_name} Invalid use of variable `{usage}`",),
+        format!("Invalid use of variable `{usage}`"),
     )
     .help(format!("Currently available variables are {vars}"))
 }
@@ -600,15 +536,14 @@ pub(super) fn query_let_variable_already_assigned(
     created: Span,
     used: Option<Span>,
 ) -> Diagnostic {
-    let err_name = error_name(QUERY, 34);
-    let diag = Diagnostic::spanned(
+    let diag = emql_error(
+        39,
         assign.span(),
-        Level::Error,
-        format!("{err_name} Cannot assign to already created variable {assign}"),
+        format!("Cannot assign to already created variable {assign}"),
     )
-    .span_note(created, "Created here".to_owned());
+    .span_note(created, "Created here".to_string());
     if let Some(used) = used {
-        diag.span_note(used, "Used here".to_owned())
+        diag.span_note(used, "Used here".to_string())
     } else {
         diag
     }
@@ -619,12 +554,11 @@ pub(super) fn query_deref_cannot_deref_bag_type(
     reference: &Ident,
     t: &Key<RecordType>,
 ) -> Diagnostic {
-    let err_name = error_name(QUERY, 35);
-    Diagnostic::spanned(
+    emql_error(
+        40,
         reference.span(),
-        Level::Error,
         format!(
-            "{err_name} Cannot dereference a bag of records `{}`",
+            "Cannot dereference a bag of records `{}`",
             With {
                 plan: lp,
                 extended: t
@@ -633,22 +567,19 @@ pub(super) fn query_deref_cannot_deref_bag_type(
     )
 }
 pub(super) fn query_cannot_return_stream(last: Span, ret: Span) -> Diagnostic {
-    let err_name = error_name(QUERY, 36);
-    Diagnostic::spanned(
-        ret,
-        Level::Error,
-        format!("{err_name} Cannot return a stream from a query",),
-    )
-    .span_note(last, "The previous operator provides the values".to_owned())
-    .help("Use a `collect` operator to convert the stream into a bag of records".to_string())
+    emql_error(41, ret, "Cannot return a stream from a query".to_string())
+        .span_note(
+            last,
+            "The previous operator provides the values".to_string(),
+        )
+        .help("Use a `collect` operator to convert the stream into a bag of records".to_string())
 }
 
 pub(super) fn query_table_access_nonexisted_columns(table_name: &Ident, col: &Ident) -> Diagnostic {
-    let err_name = error_name(QUERY, 37);
-    Diagnostic::spanned(
+    emql_error(
+        42,
         col.span(),
-        Level::Error,
-        format!("{err_name} Cannot access {col} as it does not exist in {table_name}"),
+        format!("Cannot access {col} as it does not exist in {table_name}"),
     )
     .span_note(table_name.span(), format!("{table_name} defined here"))
 }
@@ -660,13 +591,11 @@ pub(super) fn query_invalid_record_type(
     expected: &Key<RecordType>,
     found: &Key<RecordType>,
 ) -> Diagnostic {
-    let err_name = error_name(QUERY, 38);
-
-    Diagnostic::spanned(
+    emql_error(
+        43,
         op.span(),
-        Level::Error,
         format!(
-            "{err_name} Data type does not match, expected {} but found {}",
+            "Data type does not match, expected {} but found {}",
             With {
                 plan: lp,
                 extended: expected
@@ -680,70 +609,52 @@ pub(super) fn query_invalid_record_type(
 }
 
 pub(super) fn query_no_cust_type_found(t: &Ident) -> Diagnostic {
-    let err_name = error_name(QUERY, 39);
-
-    Diagnostic::spanned(
-        t.span(),
-        Level::Error,
-        format!("{err_name} Cannot find type {t}"),
-    )
+    emql_error(44, t.span(), format!("Cannot find type {t}"))
 }
 
 pub(super) fn table_query_no_such_field(table: &Ident, t: &Ident) -> Diagnostic {
-    let err_name = error_name(QUERY, 40);
-
-    Diagnostic::spanned(
-        t.span(),
-        Level::Error,
-        format!("{err_name} no such field `{t}` in `{table}`"),
-    )
-    .span_note(table.span(), format!("`{table}` defined here"))
+    emql_error(45, t.span(), format!("no such field `{t}` in `{table}`"))
+        .span_note(table.span(), format!("`{table}` defined here"))
 }
 
 pub(super) fn query_cannot_append_to_record(new: &Ident, existing: &Ident) -> Diagnostic {
-    let err_name = error_name(QUERY, 41);
-
-    Diagnostic::spanned(
+    emql_error(
+        46,
         new.span(),
-        Level::Error,
-        format!("{err_name} cannot append new field `{new}` as it is already defined"),
+        format!("Cannot append new field `{new}` as it is already defined"),
     )
     .span_note(existing.span(), format!("{existing} defined here"))
 }
 
 pub(super) fn sort_field_used_twice(field: &Ident, dup_field: &Ident) -> Diagnostic {
-    Diagnostic::spanned(field.span(), Level::Error, format!("Field `{field}` is used twice in th sort order, sorts can only sort of each field once"))
+    emql_error(47, field.span(), format!("Field `{field}` is used twice in th sort order, sorts can only sort of each field once"))
     .span_note(dup_field.span(), format!("`{dup_field}` first used here"))
 }
 
 pub(super) fn union_requires_at_least_one_input(call: &Ident) -> Diagnostic {
-    Diagnostic::spanned(
+    emql_error(
+        48,
         call.span(),
-        Level::Error,
         format!("`{call}` requires at least one input"),
     )
 }
 
 pub(super) fn operator_requires_streams(call: &Ident, var: &Ident) -> Diagnostic {
-    Diagnostic::spanned(
+    emql_error(
+        49,
         var.span(),
-        Level::Error,
         format!("`{call}` inputs must be streams, but `{var}` is not a stream"),
     )
 }
 
 pub(super) fn operator_requires_streams2(call: &Ident) -> Diagnostic {
-    Diagnostic::spanned(
-        call.span(),
-        Level::Error,
-        format!("`{call}` input must be a stream"),
-    )
+    emql_error(50, call.span(), format!("`{call}` input must be a stream"))
 }
 
 pub(super) fn no_return_in_context(call: &Ident) -> Diagnostic {
-    Diagnostic::spanned(
+    emql_error(
+        51,
         call.span(),
-        Level::Error,
         format!("No return from `{call}` is present, needed for the output of `{call}`"),
     )
 }
@@ -756,17 +667,5 @@ pub(super) fn union_not_same_type(
     other_var: &Ident,
     other_data_type: &plan::Key<plan::RecordType>,
 ) -> Diagnostic {
-    Diagnostic::spanned(
-        other_var.span(),
-        Level::Error,
-        format!("`{other_var}` has type `{}` but union requires all inputs to be of the same type `{}` (from `{var}`)", plan::With { plan: lp, extended: other_data_type }, plan::With { plan: lp, extended: data_type })
-    )
-}
-
-pub(super) fn operator_unimplemented(call: &Ident) -> Diagnostic {
-    Diagnostic::spanned(
-        call.span(),
-        Level::Error,
-        format!("`{call}` UNIMPLEMENTED!!"),
-    )
+    emql_error(52, other_var.span(), format!("`{other_var}` has type `{}` but union requires all inputs to be of the same type `{}` (from `{var}`)", plan::With { plan: lp, extended: other_data_type }, plan::With { plan: lp, extended: data_type }))
 }
