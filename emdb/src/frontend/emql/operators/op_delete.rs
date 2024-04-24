@@ -38,8 +38,8 @@ impl EMQLOperator for Delete {
                     last_span,
                 }, next_edge| {
                     let rec_field = field.into();
-                    if let Some(ts) = lp.get_record_type(data_type.fields).fields.get(&rec_field) {
-                        if let plan::ScalarTypeConc::TableRef(table_id) = lp.get_scalar_type(*ts) {
+                    if let Some(ts) = lp.get_record_type_conc(data_type.fields).fields.get(&rec_field) {
+                        if let plan::ScalarTypeConc::TableRef(table_id) = lp.get_scalar_type_conc(*ts) {
                             Ok(
                                 LinearBuilderState { 
                                     data_out: data_type, 

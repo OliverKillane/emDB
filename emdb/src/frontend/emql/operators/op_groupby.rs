@@ -50,7 +50,7 @@ impl EMQLOperator for GroupBy {
             let by_rec_field = by.clone().into();
 
             // check field exists
-            let mut in_fields = lp.get_record_type(data_type.fields).clone();
+            let mut in_fields = lp.get_record_type_conc(data_type.fields).clone();
             if let Some(grouping_type) = in_fields.fields.remove(&by_rec_field) {
                 let inner_rec = lp.record_types.insert(plan::ConcRef::Conc(in_fields));
                 let next_edge = lp.dataflow.insert(plan::DataFlow::Null);

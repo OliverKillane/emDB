@@ -5,13 +5,7 @@ use proc_macro2::{Ident, Span, TokenStream};
 use proc_macro_error::{Diagnostic, Level};
 use quote::{quote, ToTokens};
 use syn::{
-    parse2,
-    punctuated::Punctuated,
-    spanned::Spanned,
-    token::{Brace, Comma, Dot, FatArrow, Match, Paren, SelfValue},
-    Arm, Block, Expr, ExprMatch, ExprMethodCall, ExprPath, FnArg, ImplItem, ImplItemFn, ItemEnum,
-    ItemImpl, ItemTrait, Pat, PatIdent, PatTupleStruct, Path, PathSegment, Signature, Stmt,
-    TraitItem, TraitItemFn,
+    parse2, punctuated::Punctuated, spanned::Spanned, token::{Brace, Comma, Dot, FatArrow, Gt, Lt, Match, Paren, PathSep, SelfValue}, AngleBracketedGenericArguments, Arm, Block, Expr, ExprMatch, ExprMethodCall, ExprPath, FnArg, GenericArgument, Generics, ImplItem, ImplItemFn, ItemEnum, ItemImpl, ItemTrait, Pat, PatIdent, PatTupleStruct, Path, PathSegment, Signature, Stmt, TraitItem, TraitItemFn, Type, TypePath
 };
 
 use combi::{
@@ -140,11 +134,40 @@ fn extract_params(sig: Signature) -> Option<(SelfValue, Vec<Ident>)> {
     }
 }
 
+fn extract_turbofish(gens: &Generics) -> Option<AngleBracketedGenericArguments> {
+    let mut args = Punctuated::new();
+    for arg in &gens.params {
+        match arg {
+            syn::GenericParam::Lifetime(l) => (),
+            syn::GenericParam::Type(t) => {
+                args.push(GenericArgument::Type(Type::Path(TypePath {
+                    qself: None,
+                    path: t.ident.clone().into(),})));
+            },
+            syn::GenericParam::Const(c) => {
+                args.push(GenericArgument::Const(Expr::Path(ExprPath { attrs: Vec::new(), qself: None, path: c.ident.clone().into() })));
+            },
+        };
+    }
+
+    if args.is_empty() {
+        None
+    } else {
+        Some(AngleBracketedGenericArguments {
+            colon2_token: Some(PathSep::default()),
+            lt_token: Lt::default(),
+            args,
+            gt_token: Gt::default(),
+        })
+    }
+}
+
 fn generate_fn_impl(
     trait_fn: &TraitItemFn,
     enum_qual: &Path,
     enum_item: &ItemEnum,
 ) -> Option<ImplItemFn> {
+    let turbofish = extract_turbofish(&trait_fn.sig.generics);
     let (self_token, args) = extract_params(trait_fn.sig.clone())?;
 
     let pat_expr = Ident::new("it", Span::call_site());
@@ -228,7 +251,7 @@ fn generate_fn_impl(
                         })),
                         dot_token: Dot::default(),
                         method: trait_fn.sig.ident.clone(),
-                        turbofish: None,
+                        turbofish: turbofish.clone(),
                         paren_token: Paren::default(),
                         args: args_exprs.clone(),
                     })),

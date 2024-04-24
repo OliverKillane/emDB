@@ -51,13 +51,13 @@ impl EMQLOperator for DeRef {
                     prev_edge,
                     last_span,
                 }, next_edge| {
-                    let rec_fields = &lp.get_record_type(data_type.fields).fields;
+                    let rec_fields = &lp.get_record_type_conc(data_type.fields).fields;
                     let rec_reference = reference.clone().into();
                     let rec_named = named.clone().into();
                     if let Some((existing, _)) = rec_fields.get_key_value(&rec_named) {
                         Err(singlelist(errors::query_deref_field_already_exists(&named, existing.get_field())))
                     } else if let Some(field_type) = rec_fields.get(&rec_reference) {
-                        match lp.get_scalar_type(*field_type) {
+                        match lp.get_scalar_type_conc(*field_type) {
                             plan::ScalarTypeConc::Record(r) => Err(singlelist(
                                 errors::query_deref_cannot_deref_record(lp, &reference, r),
                             )),

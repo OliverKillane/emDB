@@ -117,7 +117,7 @@ pub struct FoldField {
 /// INV: mapping expressions only contain fields from input and globals
 pub struct Map {
     pub input: Key<DataFlow>,
-    pub mapping: HashMap<RecordField, Expr>,
+    pub mapping: Vec<(RecordField, Expr)>,
     pub output: Key<DataFlow>,
 }
 
@@ -134,7 +134,7 @@ pub struct Expand {
 /// INV: output matches initial types
 pub struct Fold {
     pub input: Key<DataFlow>,
-    pub fold_fields: HashMap<RecordField, FoldField>,
+    pub fold_fields: Vec<(RecordField, FoldField)>,
     pub output: Key<DataFlow>,
 }
 
@@ -299,6 +299,17 @@ pub enum Operator {
     Row,
     Return,
     Discard,
+}
+
+impl Operator {
+    /// Convenience for getting a return operator (e.g. from a [Context])
+    /// INV: the operator is a return operator
+    pub fn get_return(&self) -> &Return {
+        match self {
+            Operator::Return(r) => r,
+            _ => unreachable!("Attempted to get return from non-return operator"),
+        }
+    }
 }
 
 impl Plan {

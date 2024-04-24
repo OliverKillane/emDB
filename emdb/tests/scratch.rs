@@ -1,5 +1,7 @@
 use emdb::emql;
 
+pub fn cool_thing(x: String) -> usize { x.len() }
+
 emql! {
     impl my_db as Planviz {
         path = "scratch.dot",
@@ -7,6 +9,7 @@ emql! {
         display_ctx_ops = off,
         display_control = off
     };
+    impl my_sem as SemCheck;
 
     table people {
         name: String,
@@ -14,20 +17,7 @@ emql! {
     }
 
     query get_friendships() {
-        use people |> fork(let person, friend);
-
-        join(use person [
-            left pred {
-                if let Some(friend_name) = person.friend {
-                    friend_name == friend.name
-                } else {
-                    false
-                }
-            }
-        ] use friend)
-            |> map(peep: String = person.name, buddy: String = friend.name)
-            |> collect(friends)
-            ~> return;
+        use people |> map(x: usize = {use super::super::cool_thing; cool_thing(friend)}) |> collect(foo) ~> return;
     }
 }
 

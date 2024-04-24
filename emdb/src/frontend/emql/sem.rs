@@ -512,7 +512,7 @@ fn append_fields(
     existing_fields: plan::Key<plan::RecordType>,
 ) -> Result<plan::Key<plan::RecordType>, LinkedList<Diagnostic>> {
     let mut errors = LinkedList::new();
-    let mut fields = lp.get_record_type(existing_fields).fields.clone();
+    let mut fields = lp.get_record_type_conc(existing_fields).fields.clone();
 
     // must check even if existing is empty, a user may select the same field many times
     for (id, t) in new_fields {

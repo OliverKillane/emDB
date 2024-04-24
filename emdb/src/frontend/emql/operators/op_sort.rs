@@ -60,7 +60,7 @@ impl EMQLOperator for Sort {
                 op_ctx, 
                 cont, 
                 |lp, op_ctx, prev, next_edge| {
-                    let rec_type = lp.get_record_type(prev.data_type.fields);
+                    let rec_type = lp.get_record_type_conc(prev.data_type.fields);
                     let (raw_fields, mut errors) = extract_fields(fields, errors::sort_field_used_twice);
                     let mut sort_order = Vec::new();
                     for (field, (ordering, _)) in raw_fields {

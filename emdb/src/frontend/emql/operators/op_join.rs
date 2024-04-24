@@ -119,8 +119,8 @@ impl EMQLOperator for Join {
             let right_input = get_input(&right, vs, &mut errors);
 
             if let (Some(left_cont), Some(right_cont)) = (left_input, right_input) {
-                let left_rec_conc = lp.get_record_type(left_cont.data_type.fields);
-                let right_rec_conc = lp.get_record_type(right_cont.data_type.fields);
+                let left_rec_conc = lp.get_record_type_conc(left_cont.data_type.fields);
+                let right_rec_conc = lp.get_record_type_conc(right_cont.data_type.fields);
                 
                 if !left_cont.data_type.stream {
                     errors.push_back(errors::operator_requires_streams(&call, &left));

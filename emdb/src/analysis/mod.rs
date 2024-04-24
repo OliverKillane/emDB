@@ -1,4 +1,4 @@
 //! Analyses to label info on immutable plans.
 
-mod closures;
-mod validity;
+pub mod interface;
+pub mod validity;

@@ -47,8 +47,8 @@ impl EMQLOperator for Update {
                 |lp, op_ctx, prev, next_edge| {
                     let (raw_fields, mut errors) = extract_fields(fields, errors::query_operator_field_redefined);
                     
-                    let raw_table_id = if let Some(sk) = lp.get_record_type(prev.data_type.fields).fields.get(&rec_reference) {
-                        if let plan::ScalarTypeConc::TableRef(table) = lp.get_scalar_type(*sk) { Some(*table) } else {
+                    let raw_table_id = if let Some(sk) = lp.get_record_type_conc(prev.data_type.fields).fields.get(&rec_reference) {
+                        if let plan::ScalarTypeConc::TableRef(table) = lp.get_scalar_type_conc(*sk) { Some(*table) } else {
                                 errors.push_back(errors::query_expected_reference_type_for_update(
                                     lp, sk, &reference,
                                 ));

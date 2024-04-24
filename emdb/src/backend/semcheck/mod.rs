@@ -5,17 +5,27 @@
 
 // TODO; works best with arena mapping, develop this.
 
-mod types;
-mod ops;
 
-use crate::utils::misc::singlelist;
+use crate::{
+    analysis::interface::{self, types::translate_all_types}, plan, utils::misc::singlelist
+};
 
 use super::EMDBBackend;
+mod impl_type;
+use impl_query::translate_all_queries;
+mod impl_query;
+use impl_type::SemCheckTypes;
+
 use proc_macro_error::{Diagnostic, Level};
 use syn::spanned::Spanned;
 use quote::quote;
-pub struct SemCheck {}
 
+// TODO:
+// 1. Nice output to a file, with formatting
+// 2. Expand the number of operators covered
+// 3. set examples to use semcheck
+
+pub struct SemCheck {}
 
 impl EMDBBackend for SemCheck {
     const NAME: &'static str = "SemCheck";
@@ -40,8 +50,17 @@ impl EMDBBackend for SemCheck {
         impl_name: syn::Ident,
         plan: &crate::plan::Plan,
     ) -> Result<proc_macro2::TokenStream, std::collections::LinkedList<proc_macro_error::Diagnostic>> {
-        Ok(quote! {
-            mod #impl_name { }
-        })
+        let types_preamble = translate_all_types(plan, &SemCheckTypes);
+        let queries = translate_all_queries(plan);
+
+        let tks = quote! {
+            mod #impl_name { 
+                #types_preamble 
+                #queries
+            }
+        };
+        println!("TOKENS: {tks}");
+
+        Ok(tks)
     }
 }

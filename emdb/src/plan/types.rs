@@ -230,8 +230,8 @@ pub fn coerce_scalar_type(lp: &mut Plan, conform_to: Key<ScalarType>, change: Ke
     let conforming_index = get_conc_index(&lp.scalar_types, change);
 
     if conform_index != conforming_index {
-        let conform_scalar = lp.get_scalar_type(conform_index);
-        let conforming_scalar = lp.get_scalar_type(conforming_index);
+        let conform_scalar = lp.get_scalar_type_conc(conform_index);
+        let conforming_scalar = lp.get_scalar_type_conc(conforming_index);
 
         if let (ScalarTypeConc::Bag(r1), ScalarTypeConc::Bag(r2))
         | (ScalarTypeConc::Record(r1), ScalarTypeConc::Record(r2)) =
@@ -259,8 +259,8 @@ pub fn coerce_record_type(lp: &mut Plan, conform_to: Key<RecordType>, change: Ke
     let conforming_index = get_conc_index(&lp.record_types, change);
 
     if conform_index != conforming_index {
-        let conform_record = lp.get_record_type(conform_index);
-        let conforming_record = lp.get_record_type(conforming_index);
+        let conform_record = lp.get_record_type_conc(conform_index);
+        let conforming_record = lp.get_record_type_conc(conforming_index);
 
         let conform_fields = conform_record
             .fields
@@ -275,17 +275,25 @@ pub fn coerce_record_type(lp: &mut Plan, conform_to: Key<RecordType>, change: Ke
 }
 
 impl Plan {
-    pub fn get_scalar_type(&self, k: Key<ScalarType>) -> &ScalarTypeConc {
+    pub fn get_scalar_type(&self, k: Key<ScalarType>) -> &ScalarType {
         self.scalar_types
             .get(k)
             .unwrap()
+    }
+
+    pub fn get_scalar_type_conc(&self, k: Key<ScalarType>) -> &ScalarTypeConc {
+        self.get_scalar_type(k)
             .get_conc(&self.scalar_types)
     }
 
-    pub fn get_record_type(&self, k: Key<RecordType>) -> &RecordConc {
+    pub fn get_record_type(&self, k: Key<RecordType>) -> &RecordType {
         self.record_types
             .get(k)
             .unwrap()
+    }
+
+    pub fn get_record_type_conc(&self, k: Key<RecordType>) -> &RecordConc {
+        self.get_record_type(k)
             .get_conc(&self.record_types)
     }
 }
