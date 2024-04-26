@@ -69,6 +69,7 @@ impl EMQLOperator for ForEach {
 
             add_streams_to_context(lp, tn, ts, &mut variables, inner_ctx, contents, &call, &mut errors);
             discard_ends(lp, inner_ctx, variables);
+            lp.get_mut_context(op_ctx).add_operator(foreach_op);
 
             if let Some(out_stream) = lp.get_context(inner_ctx).returnflow {
                 if errors.is_empty() {

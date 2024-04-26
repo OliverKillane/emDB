@@ -68,7 +68,7 @@ fn dataflow_closure<Namer: ItemNamer>(lp: &plan::Plan, df_in: plan::Key<plan::Da
     }).collect();
 
     (quote! {
-        | #record_type { #(#params ),* } | {
+        move | #record_type { #(#params ),* } | {
             #inner
         }
     }, record_type)
@@ -124,58 +124,46 @@ impl OperatorClosures for plan::Update {
 }
 impl OperatorClosures for plan::Fold {
     fn gen_closure<Namer:ItemNamer>(&self,self_key:plan::Key<plan::Operator>,lp: &plan::Plan) -> ClosureValue {
+        
         ClosureValue::todo() // TODO: Change
     }
 }
 impl OperatorClosures for plan::Map {
     fn gen_closure<Namer:ItemNamer>(&self,self_key:plan::Key<plan::Operator>,lp: &plan::Plan) -> ClosureValue {
-        let mut expressions = Vec::new();
-        let mut fields = Vec::new();
-        
-        let rec_out = lp.get_dataflow(self.output).get_conn().with.fields;
-        let data_types = &lp.get_record_type_conc(rec_out).fields;
-        let rec_out_ident = Namer::record_type(rec_out);
-
-        for (field, expr) in &self.mapping {
-            let expr_typename = Namer::scalar_type(data_types[field]);
-            let field_name = Namer::record_field(field);
-            expressions.push(quote!{ let #field_name: #expr_typename = #expr ; });
-            fields.push(field_name);
-        }
-
-        let closure_expression = quote!{
-            #(#expressions )*
-            #rec_out_ident { #(#fields),* }
-        };
-
+        let (closure_expression, rec_out_ident) = mapping_expr::<Namer>(lp, self.output, self.mapping.iter().map(|(f,e)| (f,e)));
         single_expr::<Namer>(lp, self_key, self.input, closure_expression, rec_out_ident.into_token_stream())
     }
 }
 impl OperatorClosures for plan::Filter {
     fn gen_closure<Namer:ItemNamer>(&self,self_key:plan::Key<plan::Operator>,lp: &plan::Plan) -> ClosureValue {
-        single_expr::<Namer>(lp, self_key, self.input, self.predicate.clone().into_token_stream(), quote!(bool))
+        single_expr::<Namer>(lp, self_key, self.input, self.predicate.to_token_stream(), quote!(bool))
     }
 }
 impl OperatorClosures for plan::Assert {
     fn gen_closure<Namer:ItemNamer>(&self,self_key:plan::Key<plan::Operator>,lp: &plan::Plan) -> ClosureValue {
-        single_expr::<Namer>(lp, self_key, self.input, self.assert.clone().into_token_stream(), quote!(bool))
+        single_expr::<Namer>(lp, self_key, self.input, self.assert.to_token_stream(), quote!(bool))
     }
 }
 impl OperatorClosures for plan::Take {fn gen_closure<Namer:ItemNamer>(&self,self_key:plan::Key<plan::Operator>,lp: &plan::Plan) -> ClosureValue {
-        ClosureValue::todo() // TODO: Change
+    single_expr::<Namer>(lp, self_key, self.input, self.top_n.to_token_stream(), quote!(usize))
     }}
 impl OperatorClosures for plan::GroupBy {fn gen_closure<Namer:ItemNamer>(&self,self_key:plan::Key<plan::Operator>,lp: &plan::Plan) -> ClosureValue {
-        ClosureValue::todo() // TODO: Change
+    context_namer::<Namer>(lp, self_key, self.inner_ctx)
     }}
 impl OperatorClosures for plan::ForEach {fn gen_closure<Namer:ItemNamer>(&self,self_key:plan::Key<plan::Operator>,lp: &plan::Plan) -> ClosureValue {
-        ClosureValue::todo() // TODO: Change
+    context_namer::<Namer>(lp, self_key, self.inner_ctx)
     }}
 impl OperatorClosures for plan::Join {fn gen_closure<Namer:ItemNamer>(&self,self_key:plan::Key<plan::Operator>,lp: &plan::Plan) -> ClosureValue {
         ClosureValue::todo() // TODO: Change
     }}
 impl OperatorClosures for plan::Row {fn gen_closure<Namer:ItemNamer>(&self,self_key:plan::Key<plan::Operator>,lp: &plan::Plan) -> ClosureValue {
-        ClosureValue::todo() // TODO: Change
-    }}
+    let (closure_expression, rec_out_ident) = mapping_expr::<Namer>(lp, self.output, self.fields.iter().map(|(f,e)| (f,e)));
+    ClosureValue {
+        expression: closure_expression,
+        datatype: rec_out_ident.into_token_stream(),
+        }
+    }
+}
 
 fn single_expr<Namer: ItemNamer>(lp: &plan::Plan, op: plan::Key<plan::Operator>, df: plan::Key<plan::DataFlow>, expr: TokenStream, out_type: TokenStream) -> ClosureValue {
     let (closure, in_type) = dataflow_closure::<Namer>(lp, df, quote!{ let result: #out_type = {#expr}; result });
@@ -185,13 +173,34 @@ fn single_expr<Namer: ItemNamer>(lp: &plan::Plan, op: plan::Key<plan::Operator>,
     }
 }
 
+fn mapping_expr<'a, Namer: ItemNamer>(lp: &'a plan::Plan, output: plan::Key<plan::DataFlow>, mapping: impl Iterator<Item = (&'a plan::RecordField, &'a Expr)> ) -> (TokenStream, Ident) {
+    let mut expressions = Vec::new();
+    let mut fields = Vec::new();
+    
+    let rec_out = lp.get_dataflow(output).get_conn().with.fields;
+    let data_types = &lp.get_record_type_conc(rec_out).fields;
+    let rec_out_ident = Namer::record_type(rec_out);
+
+    for (field, expr) in mapping {
+        let expr_typename = Namer::scalar_type(data_types[field]);
+        let field_name = Namer::record_field(field);
+        expressions.push(quote!{ let #field_name: #expr_typename = #expr ; });
+        fields.push(field_name);
+    }
+
+    (quote!{
+        { #(#expressions )*
+        #rec_out_ident { #(#fields),* } }
+    }, rec_out_ident)
+}
+
 fn context_namer<Namer: ItemNamer>(lp: &plan::Plan, op: plan::Key<plan::Operator>, ctx: plan::Key<plan::Context>) -> ClosureValue {
     let ClosureArgs { params, value: ClosureValue { expression, datatype } } = trans_context::<Namer>(lp, ctx);
     let params_tokens: Vec<_> = params.iter().map(|(id, ty)| quote! { #id : #ty }).collect();
     let inp_types: Vec<_> = params.iter().map(|(_, ty)| quote! { #ty }).collect();
     
     ClosureValue {
-        expression: quote!{ | #(#params_tokens , )* | { #expression } },
+        expression: quote!{ move | #(#params_tokens , )* | { #expression } },
         datatype: quote!{ Fn( #(#inp_types ,)* ) -> ( #datatype ) }
     }
 }

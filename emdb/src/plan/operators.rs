@@ -107,7 +107,6 @@ pub enum SortOrder {
 }
 
 pub struct FoldField {
-    pub data_type: Key<ScalarType>,
     pub initial: Expr,
     pub update: Expr,
 }
@@ -244,7 +243,7 @@ pub struct Union {
 /// INV: output matches fields
 /// INV: output is a single
 pub struct Row {
-    pub fields: HashMap<RecordField, Expr>,
+    pub fields: Vec<(RecordField, Expr)>,
     pub output: Key<DataFlow>,
 }
 

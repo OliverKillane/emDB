@@ -70,7 +70,7 @@ impl EMQLOperator for Fold {
                         if let Some(scalar_t) = result_to_opt(ast_typeto_scalar(tn, ts, typ, |e| errors::query_nonexistent_table(&call, e), errors::query_no_cust_type_found), &mut errors) {
                             let data_type = lp.scalar_types.insert(scalar_t);
                             type_fields.insert(field.clone().into(), data_type);
-                            fold_fields.push((field.into(), plan::FoldField { data_type, initial, update }));                        
+                            fold_fields.push((field.into(), plan::FoldField { initial, update }));                        
                         }
                     }
 

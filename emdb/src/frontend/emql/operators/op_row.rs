@@ -30,14 +30,14 @@ impl EMQLOperator for Row {
             let (fields, mut errors) = extract_fields(fields, errors::query_operator_field_redefined);
             
             let mut type_fields = HashMap::new();
-            let mut expr_fields = HashMap::new();
+            let mut expr_fields = Vec::new();
 
             for (field, (ast_type, expr)) in fields {
                 match ast_typeto_scalar(tn, ts, ast_type, |e| errors::query_nonexistent_table(&call, e), errors::query_no_cust_type_found) {
                     Ok(t) => {
                         let t_index = lp.scalar_types.insert(t);
                         type_fields.insert(field.clone().into(), t_index);
-                        expr_fields.insert(field.into(), expr);
+                        expr_fields.push((field.into(), expr));
                     },
                     Err(e) => {
                         errors.push_back(e);

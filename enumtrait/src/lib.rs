@@ -94,7 +94,7 @@ pub fn quick_enum(attrs: CompilerTokenStream, item: CompilerTokenStream) -> Comp
 ///     Baz(Baz<T>),
 ///     Bar,
 /// }
-///
+/// 
 /// fn check() {
 ///     let foo_0: Foo<i32> = Bop{x: 7}.into();
 ///     let foo_1: Foo<i32> = Bing{j: -32}.into();
