@@ -1,6 +1,9 @@
+#![allow(unused_variables)]
 use emdb::emql;
 
 emql! {
+    impl my_db as SemCheck;
+    
     table people {
         name: String,
         friend: Option<String>,
@@ -11,8 +14,8 @@ emql! {
 
         join(use person [
             left pred {
-                if let Some(friend_name) = person.friend {
-                    friend_name == friend.name
+                if let Some(friend_name) = &left.friend {
+                    friend_name == &right.name
                 } else {
                     false
                 }

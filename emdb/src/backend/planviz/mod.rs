@@ -40,7 +40,7 @@ pub struct DisplayConfig {
 }
 
 impl EMDBBackend for PlanViz {
-    const NAME: &'static str = "Planviz";
+    const NAME: &'static str = "PlanViz";
 
     fn parse_options(backend_name: &Ident, options: Option<TokenStream>) -> Result<Self, LinkedList<Diagnostic>> {
         fn on_off(name: &'static str) -> impl TokenParser<bool> {

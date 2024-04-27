@@ -276,25 +276,19 @@ pub fn coerce_record_type(lp: &mut Plan, conform_to: Key<RecordType>, change: Ke
 
 impl Plan {
     pub fn get_scalar_type(&self, k: Key<ScalarType>) -> &ScalarType {
-        self.scalar_types
-            .get(k)
-            .unwrap()
+        self.scalar_types.get(k).unwrap()
     }
 
     pub fn get_scalar_type_conc(&self, k: Key<ScalarType>) -> &ScalarTypeConc {
-        self.get_scalar_type(k)
-            .get_conc(&self.scalar_types)
+        self.get_scalar_type(k).get_conc(&self.scalar_types)
     }
 
     pub fn get_record_type(&self, k: Key<RecordType>) -> &RecordType {
-        self.record_types
-            .get(k)
-            .unwrap()
+        self.record_types.get(k).unwrap()
     }
 
     pub fn get_record_type_conc(&self, k: Key<RecordType>) -> &RecordConc {
-        self.get_record_type(k)
-            .get_conc(&self.record_types)
+        self.get_record_type(k).get_conc(&self.record_types)
     }
 }
 

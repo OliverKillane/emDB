@@ -1,6 +1,9 @@
+#![allow(unused_variables)]
 use emdb::emql;
 
 emql! {
+    impl my_db as SemCheck;
+    
     table cool {
         name: String,
         something: i32,
@@ -15,7 +18,8 @@ emql! {
 
     query update_cool(id: ref cool) {
         row(id: ref cool = id)
-            ~> update(id use something = something + 1);
+            ~> deref(id as cool_val)
+            ~> update(id use something = cool_val.something + 1);
     }
 
     query get_cool(id: ref cool) {
@@ -28,7 +32,7 @@ emql! {
     query collect_most_cool() {
         ref cool as cool_ref
             |> deref(cool_ref as cool_vals)
-            |> map(sort_on: i32 = cool_vals.something)
+            |> map(sort_on: i32 = cool_vals.something, cool_ref: ref cool = cool_ref)
             |> sort(sort_on desc)
             |> take(10)
             |> map(id: ref cool = cool_ref)
@@ -39,7 +43,7 @@ emql! {
 
     query complex() {
         use cool
-            |> map(x: i32 = cool_val)
+            |> map(x: usize = name.len())
             |> filter(x > 10)
             |> let larger_than_10;
 

@@ -1,68 +1,23 @@
+//! For manually debugging generated code.
+//! 
+//! - Ensure that the proc macro is built. In vscode on the bottom bar you can 
+//!   hover over `rust-analyzer` and click `Rebuild Proc Macros` 
+//! - Saving this file should re-run the emql macro, to generate outputs.
 #![allow(unreachable_code)]
 use emdb::emql;
 
 emql! {
-    impl my_sem2 as SemCheck{debug_file = "emdb/tests/debug.rs"};
-    /*
-    table cool {
-        name: String,
-        something: i32,
-    } @ [ unique(name) as individual_names ]
+    impl debug_code as SemCheck{debug_file = "emdb/tests/debug.rs"};
+    
+    // Use the vscode dots view to see preview update live on save
+    impl debug_graph as PlanViz{path = "emdb/tests/debug.dot", display_types = on, display_ctx_ops = on, display_control = on};
 
-    // returns a reference to the row updated
-    query new_cool(name: String) {
-        row(name: String = name, something: i32 = 0)
-            ~> insert(cool as ref it)
-            ~> return;
-    }
-
-    query update_cool(id: ref cool) {
-        row(id: ref cool = id)
-            ~> update(id use something = something + 1);
-    }
-
-    query get_cool(id: ref cool) {
-        row(id: ref cool = id)
-            ~> deref(id as cool_val)
-            ~> map(score: i32 = cool_val.something)
-            ~> return;
-    }
-
-    query collect_most_cool() {
-        ref cool as cool_ref
-            |> deref(cool_ref as cool_vals)
-            |> map(sort_on: i32 = cool_vals.something, cool_ref: ref cool = cool_ref)
-            |> sort(sort_on desc)
-            |> take(10)
-            |> map(id: ref cool = cool_ref)
-            |> collect(it as type foo)
-            ~> map(blah: type foo = it, c: i32 = 2)
-            ~> return;
-    }
-
-    query complex() {
-        use cool
-            |> map(x: i32 = 3)
-            |> filter(x > 10)
-            |> let larger_than_10;
-
-        use larger_than_10
-            |> fork(let x1, x2);
-
-        use x1 
-            |> take(33 * 2)
-            |> collect(it) 
-            ~> return;
-
-        use x2 
-            |> sort(x desc);
-    }
-*/
+    // write query to check here!
     table customers {
         forename: String,
         surname: String,
         age: u8,
-    } @ [pred(age < 256) as sensible_ages]
+    } @ [ pred(age < 256) as sensible_ages ]
 
     query customer_age_brackets() {
         use customers

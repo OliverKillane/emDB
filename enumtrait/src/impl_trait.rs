@@ -5,7 +5,13 @@ use proc_macro2::{Ident, Span, TokenStream};
 use proc_macro_error::{Diagnostic, Level};
 use quote::{quote, ToTokens};
 use syn::{
-    parse2, punctuated::Punctuated, spanned::Spanned, token::{Brace, Comma, Dot, FatArrow, Gt, Lt, Match, Paren, PathSep, SelfValue}, AngleBracketedGenericArguments, Arm, Block, Expr, ExprMatch, ExprMethodCall, ExprPath, FnArg, GenericArgument, Generics, ImplItem, ImplItemFn, ItemEnum, ItemImpl, ItemTrait, Pat, PatIdent, PatTupleStruct, Path, PathSegment, Signature, Stmt, TraitItem, TraitItemFn, Type, TypePath
+    parse2,
+    punctuated::Punctuated,
+    spanned::Spanned,
+    token::{Brace, Comma, Dot, FatArrow, Gt, Lt, Match, Paren, PathSep, SelfValue},
+    AngleBracketedGenericArguments, Arm, Block, Expr, ExprMatch, ExprMethodCall, ExprPath, FnArg,
+    GenericArgument, Generics, ImplItem, ImplItemFn, ItemEnum, ItemImpl, ItemTrait, Pat, PatIdent,
+    PatTupleStruct, Path, PathSegment, Signature, Stmt, TraitItem, TraitItemFn, Type, TypePath,
 };
 
 use combi::{
@@ -64,7 +70,7 @@ pub fn apply(input: TokenStream) -> Result<TokenStream, LinkedList<Diagnostic>> 
             label: _,
         },
     ) = Triple::read(input)?;
-    
+
     Ok(add_fn_impls(impl_item, trait_item, enum_item)?.into_token_stream())
 }
 
@@ -138,15 +144,20 @@ fn extract_turbofish(gens: &Generics) -> Option<AngleBracketedGenericArguments> 
     let mut args = Punctuated::new();
     for arg in &gens.params {
         match arg {
-            syn::GenericParam::Lifetime(l) => (),
+            syn::GenericParam::Lifetime(_) => (),
             syn::GenericParam::Type(t) => {
                 args.push(GenericArgument::Type(Type::Path(TypePath {
                     qself: None,
-                    path: t.ident.clone().into(),})));
-            },
+                    path: t.ident.clone().into(),
+                })));
+            }
             syn::GenericParam::Const(c) => {
-                args.push(GenericArgument::Const(Expr::Path(ExprPath { attrs: Vec::new(), qself: None, path: c.ident.clone().into() })));
-            },
+                args.push(GenericArgument::Const(Expr::Path(ExprPath {
+                    attrs: Vec::new(),
+                    qself: None,
+                    path: c.ident.clone().into(),
+                })));
+            }
         };
     }
 
@@ -175,12 +186,10 @@ fn generate_fn_impl(
     let mut args_exprs = Punctuated::new();
     for arg in args {
         let mut arg_expr = Punctuated::new();
-        arg_expr.push(
-            PathSegment {
-                ident: arg,
-                arguments: syn::PathArguments::None,
-            }
-        );
+        arg_expr.push(PathSegment {
+            ident: arg,
+            arguments: syn::PathArguments::None,
+        });
         args_exprs.push(Expr::Path(ExprPath {
             attrs: Vec::new(),
             qself: None,

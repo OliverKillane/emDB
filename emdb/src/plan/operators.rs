@@ -1,4 +1,4 @@
-use super::{Context, Data, Key, Plan, RecordField, ScalarType, Table};
+use super::{Context, Data, Key, Plan, RecordField, RecordType, Table};
 use std::collections::HashMap;
 use syn::Expr;
 
@@ -46,6 +46,7 @@ pub struct Update {
 
     // the expressions for the output type
     pub mapping: HashMap<RecordField, Expr>,
+    pub update_type: Key<RecordType>,
 
     pub output: Key<DataFlow>,
 }

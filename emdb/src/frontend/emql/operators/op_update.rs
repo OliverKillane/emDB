@@ -67,12 +67,19 @@ impl EMQLOperator for Update {
                     if let (Some(table_id), nondup_fields) = (raw_table_id, raw_fields) {
                         let table = lp.get_table(table_id);
 
+                        let mut update_record = plan::RecordConc { fields: HashMap::new() };
                         for id in nondup_fields.keys() {
-                            if !table.columns.contains_key(id) {
-                                errors.push_back(errors::query_update_field_not_in_table(id, &table.name));
+                            match table.columns.get(id) {
+                                Some(col) => {
+                                    update_record.fields.insert(id.clone().into(), col.data_type);
+                                },
+                                None => errors.push_back(errors::query_update_field_not_in_table(id, &table.name)),
                             }
                         }
 
+                        let mapping = nondup_fields.into_iter().map(|(i, e)| (i.into(), e)).collect();
+                        let update_type = lp.record_types.insert(plan::ConcRef::Conc(update_record));
+                        
                         if errors.is_empty() {
                             Ok(
                                 LinearBuilderState { 
@@ -81,7 +88,8 @@ impl EMQLOperator for Update {
                                             input: prev.prev_edge,
                                             reference: rec_reference.clone(),
                                             table: table_id,
-                                            mapping: nondup_fields.into_iter().map(|(i, e)| (i.into(), e)).collect(),
+                                            mapping,
+                                            update_type,
                                             output: next_edge, 
                                         }.into()
                                     ), 

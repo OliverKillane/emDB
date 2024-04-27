@@ -69,7 +69,11 @@ macro_rules! create_backend {
     };
 }
 
-create_backend!(Backend as planviz::PlanViz, semcheck::SemCheck, simple::Simple);
+create_backend!(
+    Backend as planviz::PlanViz,
+    semcheck::SemCheck,
+    simple::Simple
+);
 
 /// Wrapper for the targets to produce
 pub struct Targets {

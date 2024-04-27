@@ -1,6 +1,8 @@
+#![allow(unused_variables)]
 use emdb::emql;
 
 emql! {
+    impl my_db as SemCheck;
 
     // Reasoning:
     //  - Constraint checking required, needs to fail immediately (hybrid IVM)
@@ -58,8 +60,9 @@ emql! {
     //   - Need to index data structure
     //   - Database can see only credits is updated
     query add_credits(user: ref users, creds: i32) {
-        row(user_id: ref users = users)
-            ~> update(user_id use credits = credits + creds);
+        row(user_id: ref users = user)
+            ~> deref(user_id as user)
+            ~> update(user_id use credits = user.credits + creds);
     }
 
     // Description:
@@ -75,7 +78,7 @@ emql! {
             |> map(users_ref: ref users = users_ref, new_creds: i32 = ((it.credits as f32) * cred_bonus) as i32)
             |> update(users_ref use credits = new_creds)
             |> map(creds: i32 = new_creds)
-            |> fold(sum: i64 = 0 -> sum + creds)
+            |> fold(sum: i64 = 0 -> sum + creds as i64)
             ~> return;
     }
 
@@ -87,7 +90,7 @@ emql! {
     query total_premium_credits() {
         use users
             |> filter(premium)
-            |> map(credits: i64 = credits)
+            |> map(credits: i64 = credits as i64)
             |> fold(sum: i64 = 0 -> sum + credits)
             ~> return;
     }
