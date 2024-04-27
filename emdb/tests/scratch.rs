@@ -1,14 +1,14 @@
 //! For manually debugging generated code.
-//! 
-//! - Ensure that the proc macro is built. In vscode on the bottom bar you can 
-//!   hover over `rust-analyzer` and click `Rebuild Proc Macros` 
+//!
+//! - Ensure that the proc macro is built. In vscode on the bottom bar you can
+//!   hover over `rust-analyzer` and click `Rebuild Proc Macros`
 //! - Saving this file should re-run the emql macro, to generate outputs.
 #![allow(unreachable_code)]
 use emdb::emql;
 
 emql! {
     impl debug_code as SemCheck{debug_file = "emdb/tests/debug.rs"};
-    
+
     // Use the vscode dots view to see preview update live on save
     impl debug_graph as PlanViz{path = "emdb/tests/debug.dot", display_types = on, display_ctx_ops = on, display_control = on};
 
@@ -33,4 +33,6 @@ emql! {
     }
 }
 
-fn main() {}
+fn main() {
+    debug_code::customer_age_brackets();
+}

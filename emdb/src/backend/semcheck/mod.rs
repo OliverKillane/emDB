@@ -111,6 +111,7 @@ fn translate_query(lp: &plan::Plan, qk: plan::Key<plan::Query>, query: &plan::Qu
     };
 
     quote!{
+        /// this is a function
         pub fn #query_name(#(#query_params ,)*) #return_type {
             let closures = #query_closure_gen ;
             

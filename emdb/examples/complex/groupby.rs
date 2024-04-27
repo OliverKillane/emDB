@@ -19,10 +19,9 @@ emql! {
                     ~> return;
             })
             |> filter(age_bracket > 16)
-            |> collect(brackets as type brackets)
+            |> collect(brackets)
             ~> return;
     }
-
 }
 
 fn main() {}

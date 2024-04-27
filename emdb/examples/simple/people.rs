@@ -14,18 +14,18 @@ emql! {
     table people {
         name: String,
         age: u8,
-        fav: super::super::RGB,
+        fav: super::RGB,
         score: i32,
     } @ [
         unique(name) as unique_names, 
         pred(age < 100 && age > 10) as reasonable_ages
     ]
 
-    query add_new_person(name: String, age: u8, fav: super::super::RGB) {
+    query add_new_person(name: String, age: u8, fav: super::RGB) {
         row(
             name: String = name, 
             age: u8 = age, 
-            fav: super::super::RGB = fav, 
+            fav: super::RGB = fav, 
             score: i32 = 0
         )
             ~> insert(people as ref name)

@@ -8,7 +8,7 @@ use proc_macro2::Ident;
 use std::collections::HashMap;
 use syn::Expr;
 
-use super::{Key, Plan, ScalarType};
+use super::{Key, Plan, RecordField, ScalarType};
 
 pub struct Constraint<C> {
     pub alias: Option<Ident>,
@@ -35,7 +35,7 @@ pub struct Column {
 pub struct Table {
     pub name: Ident,
     pub row_cons: RowConstraints,
-    pub columns: HashMap<Ident, Column>,
+    pub columns: HashMap<RecordField, Column>,
 }
 
 #[derive(Clone)]

@@ -124,16 +124,21 @@ fn add_table(
     let mut errs = LinkedList::new();
 
     // Add each column, checking for duplicate names
-    let mut columns: HashMap<Ident, plan::Column> = HashMap::new();
+    let mut columns: HashMap<plan::RecordField, plan::Column> = HashMap::new();
     for (col_name, col_type) in cols {
-        if let Some((duplicate, _)) = columns.get_key_value(&col_name) {
-            errs.push_back(errors::table_column_redefined(&col_name, duplicate));
+        let col_rf = col_name.clone().into();
+        if let Some((duplicate, _)) = columns.get_key_value(&col_rf) {
+            // INV: we can only conflict with other user defined fields
+            errs.push_back(errors::table_column_redefined(
+                &col_name,
+                duplicate.get_field(),
+            ));
         } else {
             let type_index = lp
                 .scalar_types
                 .insert(plan::ConcRef::Conc(plan::ScalarTypeConc::Rust(col_type)));
             columns.insert(
-                col_name,
+                col_rf,
                 plan::Column {
                     cons: plan::ColumnConstraints { unique: None },
                     data_type: type_index,
@@ -163,29 +168,32 @@ fn add_table(
             }
         }
         match expr {
-            ConstraintExpr::Unique { field } => match columns.get_mut(&field) {
-                Some(plan::Column { cons, data_type }) => match &cons.unique {
-                    Some(cons) => {
-                        errs.push_back(errors::table_constraint_duplicate_unique(
-                            &field,
-                            method_span,
-                            &cons.alias,
-                        ));
-                    }
-                    None => {
-                        cons.unique = Some(plan::Constraint {
-                            alias,
-                            cons: plan::Unique,
-                        });
-                    }
-                },
-                None => errs.push_back(errors::table_constraint_nonexistent_unique_column(
-                    &alias,
-                    &field,
-                    &name,
-                    method_span,
-                )),
-            },
+            ConstraintExpr::Unique { field } => {
+                let rf_field = field.clone().into();
+                match columns.get_mut(&rf_field) {
+                    Some(plan::Column { cons, data_type }) => match &cons.unique {
+                        Some(cons) => {
+                            errs.push_back(errors::table_constraint_duplicate_unique(
+                                &field,
+                                method_span,
+                                &cons.alias,
+                            ));
+                        }
+                        None => {
+                            cons.unique = Some(plan::Constraint {
+                                alias,
+                                cons: plan::Unique,
+                            });
+                        }
+                    },
+                    None => errs.push_back(errors::table_constraint_nonexistent_unique_column(
+                        &alias,
+                        &field,
+                        &name,
+                        method_span,
+                    )),
+                }
+            }
             ConstraintExpr::Pred(expr) => {
                 row_cons.preds.push(plan::Constraint {
                     alias,
@@ -578,7 +586,7 @@ pub fn get_all_cols(lp: &plan::Plan, table_id: plan::Key<plan::Table>) -> plan::
         fields: table
             .columns
             .iter()
-            .map(|(id, plan::Column { cons, data_type })| (id.clone().into(), *data_type))
+            .map(|(id, plan::Column { cons, data_type })| (id.clone(), *data_type))
             .collect(),
     }
 }

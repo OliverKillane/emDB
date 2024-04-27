@@ -66,7 +66,7 @@ impl EMQLOperator for Unique {
                     let rec_out = out.clone().into();
                     if let Some(table_id) = tn.get(&table) {
                         let table = lp.get_table(*table_id);
-                        if let Some(using_col) = table.columns.get(&field) {
+                        if let Some(using_col) = table.columns.get(&rec_field) {
                             if let Some(plan::Constraint { alias, cons: plan::Unique }) = &using_col.cons.unique {
                                 let record_type = generate_access::unique(*table_id, out.clone(), lp, data_type.fields)?;
                                 Ok(

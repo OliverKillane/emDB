@@ -34,19 +34,15 @@ fn make_impl<F: frontend::Frontend>(tk: TokenStream) -> TokenStream {
             let impls = bks
                 .impls
                 .into_iter()
-                .filter_map(|(id, backend)| {
-                    match backend::generate_code(backend, id.clone(), &lp) {
-                        Ok(code) => Some(quote! {
-                            mod #id {
-                                #code
-                            }
-                        }),
+                .filter_map(
+                    |(id, backend)| match backend::generate_code(backend, id, &lp) {
+                        Ok(code) => Some(code),
                         Err(mut e) => {
                             errors.append(&mut e);
                             None
                         }
-                    }
-                })
+                    },
+                )
                 .collect::<Vec<_>>();
 
             for e in errors {

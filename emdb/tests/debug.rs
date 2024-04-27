@@ -2,9 +2,9 @@ mod debug_code {
     #![allow(unused_variables)]
     #![allow(dead_code)]
     struct RecordType0 {
-        surname: ScalarType1,
-        forename: ScalarType0,
         age: ScalarType2,
+        forename: ScalarType0,
+        surname: ScalarType1,
     }
     struct RecordType1 {
         recordfield_internal_id_0: ScalarType4,
@@ -13,8 +13,8 @@ mod debug_code {
         recordfield_internal_id_1: ScalarType3,
     }
     struct RecordType3 {
-        surname: ScalarType1,
         forename: ScalarType0,
+        surname: ScalarType1,
     }
     struct RecordType4 {
         people: ScalarType5,
@@ -37,14 +37,11 @@ mod debug_code {
     type ScalarType8 = ();
     /// Reference to the table
     pub struct TableRef0 {}
+    /// this is a function
     pub fn customer_age_brackets() -> RecordType6 {
         let closures = (
-            (),
-            (),
-            (),
             move |age: ScalarType2| {
                 (
-                    (),
                     move |RecordType4 { people }| {
                         let result: RecordType5 = {
                             {
@@ -55,15 +52,12 @@ mod debug_code {
                         };
                         result
                     },
-                    (),
                 )
             },
             move |RecordType5 { age_bracket, group }| {
                 let result: bool = { age_bracket > 16 };
                 result
             },
-            (),
-            (),
         );
         todo!()
     }

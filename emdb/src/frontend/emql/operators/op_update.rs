@@ -69,7 +69,7 @@ impl EMQLOperator for Update {
 
                         let mut update_record = plan::RecordConc { fields: HashMap::new() };
                         for id in nondup_fields.keys() {
-                            match table.columns.get(id) {
+                            match table.columns.get(&id.clone().into()) {
                                 Some(col) => {
                                     update_record.fields.insert(id.clone().into(), col.data_type);
                                 },

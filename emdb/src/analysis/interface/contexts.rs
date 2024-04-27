@@ -44,7 +44,9 @@ trait OperatorClosures {
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &plan::Plan,
-    ) -> ClosureValue;
+    ) -> Option<ClosureValue> {
+        None
+    }
 }
 
 pub fn trans_context<Namer: ItemNamer>(
@@ -61,7 +63,7 @@ pub fn trans_context<Namer: ItemNamer>(
     } in ctx
         .ordering
         .iter()
-        .map(|op_key| lp.get_operator(*op_key).gen_closure::<Namer>(*op_key, lp))
+        .filter_map(|op_key| lp.get_operator(*op_key).gen_closure::<Namer>(*op_key, lp))
     {
         expressions.push(expression);
         data_types.push(datatype);
@@ -83,130 +85,34 @@ pub fn trans_context<Namer: ItemNamer>(
 #[enumtrait::impl_trait(trans_operator_trait for plan::operator_enum)]
 impl OperatorClosures for plan::Operator {}
 
-impl OperatorClosures for plan::UniqueRef {
-    fn gen_closure<Namer: ItemNamer>(
-        &self,
-        self_key: plan::Key<plan::Operator>,
-        lp: &plan::Plan,
-    ) -> ClosureValue {
-        ClosureValue::empty()
-    }
-}
-impl OperatorClosures for plan::ScanRefs {
-    fn gen_closure<Namer: ItemNamer>(
-        &self,
-        self_key: plan::Key<plan::Operator>,
-        lp: &plan::Plan,
-    ) -> ClosureValue {
-        ClosureValue::empty()
-    }
-}
-impl OperatorClosures for plan::DeRef {
-    fn gen_closure<Namer: ItemNamer>(
-        &self,
-        self_key: plan::Key<plan::Operator>,
-        lp: &plan::Plan,
-    ) -> ClosureValue {
-        ClosureValue::empty()
-    }
-}
-impl OperatorClosures for plan::Insert {
-    fn gen_closure<Namer: ItemNamer>(
-        &self,
-        self_key: plan::Key<plan::Operator>,
-        lp: &plan::Plan,
-    ) -> ClosureValue {
-        ClosureValue::empty()
-    }
-}
-impl OperatorClosures for plan::Expand {
-    fn gen_closure<Namer: ItemNamer>(
-        &self,
-        self_key: plan::Key<plan::Operator>,
-        lp: &plan::Plan,
-    ) -> ClosureValue {
-        ClosureValue::empty()
-    }
-}
-impl OperatorClosures for plan::Delete {
-    fn gen_closure<Namer: ItemNamer>(
-        &self,
-        self_key: plan::Key<plan::Operator>,
-        lp: &plan::Plan,
-    ) -> ClosureValue {
-        ClosureValue::empty()
-    }
-}
-impl OperatorClosures for plan::Sort {
-    fn gen_closure<Namer: ItemNamer>(
-        &self,
-        self_key: plan::Key<plan::Operator>,
-        lp: &plan::Plan,
-    ) -> ClosureValue {
-        ClosureValue::empty()
-    }
-}
-impl OperatorClosures for plan::Collect {
-    fn gen_closure<Namer: ItemNamer>(
-        &self,
-        self_key: plan::Key<plan::Operator>,
-        lp: &plan::Plan,
-    ) -> ClosureValue {
-        ClosureValue::empty()
-    }
-}
-impl OperatorClosures for plan::Fork {
-    fn gen_closure<Namer: ItemNamer>(
-        &self,
-        self_key: plan::Key<plan::Operator>,
-        lp: &plan::Plan,
-    ) -> ClosureValue {
-        ClosureValue::empty()
-    }
-}
-impl OperatorClosures for plan::Union {
-    fn gen_closure<Namer: ItemNamer>(
-        &self,
-        self_key: plan::Key<plan::Operator>,
-        lp: &plan::Plan,
-    ) -> ClosureValue {
-        ClosureValue::empty()
-    }
-}
-impl OperatorClosures for plan::Return {
-    fn gen_closure<Namer: ItemNamer>(
-        &self,
-        self_key: plan::Key<plan::Operator>,
-        lp: &plan::Plan,
-    ) -> ClosureValue {
-        ClosureValue::empty()
-    }
-}
-impl OperatorClosures for plan::Discard {
-    fn gen_closure<Namer: ItemNamer>(
-        &self,
-        self_key: plan::Key<plan::Operator>,
-        lp: &plan::Plan,
-    ) -> ClosureValue {
-        ClosureValue::empty()
-    }
-}
+impl OperatorClosures for plan::UniqueRef {}
+impl OperatorClosures for plan::ScanRefs {}
+impl OperatorClosures for plan::DeRef {}
+impl OperatorClosures for plan::Insert {}
+impl OperatorClosures for plan::Expand {}
+impl OperatorClosures for plan::Delete {}
+impl OperatorClosures for plan::Sort {}
+impl OperatorClosures for plan::Collect {}
+impl OperatorClosures for plan::Fork {}
+impl OperatorClosures for plan::Union {}
+impl OperatorClosures for plan::Return {}
+impl OperatorClosures for plan::Discard {}
 
 impl OperatorClosures for plan::Update {
     fn gen_closure<Namer: ItemNamer>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &plan::Plan,
-    ) -> ClosureValue {
+    ) -> Option<ClosureValue> {
         let (closure_expression, rec_out_ident) =
             mapping_expr::<Namer>(lp, self.update_type, self.mapping.iter());
-        single_expr::<Namer>(
+        Some(single_expr::<Namer>(
             lp,
             self_key,
             self.input,
             closure_expression,
             rec_out_ident.into_token_stream(),
-        )
+        ))
     }
 }
 impl OperatorClosures for plan::Fold {
@@ -214,7 +120,7 @@ impl OperatorClosures for plan::Fold {
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &plan::Plan,
-    ) -> ClosureValue {
+    ) -> Option<ClosureValue> {
         let (initial_values, rec_return) = mapto_dataflow::<Namer>(
             lp,
             self.output,
@@ -240,14 +146,14 @@ impl OperatorClosures for plan::Fold {
             "Return type of initial and update fields must be the same"
         );
 
-        ClosureValue {
+        Some(ClosureValue {
             expression: quote! {
                 (#initial_values, #update_using_input)
             },
             datatype: quote! {
                 (#rec_return, impl Fn(#input_type) -> (impl Fn(#rec_return) -> #rec_return))
             },
-        }
+        })
     }
 }
 impl OperatorClosures for plan::Map {
@@ -255,16 +161,16 @@ impl OperatorClosures for plan::Map {
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &plan::Plan,
-    ) -> ClosureValue {
+    ) -> Option<ClosureValue> {
         let (closure_expression, rec_out_ident) =
             mapto_dataflow::<Namer>(lp, self.output, self.mapping.iter().map(|(f, e)| (f, e)));
-        single_expr::<Namer>(
+        Some(single_expr::<Namer>(
             lp,
             self_key,
             self.input,
             closure_expression,
             rec_out_ident.into_token_stream(),
-        )
+        ))
     }
 }
 impl OperatorClosures for plan::Filter {
@@ -272,14 +178,14 @@ impl OperatorClosures for plan::Filter {
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &plan::Plan,
-    ) -> ClosureValue {
-        single_expr::<Namer>(
+    ) -> Option<ClosureValue> {
+        Some(single_expr::<Namer>(
             lp,
             self_key,
             self.input,
             self.predicate.to_token_stream(),
             quote!(bool),
-        )
+        ))
     }
 }
 impl OperatorClosures for plan::Assert {
@@ -287,14 +193,14 @@ impl OperatorClosures for plan::Assert {
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &plan::Plan,
-    ) -> ClosureValue {
-        single_expr::<Namer>(
+    ) -> Option<ClosureValue> {
+        Some(single_expr::<Namer>(
             lp,
             self_key,
             self.input,
             self.assert.to_token_stream(),
             quote!(bool),
-        )
+        ))
     }
 }
 impl OperatorClosures for plan::Take {
@@ -302,14 +208,14 @@ impl OperatorClosures for plan::Take {
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &plan::Plan,
-    ) -> ClosureValue {
-        single_expr::<Namer>(
+    ) -> Option<ClosureValue> {
+        Some(single_expr::<Namer>(
             lp,
             self_key,
             self.input,
             self.top_n.to_token_stream(),
             quote!(usize),
-        )
+        ))
     }
 }
 impl OperatorClosures for plan::GroupBy {
@@ -317,8 +223,8 @@ impl OperatorClosures for plan::GroupBy {
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &plan::Plan,
-    ) -> ClosureValue {
-        context_namer::<Namer>(lp, self_key, self.inner_ctx)
+    ) -> Option<ClosureValue> {
+        Some(context_namer::<Namer>(lp, self_key, self.inner_ctx))
     }
 }
 impl OperatorClosures for plan::ForEach {
@@ -326,8 +232,8 @@ impl OperatorClosures for plan::ForEach {
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &plan::Plan,
-    ) -> ClosureValue {
-        context_namer::<Namer>(lp, self_key, self.inner_ctx)
+    ) -> Option<ClosureValue> {
+        Some(context_namer::<Namer>(lp, self_key, self.inner_ctx))
     }
 }
 impl OperatorClosures for plan::Join {
@@ -335,11 +241,11 @@ impl OperatorClosures for plan::Join {
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &plan::Plan,
-    ) -> ClosureValue {
+    ) -> Option<ClosureValue> {
         if let plan::MatchKind::Pred(pred) = &self.match_kind {
             let left_t = Namer::record_type(lp.get_dataflow(self.left).get_conn().with.fields);
             let right_t = Namer::record_type(lp.get_dataflow(self.right).get_conn().with.fields);
-            ClosureValue {
+            Some(ClosureValue {
                 expression: quote! {
                     move | left: &#left_t , right: &#right_t | {
                         let result: bool = #pred;
@@ -347,9 +253,9 @@ impl OperatorClosures for plan::Join {
                     }
                 },
                 datatype: quote! {impl Fn(&#left_t, &#right_t) -> bool},
-            }
+            })
         } else {
-            ClosureValue::empty()
+            None
         }
     }
 }
@@ -358,13 +264,13 @@ impl OperatorClosures for plan::Row {
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &plan::Plan,
-    ) -> ClosureValue {
+    ) -> Option<ClosureValue> {
         let (closure_expression, rec_out_ident) =
             mapto_dataflow::<Namer>(lp, self.output, self.fields.iter().map(|(f, e)| (f, e)));
-        ClosureValue {
+        Some(ClosureValue {
             expression: closure_expression,
             datatype: rec_out_ident.into_token_stream(),
-        }
+        })
     }
 }
 
