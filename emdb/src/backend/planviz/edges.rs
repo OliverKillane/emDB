@@ -59,7 +59,6 @@ pub struct ContextReturn {
     pub return_operator: plan::Key<plan::Operator> 
 }
 
-/// DataFlow -> fields type
 #[derive(Clone, Debug)]
 pub struct DataFlowToType {
     pub df: plan::Key<plan::DataFlow>,

@@ -1,4 +1,4 @@
-//! # Planviz
+//! # Logical Plan Vizualisation
 //! The debugging plan graph view for emDB.
 //! 
 //! Given the complexity of the [`plan::Plan`], [`crate::analysis`] and 
@@ -33,7 +33,7 @@ pub struct PlanViz {
     config: DisplayConfig
 }
 
-pub struct DisplayConfig {
+struct DisplayConfig {
     display_types: bool,
     display_ctx_ops: bool,
     display_control: bool

@@ -1,4 +1,4 @@
-//! #Types for the logical plan.
+//! # Types for the logical plan.
 //!
 //! ## Type System
 //! ### Supported Types

@@ -2,8 +2,8 @@ mod debug_code {
     #![allow(unused_variables)]
     #![allow(dead_code)]
     struct RecordType0 {
-        age: ScalarType2,
         forename: ScalarType0,
+        age: ScalarType2,
         surname: ScalarType1,
     }
     struct RecordType1 {
@@ -20,8 +20,8 @@ mod debug_code {
         people: ScalarType5,
     }
     struct RecordType5 {
-        age_bracket: ScalarType6,
         group: ScalarType7,
+        age_bracket: ScalarType6,
     }
     pub struct RecordType6 {
         pub brackets: ScalarType8,
@@ -41,20 +41,18 @@ mod debug_code {
     pub fn customer_age_brackets() -> RecordType6 {
         let closures = (
             move |age: ScalarType2| {
-                (
-                    move |RecordType4 { people }| {
-                        let result: RecordType5 = {
-                            {
-                                let age_bracket: ScalarType6 = age;
-                                let group: ScalarType7 = people;
-                                RecordType5 { age_bracket, group }
-                            }
-                        };
-                        result
-                    },
-                )
+                (move |RecordType4 { people }| {
+                    let result: RecordType5 = {
+                        {
+                            let age_bracket: ScalarType6 = age;
+                            let group: ScalarType7 = people;
+                            RecordType5 { age_bracket, group }
+                        }
+                    };
+                    result
+                },)
             },
-            move |RecordType5 { age_bracket, group }| {
+            move |RecordType5 { group, age_bracket }| {
                 let result: bool = { age_bracket > 16 };
                 result
             },

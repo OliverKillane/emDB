@@ -115,6 +115,13 @@
 //!         ~> return;
 //! }
 //! ```
+//!
+//! ### Pass through documentation
+//! Allow doc comments before each query.
+//! - Doc comment stntax is expanded to #[doc = "..."]
+//! - Allow other attributes to be applied to queries
+//!
+//! Requires adding the doc comment to the plan, to pass on to generated code.
 
 mod ast;
 mod errors;

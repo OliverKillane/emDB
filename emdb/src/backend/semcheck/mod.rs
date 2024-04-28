@@ -51,8 +51,6 @@ impl EMDBBackend for SemCheck {
         let ty_impl = SimpleTypeImplementor::<SimpleNamer>::with_public_types(plan);
         let types_preamble = ty_impl.translate_all_types(plan);
         let queries = translate_all_queries(plan);
-
-
         let tks = quote! {
             mod #impl_name { 
                 #![allow(unused_variables)]
@@ -88,7 +86,7 @@ fn debug_output(debug_path: &LitStr, tks: TokenStream) -> Result<(), LinkedList<
     }
 }
 
-pub fn translate_all_queries(lp: &plan::Plan) -> TokenStream {
+fn translate_all_queries(lp: &plan::Plan) -> TokenStream {
     lp.queries.iter().map(|(key, query)| translate_query(lp, key, query)).collect()
 }
 
