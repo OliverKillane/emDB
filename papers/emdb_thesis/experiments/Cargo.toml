@@ -4,24 +4,20 @@ version = "0.1.0"
 edition = "2021"
 
 readme = "README.md"
-description = "A collection of experiments to support the emDB project"
+description = "A collection of experiments to support the thesis"
 keywords = ["experiment"]
 categories = ["experiment"]
-
-repository.workspace = true
-homepage.workspace = true
-license-file.workspace = true
 
 [dependencies]
 typed-generational-arena = "0.2.5"
 slab = "0.4.9"
-duckdb = { version = "0.9.2", features = ["bundled"] }
-rusqlite = { version = "0.30.0", features = ["bundled"] }
+duckdb = { version = "0.10.2", features = ["bundled"] }
+rusqlite = { version = "0.31.0", features = ["bundled"] }
 
 [dev-dependencies]
 divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }
 rand = "0.8"
-emdb = { path = "../emdb" }
+emdb = { path = "../../../crates/emdb" }
 
 [[bench]]
 name = "tables"
