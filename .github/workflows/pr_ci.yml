@@ -48,7 +48,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
           key: ${{ runner.os }}-mdbook-0.4
-      - run: cargo install mdbook --no-default-features --vers "^0.4" --locked
+      - run: cargo install mdbook --no-default-features --vers "^0.4" --locked || echo "already installed"
       - name: run tests
         run: mdbook test
         working-directory: book
