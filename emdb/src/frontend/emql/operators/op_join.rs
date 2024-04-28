@@ -9,11 +9,10 @@ enum MatchKind {
     Cross
 }
 
+// TODO: Add more join kinds (see `plan::JoinKind`)
 #[derive(Debug)]
 enum JoinKind {
     Inner,
-    Outer,
-    Left,
 }
 
 #[derive(Debug)]
@@ -32,9 +31,7 @@ impl EMQLOperator for Join {
         fn kind_parser() -> impl TokenParser<JoinKind> {
             choices!(
                 peekident("inner") => mapsuc(matchident("inner"), |_| JoinKind::Inner),
-                peekident("outer") => mapsuc(matchident("outer"), |_| JoinKind::Outer),
-                peekident("left") => mapsuc(matchident("left"), |_| JoinKind::Left),
-                otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, format!("expected join kind `inner`, `outer` or `left` but got `{}`", t)))
+                otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, format!("invalid join kind `{}`", t)))
             )
         }
 
@@ -144,8 +141,6 @@ impl EMQLOperator for Join {
                 // TODO: expose plan types to the user?
                 let join_kind = match join_kind {
                     JoinKind::Inner => plan::JoinKind::Inner,
-                    JoinKind::Outer => plan::JoinKind::Outer,
-                    JoinKind::Left => plan::JoinKind::Left,
                 };
 
                 if errors.is_empty() {

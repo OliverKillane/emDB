@@ -204,12 +204,11 @@ pub enum MatchKind {
     },
 }
 
-// todo: types for left, outer joins
+// TODO: Add more join kinds (left, outer), this is partially waiting on being 
+//       able to wrap emdb type in rust types, e.g. left join producing (left, Option<right>)
 /// The join type of the operator
 pub enum JoinKind {
     Inner,
-    Left,  // right is same as left, so we ignore
-    Outer, //
 }
 
 /// Join two streams together

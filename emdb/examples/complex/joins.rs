@@ -13,7 +13,7 @@ emql! {
         use people |> fork(let person, friend);
 
         join(use person [
-            left pred {
+            inner pred {
                 if let Some(friend_name) = &left.friend {
                     friend_name == &right.name
                 } else {
