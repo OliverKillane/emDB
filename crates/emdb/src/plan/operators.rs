@@ -204,7 +204,7 @@ pub enum MatchKind {
     },
 }
 
-// TODO: Add more join kinds (left, outer), this is partially waiting on being 
+// TODO: Add more join kinds (left, outer), this is partially waiting on being
 //       able to wrap emdb type in rust types, e.g. left join producing (left, Option<right>)
 /// The join type of the operator
 pub enum JoinKind {
