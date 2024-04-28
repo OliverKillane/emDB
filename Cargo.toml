@@ -1,3 +1,8 @@
 [workspace]
 resolver = "2"
-members = ["combi", "emdb", "experiments"]
+members = ["combi", "emdb", "experiments", "enumtrait"]
+
+[workspace.package]
+homepage = "https://github.com/OliverKillane/emDB"
+repository = "https://github.com/OliverKillane/emDB"
+license-file = "LICENSE"

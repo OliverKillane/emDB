@@ -1,3 +1,5 @@
+//! Basic token combinators.
+//! - Literals are not included as they are more complex to parse, consider using [`struct@syn::LitStr`] instead.
 use std::marker::PhantomData;
 
 use super::{TokenDiagnostic, TokenIter};
@@ -5,7 +7,6 @@ use crate::{
     core::{seqdiff, DiffRes},
     Combi, CombiErr, CombiResult, Repr,
 };
-use colored::Colorize;
 use derive_where::derive_where;
 use proc_macro2::{Delimiter, Ident, Literal, Punct, Span, TokenStream, TokenTree};
 use proc_macro_error::{Diagnostic, Level};
@@ -23,6 +24,7 @@ impl Combi for GetIdent {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         mut input: TokenIter,
@@ -55,7 +57,7 @@ impl Combi for GetIdent {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", "<ident>".blue())
+        write!(f, "<ident>")
     }
 }
 
@@ -73,6 +75,7 @@ impl Combi for MatchIdent {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         mut input: TokenIter,
@@ -118,7 +121,7 @@ impl Combi for MatchIdent {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self.text.magenta())
+        write!(f, "{}", self.text)
     }
 }
 
@@ -136,6 +139,7 @@ impl Combi for PeekIdent {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         input: TokenIter,
@@ -150,7 +154,7 @@ impl Combi for PeekIdent {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, " {} ", self.ident.magenta())
+        write!(f, "{}", self.ident)
     }
 }
 
@@ -167,6 +171,7 @@ impl Combi for GetPunct {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         mut input: TokenIter,
@@ -199,7 +204,7 @@ impl Combi for GetPunct {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", "<punct>".blue())
+        write!(f, "<punct>")
     }
 }
 
@@ -213,6 +218,7 @@ impl Combi for matchpunct {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         mut input: TokenIter,
@@ -258,7 +264,7 @@ impl Combi for matchpunct {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self.0.to_string().magenta())
+        write!(f, "{}", self.0)
     }
 }
 
@@ -276,6 +282,7 @@ impl Combi for PeekPunct {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         input: TokenIter,
@@ -290,7 +297,7 @@ impl Combi for PeekPunct {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self.punct.to_string().magenta())
+        write!(f, "{}", self.punct)
     }
 }
 
@@ -306,6 +313,7 @@ impl Combi for GetLiteral {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         mut input: TokenIter,
@@ -338,7 +346,7 @@ impl Combi for GetLiteral {
     }
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", "<literal>".blue())
+        write!(f, "<literal>")
     }
 }
 
@@ -354,6 +362,7 @@ impl Combi for IsEmpty {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         input: TokenIter,
@@ -420,6 +429,17 @@ where
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    // NOTE: "Why" I hear you say, "why is recovgroup not inlined, this is trivially done, seems
+    //       arbitrary to given the decision for the other combis here". And I agree with you!
+    //
+    //       However on rustc 1.79.0-nightly (ab5bda1aa 2024-04-08) uncommenting the below
+    //       attribute causes a segfault, I suspect it has something to do with a stack overflow,
+    //       but honestly have not the time to investigate.
+    //
+    //       emdb compiles, but segfaults when a query is parsed.
+    //
+    //       still, `error: rustc interrupted by SIGSEGV, printing backtrace` is pretty funny.
+    // #[inline(always)]  // <- satanic runes here
     fn comp(
         &self,
         mut input: TokenIter,
@@ -501,7 +521,7 @@ where
 
     fn repr(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         let (l, r) = delim_sep(self.0);
-        write!(f, "{}{}{}", l.magenta(), Repr(&self.1), r.magenta())
+        write!(f, "{l}{}{r}", Repr(&self.1))
     }
 }
 
@@ -533,6 +553,7 @@ where
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         mut input: TokenIter,
@@ -621,6 +642,7 @@ where
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         input: TokenIter,
@@ -680,6 +702,7 @@ impl Combi for gettoken {
     type Inp = TokenIter;
     type Out = TokenIter;
 
+    #[inline(always)]
     fn comp(
         &self,
         mut input: TokenIter,
@@ -718,15 +741,22 @@ impl Combi for terminal {
     type Inp = TokenIter;
     type Out = ();
 
+    #[inline(always)]
     fn comp(
         &self,
         mut input: Self::Inp,
     ) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         if let Some(tt) = input.next() {
-            // BUG: will fail on non-nightly due to `a.join` retuning None
-            let big_span = input
-                .extract_iter()
-                .fold(tt.span(), |a, s| a.join(s.span()).unwrap());
+            // NOTE: `a.join` returns None on Stable, and always Some on nightly.
+            let big_span = if cfg!(nightly) {
+                // INV: On nightly the result of the join is always Some(..)
+                #[allow(clippy::unwrap_used)]
+                input
+                    .extract_iter()
+                    .fold(tt.span(), |a, s| a.join(s.span()).unwrap())
+            } else {
+                TokenStream::from_iter(input.iter).span()
+            };
             (
                 (),
                 CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(

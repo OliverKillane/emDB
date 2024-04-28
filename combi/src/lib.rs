@@ -1,6 +1,12 @@
 //! An easily extensible function combinator library
 #![allow(internal_features)]
 #![feature(rustc_attrs)]
+// TODO: Add further verification to ensure
+#![warn(clippy::style)]
+#![warn(clippy::perf)]
+#![warn(clippy::cargo)]
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::panic)]
 
 use std::fmt::{Display, Error, Formatter};
 
@@ -8,11 +14,9 @@ pub mod core;
 pub mod derived;
 pub mod logical;
 pub mod macros;
-#[cfg(feature = "tokens")]
-pub mod tokens;
 
-#[cfg(feature = "text")]
 pub mod text;
+pub mod tokens;
 
 /// The result of [Combi] computation
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -20,6 +24,16 @@ pub enum CombiResult<S, C, E> {
     Suc(S),
     Con(C),
     Err(E),
+}
+
+impl<S, E> CombiResult<S, E, E> {
+    /// When the error and continuation types are identical, we can convert a result into an regular rust [`Result`]
+    pub fn to_result(self) -> Result<S, E> {
+        match self {
+            CombiResult::Suc(s) => Ok(s),
+            CombiResult::Con(e) | CombiResult::Err(e) => Err(e),
+        }
+    }
 }
 
 /// The core trait for defining combinable computations
@@ -49,12 +63,23 @@ pub trait Combi {
 }
 
 /// Allows a [continuation](Combi::Con) to be combined with subsequent [continuations](Combi::Con) and [successes](Combi::Suc).
-/// ```ignore
+/// ```
+/// # use combi::{Combi, CombiErr, CombiCon, CombiResult};
+/// # struct NothingCont;
+/// # impl CombiCon<(), NothingCont> for NothingCont {
+/// #     fn combine_suc(self, _: ()) -> Self {
+/// #        NothingCont
+/// #    }
+/// #    fn combine_con(self, con: NothingCont) -> Self {
+/// #        NothingCont
+/// #    }
+/// # }
+/// # let results = (NothingCont, (), (), NothingCont);
 /// // from some combinators we get:
-/// let (c1, s2, s3, c4) = ...;
+/// let (cont_1, suc_2, suc_3, cont_4) = results;
 ///
 /// // and can combine in order:
-/// let c_total = c1.combine_suc(s2).combine_suc(s3).combine_con(c4)
+/// let c_total = cont_1.combine_suc(suc_2).combine_suc(suc_3).combine_con(cont_4);
 /// ```
 #[cfg_attr(
     feature = "nightly",
@@ -69,18 +94,37 @@ pub trait CombiCon<Suc, Con> {
 }
 
 /// Allows an error to inherit the previous [continuation](Combi::Con)
-/// ```ignore
-/// // from some combinators we get:
-/// let (c1, s2, o3, e4) = ...;
+/// ```
+/// # use combi::{Combi, CombiErr, CombiCon, CombiResult};
+/// # struct NothingErr;
+/// # struct NothingCont;
+/// # impl CombiErr<NothingCont> for NothingErr {
+/// #     fn inherit_con(self, con: NothingCont) -> Self {
+/// #        NothingErr
+/// #    }
+/// #    fn catch_con(con: NothingCont) -> Self {
+/// #        NothingErr
+/// #    }
+/// # }
+/// # impl CombiCon<(), NothingCont> for NothingCont {
+/// #     fn combine_suc(self, _: ()) -> Self {
+/// #        NothingCont
+/// #    }
+/// #    fn combine_con(self, con: NothingCont) -> Self {
+/// #        NothingCont
+/// #    }
+/// # }
+/// # let results = (NothingCont, (), NothingCont, NothingErr);
+/// // we can take continuations, successes and errors:
+/// let (cont_1, suc_2, cont_3, error_4) = results;
 ///
-/// // and can combine in order:
-/// let c_total = c1.combine_suc(s2).combine_out(o3);
+/// // and can combine in order, propagating context:
+/// let c_total = cont_1.combine_suc(suc_2).combine_con(cont_3);
 ///
 /// // but we have reached an error, and want to keep the context of continuations:
-/// let e_final = e4.inherit_con(c_total);
+/// let e_final = error_4.inherit_con(c_total);
 /// ```
-///
-/// Also allow for [continuations](Combi::Con) to be caught as errors (for example in [core::choice], where the branch is know from a [success](Combi::Suc)).
+/// Also allow for [continuations](Combi::Con) to be caught as errors (for example in [`core::choice`], where the branch is know from a [success](Combi::Suc)).
 #[cfg_attr(
     feature = "nightly",
     rustc_on_unimplemented(
@@ -94,7 +138,7 @@ pub trait CombiErr<Con> {
 }
 
 /// A simple wrapper to allow the [Combi::repr] function to implement [Display]
-pub struct Repr<T>(T);
+pub struct Repr<T>(pub T);
 
 impl<C: Combi> Display for Repr<&C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

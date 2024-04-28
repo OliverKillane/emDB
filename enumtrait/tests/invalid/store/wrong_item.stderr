@@ -1,0 +1,5 @@
+error[E0425]: cannot find value `dont_compile_me` in this scope
+  --> tests/invalid/store/wrong_item.rs:29:14
+   |
+29 | fn main() {  dont_compile_me }
+   |              ^^^^^^^^^^^^^^^ not found in this scope

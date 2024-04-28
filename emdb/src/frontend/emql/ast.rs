@@ -1,58 +1,21 @@
-// TODO: parameterize by span type (want to go to resolved AST spanned by types)
-use proc_macro2::{Ident, Span};
-use syn::{self, Expr, Type};
+//! # emQL Abstract Syntax Tree
+//! A basic AST, without error nodes. Includes spans required for [`super::sem`] to create [`super::errors`].
+
+use super::operators::Operator;
+use proc_macro2::{Ident, Span, TokenStream};
+use syn::{Expr, Type};
 
 #[derive(Debug)]
-pub(super) enum Operator {
-    Ret { ret_span: Span },
-    Ref { ref_span: Span, table_name: Ident },
-    Let { let_span: Span, var_name: Ident },
-    Use { use_span: Span, var_name: Ident },
-    FuncOp { fn_span: Span, op: FuncOp },
-}
-
-#[derive(Debug)]
-pub(super) enum SortOrder {
-    Asc,
-    Desc,
-}
-
-#[derive(Debug)]
-pub(super) enum FuncOp {
-    Update {
-        reference: Ident,
-        fields: Vec<(Ident, Expr)>,
-    },
-    Insert {
-        table_name: Ident,
-    },
-    Delete,
-    Map {
-        new_fields: Vec<(Ident, Type, Expr)>,
-    },
-    Unique {
-        unique_field: Ident,
-        from_field: Ident,
-    },
-    Filter(Expr),
-    Row {
-        fields: Vec<(Ident, Type, Expr)>,
-    },
-    Sort {
-        fields: Vec<(Ident, SortOrder, Span)>,
-    },
-    Fold {
-        initial: Vec<(Ident, Type, Expr)>,
-        update: Vec<(Ident, Expr)>,
-    },
-    Assert(Expr),
-    Collect,
+pub(super) enum AstType {
+    RsType(syn::Type),
+    TableRef(Ident),
+    Custom(Ident),
 }
 
 #[derive(Debug)]
 pub(super) struct Connector {
     /// single (~>) or stream (|>)
-    pub single: bool,
+    pub stream: bool,
     pub span: Span,
 }
 
@@ -66,7 +29,6 @@ pub(super) struct StreamExpr {
 pub(super) enum ConstraintExpr {
     Unique { field: Ident },
     Pred(Expr),
-    GenPK { field: Ident },
     Limit { size: Expr },
 }
 
@@ -80,21 +42,27 @@ pub(super) struct Constraint {
 #[derive(Debug)]
 pub(super) struct Table {
     pub name: Ident,
-    pub cols: Vec<(Ident, syn::Type)>,
+    pub cols: Vec<(Ident, Type)>,
     pub cons: Vec<Constraint>,
+}
+
+#[derive(Debug)]
+pub struct Context {
+    pub params: Vec<(Ident, AstType)>,
+    pub streams: Vec<StreamExpr>,
 }
 
 #[derive(Debug)]
 pub(super) struct Query {
     pub name: Ident,
-    pub params: Vec<(Ident, syn::Type)>,
-    pub streams: Vec<StreamExpr>,
+    pub context: Context,
 }
 
 #[derive(Debug)]
 pub(super) struct BackendImpl {
-    pub db_name: Ident,
-    pub db_backend: Ident,
+    pub impl_name: Ident,
+    pub backend_name: Ident,
+    pub options: Option<TokenStream>,
 }
 
 #[derive(Debug)]

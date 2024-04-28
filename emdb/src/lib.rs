@@ -1,36 +1,72 @@
+// #![warn(clippy::pedantic)]
+// #![allow(clippy::linkedlist)]
+// linked lists used for quick merging of errors lists, and are only iterated over for fast-escape failure case
 #![allow(dead_code)]
 #![allow(unused_variables)]
+use std::collections::LinkedList;
+
+// TODO: check readme by including as documentation (needs readme to compile first)
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use proc_macro_error::{proc_macro_error, Diagnostic, Level};
+use proc_macro_error::proc_macro_error;
+use quote::quote;
+
 extern crate proc_macro;
 
+mod analysis;
 mod backend;
 mod frontend;
+mod optimise;
 mod plan;
 mod utils;
 
-use crate::backend::{Backend, Volcano};
-use crate::frontend::{Emql, Frontend};
-
-#[proc_macro_error]
-#[proc_macro]
-pub fn database(tk: TokenStream) -> TokenStream {
-    match Emql::from_tokens(TokenStream2::from(tk)) {
+fn make_impl<F: frontend::Frontend>(tk: TokenStream) -> TokenStream {
+    match F::from_tokens(TokenStream2::from(tk)) {
         Err(ds) => {
             for d in ds {
-                d.emit()
+                d.emit();
             }
             TokenStream::new()
         }
-        Ok(lp) => proc_macro::TokenStream::from(Volcano::generate_code(lp)),
+        Ok((lp, bks)) => {
+            let mut errors = LinkedList::new();
+            let impls = bks
+                .impls
+                .into_iter()
+                .filter_map(
+                    |(id, backend)| match backend::generate_code(backend, id, &lp) {
+                        Ok(code) => Some(code),
+                        Err(mut e) => {
+                            errors.append(&mut e);
+                            None
+                        }
+                    },
+                )
+                .collect::<Vec<_>>();
+
+            for e in errors {
+                e.emit();
+            }
+
+            proc_macro::TokenStream::from(quote! {
+                #(#impls)*
+            })
+        }
     }
 }
 
-#[proc_macro_error]
-#[proc_macro]
-pub fn bob(tk: TokenStream) -> TokenStream {
-    Diagnostic::new(Level::Error, String::from("bob")).emit();
-    TokenStream::new()
+macro_rules! create_frontend {
+    ($frontend:ident as $implement:path => $($t:tt)*) => {
+        $($t)*
+        #[proc_macro_error]
+        #[proc_macro]
+        pub fn $frontend(tk: TokenStream) -> TokenStream {
+            make_impl::<$implement>(tk)
+        }
+    };
 }
+
+create_frontend!(emql as frontend::Emql =>
+    /// The `emql` language frontend for [emdb](crate).
+);

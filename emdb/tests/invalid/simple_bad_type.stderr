@@ -1,0 +1,7 @@
+error: [EMQL-15] Table `countries` not found in query `no_table`
+  --> tests/invalid/simple_bad_type.rs:12:34
+   |
+12 |     query cool_bob(no_table: ref countries) {
+   |                                  ^^^^^^^^^
+   |
+   = help: Either use a `ref <other table>` or create `table countries {...} @ [...]
