@@ -7,10 +7,10 @@
 use emdb::emql;
 
 emql! {
-    impl debug_code as SemCheck{debug_file = "emdb/tests/debug.rs"};
+    impl debug_code as SemCheck{debug_file = "emdb/tests/debug/code.rs"};
 
     // Use the vscode dots view to see preview update live on save
-    impl debug_graph as PlanViz{path = "emdb/tests/debug.dot", display_types = on, display_ctx_ops = on, display_control = on};
+    impl debug_graph as PlanViz{path = "emdb/tests/debug/graph.dot", display_types = on, display_ctx_ops = on, display_control = on};
 
     // write query to check here!
     table customers {

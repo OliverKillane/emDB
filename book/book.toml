@@ -1,0 +1,21 @@
+[book]
+authors = ["Oliver Killane"]
+language = "en"
+multilingual = false
+src = "src"
+title = "emDB"
+description = "The documentation for emDB and the emQL language"
+
+[output.html]
+mathjax-support = true
+default-theme = "light"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/OliverKillane/emDB/edit/main/docs/"
+edit-url-template = "https://github.com/OliverKillane/emDB/edit/main/docs/{path}"
+
+[output.html.code.hidelines]
+python = "~"
+
+[output.html.playground]
+editable = true
+line-numbers = true

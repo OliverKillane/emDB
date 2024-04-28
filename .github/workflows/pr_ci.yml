@@ -1,0 +1,54 @@
+name: CI for Pull Requests
+
+on:
+  push:
+  pull_request:
+
+env: 
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-Dwarnings"
+
+jobs:
+  crates_ci:
+    name: CI for Crates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            crates/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: run tests
+        run: cargo test
+        working-directory: crates
+      - name: run doc build
+        run: cargo doc
+        working-directory: crates
+      - name: check formatting
+        run: cargo fmt -- --check
+        working-directory: crates
+      - name: check lint
+        run: cargo clippy
+        working-directory: crates
+  book_check:
+    name: CI for Book
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-mdbook-0.4
+      - run: cargo install mdbook --no-default-features --vers "^0.4" --locked || echo "already installed"
+      - name: run tests
+        run: mdbook test
+        working-directory: book

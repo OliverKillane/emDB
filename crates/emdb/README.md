@@ -1,9 +1,8 @@
-<img src="./docs/logo/simple.drawio.svg" alt="emDB" title="emdb logo" width="300"/>
+<img src="./docs/logo.drawio.svg" alt="emDB" title="emdb logo" width="300"/>
 
-## What is this?
-The `emdb` library to used the emdb project.
+The main `emdb` library to used the emdb project.
 
-## How to use <img src="./docs/logo/simple.drawio.svg" alt="emDB" style="vertical-align: middle;" title="emdb logo" width="70"/>
+## How to use <img src="./docs/logo.drawio.svg" alt="emDB" style="vertical-align: middle;" title="emdb logo" width="70"/>
 1. Add the dependency to your `Cargo.toml`
     ```toml
     [dependencies]
