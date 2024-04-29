@@ -5,6 +5,24 @@
 //!   with different data, as members of the operator)
 //! - Arena based (allows [analyses](crate::analysis) to index nodes in the
 //!   plan, without requiring additions to it)
+//!
+//! ## Shortcomings
+//! For the side effecting operators, we want to move some attributes from the
+//! stream, but propagate others.
+//!
+//! Ideally we would have something like:
+//! ```text
+//! Rec { a, b } -> insert(only take a) -> Rec { ref, b }
+//! ```
+//!
+//! We could generalise this as a `remap` operator
+//! ```text
+//! Rec { a, b } -> remap( Rec{a} -> insert() -> return, Rec{b} -> return ) -> Rec { b })
+//! ```
+//!
+//! In the [super] documentation the shortcomings note provides some of a suggestion:
+//! - Could nest a context, but the operator type is restricted to ones that dont affect
+//!   cardinality of output.
 
 use super::{Context, Data, Key, Plan, RecordField, RecordType, Table};
 use std::collections::HashMap;
@@ -42,47 +60,73 @@ impl DataFlow {
     }
 }
 
-/// Apply write to specific columns in a table.
-/// - `INV`: mapping and output have the same fields
-/// - `INV`: mapping expressions only contain fields from input and globals
-/// - `INV`: mapping assignment only contains fields from referenced table
+/// Write to columns of a row in the table from a stream/single, specifying:
+/// - The values to provide for columns (using references to the input)
+/// - The field that contains the table reference to use.
+///
+/// Returns the input type, table is mutated.
+/// ```text
+/// RECORD -> update(use RECORD.{ .. } and Fields = |&RECORD| { .. } ) -> RECORD
+/// ```
 pub struct Update {
     pub input: Key<DataFlow>,
 
-    /// The field and table referenced
-    pub reference: RecordField, //
+    /// `INV`: `reference` field is in the input
+    pub reference: RecordField,
+
     pub table: Key<Table>,
 
-    // the expressions for the output type
+    // `INV`: each field in mapping is in the table.
     pub mapping: HashMap<RecordField, Expr>,
+
+    /// `INV`: All fields in the record are fields in the table
     pub update_type: Key<RecordType>,
 
+    // `INV`: `input.with == output.with`
     pub output: Key<DataFlow>,
 }
 
-/// Insert a single row or a stream into a table, the inserted rows
-/// are propagated
-/// - `INV`: input and output have the same fields
-/// - `INV`: input has same fields as table
+/// Insert the record as a field stream/single, producing a stream/single of row
+/// references.
+/// - return stream is of references to the inserted values.
+///
+/// ```text
+/// TABLE::INSERT -> insert(TABLE) -> TABLE::REF
+/// ```
 pub struct Insert {
     pub input: Key<DataFlow>,
     pub table: Key<Table>,
+
+    /// The single field to place the out_ref in.
+    /// `INV`: `out_ref` is the only field in `output.with`
     pub out_ref: RecordField,
+
     pub output: Key<DataFlow>,
 }
 
-/// Delete a single row or a stream from a table by reference,
-/// the deleted rows are propagated
-/// - `INV`: input is a stream or single of row references
-/// - `INV`: output contains the tuple of removed values, same fields as table
+/// Delete a rows from a table using a row reference.
+///
+/// ```text
+/// RECORD -> delete(Ruse RECORD.{ .. } ) -> RECORD
+/// ```
 pub struct Delete {
     pub input: Key<DataFlow>,
+
+    /// The table reference to delete with.
     pub reference: RecordField,
     pub table: Key<Table>,
+
+    /// `INV`: `[Self::input].with == output.with`
     pub output: Key<DataFlow>,
 }
 
-/// Gets a unique row from a table
+/// Borrow a field and use it for unique lookup into a table, to get a row
+/// reference.
+/// - The column used for the row lookup must have the unique constraint
+///
+/// ```text
+/// RECORD -> unique_ref(use RECORD.{ .. } TABLE at COLUMN ) -> RECORD + TABLE::REF
+/// ```
 pub struct UniqueRef {
     pub input: Key<DataFlow>,
 
@@ -94,10 +138,16 @@ pub struct UniqueRef {
     pub output: Key<DataFlow>,
 }
 
-/// Scan a table to generate a stream of table references
+/// Scan all refs from a table into a stream.
+///
+/// ```text
+/// scan_refs(TABLE) -> TABLE::REF
+/// ```
 pub struct ScanRefs {
     pub table: Key<Table>,
     pub out_ref: RecordField,
+
+    //. `INV`: is a stream with a single field (`out_ref`) of table reference to `table`
     pub output: Key<DataFlow>,
 }
 
@@ -109,16 +159,6 @@ pub struct DeRef {
     pub named: RecordField,
     pub table: Key<Table>,
     pub output: Key<DataFlow>,
-}
-
-pub enum SortOrder {
-    Asc,
-    Desc,
-}
-
-pub struct FoldField {
-    pub initial: Expr,
-    pub update: Expr,
 }
 
 /// Applying a function over a stream of values
@@ -139,6 +179,11 @@ pub struct Expand {
     pub output: Key<DataFlow>,
 }
 
+pub struct FoldField {
+    pub initial: Expr,
+    pub update: Expr,
+}
+
 /// A fold operation over a stream of values
 /// - `INV`: initial fields only contain globals
 /// - `INV`: update expressions only contain fields from input, initial and globals
@@ -155,6 +200,11 @@ pub struct Filter {
     pub input: Key<DataFlow>,
     pub predicate: Expr,
     pub output: Key<DataFlow>,
+}
+
+pub enum SortOrder {
+    Asc,
+    Desc,
 }
 
 /// Sort the input given some keys and ordering

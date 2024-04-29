@@ -3,7 +3,7 @@ use emdb::emql;
 
 emql! {
     impl my_db as SemCheck;
-    
+
     table cool {
         name: String,
         something: i32,
@@ -50,12 +50,12 @@ emql! {
         use larger_than_10
             |> fork(let x1, x2);
 
-        use x1 
+        use x1
             |> take(1)
-            |> collect(it) 
+            |> collect(it)
             ~> return;
 
-        use x2 
+        use x2
             |> sort(x desc);
     }
 }

@@ -1,5 +1,10 @@
 //! # emDB Logical Plan
 //! Describes the schema, tables, expressions and operations.
+//!
+//! ## Shortcomings
+//! Heavy usage of indexes, and not grouping queries, contexts, and operators optimally.
+//! - More invariants checked and reasoned about, but not enforced by types.
+//! - Potentially nesting contexts with dataflow and operators inside.
 
 use typed_generational_arena::{Index, NonzeroGeneration, StandardArena as GenArena};
 

@@ -3,7 +3,7 @@ use emdb::emql;
 
 emql! {
     impl my_db as SemCheck;
-    
+
     table simple {
         a: i32,
         b: String,
@@ -21,18 +21,18 @@ emql! {
 
     query update_b(new_b: String) {
         ref simple as simple_ref
-            |> update(simple_ref use b = new_b) 
+            |> update(simple_ref use b = new_b)
             |> collect(it as type foo)
             ~> return;
     }
 
     query single_maths() {
-        row(a: i32 = 0, b: i32 = 2) 
-            ~> map(c: i32 = a + b) 
+        row(a: i32 = 0, b: i32 = 2)
+            ~> map(c: i32 = a + b)
             ~> let x;
 
-        use x 
-            ~> map(z: i32 = c*c) 
+        use x
+            ~> map(z: i32 = c*c)
             ~> return;
     }
 }

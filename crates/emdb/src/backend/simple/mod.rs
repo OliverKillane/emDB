@@ -1,7 +1,13 @@
 //! A simple reference backend using basic volcano operators
 
 use super::EMDBBackend;
-mod ops;
+
+mod buffers;
+mod error;
+mod physical_ops;
+mod trans_ops;
+mod table;
+
 pub struct Simple{}
 
 impl EMDBBackend for Simple {

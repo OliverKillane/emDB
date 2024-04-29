@@ -3,7 +3,7 @@ use emdb::emql;
 
 emql! {
     impl my_db as SemCheck;
-    
+
     table people {
         name: String,
         friend: Option<String>,
