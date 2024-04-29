@@ -27,7 +27,7 @@ jobs:
         run: cargo test
         working-directory: crates
       - name: run doc build
-        run: cargo doc
+        run: cargo doc --document-private-items
         working-directory: crates
       - name: check formatting
         run: cargo fmt -- --check

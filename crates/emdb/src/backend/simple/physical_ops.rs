@@ -7,7 +7,6 @@ trait Table {
     type Ref;
 }
 
-/// [`plan::Update`]
 fn update<InputRecord: Clone, UpdateTable: Table, UpdateRecord, Error>(
     input: impl Buffer<InputRecord>, 
     table: &mut UpdateTable, 
