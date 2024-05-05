@@ -46,7 +46,7 @@ hooks
 /*
 
 Access {
-    hooks: 
+    hooks:
     blagh:
 }
 */

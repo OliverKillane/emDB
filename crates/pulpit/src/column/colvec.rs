@@ -1,1 +1,2 @@
-//! # Vector based column
+//! # Vector based Column
+//!

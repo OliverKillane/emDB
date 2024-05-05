@@ -6,7 +6,7 @@ edition = "2021"
 readme = "README.md"
 description = "A library for generating table data structures"
 keywords = ["performance", "traits", "arenas"]
-categories = [""]
+categories = ["data"]
 
 repository.workspace = true
 homepage.workspace = true
