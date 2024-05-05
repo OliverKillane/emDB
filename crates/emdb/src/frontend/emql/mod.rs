@@ -122,6 +122,21 @@
 //! - Allow other attributes to be applied to queries
 //!
 //! Requires adding the doc comment to the plan, to pass on to generated code.
+//!
+//! ### Pass through references
+//! Allow references to be stored in tables, where the lifetime of the reference 
+//! matches that of the database.
+//! 
+//! ```ignore
+//! table cool {
+//!     name: String,
+//!     very_huge_thing: &Huge // inferred as &'database Huge
+//! }
+//! 
+//! query add_new(name: String, huge: &Huge) {
+//!     row(name: String = name, very_huge_thing: &Huge = huge) |> insert(cool);
+//! }
+//! ```
 
 mod ast;
 mod errors;
