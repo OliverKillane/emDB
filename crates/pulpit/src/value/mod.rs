@@ -71,14 +71,14 @@
 
 mod unit;
 pub use unit::*;
-mod valind;
-pub use valind::*;
 mod valref;
 pub use valref::*;
 mod valcpy;
 pub use valcpy::*;
 mod valbox;
 pub use valbox::*;
+mod valcnt;
+pub use valcnt::*;
 
 /// Wraps an immutable value that is part of a column
 /// - Values can be safely shared for lifetime of the column
@@ -114,46 +114,6 @@ pub use valbox::*;
 /// let j = &mut z;
 /// let x_get_move = x_get;
 /// # }
-/// ```
-///
-/// ## Lifetime Trickery & Unsafety
-/// We can set the lifetime for which the `get` should be valid using the `'db`
-/// lifetime parameter.
-///
-/// As a result, it is possible to create a [`ImmutVal::Get`] that is valid longer
-/// than the object itself correctly (e.g. copies, ref counting), or incorrectly
-/// (using [`ValRef`] and returning a reference that outlasts the object).
-///
-/// We can see this in the following example
-/// ```compile_fail,E0505
-/// # use pulpit::value::{ImmutVal, StableImmutVal, ValRef};
-/// struct UnitNoCopy;
-/// type TestType = (i32, i32);
-/// fn set_lifetime<'db, V: ImmutVal<'db, TestType> + StableImmutVal<'db, TestType>>(x: &'db UnitNoCopy, n: TestType) -> V::Get {
-///     let mut z: (i32, V) = (3, V::from_store(n));
-///     let x = &mut z.0;
-///     let x_get_fail = z.1.get();
-///     *x += 2;
-///     let y = &mut z;
-///     x_get_fail
-/// }
-///
-/// fn lifetime_check() {
-///     let out: &i32;
-///     let dummy = UnitNoCopy; // fails on the drop
-///     {
-///         // we use dummy to set lifetime of the borrow.
-///         // this is fundamentally unsafe (hence the unsafe trait), I should constrain to the tuple itself.
-///         // without the dummy type to 'transfer' its lifetime over to the contained immutable value references, this fails.
-///         
-///         // let dummy = UnitNoCopy; // fails on the `out;` after the block
-///         let (x, y) = set_lifetime::<ValRef<(i32, i32)>>(&dummy, (1,2));
-///         out = x;
-///     }
-///     out; // causes compile failure
-///     drop(dummy);
-///     let y = out.clone();
-/// }
 /// ```
 pub trait ImmutVal<'db, Store> {
     /// The value to provide for get - share (valid for lifetime of database), but not a borrow.
