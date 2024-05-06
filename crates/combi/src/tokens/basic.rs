@@ -748,7 +748,7 @@ impl Combi for terminal {
     ) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         if let Some(tt) = input.next() {
             // NOTE: `a.join` returns None on Stable, and always Some on nightly.
-            let big_span = if cfg!(nightly) {
+            let big_span = if cfg!(feature = "nightly") {
                 // INV: On nightly the result of the join is always Some(..)
                 #[allow(clippy::unwrap_used)]
                 input
