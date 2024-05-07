@@ -33,6 +33,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1fdabc7756949593fe60f30ec81974b613357de856987752631dea1e3394c80"
 
 [[package]]
+name = "bimap"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "230c5f1ca6a325a32553f8640d31ac9b49f2411e901e427570154868b46da4f7"
+
+[[package]]
 name = "bitflags"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -396,6 +402,32 @@ dependencies = [
  "divan",
  "glob",
  "proc-macro-error",
+ "proc-macro2 1.0.81",
+ "quote 1.0.36",
+ "syn 2.0.60",
+ "trybuild",
+]
+
+[[package]]
+name = "pulpit_gen"
+version = "0.1.0"
+dependencies = [
+ "bimap",
+ "divan",
+ "enumtrait",
+ "glob",
+ "proc-macro2 1.0.81",
+ "quote 1.0.36",
+ "syn 2.0.60",
+ "trybuild",
+]
+
+[[package]]
+name = "pulpit_macro"
+version = "0.1.0"
+dependencies = [
+ "divan",
+ "glob",
  "proc-macro2 1.0.81",
  "quote 1.0.36",
  "syn 2.0.60",

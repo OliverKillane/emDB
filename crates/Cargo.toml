@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["combi", "emdb", "enumtrait", "pulpit"]
+members = ["combi", "emdb", "enumtrait", "pulpit", "pulpit_gen", "pulpit_macro"]
 
 [workspace.package]
 homepage = "https://github.com/OliverKillane/emDB"
