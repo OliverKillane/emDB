@@ -68,10 +68,8 @@ impl TableWindow<'imm> {
     fn update_y(&mut self, field3: i32, field2: String) { todo!() }
 
     fn get(&self, index: TableIndex) -> (i32, String, &'imm String, i32) { todo!() }
-    
+
     fn insert() -> ...
 
 }
 */
-
-

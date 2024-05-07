@@ -1,3 +1,3 @@
-
-mod scan; pub use scan::*;
-mod unique; pub use unique::*;
+mod scan;
+pub use scan::*;
+mod unique;

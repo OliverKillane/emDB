@@ -127,7 +127,6 @@ mod colbuff;
 mod colmap;
 mod colvec;
 
-
 pub type ColInd = usize;
 
 /// An indexable (with [`ColInd`]) data structure, that is windowable using [`Column::Window`].

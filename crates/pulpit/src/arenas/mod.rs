@@ -2,7 +2,7 @@
 
 /*
 
-- Push only buffer. 
+- Push only buffer.
 - generational arena.
 - insert only, immutable mapping.
 

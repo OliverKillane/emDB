@@ -9,36 +9,37 @@ The library is split into separate modules for:
 
 ## Usage
 ```rust
-use pulpit::arena;
-
-arena!{
-    struct 
-
-
+pulpit::table! {
+    my_table {
+        fields {
+            [
+                name: String
+            ],[
+                other: i32,
+                other2: usize
+            ],
+        },
+        actions {
+            insert() as insert,
+            update(name) as update_name,
+            delete() as delete,
+            update(name, other) as update_all,
+            get(name) as get_name 
+        },
+        hooks {
+            predicate(other > 3) as other_size_cons,
+            limit(70),
+            unique(name) as by_name
+        }
+    }
 }
 
+fn test() {
+    let mut t = my_table::Table::new();
+    let mut w = t.window();
 
-#[arena(
-    // checks to enforce, failing operations if encountered
-    check [
-        pred(my_predicate) as constraint
-        unique(name) as uniqueness,
-        limit(2300) as capacity_check,
-    ],
-    // accesses through an index to generate
-    access [
-        insert() as insert_all_fn,
-        update(name) as update_fn,
-        delete() as do_thing
-    ],
-    // ways to get references to rows
-    index [
-        scan() as get_idx,
-        unique(name) as ,
-    ]
-)]
-struct myarena {
-    name: String,
-    cool: i32
+
+    let ind = w.insert("Cool".to_owned(), 4, 7).unwrap();
+    w.get_name(ind).unwrap()
 }
 ```

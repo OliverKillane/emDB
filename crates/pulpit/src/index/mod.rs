@@ -1,8 +1,9 @@
 //! Indexes for gathering values from a group of columns.
 
-use crate::column::{ColInd};
+use crate::column::ColInd;
 
-mod idxgen; pub use idxgen::*;
+mod idxgen;
+pub use idxgen::*;
 
 struct IncorrectIndexError;
 

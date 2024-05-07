@@ -8,7 +8,7 @@ pub enum Kind {
     DebugAccess,
 }
 
-struct AccessReq {
+pub struct AccessReq {
     prelude: TokenStream,
     access_methods: TokenStream,
 }
@@ -23,7 +23,7 @@ pub trait AccessGen {
 #[enumtrait::impl_trait(access_gen_trait for kind_enum)]
 impl AccessGen for Kind {}
 
-struct DebugAccess;
+pub struct DebugAccess;
 
 impl AccessGen for DebugAccess {
     fn state(&self) -> TokenStream {

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(unused_imports)]
 use bimap::BiHashMap;
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;

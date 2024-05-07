@@ -1,6 +1,5 @@
 //! # Vector based Column
 //!
-use syn::token::Mut;
 
 use super::{Column, ColumnWindow};
 
