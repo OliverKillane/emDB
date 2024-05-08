@@ -12,11 +12,17 @@ The library is split into separate modules for:
 pulpit::table! {
     my_table {
         fields {
-            [
-                name: String
-            ],[
-                other: i32,
-                other2: usize
+            colmap() [
+                { name: String }
+            ],
+            colvec() => [
+                mut { 
+                    other: i32,
+                    other2: usize
+                },
+                {
+                    other3: usize
+                }
             ],
         },
         actions {

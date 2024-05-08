@@ -418,6 +418,7 @@ dependencies = [
  "glob",
  "proc-macro2 1.0.81",
  "quote 1.0.36",
+ "quote_debug",
  "syn 2.0.60",
  "trybuild",
 ]
@@ -450,6 +451,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fa76aaf39101c457836aec0ce2316dbdc3ab723cdda1c6bd4e6ad4208acaca7"
 dependencies = [
  "proc-macro2 1.0.81",
+]
+
+[[package]]
+name = "quote_debug"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2 1.0.81",
+ "quote 1.0.36",
+ "syn 2.0.60",
 ]
 
 [[package]]
