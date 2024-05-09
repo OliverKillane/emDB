@@ -1,5 +1,4 @@
 //! # Vector based Column
-//!
 
 use super::{Column, ColumnWindow};
 
@@ -36,7 +35,7 @@ where
     ImmData: Clone,
     MutData: Clone,
 {
-    type GetVal<'brw> = ImmData;
+    type GetVal = ImmData;
     type Col = ColVec<ImmData, MutData>;
 
     fn new_view(col: &'imm mut Self::Col) -> Self {
@@ -45,7 +44,7 @@ where
         }
     }
 
-    unsafe fn get<'brw>(&'brw self, ind: super::ColInd) -> (Self::GetVal<'imm>, MutData) {
+    unsafe fn get(&self, ind: super::ColInd) -> (Self::GetVal, MutData) {
         let (imm, muta) = &self.data[ind];
         (imm.clone(), muta.clone())
     }

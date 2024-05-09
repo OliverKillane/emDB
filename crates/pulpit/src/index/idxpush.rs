@@ -1,29 +1,36 @@
 //! # An append-only index
 //! Does not support deletions
-use super::{Index, IndexPull};
+use super::Index;
 
 pub struct IndexPush {
-    size: usize
+    size: usize,
 }
 
 impl Index for IndexPush {
-    type ExternalIndex = usize;
-    type InitData = usize;
+    type Key = usize;
+    type InitData = ();
 
     fn new(init: Self::InitData) -> Self {
-        IndexPush { size: init }
+        IndexPush { size: 0 }
     }
-    
-    fn to_index(&self, index: Self::ExternalIndex) -> Result<crate::column::ColInd, super::IncorrectIndexError> {
+
+    fn to_index(
+        &self,
+        index: Self::Key,
+    ) -> Result<crate::column::ColInd, super::IncorrectKeyError> {
         if index < self.size {
             Ok(index)
         } else {
-            Err(super::IncorrectIndexError)
+            Err(super::IncorrectKeyError)
         }
     }
-    
-    fn new_index(&mut self) -> Result<Self::ExternalIndex, crate::column::AllocationFailure> {
+
+    fn count(&self) -> usize {
+        self.size
+    }
+
+    fn new_index(&mut self) -> Self::Key {
         self.size += 1;
-        Ok(self.size - 1)
+        self.size - 1
     }
 }

@@ -123,9 +123,11 @@
 //!
 
 mod colblok;
-mod colbuff;
-mod colmap;
+pub use colblok::*;
+mod colret;
+pub use colret::*;
 mod colvec;
+pub use colvec::*;
 
 pub type ColInd = usize;
 
@@ -149,7 +151,7 @@ pub trait ColumnWindow<'imm, ImmStore, MutStore> {
     /// Getting the immutable value for the lifetime of the [`ColumnWindow`]
     /// - Does not conflict with concurrent [`ColumnWindow::brw`], [`ColumnWindow::brw_mut`]
     ///   or any [`ColumnWindowPull`] operations.
-    type GetVal<'brw>;
+    type GetVal;
 
     /// The type of the data structure that owns the data accessed through the [`ColumnWindow`]
     /// - A [`ColumnWindow`] contains a mutable reference to this owner.
@@ -169,7 +171,7 @@ pub trait ColumnWindow<'imm, ImmStore, MutStore> {
     /// # Safety
     /// - No bounds checks applied
     /// - index assumed to be in valid state
-    unsafe fn get<'brw>(&'brw self, ind: ColInd) -> (Self::GetVal<'imm>, MutStore);
+    unsafe fn get(&self, ind: ColInd) -> (Self::GetVal, MutStore);
 
     /// Borrow a value from an index in the column for a smaller lifetime
     /// - Zero cost, a normal reference.
@@ -213,4 +215,82 @@ pub trait ColumnWindowPull<'imm, ImmStore, MutStore>:
     /// # Safety
     /// - No bounds checks
     unsafe fn place(&mut self, ind: ColInd, x: (ImmStore, MutStore));
+}
+
+mod utils {
+    use std::mem::MaybeUninit;
+
+    pub unsafe fn push_new_block<Data, const BLOCK_SIZE: usize>(
+        filled: &mut usize,
+        new_entry: Data,
+        data: &mut Vec<Box<[MaybeUninit<Data>; BLOCK_SIZE]>>,
+    ) -> *mut Data {
+        let (block, seq) = quotrem::<BLOCK_SIZE>(*filled);
+        let data_ptr;
+        unsafe {
+            if seq == 0 {
+                data.push(Box::new(MaybeUninit::uninit().assume_init()));
+            }
+            data_ptr = data.get_unchecked_mut(block)[seq].as_mut_ptr();
+            data_ptr.write(new_entry);
+        }
+        *filled += 1;
+        data_ptr
+    }
+
+    pub fn quotrem<const DIV: usize>(val: usize) -> (usize, usize) {
+        (val / DIV, val % DIV)
+    }
+}
+
+mod verif {
+    use super::*;
+    use crate::index::{Index, IndexPush};
+
+    struct ReferenceColumn<ColView> {
+        idx: IndexPush,
+        win: ColView,
+    }
+
+    impl<'imm, ColView: ColumnWindow<'imm, usize, usize>> ReferenceColumn<ColView> {
+        fn check_access_bounds(&mut self, key: usize) {
+            if let Ok(idx) = self.idx.to_index(key) {
+                unsafe {
+                    self.win.brw(idx);
+                    self.win.brw_mut(idx);
+                    self.win.get(idx);
+                }
+            }
+        }
+
+        fn put_new(&mut self) {
+            let idx = self.idx.new_index();
+            self.win.put_new((usize::MAX, usize::MAX));
+        }
+    }
+
+    #[cfg(kani)]
+    mod kani_verif {
+        use super::*;
+
+        fn kani_col<Col: Column<usize, usize>>(init: Col::InitData) {
+            let mut col: Col = Col::new(init);
+            let mut win = Col::Window::new_view(&mut col);
+            let mut refcol = ReferenceColumn {
+                idx: IndexPush::new(()),
+                win,
+            };
+            for _ in 0..20 {
+                refcol.put_new();
+                refcol.check_access_bounds(kani::any());
+            }
+        }
+
+        #[kani::proof]
+        #[kani::unwind(32)]
+        fn check_vec_col() {
+            kani_col::<ColBlok<usize, usize, 1>>(0);
+            kani_col::<ColVec<usize, usize>>(0);
+        }
+    }
 }
