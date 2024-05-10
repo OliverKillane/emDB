@@ -27,3 +27,7 @@ glob = "0.3.1"
 [[bench]]
 name = "rc_vs_brw"
 harness = false
+
+[[bench]]
+name = "col_vs_tup"
+harness = false

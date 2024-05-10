@@ -15,7 +15,7 @@ pulpit::table! {
             colmap() [
                 { name: String }
             ],
-            colvec() => [
+            ref colvec() => [
                 mut { 
                     other: i32,
                     other2: usize
@@ -36,6 +36,24 @@ pulpit::table! {
             predicate(other > 3) as other_size_cons,
             limit(70),
             unique(name) as by_name
+        }
+    }
+}
+
+pulpit::auto_table! {
+    my_auto_table {
+        fields {
+            mut {
+                thing: String,
+                lol: i32
+            },
+            {
+                blagh: [u8;100]
+                surname: String,
+            }
+        },
+        actions {
+            update() as something: x
         }
     }
 }

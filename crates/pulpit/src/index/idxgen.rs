@@ -3,7 +3,13 @@
 
 use super::{Index, IndexPull};
 
-pub struct IdxGen {}
+// TODO: Complete
+
+pub struct IdxGen {
+    next_free: Option<usize>,
+    count: usize,
+    items: Vec<usize>,
+}
 
 impl Index for IdxGen {
     type Key = (usize, usize);

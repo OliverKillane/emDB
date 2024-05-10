@@ -1,5 +1,3 @@
-//! # Block Based Column providing pointer stability
-
 use std::mem::{transmute, MaybeUninit};
 
 use super::{
