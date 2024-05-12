@@ -35,29 +35,6 @@ impl GenEntry {
     }
 }
 
-pub struct WrapKey<Store> {
-    index: usize,
-    generation: usize,
-    phantom: PhantomData<Store>,
-}
-
-impl<Store> PartialEq for WrapKey<Store> {
-    fn eq(&self, other: &Self) -> bool {
-        self.index == other.index && self.generation == other.generation
-    }
-}
-impl<Store> Eq for WrapKey<Store> {}
-impl<Store> Clone for WrapKey<Store> {
-    fn clone(&self) -> Self {
-        Self {
-            index: self.index.clone(),
-            generation: self.generation.clone(),
-            phantom: PhantomData,
-        }
-    }
-}
-impl<Store> Copy for WrapKey<Store> {}
-
 struct GenInfo {
     next_free: Option<usize>,
     gen_counter: usize,
@@ -65,14 +42,14 @@ struct GenInfo {
 }
 
 impl GenInfo {
-    fn lookup_key<Store>(&self, key: WrapKey<Store>) -> Result<ColInd, KeyError> {
+    fn lookup_key<Store>(&self, key: GenKey<Store, usize>) -> Result<ColInd, KeyError> {
         match self.generations.get(key.index).map(GenEntry::decode) {
             Some(GenEntry::Generation(g)) if key.generation == g => Ok(key.index),
             _ => Err(KeyError),
         }
     }
 
-    fn pull_key<Store>(&mut self, key: WrapKey<Store>) -> Result<ColInd, KeyError> {
+    fn pull_key<Store>(&mut self, key: GenKey<Store, usize>) -> Result<ColInd, KeyError> {
         if let Some(entry) = self.generations.get_mut(key.index) {
             match GenEntry::decode(&*entry) {
                 GenEntry::Generation(g) if g == key.generation => {
@@ -88,7 +65,7 @@ impl GenInfo {
         }
     }
 
-    fn insert<Store>(&mut self) -> (WrapKey<Store>, InsertAction) {
+    fn insert<Store>(&mut self) -> (GenKey<Store, usize>, InsertAction) {
         if let Some(k) = self.next_free {
             // TODO: could use unchecked here
             let entry = self.generations.get_mut(k).unwrap();
@@ -97,7 +74,7 @@ impl GenInfo {
                     self.next_free = opt;
                     *entry = GenEntry::Generation(self.gen_counter).encode();
                     (
-                        WrapKey {
+                        GenKey {
                             index: k,
                             generation: self.gen_counter,
                             phantom: PhantomData,
@@ -112,7 +89,7 @@ impl GenInfo {
             self.generations
                 .push(GenEntry::Generation(self.gen_counter).encode());
             (
-                WrapKey {
+                GenKey {
                     index,
                     generation: self.gen_counter,
                     phantom: PhantomData,
@@ -162,7 +139,7 @@ where
     Col::WindowKind<'imm>: AssocWindow<'imm, ImmData, MutData>,
 {
     type ImmGet = <Col::WindowKind<'imm> as AssocWindow<'imm, ImmData, MutData>>::ImmGet;
-    type Key = WrapKey<PullWrap<Col>>;
+    type Key = GenKey<PullWrap<Col>, usize>;
 
     fn get(&self, key: Self::Key) -> Access<Self::ImmGet, MutData> {
         let index = self.gen.lookup_key(key)?;
