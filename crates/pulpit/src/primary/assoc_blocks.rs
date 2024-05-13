@@ -1,10 +1,12 @@
 use super::*;
 
+/// An associated, append only [`Column`] that stores mutable and immutable data together in
+/// blocks, and provides stable references to the immutable part.
 pub struct ColBlok<ImmData, MutData, const BLOCK_SIZE: usize> {
     blocks: utils::Blocks<Data<ImmData, MutData>, BLOCK_SIZE>,
 }
 
-impl<ImmData, MutData, const BLOCK_SIZE: usize> Store for ColBlok<ImmData, MutData, BLOCK_SIZE> {
+impl<ImmData, MutData, const BLOCK_SIZE: usize> Column for ColBlok<ImmData, MutData, BLOCK_SIZE> {
     type WindowKind<'imm> = Window<'imm, ColBlok<ImmData, MutData, BLOCK_SIZE>>
     where
         Self: 'imm;
@@ -27,7 +29,7 @@ where
 {
     type ImmGet = &'imm ImmData;
 
-    unsafe fn get(&self, ind: ColInd) -> Data<Self::ImmGet, MutData> {
+    unsafe fn get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, MutData> {
         unsafe {
             let Data { imm_data, mut_data } = self.brw(ind);
             Data {
@@ -37,14 +39,14 @@ where
         }
     }
 
-    unsafe fn brw(&self, ind: ColInd) -> Data<&ImmData, &MutData> {
+    unsafe fn brw(&self, ind: UnsafeIndex) -> Data<&ImmData, &MutData> {
         unsafe {
             let Data { imm_data, mut_data } = self.inner.blocks.get(ind);
             Data { imm_data, mut_data }
         }
     }
 
-    unsafe fn brw_mut(&mut self, ind: ColInd) -> Data<&ImmData, &mut MutData> {
+    unsafe fn brw_mut(&mut self, ind: UnsafeIndex) -> Data<&ImmData, &mut MutData> {
         unsafe {
             let Data { imm_data, mut_data } = self.inner.blocks.get_mut(ind);
             Data { imm_data, mut_data }

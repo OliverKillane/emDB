@@ -18,6 +18,8 @@ proc-macro-error = "1.0.4"
 syn = { version = "2.0.45", features = ["full", "extra-traits"] }
 quote = "1.0.33"
 combi = { path = "../combi" }
+typed-generational-arena = "0.2"
+thunderdome = "0.6.1"
 
 [dev-dependencies]
 divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }

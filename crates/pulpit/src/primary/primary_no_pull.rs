@@ -7,7 +7,7 @@ pub struct SimpleKey<Col> {
     max_key: usize,
 }
 
-impl<Col: Store> Store for SimpleKey<Col> {
+impl<Col: Column> Column for SimpleKey<Col> {
     type WindowKind<'imm> = SimpleKeyWindow<'imm, Col> where Self: 'imm;
 
     fn window<'imm>(&'imm mut self) -> Self::WindowKind<'imm> {
@@ -25,7 +25,7 @@ impl<Col: Store> Store for SimpleKey<Col> {
     }
 }
 
-pub struct SimpleKeyWindow<'imm, Col: Store + 'imm> {
+pub struct SimpleKeyWindow<'imm, Col: Column + 'imm> {
     col: Col::WindowKind<'imm>,
     max_key: &'imm mut usize,
 }
@@ -33,7 +33,7 @@ pub struct SimpleKeyWindow<'imm, Col: Store + 'imm> {
 impl<'imm, ImmData, MutData, Col> PrimaryWindow<'imm, ImmData, MutData>
     for SimpleKeyWindow<'imm, Col>
 where
-    Col: Store,
+    Col: Column,
     Col::WindowKind<'imm>: AssocWindow<'imm, ImmData, MutData>,
 {
     type ImmGet = <Col::WindowKind<'imm> as AssocWindow<'imm, ImmData, MutData>>::ImmGet;
@@ -76,7 +76,7 @@ where
 impl<'imm, ImmData, MutData, Col> PrimaryWindowApp<'imm, ImmData, MutData>
     for SimpleKeyWindow<'imm, Col>
 where
-    Col: Store,
+    Col: Column,
     Col::WindowKind<'imm>: AssocWindow<'imm, ImmData, MutData>,
 {
     fn append(&mut self, val: Data<ImmData, MutData>) -> Self::Key {

@@ -1,1 +1,0 @@
-//! Arena with copy instead of ref.

@@ -42,14 +42,14 @@ struct GenInfo {
 }
 
 impl GenInfo {
-    fn lookup_key<Store>(&self, key: GenKey<Store, usize>) -> Result<ColInd, KeyError> {
+    fn lookup_key<Store>(&self, key: GenKey<Store, usize>) -> Result<UnsafeIndex, KeyError> {
         match self.generations.get(key.index).map(GenEntry::decode) {
             Some(GenEntry::Generation(g)) if key.generation == g => Ok(key.index),
             _ => Err(KeyError),
         }
     }
 
-    fn pull_key<Store>(&mut self, key: GenKey<Store, usize>) -> Result<ColInd, KeyError> {
+    fn pull_key<Store>(&mut self, key: GenKey<Store, usize>) -> Result<UnsafeIndex, KeyError> {
         if let Some(entry) = self.generations.get_mut(key.index) {
             match GenEntry::decode(&*entry) {
                 GenEntry::Generation(g) if g == key.generation => {
@@ -100,12 +100,13 @@ impl GenInfo {
     }
 }
 
+/// An adapter to convert an [`AssocWindowPull`] into a [`PrimaryWindowPull`] with generational indices.
 pub struct PullWrap<Col> {
     col: Col,
     gen: GenInfo,
 }
 
-impl<Col: Store> Store for PullWrap<Col> {
+impl<Col: Column> Column for PullWrap<Col> {
     type WindowKind<'imm> =  PullWrapWindow<'imm, Col> where Self: 'imm;
 
     fn new(size_hint: usize) -> Self {
@@ -127,7 +128,7 @@ impl<Col: Store> Store for PullWrap<Col> {
     }
 }
 
-pub struct PullWrapWindow<'imm, Col: Store + 'imm> {
+pub struct PullWrapWindow<'imm, Col: Column + 'imm> {
     col: Col::WindowKind<'imm>,
     gen: &'imm mut GenInfo,
 }
@@ -135,7 +136,7 @@ pub struct PullWrapWindow<'imm, Col: Store + 'imm> {
 impl<'imm, ImmData, MutData, Col> PrimaryWindow<'imm, ImmData, MutData>
     for PullWrapWindow<'imm, Col>
 where
-    Col: Store,
+    Col: Column,
     Col::WindowKind<'imm>: AssocWindow<'imm, ImmData, MutData>,
 {
     type ImmGet = <Col::WindowKind<'imm> as AssocWindow<'imm, ImmData, MutData>>::ImmGet;
@@ -169,7 +170,7 @@ where
 impl<'imm, ImmData, MutData, Col> PrimaryWindowPull<'imm, ImmData, MutData>
     for PullWrapWindow<'imm, Col>
 where
-    Col: Store,
+    Col: Column,
     Col::WindowKind<'imm>: AssocWindowPull<'imm, ImmData, MutData>,
 {
     type ImmPull = <Col::WindowKind<'imm> as AssocWindowPull<'imm, ImmData, MutData>>::ImmPull;

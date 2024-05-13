@@ -67,3 +67,13 @@ fn test() {
     w.get_name(ind).unwrap()
 }
 ```
+
+TODO:
+1. Clean up primary, add docs
+2. Setup the associated unique index (efficiently) for imm and mut keys
+3. Create verification checks and benchmark against generational arena
+4. Change the gen to support this change in structure
+5. Generate basic structures
+6. Transaction generation
+7. Macro interface
+8. Stream operator library
