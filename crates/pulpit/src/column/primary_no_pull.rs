@@ -1,7 +1,7 @@
 use super::*;
 
-/// Converts an [`AssocWindow`] (unchecked, without an index [`Store`]) into a
-/// safely indexed [`Store`] that can be windowed into a  [`PrimaryWindow`].
+/// Converts an [`AssocWindow`] (unchecked, without an index [`Column`]) into a
+/// safely indexed [`Column`] that can be windowed into a  [`PrimaryWindow`].
 pub struct SimpleKey<Col> {
     col: Col,
     max_key: usize,
@@ -10,7 +10,7 @@ pub struct SimpleKey<Col> {
 impl<Col: Column> Column for SimpleKey<Col> {
     type WindowKind<'imm> = SimpleKeyWindow<'imm, Col> where Self: 'imm;
 
-    fn window<'imm>(&'imm mut self) -> Self::WindowKind<'imm> {
+    fn window(&mut self) -> Self::WindowKind<'_> {
         SimpleKeyWindow {
             col: self.col.window(),
             max_key: &mut self.max_key,

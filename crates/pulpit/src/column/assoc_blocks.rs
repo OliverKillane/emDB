@@ -17,7 +17,7 @@ impl<ImmData, MutData, const BLOCK_SIZE: usize> Column for ColBlok<ImmData, MutD
         }
     }
 
-    fn window<'imm>(&'imm mut self) -> Self::WindowKind<'imm> {
+    fn window(&mut self) -> Self::WindowKind<'_> {
         Window { inner: self }
     }
 }

@@ -1,5 +1,7 @@
-//! # Table Columns
-//! Traits and implementations for the basic column structures accessed through.
+//! # Primary and Associated Index Columns
+//! Each pulpit table is composed of a primary column (accessed through user-visible
+//! [keys](PrimaryWindow::Key)) and associated columns (accessed without bounds
+//! checks through raw column indexes).
 //!
 //! ## Immutability Advantage
 //! This column interface explicitly supports demarking parts of each row as
@@ -10,7 +12,7 @@
 //! - Immutable data gotten with copy or cheaper (from borrow, to reindex, to copy)
 //! - Mutable data gotten must be copied (table can be mutated after)
 //!
-//! For tables supporting [`ColumnWindowPull`]
+//! For tables supporting [`PrimaryWindowPull`] or [`AssocWindowPull`], the immutable data is retained
 //! - All data can be pulled (mutable by move, immutable by move or cheaper - e.g. cloning [`Rc`](std::rc::Rc))
 //!
 //! This advantage is significant when compared to conventional tables in embedded
@@ -100,11 +102,12 @@
 //! runtime checks as with interior mutability), while preventing any dangling
 //! references (immutable borrows properly qualified).
 //!
-//! This implementation is chosen in the form of [`ColumnWindow`], which is a window into its [`ColumnWindow::Col`].
+//! This implementation is chosen in the form of [`Column::WindowKind`], which is a 
+//! single mutable borrow of the column.
 //!
 //! ## Immutable Value Storage
 //! ### Pullability
-//! The delete operation on tables is expressed through [`ColumnWindowPull`], here pulling the value
+//! The delete operation on tables is expressed through [`PrimaryWindowPull`]/[`AssocWindowPull`], here pulling the value
 //! (ideally a move) from the table for the user.
 //!
 //! This affects references to values, if a value is pulled from a column,
@@ -121,57 +124,111 @@
 //! To prevent this requires placing the data in some separate stable allocation
 //! that can be referenced, or copying.
 //!
+//! ## Why not separate indexes?
+//! I originally considered having the index entirely separate to the data
+//! storage, however as demonstrated in the `col_vs_tup` benchmark, the cost of
+//! separate inserts (required for an index that need to keep generations) is high.
+//! - Allows for other optimisations, such as in [`RetainArena`]'s reuse of space for
+//!   data, and for the mutable data for generation & free slot storage.
 
-mod colblok;
-pub use colblok::*;
-mod colret;
-pub use colret::*;
-mod colvec;
-pub use colvec::*;
+use std::{marker::PhantomData, mem::transmute};
 
-pub type ColInd = usize;
+mod assoc_blocks;
+pub use assoc_blocks::*;
+mod assoc_vec;
+pub use assoc_vec::*;
+mod primary_gen_arena;
+pub use primary_gen_arena::*;
+mod primary_no_pull;
+pub use primary_no_pull::*;
+mod primary_pull;
+pub use primary_pull::*;
+mod primary_retain;
+pub use primary_retain::*;
+mod primary_thunderdome;
+pub use primary_thunderdome::*;
 
-/// An indexable (with [`ColInd`]) data structure, that is windowable using [`Column::Window`].
-pub trait Column<ImmStore, MutStore> {
-    type Window<'imm>: ColumnWindow<'imm, ImmStore, MutStore, Col = Self>
-    where
-        ImmStore: 'imm,
-        MutStore: 'imm;
-    type InitData;
-
-    fn new(init: Self::InitData) -> Self;
+/// A single window type holding a mutable references through which windows for
+/// columns and primary indexes can be generated.
+pub struct Window<'imm, Data> {
+    inner: &'imm mut Data,
 }
 
-/// A view into an indexable data structure representing a column.
-/// - Is indexed by [`ColInd`], with no bounds checks.
-/// - Can store mutable and immutable data together safely.
-/// - Provides a window to access data, immutable values can be borrowed for the
-///   lifetime of the reference contained in the window.
-pub trait ColumnWindow<'imm, ImmStore, MutStore> {
-    /// Getting the immutable value for the lifetime of the [`ColumnWindow`]
-    /// - Does not conflict with concurrent [`ColumnWindow::brw`], [`ColumnWindow::brw_mut`]
-    ///   or any [`ColumnWindowPull`] operations.
-    type GetVal;
-
-    /// The type of the data structure that owns the data accessed through the [`ColumnWindow`]
-    /// - A [`ColumnWindow`] contains a mutable reference to this owner.
-    type Col: Column<ImmStore, MutStore, Window<'imm> = Self>
+/// The trait for describing column construction and windowing.
+pub trait Column {
+    type WindowKind<'imm>
     where
-        ImmStore: 'imm,
-        MutStore: 'imm;
+        Self: 'imm;
+    fn new(size_hint: usize) -> Self;
+    fn window(&mut self) -> Self::WindowKind<'_>;
+}
 
-    /// Create a new view, usable for `'imm` from a column.
-    fn new_view(col: &'imm mut Self::Col) -> Self;
+/// The raw column index type (used for unchecked indexes)
+pub type UnsafeIndex = usize;
 
-    /// Get a value from an index in the column, which should be accessible as a valid [`ColumnWindow::GetVal`]
-    /// for `'imm`.
+pub struct Data<ImmData, MutData> {
+    pub imm_data: ImmData,
+    pub mut_data: MutData,
+}
+
+pub struct Entry<ImmData, MutData> {
+    pub index: UnsafeIndex,
+    pub data: Data<ImmData, MutData>,
+}
+
+pub type Access<Imm, Mut> = Result<Entry<Imm, Mut>, KeyError>;
+
+pub enum InsertAction {
+    Place(UnsafeIndex),
+    Append,
+}
+
+/// For safe access to a [`PrimaryWindow`] with an incorrect index.
+pub struct KeyError;
+
+/// A view into a primary index (bounds checked, and produced [`UnsafeIndex`]es
+/// for access to associated columns).
+pub trait PrimaryWindow<'imm, ImmData, MutData> {
+    /// Getting the immutable value for the lifetime of the [`PrimaryWindow`]
+    /// - Does not conflict with concurrent [`PrimaryWindow::brw`], [`PrimaryWindow::brw_mut`]
+    ///   or any [`PrimaryWindowPull`] operations.
+    type ImmGet: 'imm;
+
+    /// The key type for the primary index.
+    type Key: Copy + Eq;
+
+    fn get(&self, key: Self::Key) -> Access<Self::ImmGet, MutData>;
+    fn brw(&self, key: Self::Key) -> Access<&ImmData, &MutData>;
+    fn brw_mut(&mut self, key: Self::Key) -> Access<&ImmData, &mut MutData>;
+}
+
+pub trait PrimaryWindowApp<'imm, ImmData, MutData>: PrimaryWindow<'imm, ImmData, MutData> {
+    fn append(&mut self, val: Data<ImmData, MutData>) -> Self::Key;
+}
+
+pub trait PrimaryWindowPull<'imm, ImmData, MutData>: PrimaryWindow<'imm, ImmData, MutData> {
+    /// The immutable data that can be pulled from the table. This is separate from
+    /// [`PrimaryWindow::ImmGet`]. Allows for deletions that take ownership of contained
+    /// data.
+    type ImmPull: 'imm;
+
+    /// n insert must track if old [`UnsafeIndex`] is to be overwritten in
+    /// [`AssocWindowPull`] or an append is required.
+    fn insert(&mut self, val: Data<ImmData, MutData>) -> (Self::Key, InsertAction);
+    fn pull(&mut self, key: Self::Key) -> Access<Self::ImmPull, MutData>;
+}
+
+pub trait AssocWindow<'imm, ImmData, MutData> {
+    type ImmGet: 'imm;
+
+    /// Get the value of the given [`UnsafeIndex`], that lives as long as the window
     /// - Not zero cost, but at least as cheap as [`Clone`]
-    /// - Resulting [`ColumnWindow::GetVal`] can be held without blocking concurrent operations.
+    /// - Resulting [`AssocWindow::ImmGet`] can be held without blocking concurrent operations.
     ///
     /// # Safety
     /// - No bounds checks applied
     /// - index assumed to be in valid state
-    unsafe fn get(&self, ind: ColInd) -> (Self::GetVal, MutStore);
+    unsafe fn get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, MutData>;
 
     /// Borrow a value from an index in the column for a smaller lifetime
     /// - Zero cost, a normal reference.
@@ -179,118 +236,111 @@ pub trait ColumnWindow<'imm, ImmStore, MutStore> {
     /// # Safety
     /// - No bounds checks applied
     /// - index assumed to be in valid state
-    unsafe fn brw(&self, ind: ColInd) -> (&ImmStore, &MutStore);
+    unsafe fn brw(&self, ind: UnsafeIndex) -> Data<&ImmData, &MutData>;
 
     /// Mutably borrow the mutable part of an index in the column.
     ///
     /// # Safety
     /// - No bounds checks applied
     /// - index assumed to be in valid state
-    unsafe fn brw_mut(&mut self, ind: ColInd) -> &mut MutStore;
+    unsafe fn brw_mut(&mut self, ind: UnsafeIndex) -> Data<&ImmData, &mut MutData>;
 
-    /// Add a new value to the column at the next index.
-    fn put_new(&mut self, x: (ImmStore, MutStore));
+    /// Append a value to the column that is at the new largest [`UnsafeIndex`].
+    fn append(&mut self, val: Data<ImmData, MutData>);
 }
 
-/// A view into a column that supports values being pulled/deleted from the column.
-///
-/// ## New States
-/// An index can now be: `FULL` (has a value) or `PULLED` (index was removed)
-pub trait ColumnWindowPull<'imm, ImmStore, MutStore>:
-    ColumnWindow<'imm, ImmStore, MutStore>
-{
-    /// A value that can be pulled from the column, containing the original `ImmStore`
-    /// data, potentially represented differently.
-    type PullVal;
+pub trait AssocWindowPull<'imm, ImmData, MutData>: AssocWindow<'imm, ImmData, MutData> {
+    type ImmPull: 'imm;
 
     /// Pull a value from an index. The index is in an `INVALID` state after
     /// this operation.
     ///
     /// # Safety
     /// - No bounds checks
-    unsafe fn pull(&mut self, ind: ColInd) -> (Self::PullVal, MutStore);
+    unsafe fn pull(&mut self, ind: UnsafeIndex) -> Data<Self::ImmPull, MutData>;
 
     /// Place a value in an index that is in a `PULLED` state.
     ///
     /// # Safety
     /// - No bounds checks
-    unsafe fn place(&mut self, ind: ColInd, x: (ImmStore, MutStore));
+    unsafe fn place(&mut self, ind: UnsafeIndex, val: Data<ImmData, MutData>);
 }
+
+/// A Simple Generational Index Key
+pub struct GenKey<Store, GenCounter: Copy + Eq> {
+    index: UnsafeIndex,
+    generation: GenCounter,
+    phantom: PhantomData<Store>,
+}
+
+impl<Store, GenCounter: Copy + Eq> PartialEq for GenKey<Store, GenCounter> {
+    fn eq(&self, other: &Self) -> bool {
+        self.index == other.index && self.generation == other.generation
+    }
+}
+impl<Store, GenCounter: Copy + Eq> Eq for GenKey<Store, GenCounter> {}
+impl<Store, GenCounter: Copy + Eq> Clone for GenKey<Store, GenCounter> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<Store, GenCounter: Copy + Eq> Copy for GenKey<Store, GenCounter> {}
 
 mod utils {
     use std::mem::MaybeUninit;
 
-    pub unsafe fn push_new_block<Data, const BLOCK_SIZE: usize>(
-        filled: &mut usize,
-        new_entry: Data,
-        data: &mut Vec<Box<[MaybeUninit<Data>; BLOCK_SIZE]>>,
-    ) -> *mut Data {
-        let (block, seq) = quotrem::<BLOCK_SIZE>(*filled);
-        let data_ptr;
-        unsafe {
-            if seq == 0 {
-                data.push(Box::new(MaybeUninit::uninit().assume_init()));
+    /// A sequence of allocated blocks providing stable pointers.
+    pub struct Blocks<Value, const BLOCK_SIZE: usize> {
+        count: usize,
+        data: Vec<Box<[MaybeUninit<Value>; BLOCK_SIZE]>>,
+    }
+
+    impl<Value, const BLOCK_SIZE: usize> Drop for Blocks<Value, BLOCK_SIZE> {
+        fn drop(&mut self) {
+            for alive in 0..self.count {
+                let (block, seq) = quotrem::<BLOCK_SIZE>(alive);
+                unsafe {
+                    self.data.get_unchecked_mut(block)[seq].assume_init_drop();
+                }
             }
-            data_ptr = data.get_unchecked_mut(block)[seq].as_mut_ptr();
-            data_ptr.write(new_entry);
         }
-        *filled += 1;
-        data_ptr
+    }
+
+    impl<Value, const BLOCK_SIZE: usize> Blocks<Value, BLOCK_SIZE> {
+        pub fn new(size_hint: usize) -> Self {
+            Blocks {
+                count: 0,
+                data: Vec::with_capacity(size_hint / BLOCK_SIZE + 1),
+            }
+        }
+
+        pub fn append(&mut self, val: Value) -> *mut Value {
+            let (block, seq) = quotrem::<BLOCK_SIZE>(self.count);
+            let data_ptr;
+            unsafe {
+                if seq == 0 {
+                    self.data
+                        .push(Box::new(MaybeUninit::uninit().assume_init()));
+                }
+                data_ptr = self.data.get_unchecked_mut(block)[seq].as_mut_ptr();
+                data_ptr.write(val);
+            }
+            self.count += 1;
+            data_ptr
+        }
+
+        pub unsafe fn get(&self, ind: usize) -> &Value {
+            let (block, seq) = quotrem::<BLOCK_SIZE>(ind);
+            self.data.get_unchecked(block)[seq].assume_init_ref()
+        }
+
+        pub unsafe fn get_mut(&mut self, ind: usize) -> &mut Value {
+            let (block, seq) = quotrem::<BLOCK_SIZE>(ind);
+            self.data.get_unchecked_mut(block)[seq].assume_init_mut()
+        }
     }
 
     pub fn quotrem<const DIV: usize>(val: usize) -> (usize, usize) {
         (val / DIV, val % DIV)
-    }
-}
-
-mod verif {
-    use super::*;
-    use crate::index::{Index, IndexPush};
-
-    struct ReferenceColumn<ColView> {
-        idx: IndexPush,
-        win: ColView,
-    }
-
-    impl<'imm, ColView: ColumnWindow<'imm, usize, usize>> ReferenceColumn<ColView> {
-        fn check_access_bounds(&mut self, key: usize) {
-            if let Ok(idx) = self.idx.to_index(key) {
-                unsafe {
-                    self.win.brw(idx);
-                    self.win.brw_mut(idx);
-                    self.win.get(idx);
-                }
-            }
-        }
-
-        fn put_new(&mut self) {
-            let idx = self.idx.new_index();
-            self.win.put_new((usize::MAX, usize::MAX));
-        }
-    }
-
-    #[cfg(kani)]
-    mod kani_verif {
-        use super::*;
-
-        fn kani_col<Col: Column<usize, usize>>(init: Col::InitData) {
-            let mut col: Col = Col::new(init);
-            let mut win = Col::Window::new_view(&mut col);
-            let mut refcol = ReferenceColumn {
-                idx: IndexPush::new(()),
-                win,
-            };
-            for _ in 0..20 {
-                refcol.put_new();
-                refcol.check_access_bounds(kani::any());
-            }
-        }
-
-        #[kani::proof]
-        #[kani::unwind(32)]
-        fn check_vec_col() {
-            kani_col::<ColBlok<usize, usize, 1>>(0);
-            kani_col::<ColVec<usize, usize>>(0);
-        }
     }
 }

@@ -15,7 +15,7 @@ impl NextFree {
     fn encode(&self) -> usize {
         if let Some(index) = self.0 {
             debug_assert!(index != EncodedNextFree::MAX);
-            return index;
+            index
         } else {
             EncodedNextFree::MAX
         }
@@ -42,7 +42,7 @@ struct MutEntry<ImmData, MutData> {
 
 impl<ImmData, MutData> Drop for MutEntry<ImmData, MutData> {
     fn drop(&mut self) {
-        if self.imm_ptr != ptr::null() {
+        if self.imm_ptr.is_null() {
             unsafe {
                 ManuallyDrop::drop(&mut self.mut_data.data);
             }
@@ -107,7 +107,7 @@ impl<ImmData, MutData, const BLOCK_SIZE: usize> Column
         }
     }
 
-    fn window<'imm>(&'imm mut self) -> Self::WindowKind<'imm> {
+    fn window(&mut self) -> Self::WindowKind<'_> {
         Window { inner: self }
     }
 }
@@ -166,7 +166,7 @@ where
                         index: key.index,
                         data: Data {
                             imm_data: if size_of::<ImmData>() == 0 {
-                                transmute::<&(), &ImmData>(&mut self.inner.dummy_zero_size)
+                                transmute::<&(), &ImmData>(&self.inner.dummy_zero_size)
                             } else {
                                 &*(*imm_ptr).cast::<ImmData>()
                             },
@@ -198,7 +198,7 @@ where
         if let NextFree(Some(next_free)) = self.inner.next_free_mut {
             unsafe {
                 let mut_entry = self.inner.mut_data.get_unchecked_mut(next_free);
-                debug_assert!(mut_entry.imm_ptr == ptr::null());
+                debug_assert!(mut_entry.imm_ptr.is_null());
 
                 let imm_ptr = if size_of::<ImmData>() == 0 {
                     // For zero sized types, use the generation counter.

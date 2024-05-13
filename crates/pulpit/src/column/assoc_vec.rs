@@ -17,7 +17,7 @@ impl<ImmData, MutData> Column for VecAssoc<ImmData, MutData> {
         }
     }
 
-    fn window<'imm>(&'imm mut self) -> Self::WindowKind<'imm> {
+    fn window(&mut self) -> Self::WindowKind<'_> {
         Window { inner: self }
     }
 }

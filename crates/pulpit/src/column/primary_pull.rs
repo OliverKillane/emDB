@@ -27,7 +27,7 @@ impl GenEntry {
             }
             GenEntry::NextFree(opt) => opt
                 .map(|val| {
-                    debug_assert!(val <= ((usize::MAX - 1) / 2) - 1);
+                    debug_assert!(val < ((usize::MAX - 1) / 2));
                     (val + 1) * 2 + 1
                 })
                 .unwrap_or(1),
@@ -53,7 +53,7 @@ impl GenInfo {
         if let Some(entry) = self.generations.get_mut(key.index) {
             match GenEntry::decode(&*entry) {
                 GenEntry::Generation(g) if g == key.generation => {
-                    *entry = GenEntry::NextFree(self.next_free.clone()).encode();
+                    *entry = GenEntry::NextFree(self.next_free).encode();
                     self.next_free = Some(key.index);
                     self.gen_counter += 1;
                     Ok(key.index)
@@ -120,7 +120,7 @@ impl<Col: Column> Column for PullWrap<Col> {
         }
     }
 
-    fn window<'imm>(&'imm mut self) -> Self::WindowKind<'imm> {
+    fn window(&mut self) -> Self::WindowKind<'_> {
         PullWrapWindow {
             col: self.col.window(),
             gen: &mut self.gen,
