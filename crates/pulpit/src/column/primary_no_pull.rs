@@ -2,16 +2,16 @@ use super::*;
 
 /// Converts an [`AssocWindow`] (unchecked, without an index [`Column`]) into a
 /// safely indexed [`Column`] that can be windowed into a  [`PrimaryWindow`].
-pub struct SimpleKey<Col> {
+pub struct PrimaryAppend<Col> {
     col: Col,
     max_key: usize,
 }
 
-impl<Col: Column> Column for SimpleKey<Col> {
-    type WindowKind<'imm> = SimpleKeyWindow<'imm, Col> where Self: 'imm;
+impl<Col: Column> Column for PrimaryAppend<Col> {
+    type WindowKind<'imm> = WindowPrimaryAppend<'imm, Col> where Self: 'imm;
 
     fn window(&mut self) -> Self::WindowKind<'_> {
-        SimpleKeyWindow {
+        WindowPrimaryAppend {
             col: self.col.window(),
             max_key: &mut self.max_key,
         }
@@ -25,13 +25,13 @@ impl<Col: Column> Column for SimpleKey<Col> {
     }
 }
 
-pub struct SimpleKeyWindow<'imm, Col: Column + 'imm> {
+pub struct WindowPrimaryAppend<'imm, Col: Column + 'imm> {
     col: Col::WindowKind<'imm>,
     max_key: &'imm mut usize,
 }
 
 impl<'imm, ImmData, MutData, Col> PrimaryWindow<'imm, ImmData, MutData>
-    for SimpleKeyWindow<'imm, Col>
+    for WindowPrimaryAppend<'imm, Col>
 where
     Col: Column,
     Col::WindowKind<'imm>: AssocWindow<'imm, ImmData, MutData>,
@@ -71,10 +71,14 @@ where
             Err(KeyError)
         }
     }
+
+    fn conv_get(get: Self::ImmGet) -> ImmData {
+        Col::WindowKind::conv_get(get)
+    }
 }
 
 impl<'imm, ImmData, MutData, Col> PrimaryWindowApp<'imm, ImmData, MutData>
-    for SimpleKeyWindow<'imm, Col>
+    for WindowPrimaryAppend<'imm, Col>
 where
     Col: Column,
     Col::WindowKind<'imm>: AssocWindow<'imm, ImmData, MutData>,

@@ -65,6 +65,10 @@ where
             None => Err(KeyError),
         }
     }
+
+    fn conv_get(get: Self::ImmGet) -> ImmData {
+        get
+    }
 }
 
 impl<'imm, ImmData, MutData> PrimaryWindowPull<'imm, ImmData, MutData>
@@ -96,5 +100,9 @@ where
             }),
             None => Err(KeyError),
         }
+    }
+
+    fn conv_pull(pull: Self::ImmPull) -> ImmData {
+        pull
     }
 }

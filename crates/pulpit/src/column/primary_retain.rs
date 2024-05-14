@@ -82,7 +82,7 @@ impl<ImmData, MutData> Drop for MutEntry<ImmData, MutData> {
 ///     assert_eq!(x[0].as_ptr(), x[9].as_ptr());
 /// }
 /// ```  
-pub struct RetainArena<ImmData, MutData, const BLOCK_SIZE: usize> {
+pub struct PrimaryRetain<ImmData, MutData, const BLOCK_SIZE: usize> {
     mut_data: Vec<MutEntry<ImmData, MutData>>,
     next_free_mut: NextFree,
     imm_data: utils::Blocks<ImmData, BLOCK_SIZE>,
@@ -91,14 +91,14 @@ pub struct RetainArena<ImmData, MutData, const BLOCK_SIZE: usize> {
 }
 
 impl<ImmData, MutData, const BLOCK_SIZE: usize> Column
-    for RetainArena<ImmData, MutData, BLOCK_SIZE>
+    for PrimaryRetain<ImmData, MutData, BLOCK_SIZE>
 {
-    type WindowKind<'imm> = Window<'imm, RetainArena<ImmData, MutData, BLOCK_SIZE>>
+    type WindowKind<'imm> = Window<'imm, PrimaryRetain<ImmData, MutData, BLOCK_SIZE>>
     where
         Self: 'imm;
 
     fn new(size_hint: usize) -> Self {
-        RetainArena {
+        PrimaryRetain {
             mut_data: Vec::with_capacity(size_hint / BLOCK_SIZE + 1),
             imm_data: utils::Blocks::new(size_hint),
             next_free_mut: NextFree(None),
@@ -113,12 +113,13 @@ impl<ImmData, MutData, const BLOCK_SIZE: usize> Column
 }
 
 impl<'imm, ImmData, MutData, const BLOCK_SIZE: usize> PrimaryWindow<'imm, ImmData, MutData>
-    for Window<'imm, RetainArena<ImmData, MutData, BLOCK_SIZE>>
+    for Window<'imm, PrimaryRetain<ImmData, MutData, BLOCK_SIZE>>
 where
     MutData: Clone,
+    ImmData: Clone,
 {
     type ImmGet = &'imm ImmData;
-    type Key = GenKey<RetainArena<ImmData, MutData, BLOCK_SIZE>, *const ImmData>;
+    type Key = GenKey<PrimaryRetain<ImmData, MutData, BLOCK_SIZE>, *const ImmData>;
 
     fn get(&self, key: Self::Key) -> Access<Self::ImmGet, MutData> {
         let Entry {
@@ -181,12 +182,17 @@ where
             Err(KeyError)
         }
     }
+
+    fn conv_get(get: Self::ImmGet) -> ImmData {
+        get.clone()
+    }
 }
 
 impl<'imm, ImmData, MutData, const BLOCK_SIZE: usize> PrimaryWindowPull<'imm, ImmData, MutData>
-    for Window<'imm, RetainArena<ImmData, MutData, BLOCK_SIZE>>
+    for Window<'imm, PrimaryRetain<ImmData, MutData, BLOCK_SIZE>>
 where
     MutData: Clone,
+    ImmData: Clone,
 {
     type ImmPull = &'imm ImmData;
 
@@ -274,6 +280,27 @@ where
             }
         } else {
             Err(KeyError)
+        }
+    }
+
+    fn conv_pull(pull: Self::ImmPull) -> ImmData {
+        pull.clone()
+    }
+}
+
+#[cfg(kani)]
+impl<ImmData, MutData, const BLOCK_SIZE: usize> kani::Arbitrary
+    for GenKey<PrimaryRetain<ImmData, MutData, BLOCK_SIZE>, *const ImmData>
+{
+    fn any() -> Self {
+        let mut gen_ind: usize = kani::any();
+        if gen_ind == 0 {
+            gen_ind += 1;
+        }
+        Self {
+            index: kani::any(),
+            generation: (gen_ind as *const ImmData),
+            phantom: PhantomData,
         }
     }
 }

@@ -102,7 +102,7 @@
 //! runtime checks as with interior mutability), while preventing any dangling
 //! references (immutable borrows properly qualified).
 //!
-//! This implementation is chosen in the form of [`Column::WindowKind`], which is a 
+//! This implementation is chosen in the form of [`Column::WindowKind`], which is a
 //! single mutable borrow of the column.
 //!
 //! ## Immutable Value Storage
@@ -131,7 +131,7 @@
 //! - Allows for other optimisations, such as in [`RetainArena`]'s reuse of space for
 //!   data, and for the mutable data for generation & free slot storage.
 
-use std::{marker::PhantomData, mem::transmute};
+use std::{hash::Hash, marker::PhantomData, mem::transmute};
 
 mod assoc_blocks;
 pub use assoc_blocks::*;
@@ -166,6 +166,7 @@ pub trait Column {
 /// The raw column index type (used for unchecked indexes)
 pub type UnsafeIndex = usize;
 
+#[derive(Clone)]
 pub struct Data<ImmData, MutData> {
     pub imm_data: ImmData,
     pub mut_data: MutData,
@@ -184,6 +185,7 @@ pub enum InsertAction {
 }
 
 /// For safe access to a [`PrimaryWindow`] with an incorrect index.
+#[derive(Debug)]
 pub struct KeyError;
 
 /// A view into a primary index (bounds checked, and produced [`UnsafeIndex`]es
@@ -200,6 +202,9 @@ pub trait PrimaryWindow<'imm, ImmData, MutData> {
     fn get(&self, key: Self::Key) -> Access<Self::ImmGet, MutData>;
     fn brw(&self, key: Self::Key) -> Access<&ImmData, &MutData>;
     fn brw_mut(&mut self, key: Self::Key) -> Access<&ImmData, &mut MutData>;
+
+    /// For testing include a conversion for the immutable value
+    fn conv_get(get: Self::ImmGet) -> ImmData;
 }
 
 pub trait PrimaryWindowApp<'imm, ImmData, MutData>: PrimaryWindow<'imm, ImmData, MutData> {
@@ -216,6 +221,9 @@ pub trait PrimaryWindowPull<'imm, ImmData, MutData>: PrimaryWindow<'imm, ImmData
     /// [`AssocWindowPull`] or an append is required.
     fn insert(&mut self, val: Data<ImmData, MutData>) -> (Self::Key, InsertAction);
     fn pull(&mut self, key: Self::Key) -> Access<Self::ImmPull, MutData>;
+
+    /// For testing include a conversion for the immutable value pulled
+    fn conv_pull(pull: Self::ImmPull) -> ImmData;
 }
 
 pub trait AssocWindow<'imm, ImmData, MutData> {
@@ -247,6 +255,9 @@ pub trait AssocWindow<'imm, ImmData, MutData> {
 
     /// Append a value to the column that is at the new largest [`UnsafeIndex`].
     fn append(&mut self, val: Data<ImmData, MutData>);
+
+    /// For testing include a conversion for the immutable value
+    fn conv_get(get: Self::ImmGet) -> ImmData;
 }
 
 pub trait AssocWindowPull<'imm, ImmData, MutData>: AssocWindow<'imm, ImmData, MutData> {
@@ -264,6 +275,9 @@ pub trait AssocWindowPull<'imm, ImmData, MutData>: AssocWindow<'imm, ImmData, Mu
     /// # Safety
     /// - No bounds checks
     unsafe fn place(&mut self, ind: UnsafeIndex, val: Data<ImmData, MutData>);
+
+    /// For testing include a conversion for the immutable value pulled
+    fn conv_pull(pull: Self::ImmPull) -> ImmData;
 }
 
 /// A Simple Generational Index Key
@@ -285,7 +299,12 @@ impl<Store, GenCounter: Copy + Eq> Clone for GenKey<Store, GenCounter> {
     }
 }
 impl<Store, GenCounter: Copy + Eq> Copy for GenKey<Store, GenCounter> {}
-
+impl<Store, GenCounter: Copy + Eq + Hash> Hash for GenKey<Store, GenCounter> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.index.hash(state);
+        self.generation.hash(state);
+    }
+}
 mod utils {
     use std::mem::MaybeUninit;
 
@@ -342,5 +361,356 @@ mod utils {
 
     pub fn quotrem<const DIV: usize>(val: usize) -> (usize, usize) {
         (val / DIV, val % DIV)
+    }
+}
+
+mod verif {
+    use super::*;
+    use std::collections::HashMap;
+
+    trait ReferenceMap<Key, Value> {
+        fn with_capacity(size_hint: usize) -> Self;
+        fn get(&self, key: &Key) -> Option<&Value>;
+        fn insert(&mut self, key: Key, value: Value) -> Option<Value>;
+        fn remove(&mut self, key: &Key) -> Option<Value>;
+        fn len(&self) -> usize;
+        fn get_next_key(&self) -> Option<Key>;
+    }
+
+    /// A very simple (and horribly inefficient) map, that is far faster to
+    /// verify than the (efficient) HashMap.
+    /// As verification of a [`primaryWindow`] requires tracking with a map,
+    /// we need to use this.
+    struct SimpleMap<Key, Value> {
+        data: Vec<Option<(Key, Value)>>,
+        count: usize,
+    }
+
+    impl<Key: Eq + Clone, Value: Clone> ReferenceMap<Key, Value> for SimpleMap<Key, Value> {
+        fn with_capacity(size_hint: usize) -> Self {
+            Self {
+                data: Vec::with_capacity(size_hint),
+                count: 0,
+            }
+        }
+
+        fn get(&self, key: &Key) -> Option<&Value> {
+            self.data.iter().find_map(|entry| {
+                if let Some((k, v)) = entry {
+                    if k == key {
+                        Some(v)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+        }
+
+        fn insert(&mut self, key: Key, value: Value) -> Option<Value> {
+            if let Some(v) = self.get(&key) {
+                Some(v.clone())
+            } else {
+                self.data.push(Some((key, value)));
+                self.count += 1;
+                None
+            }
+        }
+
+        fn remove(&mut self, key: &Key) -> Option<Value> {
+            let val = self.data.iter_mut().find_map(|entry| {
+                if let Some((k, v)) = entry {
+                    if k == key {
+                        Some(entry)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })?;
+
+            val.take().map(|(_, v)| {
+                self.count -= 1;
+                v
+            })
+        }
+
+        fn len(&self) -> usize {
+            self.count
+        }
+
+        fn get_next_key(&self) -> Option<Key> {
+            self.data.iter().find_map(|entry| {
+                if let Some((k, _)) = entry {
+                    Some(k.clone())
+                } else {
+                    None
+                }
+            })
+        }
+    }
+
+    impl<Key: Eq + Hash + Clone, Value> ReferenceMap<Key, Value> for HashMap<Key, Value> {
+        fn with_capacity(size_hint: usize) -> Self {
+            HashMap::with_capacity(size_hint)
+        }
+
+        fn get(&self, key: &Key) -> Option<&Value> {
+            self.get(key)
+        }
+
+        fn insert(&mut self, key: Key, value: Value) -> Option<Value> {
+            self.insert(key, value)
+        }
+
+        fn remove(&mut self, key: &Key) -> Option<Value> {
+            self.remove(key)
+        }
+
+        fn len(&self) -> usize {
+            self.len()
+        }
+
+        fn get_next_key(&self) -> Option<Key> {
+            self.keys().next().cloned()
+        }
+    }
+
+    // A wrapper to check the correct
+    struct CheckPrimary<'imm, ImmData, MutData, ColWindow, RefMap>
+    where
+        ColWindow: PrimaryWindow<'imm, ImmData, MutData>,
+        RefMap: ReferenceMap<ColWindow::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
+    {
+        colwindow: ColWindow,
+        items: RefMap,
+        phantom: PhantomData<&'imm (ImmData, MutData)>,
+    }
+
+    impl<'imm, ImmData, MutData, ColWindow, RefMap>
+        CheckPrimary<'imm, ImmData, MutData, ColWindow, RefMap>
+    where
+        RefMap: ReferenceMap<ColWindow::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
+        ColWindow: PrimaryWindow<'imm, ImmData, MutData>,
+        ImmData: Clone + Eq + std::fmt::Debug,
+        MutData: Clone + Eq + std::fmt::Debug,
+        <ColWindow as PrimaryWindow<'imm, ImmData, MutData>>::Key: Eq + Hash,
+    {
+        fn new(size_hint: usize, colwindow: ColWindow) -> Self {
+            Self {
+                colwindow,
+                items: RefMap::with_capacity(size_hint),
+                phantom: PhantomData,
+            }
+        }
+
+        fn check_get(&self, key: ColWindow::Key) {
+            if let Some((unsafeindex, data)) = self.items.get(&key) {
+                let entry = self
+                    .colwindow
+                    .get(key)
+                    .expect("Key unexpectedly missing from column");
+                let imm_data = ColWindow::conv_get(entry.data.imm_data);
+                assert_eq!(imm_data, data.imm_data, "Incorrect immutable data");
+                assert_eq!(entry.data.mut_data, data.mut_data, "Incorrect mutable data");
+                assert_eq!(entry.index, *unsafeindex, "Incorrect index");
+            } else {
+                let entry = self.colwindow.get(key);
+                assert!(entry.is_err(), "Key unexpectedly present in column");
+            }
+        }
+    }
+
+    impl<'imm, ImmData, MutData, ColWindow, RefMap>
+        CheckPrimary<'imm, ImmData, MutData, ColWindow, RefMap>
+    where
+        RefMap: ReferenceMap<ColWindow::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
+        ColWindow: PrimaryWindowApp<'imm, ImmData, MutData>,
+        ImmData: Clone + Eq + std::fmt::Debug,
+        MutData: Clone + Eq + std::fmt::Debug,
+        <ColWindow as PrimaryWindow<'imm, ImmData, MutData>>::Key: Eq + Hash,
+    {
+        fn check_append(&mut self, data: Data<ImmData, MutData>) {
+            let key = self.colwindow.append(data.clone());
+            let unsafeindex = self.items.len();
+            assert!(
+                self.items
+                    .insert(key, (unsafeindex, data.clone()))
+                    .is_none(),
+                "Key unexpectedly present in column"
+            );
+        }
+    }
+
+    impl<'imm, ImmData, MutData, ColWindow, RefMap>
+        CheckPrimary<'imm, ImmData, MutData, ColWindow, RefMap>
+    where
+        RefMap: ReferenceMap<ColWindow::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
+        ColWindow: PrimaryWindowPull<'imm, ImmData, MutData>,
+        ImmData: Clone + Eq + std::fmt::Debug,
+        MutData: Clone + Eq + std::fmt::Debug,
+        <ColWindow as PrimaryWindow<'imm, ImmData, MutData>>::Key: Eq + Hash,
+    {
+        fn check_pull(&mut self, key: ColWindow::Key) {
+            if let Some((unsafeindex, data)) = self.items.remove(&key) {
+                let entry = self
+                    .colwindow
+                    .pull(key)
+                    .expect("Key unexpectedly missing from column");
+                let imm_data = ColWindow::conv_pull(entry.data.imm_data);
+                assert_eq!(imm_data, data.imm_data, "Incorrect immutable data");
+                assert_eq!(entry.data.mut_data, data.mut_data, "Incorrect mutable data");
+                assert_eq!(entry.index, unsafeindex, "Incorrect index");
+            } else {
+                let entry = self.colwindow.pull(key);
+                assert!(entry.is_err(), "Key unexpectedly present in column");
+            }
+        }
+
+        fn check_insert(&mut self, data: Data<ImmData, MutData>) {
+            let (key, action) = self.colwindow.insert(data.clone());
+            match action {
+                InsertAction::Place(unsafeindex) => {
+                    assert!(
+                        self.items
+                            .insert(key, (unsafeindex, data.clone()))
+                            .is_none(),
+                        "Key unexpectedly present in column"
+                    );
+                }
+                InsertAction::Append => {
+                    let unsafeindex = self.items.len();
+                    assert!(
+                        self.items
+                            .insert(key, (unsafeindex, data.clone()))
+                            .is_none(),
+                        "Key unexpectedly present in column"
+                    );
+                }
+            }
+        }
+    }
+
+    #[cfg(test)]
+    mod test_verif {
+        use super::*;
+
+        fn check_primary_pull<Col>()
+        where
+            Col: Column,
+            for<'a> Col::WindowKind<'a>: PrimaryWindowPull<'a, usize, usize>,
+            for<'a> <Col::WindowKind<'a> as PrimaryWindow<'a, usize, usize>>::Key: Eq + Hash,
+        {
+            const ITERS: usize = 100000;
+            let mut col = Col::new(ITERS);
+            let mut check: CheckPrimary<_, _, _, HashMap<_, _>> =
+                CheckPrimary::new(ITERS, col.window());
+
+            for n in 0..1024 {
+                check.check_insert(Data {
+                    imm_data: n,
+                    mut_data: n,
+                });
+                check.check_insert(Data {
+                    imm_data: n,
+                    mut_data: n,
+                });
+                if let Some(next_key) = check.items.get_next_key() {
+                    check.check_get(next_key)
+                }
+                if let Some(next_key) = check.items.get_next_key() {
+                    check.check_pull(next_key);
+                    check.check_pull(next_key);
+                }
+            }
+        }
+
+        fn check_primary_app<Col>()
+        where
+            Col: Column,
+            for<'a> Col::WindowKind<'a>: PrimaryWindowApp<'a, usize, usize>,
+            for<'a> <Col::WindowKind<'a> as PrimaryWindow<'a, usize, usize>>::Key: Eq + Hash,
+        {
+            const ITERS: usize = 100000;
+            let mut col = Col::new(ITERS);
+            let mut check: CheckPrimary<_, _, _, HashMap<_, _>> =
+                CheckPrimary::new(ITERS, col.window());
+
+            for n in 0..1024 {
+                check.check_append(Data {
+                    imm_data: n,
+                    mut_data: n,
+                });
+                check.check_append(Data {
+                    imm_data: n,
+                    mut_data: n,
+                });
+                if let Some(next_key) = check.items.get_next_key() {
+                    check.check_get(next_key)
+                }
+            }
+        }
+
+        macro_rules! test_pull_impl {
+            ($name:ident => $col:ty) => {
+                #[test]
+                fn $name() {
+                    check_primary_pull::<$col>();
+                }
+            };
+        }
+
+        macro_rules! test_app_impl {
+            ($name:ident => $col:ty) => {
+                #[test]
+                fn $name() {
+                    check_primary_app::<$col>();
+                }
+            };
+        }
+
+        test_pull_impl!(primary_retain => PrimaryRetain<usize, usize, 16>);
+        test_pull_impl!(gen_arena => PrimaryGenerationalArena<usize, usize>);
+        test_pull_impl!(thunderdome => PrimaryThunderDome<usize, usize>);
+
+        test_app_impl!(block => PrimaryAppend<AssocBlocks<usize, usize, 16>>);
+    }
+
+    #[cfg(kani)]
+    mod kani_verif {
+        use super::*;
+
+        fn verif_pull<Col, const ITERS: usize>()
+        where
+            Col: Column,
+            for<'a> Col::WindowKind<'a>: PrimaryWindowPull<'a, usize, usize>,
+            for<'a> <Col::WindowKind<'a> as PrimaryWindow<'a, usize, usize>>::Key:
+                kani::Arbitrary + Eq + Hash,
+        {
+            let mut col = Col::new(ITERS);
+            let mut check: CheckPrimary<_, _, _, SimpleMap<_, _>> =
+                CheckPrimary::new(ITERS, col.window());
+
+            for n in 0..ITERS {
+                check.check_insert(Data {
+                    imm_data: n,
+                    mut_data: n,
+                });
+                check.check_insert(Data {
+                    imm_data: n,
+                    mut_data: n,
+                });
+                check.check_pull(kani::any());
+                check.check_get(kani::any());
+            }
+        }
+
+        #[kani::proof]
+        #[kani::unwind(6)]
+        fn check_id_arena() {
+            verif_pull::<PrimaryRetain<usize, usize, 16>, 5>();
+        }
     }
 }

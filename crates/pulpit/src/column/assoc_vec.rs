@@ -1,18 +1,19 @@
+// TODO: Group together accesses into a hot block, then transfer these to the vector as it grows.
 use super::*;
 
 /// An associated, append only [`Column`] storing data in a large vector for faster
 /// lookup than [`ColBlok`], but at the expense of needing copies for [`AssocWindow::get`].
-pub struct VecAssoc<ImmData, MutData> {
+pub struct AssocVec<ImmData, MutData> {
     data: Vec<Data<ImmData, MutData>>,
 }
 
-impl<ImmData, MutData> Column for VecAssoc<ImmData, MutData> {
-    type WindowKind<'imm> = Window<'imm, VecAssoc<ImmData, MutData>>
+impl<ImmData, MutData> Column for AssocVec<ImmData, MutData> {
+    type WindowKind<'imm> = Window<'imm, AssocVec<ImmData, MutData>>
     where
         Self: 'imm;
 
     fn new(size_hint: usize) -> Self {
-        VecAssoc {
+        AssocVec {
             data: Vec::with_capacity(size_hint),
         }
     }
@@ -23,7 +24,7 @@ impl<ImmData, MutData> Column for VecAssoc<ImmData, MutData> {
 }
 
 impl<'imm, ImmData, MutData> AssocWindow<'imm, ImmData, MutData>
-    for Window<'imm, VecAssoc<ImmData, MutData>>
+    for Window<'imm, AssocVec<ImmData, MutData>>
 where
     ImmData: Clone,
     MutData: Clone,
@@ -50,5 +51,9 @@ where
 
     fn append(&mut self, val: Data<ImmData, MutData>) {
         self.inner.data.push(val)
+    }
+
+    fn conv_get(get: Self::ImmGet) -> ImmData {
+        get
     }
 }

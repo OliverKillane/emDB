@@ -2,17 +2,19 @@ use super::*;
 
 /// An associated, append only [`Column`] that stores mutable and immutable data together in
 /// blocks, and provides stable references to the immutable part.
-pub struct ColBlok<ImmData, MutData, const BLOCK_SIZE: usize> {
+pub struct AssocBlocks<ImmData, MutData, const BLOCK_SIZE: usize> {
     blocks: utils::Blocks<Data<ImmData, MutData>, BLOCK_SIZE>,
 }
 
-impl<ImmData, MutData, const BLOCK_SIZE: usize> Column for ColBlok<ImmData, MutData, BLOCK_SIZE> {
-    type WindowKind<'imm> = Window<'imm, ColBlok<ImmData, MutData, BLOCK_SIZE>>
+impl<ImmData, MutData, const BLOCK_SIZE: usize> Column
+    for AssocBlocks<ImmData, MutData, BLOCK_SIZE>
+{
+    type WindowKind<'imm> = Window<'imm, AssocBlocks<ImmData, MutData, BLOCK_SIZE>>
     where
         Self: 'imm;
 
     fn new(size_hint: usize) -> Self {
-        ColBlok {
+        AssocBlocks {
             blocks: utils::Blocks::new(size_hint),
         }
     }
@@ -23,9 +25,10 @@ impl<ImmData, MutData, const BLOCK_SIZE: usize> Column for ColBlok<ImmData, MutD
 }
 
 impl<'imm, ImmData, MutData, const BLOCK_SIZE: usize> AssocWindow<'imm, ImmData, MutData>
-    for Window<'imm, ColBlok<ImmData, MutData, BLOCK_SIZE>>
+    for Window<'imm, AssocBlocks<ImmData, MutData, BLOCK_SIZE>>
 where
     MutData: Clone,
+    ImmData: Clone,
 {
     type ImmGet = &'imm ImmData;
 
@@ -55,5 +58,9 @@ where
 
     fn append(&mut self, val: Data<ImmData, MutData>) {
         self.inner.blocks.append(val);
+    }
+
+    fn conv_get(get: Self::ImmGet) -> ImmData {
+        get.clone()
     }
 }

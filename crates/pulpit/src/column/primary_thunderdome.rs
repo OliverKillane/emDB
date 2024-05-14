@@ -4,12 +4,12 @@ use thunderdome::{Arena as ThunderArena, Index as ThunderIndex};
 /// A Primary [`Column`] implemented using the [`thunderdome`]'s [`ThunderArena`].
 /// - Conforms to the interface (using 8 byte [`UnsafeIndex`] indices) despite being
 ///   backed by [`u32`] indexed [`ThunderIndex`]s.
-pub struct ThunderDome<ImmData, MutData> {
+pub struct PrimaryThunderDome<ImmData, MutData> {
     arena: ThunderArena<Data<ImmData, MutData>>,
 }
 
-impl<ImmData, MutData> Column for ThunderDome<ImmData, MutData> {
-    type WindowKind<'imm> = Window<'imm, ThunderDome<ImmData, MutData>>
+impl<ImmData, MutData> Column for PrimaryThunderDome<ImmData, MutData> {
+    type WindowKind<'imm> = Window<'imm, PrimaryThunderDome<ImmData, MutData>>
     where
         Self: 'imm;
 
@@ -25,7 +25,7 @@ impl<ImmData, MutData> Column for ThunderDome<ImmData, MutData> {
 }
 
 impl<'imm, ImmData, MutData> PrimaryWindow<'imm, ImmData, MutData>
-    for Window<'imm, ThunderDome<ImmData, MutData>>
+    for Window<'imm, PrimaryThunderDome<ImmData, MutData>>
 where
     ImmData: Clone,
     MutData: Clone,
@@ -66,10 +66,14 @@ where
             None => Err(KeyError),
         }
     }
+
+    fn conv_get(get: Self::ImmGet) -> ImmData {
+        get
+    }
 }
 
 impl<'imm, ImmData, MutData> PrimaryWindowPull<'imm, ImmData, MutData>
-    for Window<'imm, ThunderDome<ImmData, MutData>>
+    for Window<'imm, PrimaryThunderDome<ImmData, MutData>>
 where
     ImmData: Clone,
     MutData: Clone,
@@ -98,5 +102,9 @@ where
             }),
             None => Err(KeyError),
         }
+    }
+
+    fn conv_pull(pull: Self::ImmPull) -> ImmData {
+        pull
     }
 }

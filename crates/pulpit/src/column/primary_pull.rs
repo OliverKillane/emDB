@@ -101,16 +101,16 @@ impl GenInfo {
 }
 
 /// An adapter to convert an [`AssocWindowPull`] into a [`PrimaryWindowPull`] with generational indices.
-pub struct PullWrap<Col> {
+pub struct PrimaryPull<Col> {
     col: Col,
     gen: GenInfo,
 }
 
-impl<Col: Column> Column for PullWrap<Col> {
-    type WindowKind<'imm> =  PullWrapWindow<'imm, Col> where Self: 'imm;
+impl<Col: Column> Column for PrimaryPull<Col> {
+    type WindowKind<'imm> =  WindowPrimaryPull<'imm, Col> where Self: 'imm;
 
     fn new(size_hint: usize) -> Self {
-        PullWrap {
+        PrimaryPull {
             col: Col::new(size_hint),
             gen: GenInfo {
                 next_free: None,
@@ -121,26 +121,26 @@ impl<Col: Column> Column for PullWrap<Col> {
     }
 
     fn window(&mut self) -> Self::WindowKind<'_> {
-        PullWrapWindow {
+        WindowPrimaryPull {
             col: self.col.window(),
             gen: &mut self.gen,
         }
     }
 }
 
-pub struct PullWrapWindow<'imm, Col: Column + 'imm> {
+pub struct WindowPrimaryPull<'imm, Col: Column + 'imm> {
     col: Col::WindowKind<'imm>,
     gen: &'imm mut GenInfo,
 }
 
 impl<'imm, ImmData, MutData, Col> PrimaryWindow<'imm, ImmData, MutData>
-    for PullWrapWindow<'imm, Col>
+    for WindowPrimaryPull<'imm, Col>
 where
     Col: Column,
     Col::WindowKind<'imm>: AssocWindow<'imm, ImmData, MutData>,
 {
     type ImmGet = <Col::WindowKind<'imm> as AssocWindow<'imm, ImmData, MutData>>::ImmGet;
-    type Key = GenKey<PullWrap<Col>, usize>;
+    type Key = GenKey<PrimaryPull<Col>, usize>;
 
     fn get(&self, key: Self::Key) -> Access<Self::ImmGet, MutData> {
         let index = self.gen.lookup_key(key)?;
@@ -165,10 +165,14 @@ where
             data: unsafe { self.col.brw_mut(index) },
         })
     }
+
+    fn conv_get(get: Self::ImmGet) -> ImmData {
+        Col::WindowKind::conv_get(get)
+    }
 }
 
 impl<'imm, ImmData, MutData, Col> PrimaryWindowPull<'imm, ImmData, MutData>
-    for PullWrapWindow<'imm, Col>
+    for WindowPrimaryPull<'imm, Col>
 where
     Col: Column,
     Col::WindowKind<'imm>: AssocWindowPull<'imm, ImmData, MutData>,
@@ -190,5 +194,9 @@ where
             InsertAction::Append => self.col.append(val),
         }
         (key, action)
+    }
+
+    fn conv_pull(pull: Self::ImmPull) -> ImmData {
+        Col::WindowKind::conv_pull(pull)
     }
 }
