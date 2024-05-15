@@ -1,4 +1,5 @@
 use super::*;
+// TODO: optimise by keeping end pointer immediately available
 
 /// An associated, append only [`Column`] that stores mutable and immutable data together in
 /// blocks, and provides stable references to the immutable part.

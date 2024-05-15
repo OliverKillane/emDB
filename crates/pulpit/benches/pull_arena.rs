@@ -2,8 +2,7 @@
 /// Here we compare insert, followed by sequential access.
 use divan;
 use pulpit::column::{
-    Column, Data, PrimaryGenerationalArena, PrimaryRetain, PrimaryThunderDome, PrimaryWindow,
-    PrimaryWindowPull,
+    Column, Data, Entry, PrimaryGenerationalArena, PrimaryRetain, PrimaryThunderDome, PrimaryWindow, PrimaryWindowPull
 };
 
 /// Sequential insert & access. assumes the user needs to get a value lasting longer than a borrow.   
@@ -13,14 +12,17 @@ where
     for<'a> Col::WindowKind<'a>: PrimaryWindowPull<'a, ImmData, MutData>,
 {
     let mut col = Col::new(to_insert.len());
+    let mut vals = Vec::with_capacity(to_insert.len());
     let mut win = col.window();
 
     for val in to_insert {
         let (key, _) = win.insert(val);
-        divan::black_box_drop(win.get(key));
+        let Entry { index: _, data } = win.get(key).unwrap();
+        vals.push(data);
     }
-
+    
     divan::black_box_drop(win);
+    divan::black_box_drop(vals);
     divan::black_box_drop(col);
 }
 
@@ -49,24 +51,26 @@ where
         PrimaryThunderDome<String, usize>,
         PrimaryRetain<String, usize, 1024>
     ],
+    consts=[64,512,4096],
 )]
-fn bench_workload<Col>(bencher: divan::Bencher)
+fn bench_workload<Col, const STRING_LEN: usize>(bencher: divan::Bencher)
 where
     Col: Column,
     for<'a> Col::WindowKind<'a>: PrimaryWindowPull<'a, String, usize>,
 {
-    const STRING_LEN: usize = 128;
-    const ELEMENTS: usize = 1000000;
+    const ELEMENTS: usize = 100000;
     bencher
+        .counter(divan::counter::ItemsCount::new(ELEMENTS))
         .with_inputs(|| {
-            (0..ELEMENTS)
+            let x: Vec<Data<String, usize>> = (0..ELEMENTS)
                 .map(|i| Data {
                     imm_data: "a".repeat(STRING_LEN),
                     mut_data: i,
                 })
-                .collect()
+                .collect();
+            x
         })
-        .bench_values(|v| workload::<String, usize, Col>(v))
+        .bench_values(|v: Vec<Data<String, usize>>| workload::<String, usize, Col>(v))
 }
 
 #[divan::bench(
@@ -83,8 +87,9 @@ where
     for<'a> Col::WindowKind<'a>: PrimaryWindowPull<'a, String, usize>,
 {
     const STRING_LEN: usize = 128;
-    const ELEMENTS: usize = 1000000;
+    const ELEMENTS: usize = 100000;
     bencher
+        .counter(divan::counter::ItemsCount::new(ELEMENTS))
         .with_inputs(|| {
             (0..ELEMENTS)
                 .map(|i| Data {
@@ -109,8 +114,9 @@ where
     Col: Column,
     for<'a> Col::WindowKind<'a>: PrimaryWindowPull<'a, usize, usize>,
 {
-    const ELEMENTS: usize = 1000000;
+    const ELEMENTS: usize = 100000;
     bencher
+        .counter(divan::counter::ItemsCount::new(ELEMENTS))
         .with_inputs(|| {
             (0..ELEMENTS)
                 .map(|i| Data {
@@ -135,8 +141,9 @@ where
     Col: Column,
     for<'a> Col::WindowKind<'a>: PrimaryWindowPull<'a, (), ()>,
 {
-    const ELEMENTS: usize = 1000000;
+    const ELEMENTS: usize = 100000;
     bencher
+    .counter(divan::counter::ItemsCount::new(ELEMENTS))
         .with_inputs(|| {
             (0..ELEMENTS)
                 .map(|_| Data {
