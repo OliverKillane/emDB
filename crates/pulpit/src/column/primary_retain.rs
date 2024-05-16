@@ -186,6 +186,20 @@ where
     fn conv_get(get: Self::ImmGet) -> ImmData {
         get.clone()
     }
+    
+    fn scan(&self) -> impl Iterator<Item = Self::Key> {
+        self.inner.mut_data.iter().enumerate().filter_map(|(index, entry)| {
+            if entry.imm_ptr.is_null() {
+                None
+            } else {
+                Some(GenKey {
+                    index,
+                    generation: entry.imm_ptr,
+                    phantom: PhantomData,
+                })
+            }
+        })
+    }
 }
 
 impl<'imm, ImmData, MutData, const BLOCK_SIZE: usize> PrimaryWindowPull<'imm, ImmData, MutData>

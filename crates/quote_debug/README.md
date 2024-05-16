@@ -9,7 +9,7 @@ For example the following pass
 ```rust
 use quote_debug::Tokens;
 use quote::quote;
-use syn::{ExprBlock, ItemEnum, TraitItemFn};
+use syn::{ExprBlock, ItemEnum, TraitItemFn, Type};
 
 Tokens::<ExprBlock>::from(quote! {
     {
@@ -20,13 +20,17 @@ Tokens::<ExprBlock>::from(quote! {
 Tokens::<TraitItemFn>::from(quote! {
     /// stuff
     fn method(&self) -> i32 {
-        
-    }
+        2
+    } a;
 });
 Tokens::<ItemEnum>::from(quote! {
     enum Cool {
         A, B, C
     }
+});
+
+Tokens::<Type>::from(quote! {
+    ()
 });
 ```
 

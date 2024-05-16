@@ -21,6 +21,7 @@ enumtrait = { path = "../enumtrait" }
 quote_debug = { path = "../quote_debug" }
 
 [dev-dependencies]
+prettyplease = "0.2"
 divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }
 trybuild = "1.0.91"
 glob = "0.3.1"

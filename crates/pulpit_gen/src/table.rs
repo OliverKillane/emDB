@@ -2,45 +2,44 @@ use std::collections::HashMap;
 
 use crate::{
     access::{AccessGen, AccessKind, FieldState},
-    column::{ColumnGen, Columns, Group},
-    index::{IndexGen, IndexKind},
+    column::{AssocInd, ColumnGenerate, ColumnsConfig},
     ops::{OpGen, OperationKind},
 };
 use bimap::BiHashMap;
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote_debug::Tokens;
-use syn::{ExprBlock, Ident, ItemMod, Type};
+use syn::{ExprBlock, Ident, ItemMod, Lifetime, Type};
 
 pub struct Table {
-    pub namer: Namer,
-    pub columns: Columns,
-    pub index: IndexKind,
+    pub columns: ColumnsConfig,
     pub access: Vec<AccessKind>,
+    pub transactions: bool,
     pub operations: HashMap<Ident, OperationKind>,
 }
 
 pub struct Namer {
-    mod_name: Ident,
+    pub mod_name: Ident,
 }
 impl Namer {
     pub fn mod_name(&self) -> &Ident {
         &self.mod_name
     }
-    pub fn access_field(&self, id: usize) -> Ident {
-        Ident::new(
-            &format!("access_field_{}", id),
-            proc_macro2::Span::call_site(),
-        )
+    pub fn access_field(&self) -> Ident {
+        Ident::new("access_fields", proc_macro2::Span::call_site())
     }
     pub fn col_field(&self, id: usize) -> Ident {
         Ident::new(&format!("col_{}", id), proc_macro2::Span::call_site())
     }
-    pub fn window_lifetime(&self) -> Ident {
-        Ident::new("'imm", proc_macro2::Span::call_site())
+    pub fn window_lifetime(&self) -> Tokens<Lifetime> {
+        quote!('imm).into()
     }
-    pub fn index_field(&self) -> Ident {
-        Ident::new("index", proc_macro2::Span::call_site())
+    pub fn primary_column(&self) -> Ident {
+        Ident::new("primary_column", proc_macro2::Span::call_site())
+    }
+
+    pub fn associated_column_tuple(&self) -> Ident {
+        Ident::new("assoc_columns", proc_macro2::Span::call_site())
     }
 }
 
@@ -111,42 +110,44 @@ impl HookStore {
 }
 
 impl Table {
-    fn generate(&self) -> Tokens<ItemMod> {
+    pub fn generate(&self, namer: &Namer) -> Tokens<ItemMod> {
         let mut hooks = HookStore::new();
         let mut prelude = PushVec::new();
         let mut methods = PushVec::new();
 
-        let (fields_def, fields_init): (Vec<_>, Vec<_>) = self
+        let (access_fields_types, access_fields_init): (Vec<_>, Vec<_>) = self
             .access
             .iter()
             .enumerate()
             .map(|(access_id, access)| {
-                let access_ident = self.namer.access_field(access_id);
-                (
-                    access.gen(&access_ident, self, &mut hooks, &mut prelude, &mut methods),
-                    access_ident,
+                access.gen(
+                    access_id,
+                    namer,
+                    self,
+                    &mut hooks,
+                    &mut prelude,
+                    &mut methods,
                 )
             })
-            .chain(self.columns.groups().map(
-                |(
-                    col_id,
-                    Group {
-                        col,
-                        mut_fields,
-                        imm_fields,
-                    },
-                )| {
-                    let col_ident = self.namer.col_field(col_id);
-                    (col.gen_state(&col_ident, mut_fields, imm_fields), col_ident)
-                },
-            ))
-            .map(|(FieldState { datatype, init }, access_ident)| {
-                (
-                    quote!(#access_ident : #datatype ),
-                    quote!(#access_ident : #init),
-                )
-            })
+            .map(|FieldState { datatype, init }| (datatype, init))
             .unzip();
+        let access_fields_name = namer.access_field();
+
+        let primary_type = self
+            .columns
+            .primary_col
+            .col
+            .generate(&self.columns.primary_col.fields, &mut prelude);
+        let primary_name = namer.primary_column();
+
+        let (assoc_fields_types, assoc_field_numbers): (Vec<_>, Vec<_>) = self
+            .columns
+            .assoc_columns
+            .iter()
+            .enumerate()
+            .map(|(ind, assoc_col)| (assoc_col.col.generate(&assoc_col.fields, &mut prelude), ind))
+            .unzip();
+        let assoc_cols_name = namer.associated_column_tuple();
 
         for (id, op) in &self.operations {
             let (before, after) = if let Some(Hook { before, after }) = hooks.get_hooks(id) {
@@ -154,41 +155,50 @@ impl Table {
             } else {
                 (&Vec::new(), &Vec::new())
             };
-            methods.push(op.generate(id, self, &mut prelude, before, after));
+            methods.push(op.generate(id, self, namer, &mut prelude, before, after));
         }
 
-        let mod_name = self.namer.mod_name();
+        let mod_name = namer.mod_name();
         let prelude = prelude.open();
         let methods = methods.open();
-        let window_lifetime = self.namer.window_lifetime();
-        let FieldState { datatype, init } = self.index.gen_state();
-        let index_id = self.namer.index_field();
+        let window_lifetime = namer.window_lifetime();
 
         quote! {
             mod #mod_name {
                 #(#prelude)*
 
                 struct Table {
-                    #(#fields_def),*
-                    #index_id : #datatype
+                    #access_fields_name : (#(#access_fields_types),*),
+                    #primary_name : #primary_type,
+                    #assoc_cols_name : (#(#assoc_fields_types),*),
+                }
+
+                struct Window<#window_lifetime> {
+                    #access_fields_name : &#window_lifetime mut (#(#access_fields_types),*),
+                    #primary_name : <#primary_type as Column>::WindowKind<#window_lifetime>,
+                    #assoc_cols_name : (#(<#assoc_fields_types as Column>::WindowKind<#window_lifetime> ),*),
                 }
 
                 impl Table {
                     fn new() -> Self {
                         Self {
-                            #(#fields_init),*
-                            #index_id : #init
+                            #access_fields_name : (#(#access_fields_init),*),
+                            #primary_name: <#primary_type as Column>::new(0),
+                            #assoc_cols_name : (#(<#assoc_fields_types as Column>::new(0)),*),
                         }
                     }
                     fn window(&mut self) -> Window<'_> {
+                        let Self {
+                            #access_fields_name,
+                            #primary_name,
+                            #assoc_cols_name,
+                        } = self;
                         Window {
-                            table: self
+                            #access_fields_name: #access_fields_name,
+                            #primary_name: #primary_name.window(),
+                            #assoc_cols_name: (#(#assoc_cols_name.#assoc_field_numbers.window()),*),
                         }
                     }
-                }
-
-                struct Window<#window_lifetime> {
-                    table: &#window_lifetime Table
                 }
                 impl <#window_lifetime> Window<#window_lifetime> {
                     #(#methods)*

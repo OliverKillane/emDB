@@ -56,4 +56,8 @@ where
     fn conv_get(get: Self::ImmGet) -> ImmData {
         get
     }
+    
+    unsafe fn unppend(&mut self) {
+        self.inner.data.pop();
+    }
 }

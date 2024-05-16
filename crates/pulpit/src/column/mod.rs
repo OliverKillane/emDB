@@ -205,10 +205,19 @@ pub trait PrimaryWindow<'imm, ImmData, MutData> {
 
     /// For testing include a conversion for the immutable value
     fn conv_get(get: Self::ImmGet) -> ImmData;
+
+    fn scan(&self) -> impl Iterator<Item = Self::Key>;
 }
 
 pub trait PrimaryWindowApp<'imm, ImmData, MutData>: PrimaryWindow<'imm, ImmData, MutData> {
     fn append(&mut self, val: Data<ImmData, MutData>) -> Self::Key;
+
+    /// To allow for transactions to remove data from the table
+    /// 
+    /// # Safety
+    /// - All [`PrimaryWindow::get`] values must not be accessed from this call, 
+    ///   to when they are dropped.
+    unsafe fn unppend(&mut self);
 }
 
 pub trait PrimaryWindowPull<'imm, ImmData, MutData>: PrimaryWindow<'imm, ImmData, MutData> {
@@ -255,6 +264,13 @@ pub trait AssocWindow<'imm, ImmData, MutData> {
 
     /// Append a value to the column that is at the new largest [`UnsafeIndex`].
     fn append(&mut self, val: Data<ImmData, MutData>);
+
+    /// To allow for transactions to remove data from the table
+    /// 
+    /// # Safety
+    /// - All [`AssocWindow::get`] values must not be accessed from this call, 
+    ///   to when they are dropped.
+    unsafe fn unppend(&mut self);
 
     /// For testing include a conversion for the immutable value
     fn conv_get(get: Self::ImmGet) -> ImmData;
@@ -346,6 +362,13 @@ mod utils {
             }
             self.count += 1;
             data_ptr
+        }
+
+        /// Must not be used if references to the value still exist.
+        pub unsafe fn unppend(&mut self) {
+            let (block, seq) = quotrem::<BLOCK_SIZE>(self.count - 1);
+            self.data.get_unchecked_mut(block)[seq].assume_init_drop();
+            self.count -= 1;
         }
 
         pub unsafe fn get(&self, ind: usize) -> &Value {

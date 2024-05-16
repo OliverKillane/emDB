@@ -20,6 +20,7 @@ quote = "1.0.33"
 combi = { path = "../combi" }
 typed-generational-arena = "0.2"
 thunderdome = "0.6.1"
+enumtrait = { path = "../enumtrait" }
 
 [dev-dependencies]
 divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }

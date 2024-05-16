@@ -69,6 +69,10 @@ where
     fn conv_get(get: Self::ImmGet) -> ImmData {
         get
     }
+    
+    fn scan(&self) -> impl Iterator<Item = Self::Key> {
+        self.inner.arena.iter().map(|(key, _)| key)
+    }
 }
 
 impl<'imm, ImmData, MutData> PrimaryWindowPull<'imm, ImmData, MutData>

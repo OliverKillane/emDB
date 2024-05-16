@@ -14,8 +14,9 @@ impl<T: syn::parse::Parse + ToTokens> From<TokenStream> for Tokens<T> {
     fn from(value: TokenStream) -> Self {
         debug_assert!(
             parse2::<T>(value.clone()).is_ok(),
-            "Tokensed a tokenstream of `{}` but could not parse it as such.",
-            type_name::<T>()
+            "Attempted to parse as `{}` but failed. Tokens: `{}`",
+            type_name::<T>(),
+            value
         );
         Self {
             tks: value,

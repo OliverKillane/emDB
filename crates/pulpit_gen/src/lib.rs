@@ -4,6 +4,5 @@
 
 pub mod access;
 pub mod column;
-pub mod index;
 pub mod ops;
 pub mod table;

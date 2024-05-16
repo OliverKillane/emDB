@@ -400,6 +400,7 @@ version = "0.1.0"
 dependencies = [
  "combi",
  "divan",
+ "enumtrait",
  "glob",
  "proc-macro-error",
  "proc-macro2 1.0.81",
@@ -418,6 +419,7 @@ dependencies = [
  "divan",
  "enumtrait",
  "glob",
+ "prettyplease",
  "proc-macro2 1.0.81",
  "quote 1.0.36",
  "quote_debug",

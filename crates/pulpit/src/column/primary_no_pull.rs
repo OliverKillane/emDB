@@ -75,6 +75,10 @@ where
     fn conv_get(get: Self::ImmGet) -> ImmData {
         Col::WindowKind::conv_get(get)
     }
+    
+    fn scan(&self) -> impl Iterator<Item = Self::Key> {
+        0..(*self.max_key)
+    }
 }
 
 impl<'imm, ImmData, MutData, Col> PrimaryWindowApp<'imm, ImmData, MutData>
@@ -88,5 +92,9 @@ where
         *self.max_key += 1;
         self.col.append(val);
         key
+    }
+    
+    unsafe fn unppend(&mut self) {
+        self.col.unppend();
     }
 }

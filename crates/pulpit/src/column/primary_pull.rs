@@ -65,6 +65,20 @@ impl GenInfo {
         }
     }
 
+    fn scan<Store>(&self) -> impl Iterator<Item = GenKey<Store, usize>> + '_ {
+        self.generations
+            .iter()
+            .enumerate()
+            .filter_map(|(i, e)| match GenEntry::decode(e) {
+                GenEntry::Generation(g) => Some(GenKey {
+                    index: i,
+                    generation: g,
+                    phantom: PhantomData,
+                }),
+                GenEntry::NextFree(_) => None,
+            })
+    }
+
     fn insert<Store>(&mut self) -> (GenKey<Store, usize>, InsertAction) {
         if let Some(k) = self.next_free {
             // TODO: could use unchecked here
@@ -168,6 +182,10 @@ where
 
     fn conv_get(get: Self::ImmGet) -> ImmData {
         Col::WindowKind::conv_get(get)
+    }
+    
+    fn scan(&self) -> impl Iterator<Item = Self::Key> {
+        self.gen.scan()
     }
 }
 

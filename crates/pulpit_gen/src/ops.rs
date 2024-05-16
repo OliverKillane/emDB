@@ -1,8 +1,7 @@
 use std::any::type_name;
 
 use crate::{
-    index::IndexGen,
-    table::{PushVec, Table},
+    table::{Namer, PushVec, Table},
 };
 use proc_macro2::TokenStream;
 use quote_debug::Tokens;
@@ -10,13 +9,13 @@ use syn::{ExprBlock, Ident, Item, TraitItemFn};
 
 use quote::{quote, ToTokens};
 #[enumtrait::quick_enum]
+#[enumtrait::quick_from]
 #[enumtrait::store(ops_kind_enum)]
 pub enum OperationKind {
     Insert,
     Update,
     Get,
-    Brw,
-    BrwMut,
+    Delete,
     Count,
 }
 
@@ -26,6 +25,7 @@ pub trait OpGen {
         &self,
         name: &Ident,
         table: &Table,
+        namer: &Namer,
         prelude: &mut PushVec<Tokens<Item>>,
         tks_before: &[Tokens<ExprBlock>],
         tks_after: &[Tokens<ExprBlock>],
@@ -33,11 +33,11 @@ pub trait OpGen {
         let type_name = std::any::type_name::<Self>();
         quote! {
             /// TODO: this operation is unimplemented for
-            fn #name(&self) {
-                let this_op: #type_name;
-                #(#tks_before)*
+            fn #name(&self) -> () {
+                let this_op: &str = #type_name;
+                {#(#tks_before)*}
                 let do_op = ();
-                #(#tks_after)*
+                {#(#tks_after)*}
             }
         }
         .into()
@@ -59,14 +59,29 @@ pub struct Get;
 
 impl OpGen for Get {}
 
-pub struct Brw;
+pub struct Delete;
 
-impl OpGen for Brw {}
-
-pub struct BrwMut;
-
-impl OpGen for BrwMut {}
+impl OpGen for Delete {}
 
 pub struct Count;
 
-impl OpGen for Count {}
+impl OpGen for Count {
+    fn generate(
+        &self,
+        name: &Ident,
+        table: &Table,
+        namer: &Namer,
+        prelude: &mut PushVec<Tokens<Item>>,
+        tks_before: &[Tokens<ExprBlock>],
+        tks_after: &[Tokens<ExprBlock>],
+    ) -> Tokens<TraitItemFn> {
+        let prim_name = namer.primary_column();
+        quote! {
+            fn #name(&self) -> usize {
+                #(#tks_before)*
+                self.#prim_name.len()
+                #(#tks_after)*
+            }
+        }.into()
+    }
+}
