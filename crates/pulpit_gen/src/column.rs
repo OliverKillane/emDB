@@ -159,9 +159,20 @@ pub struct Decoupling {
     types: Vec<Tokens<Type>>,
 }
 
+pub struct ColumnTypes {
+    /// The type for the column
+    pub concrete_type: Tokens<Type>,
+
+    /// primaryWindow, AssocWindow, etc.
+    pub kind_trait: Tokens<Type>,
+
+    /// PrimaryWindowPull, PrimaryWindowAppend, AssocWindowPull, AssocWindow etc.
+    pub access_trait: Tokens<Type>
+}
+
 #[enumtrait::store(column_gen_trait)]
 pub trait ColumnGenerate {
-    fn generate(&self, fields: &ColFields, prelude: &mut PushVec<Tokens<Item>>) -> Tokens<Type>;
+    fn generate(&self, namer: &Namer, fields: &ColFields, prelude: &mut PushVec<Tokens<Item>>) -> ColumnTypes;
 
     fn decouple_imm(&self, imm_fields: &[Field], namer: &Namer) -> Decoupling;
     fn decouple_pull(&self, imm_fields: &[Field], namer: &Namer) -> Decoupling;
@@ -203,12 +214,16 @@ pub struct PrimaryRetain {
 }
 
 impl ColumnGenerate for PrimaryRetain {
-    fn generate(&self, fields: &ColFields, prelude: &mut PushVec<Tokens<Item>>) -> Tokens<Type> {
+    fn generate(&self, namer: &Namer, fields: &ColFields, prelude: &mut PushVec<Tokens<Item>>) -> ColumnTypes {
         let block_size = self.block_size;
         let imm_data = utils::tuple_type(&fields.imm_data);
         let mut_data = utils::tuple_type(&fields.mut_data);
-
-        quote! { PrimaryRetain<#imm_data,#mut_data,#block_size> }.into()
+        let lifetime = namer.window_lifetime();
+        ColumnTypes {
+            concrete_type: quote! ( PrimaryRetain<#imm_data,#mut_data,#block_size> ).into(),
+            kind_trait: quote! ( PrimaryWindow<#lifetime, #imm_data,#mut_data> ).into(),
+            access_trait: quote!( PrimaryWindowPull<#lifetime, #imm_data,#mut_data> ).into(),
+        }
     }
 
     fn decouple_imm(&self, imm_fields: &[Field], namer: &Namer) -> Decoupling {
@@ -225,12 +240,16 @@ pub struct AssocBlocks {
 }
 
 impl ColumnGenerate for AssocBlocks {
-    fn generate(&self, fields: &ColFields, prelude: &mut PushVec<Tokens<Item>>) -> Tokens<Type> {
+    fn generate(&self, namer: &Namer, fields: &ColFields, prelude: &mut PushVec<Tokens<Item>>) -> ColumnTypes {
         let block_size = self.block_size;
         let imm_data = utils::tuple_type(&fields.imm_data);
         let mut_data = utils::tuple_type(&fields.mut_data);
-
-        quote! { AssocBlocks<#imm_data,#mut_data,#block_size> }.into()
+        let lifetime = namer.window_lifetime();
+        ColumnTypes {
+            concrete_type: quote! ( AssocBlocks<#imm_data,#mut_data,#block_size> ).into(),
+            kind_trait: quote! ( AssocWindow<#lifetime, #imm_data,#mut_data> ).into(),
+            access_trait: quote!( AssocWindow<#lifetime, #imm_data,#mut_data> ).into(),
+        }
     }
 
     fn decouple_imm(&self, imm_fields: &[Field], namer: &Namer) -> Decoupling {

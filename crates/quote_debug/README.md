@@ -21,14 +21,13 @@ Tokens::<TraitItemFn>::from(quote! {
     /// stuff
     fn method(&self) -> i32 {
         2
-    } a;
+    }
 });
 Tokens::<ItemEnum>::from(quote! {
     enum Cool {
         A, B, C
     }
 });
-
 Tokens::<Type>::from(quote! {
     ()
 });

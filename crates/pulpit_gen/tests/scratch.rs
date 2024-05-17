@@ -12,7 +12,7 @@ fn main() {
         columns: ColumnsConfig { primary_col: Column{ col: PrimaryRetain{block_size: 10}.into(), fields:  ColFields { imm_data: vec![], mut_data: vec![] }}, assoc_columns: vec![] }, 
         access: vec![DebugAccess.into()], 
         transactions: false, 
-        operations: HashMap::from([(Ident::new("cool_insert", Span::call_site()), Insert.into())]) 
+        user_ops: HashMap::from([(Ident::new("cool_insert", Span::call_site()), Insert.into())]) 
     };
 
     let tks = table.generate(&Namer{mod_name: Ident::new("cool_mod", Span::call_site())});

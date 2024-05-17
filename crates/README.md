@@ -60,6 +60,11 @@ cargo test
 cargo bench
 ```
 
+For test output from prints, and getting panic backtraces, a handy command is
+```bash
+RUST_BACKTRACE=1 cargo test -- --nocapture
+```
+
 ### Lockfile
 [`Cargo.lock`](./Cargo.lock) is tracked by version control for reproducability ([see this justification](https://doc.rust-lang.org/cargo/faq.html#why-have-cargolock-in-version-control)).
 

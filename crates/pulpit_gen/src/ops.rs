@@ -5,7 +5,7 @@ use crate::{
 };
 use proc_macro2::TokenStream;
 use quote_debug::Tokens;
-use syn::{ExprBlock, Ident, Item, TraitItemFn};
+use syn::{ExprBlock, Ident, Item, TraitItemFn, Type};
 
 use quote::{quote, ToTokens};
 #[enumtrait::quick_enum]
@@ -13,6 +13,7 @@ use quote::{quote, ToTokens};
 #[enumtrait::store(ops_kind_enum)]
 pub enum OperationKind {
     Insert,
+    Append,
     Update,
     Get,
     Delete,
@@ -47,10 +48,27 @@ pub trait OpGen {
 #[enumtrait::impl_trait(ops_gen_trait for ops_kind_enum)]
 impl OpGen for OperationKind {}
 
-pub struct Insert;
+pub struct Insert{
+    input_struct: Tokens<Type>,
+}
 
-impl OpGen for Insert {}
+impl OpGen for Insert {
+    fn generate(&self,name: &Ident,table: &Table,namer: &Namer,prelude: &mut PushVec<Tokens<Item>>,tks_before: &[Tokens<ExprBlock>],tks_after: &[Tokens<ExprBlock>],) -> Tokens<TraitItemFn> {
+        
+        let input_struct = &self.input_struct;
 
+        quote!{
+            fn #name(row: #input_struct) -> Result<Key, >
+        }.into()
+    }
+}
+
+struct Append {
+    input_struct: Tokens<Type>,
+}
+
+
+impl OpGen for Append {}
 pub struct Update;
 
 impl OpGen for Update {}
@@ -85,3 +103,5 @@ impl OpGen for Count {
         }.into()
     }
 }
+
+// Before Hooks: () -> Result<A, E>, After Hooks (A) -> Result<(), E>
