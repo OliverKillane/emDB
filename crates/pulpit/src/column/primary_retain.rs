@@ -30,8 +30,13 @@ impl NextFree {
     }
 }
 
+struct HiddenData<MutData> {
+    hidden: bool,
+    data: MutData,
+}
+
 union Slot<MutData> {
-    data: ManuallyDrop<MutData>,
+    full: ManuallyDrop<HiddenData<MutData>>,
     next_free: EncodedNextFree,
 }
 
@@ -44,7 +49,7 @@ impl<ImmData, MutData> Drop for MutEntry<ImmData, MutData> {
     fn drop(&mut self) {
         if self.imm_ptr.is_null() {
             unsafe {
-                ManuallyDrop::drop(&mut self.mut_data.data);
+                ManuallyDrop::drop(&mut self.mut_data.full);
             }
         }
     }
@@ -90,6 +95,10 @@ pub struct PrimaryRetain<ImmData, MutData, const BLOCK_SIZE: usize> {
     dummy_zero_size: (),
 }
 
+impl <ImmData, MutData, const BLOCK_SIZE: usize> Keyable for PrimaryRetain<ImmData, MutData, BLOCK_SIZE> {
+    type Key = GenKey<PrimaryRetain<ImmData, MutData, BLOCK_SIZE>, *const ImmData>;
+}
+
 impl<ImmData, MutData, const BLOCK_SIZE: usize> Column
     for PrimaryRetain<ImmData, MutData, BLOCK_SIZE>
 {
@@ -119,9 +128,9 @@ where
     ImmData: Clone,
 {
     type ImmGet = &'imm ImmData;
-    type Key = GenKey<PrimaryRetain<ImmData, MutData, BLOCK_SIZE>, *const ImmData>;
+    type Col = PrimaryRetain<ImmData, MutData, BLOCK_SIZE>;
 
-    fn get(&self, key: Self::Key) -> Access<Self::ImmGet, MutData> {
+    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, MutData> {
         let Entry {
             index,
             data: Data { imm_data, mut_data },
@@ -135,34 +144,37 @@ where
         })
     }
 
-    fn brw(&self, key: Self::Key) -> Access<&ImmData, &MutData> {
+    fn brw(&self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &MutData> {
         if let Some(MutEntry { imm_ptr, mut_data }) = self.inner.mut_data.get(key.index) {
-            if key.generation == *imm_ptr {
-                Ok(Entry {
-                    index: key.index,
-                    data: Data {
-                        imm_data: unsafe {
-                            if size_of::<ImmData>() == 0 {
-                                transmute::<&(), &ImmData>(&self.inner.dummy_zero_size)
-                            } else {
-                                &*(*imm_ptr).cast::<ImmData>()
-                            }
+            unsafe {
+                if key.generation == *imm_ptr && !mut_data.full.hidden {
+                    
+                    Ok(Entry {
+                        index: key.index,
+                        data: Data {
+                            imm_data: 
+                                if size_of::<ImmData>() == 0 {
+                                    transmute::<&(), &ImmData>(&self.inner.dummy_zero_size)
+                                } else {
+                                    &*(*imm_ptr).cast::<ImmData>()
+                                }
+                            ,
+                            mut_data:  &mut_data.full.data,
                         },
-                        mut_data: unsafe { &mut_data.data },
-                    },
-                })
-            } else {
-                Err(KeyError)
+                    })
+                } else {
+                    Err(KeyError)
+                }
             }
         } else {
             Err(KeyError)
         }
     }
 
-    fn brw_mut(&mut self, key: Self::Key) -> Access<&ImmData, &mut MutData> {
+    fn brw_mut(&mut self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &mut MutData> {
         if let Some(MutEntry { imm_ptr, mut_data }) = self.inner.mut_data.get_mut(key.index) {
             unsafe {
-                if key.generation == *imm_ptr {
+                if key.generation == *imm_ptr  && !mut_data.full.hidden {
                     Ok(Entry {
                         index: key.index,
                         data: Data {
@@ -171,7 +183,7 @@ where
                             } else {
                                 &*(*imm_ptr).cast::<ImmData>()
                             },
-                            mut_data: &mut mut_data.data,
+                            mut_data: &mut mut_data.full.data,
                         },
                     })
                 } else {
@@ -187,7 +199,7 @@ where
         get.clone()
     }
     
-    fn scan(&self) -> impl Iterator<Item = Self::Key> {
+    fn scan(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
         self.inner.mut_data.iter().enumerate().filter_map(|(index, entry)| {
             if entry.imm_ptr.is_null() {
                 None
@@ -213,7 +225,7 @@ where
     fn insert(
         &mut self,
         Data { imm_data, mut_data }: Data<ImmData, MutData>,
-    ) -> (Self::Key, InsertAction) {
+    ) -> (<Self::Col as Keyable>::Key, InsertAction) {
         let imm_ptr = self.inner.imm_data.append(imm_data);
         if let NextFree(Some(next_free)) = self.inner.next_free_mut {
             unsafe {
@@ -233,7 +245,7 @@ where
                 *mut_entry = MutEntry {
                     imm_ptr,
                     mut_data: Slot {
-                        data: ManuallyDrop::new(mut_data),
+                        full: ManuallyDrop::new(HiddenData { hidden: false, data: mut_data }),
                     },
                 };
                 (
@@ -250,7 +262,7 @@ where
             self.inner.mut_data.push(MutEntry {
                 imm_ptr,
                 mut_data: Slot {
-                    data: ManuallyDrop::new(mut_data),
+                    full: ManuallyDrop::new(HiddenData { hidden: false, data: mut_data }),
                 },
             });
             (
@@ -264,7 +276,7 @@ where
         }
     }
 
-    fn pull(&mut self, key: Self::Key) -> Access<Self::ImmPull, MutData> {
+    fn pull(&mut self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmPull, MutData> {
         if let Some(mut_entry) = self.inner.mut_data.get_mut(key.index) {
             unsafe {
                 if key.generation == mut_entry.imm_ptr {
@@ -273,7 +285,7 @@ where
                     } else {
                         &*(mut_entry.imm_ptr).cast::<ImmData>()
                     };
-                    let pull_mut_data = ManuallyDrop::take(&mut mut_entry.mut_data.data);
+                    let pull_mut_data = ManuallyDrop::take(&mut mut_entry.mut_data.full);
                     *mut_entry = MutEntry {
                         imm_ptr: ptr::null(),
                         mut_data: Slot {
@@ -285,7 +297,7 @@ where
                         index: key.index,
                         data: Data {
                             imm_data: pull_imm_ref,
-                            mut_data: pull_mut_data,
+                            mut_data: pull_mut_data.data,
                         },
                     })
                 } else {
@@ -299,6 +311,43 @@ where
 
     fn conv_pull(pull: Self::ImmPull) -> ImmData {
         pull.clone()
+    }
+}
+
+
+impl<'imm, ImmData, MutData, const BLOCK_SIZE: usize> PrimaryWindowHide<'imm, ImmData, MutData>
+for Window<'imm, PrimaryRetain<ImmData, MutData, BLOCK_SIZE>>
+where
+MutData: Clone,
+ImmData: Clone, {
+    fn hide(&mut self, key: <Self::Col as Keyable>::Key) -> Result<(), KeyError> {
+        if let Some(MutEntry { imm_ptr, mut_data }) = self.inner.mut_data.get_mut(key.index) {
+            unsafe {
+                if key.generation == *imm_ptr  && !mut_data.full.hidden {
+                    mut_data.full.hidden = true;
+                    Ok(())
+                } else {
+                    Err(KeyError)
+                }
+            }
+        } else {
+            Err(KeyError)
+        }
+    }
+
+    fn reveal(&mut self, key: <Self::Col as Keyable>::Key) -> Result<(), KeyError>{
+        if let Some(MutEntry { imm_ptr, mut_data }) = self.inner.mut_data.get_mut(key.index) {
+            unsafe {
+                if key.generation == *imm_ptr  && mut_data.full.hidden {
+                    mut_data.full.hidden = false;
+                    Ok(())
+                } else {
+                    Err(KeyError)
+                }
+            }
+        } else {
+            Err(KeyError)
+        }
     }
 }
 

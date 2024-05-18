@@ -1,7 +1,8 @@
 use std::any::type_name;
 
 use crate::{
-    table::{Namer, PushVec, Table},
+    namer::Namer,
+    table::{PushVec, Table},
 };
 use proc_macro2::TokenStream;
 use quote_debug::Tokens;
@@ -13,7 +14,6 @@ use quote::{quote, ToTokens};
 #[enumtrait::store(ops_kind_enum)]
 pub enum OperationKind {
     Insert,
-    Append,
     Update,
     Get,
     Delete,
@@ -28,22 +28,10 @@ pub trait OpGen {
         table: &Table,
         namer: &Namer,
         prelude: &mut PushVec<Tokens<Item>>,
-        tks_before: &[Tokens<ExprBlock>],
-        tks_after: &[Tokens<ExprBlock>],
-    ) -> Tokens<TraitItemFn> {
-        let type_name = std::any::type_name::<Self>();
-        quote! {
-            /// TODO: this operation is unimplemented for
-            fn #name(&self) -> () {
-                let this_op: &str = #type_name;
-                {#(#tks_before)*}
-                let do_op = ();
-                {#(#tks_after)*}
-            }
-        }
-        .into()
-    }
+    ) -> Tokens<TraitItemFn>;
 }
+
+
 
 #[enumtrait::impl_trait(ops_gen_trait for ops_kind_enum)]
 impl OpGen for OperationKind {}
@@ -53,54 +41,40 @@ pub struct Insert{
 }
 
 impl OpGen for Insert {
-    fn generate(&self,name: &Ident,table: &Table,namer: &Namer,prelude: &mut PushVec<Tokens<Item>>,tks_before: &[Tokens<ExprBlock>],tks_after: &[Tokens<ExprBlock>],) -> Tokens<TraitItemFn> {
-        
-        let input_struct = &self.input_struct;
-
-        quote!{
-            fn #name(row: #input_struct) -> Result<Key, >
-        }.into()
+    fn generate(&self,name: &Ident,table: &Table,namer: &Namer,prelude: &mut PushVec<Tokens<Item>>,) -> Tokens<TraitItemFn> {
+        todo!()
     }
 }
 
-struct Append {
-    input_struct: Tokens<Type>,
-}
-
-
-impl OpGen for Append {}
 pub struct Update;
 
-impl OpGen for Update {}
+impl OpGen for Update {
+    fn generate(&self,name: &Ident,table: &Table,namer: &Namer,prelude: &mut PushVec<Tokens<Item>>,) -> Tokens<TraitItemFn> {
+        todo!()
+    }
+}
 
 pub struct Get;
 
-impl OpGen for Get {}
+impl OpGen for Get {
+    fn generate(&self,name: &Ident,table: &Table,namer: &Namer,prelude: &mut PushVec<Tokens<Item>>,) -> Tokens<TraitItemFn> {
+        todo!()
+    }
+}
 
 pub struct Delete;
 
-impl OpGen for Delete {}
+impl OpGen for Delete {
+    fn generate(&self,name: &Ident,table: &Table,namer: &Namer,prelude: &mut PushVec<Tokens<Item>>,) -> Tokens<TraitItemFn> {
+        todo!()
+    }
+}
 
 pub struct Count;
 
 impl OpGen for Count {
-    fn generate(
-        &self,
-        name: &Ident,
-        table: &Table,
-        namer: &Namer,
-        prelude: &mut PushVec<Tokens<Item>>,
-        tks_before: &[Tokens<ExprBlock>],
-        tks_after: &[Tokens<ExprBlock>],
-    ) -> Tokens<TraitItemFn> {
-        let prim_name = namer.primary_column();
-        quote! {
-            fn #name(&self) -> usize {
-                #(#tks_before)*
-                self.#prim_name.len()
-                #(#tks_after)*
-            }
-        }.into()
+    fn generate(&self,name: &Ident,table: &Table,namer: &Namer,prelude: &mut PushVec<Tokens<Item>>,) -> Tokens<TraitItemFn> {
+        todo!()
     }
 }
 

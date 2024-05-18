@@ -7,6 +7,10 @@ pub struct PrimaryAppend<Col> {
     max_key: usize,
 }
 
+impl <Col> Keyable for PrimaryAppend<Col> {
+    type Key = usize;
+}
+
 impl<Col: Column> Column for PrimaryAppend<Col> {
     type WindowKind<'imm> = WindowPrimaryAppend<'imm, Col> where Self: 'imm;
 
@@ -37,9 +41,9 @@ where
     Col::WindowKind<'imm>: AssocWindow<'imm, ImmData, MutData>,
 {
     type ImmGet = <Col::WindowKind<'imm> as AssocWindow<'imm, ImmData, MutData>>::ImmGet;
-    type Key = usize;
+    type Col = PrimaryAppend<Col>;
 
-    fn get(&self, key: Self::Key) -> Access<Self::ImmGet, MutData> {
+    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, MutData> {
         if key < *self.max_key {
             Ok(Entry {
                 index: key,
@@ -50,7 +54,7 @@ where
         }
     }
 
-    fn brw(&self, key: Self::Key) -> Access<&ImmData, &MutData> {
+    fn brw(&self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &MutData> {
         if key < *self.max_key {
             Ok(Entry {
                 index: key,
@@ -61,7 +65,7 @@ where
         }
     }
 
-    fn brw_mut(&mut self, key: Self::Key) -> Access<&ImmData, &mut MutData> {
+    fn brw_mut(&mut self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &mut MutData> {
         if key < *self.max_key {
             Ok(Entry {
                 index: key,
@@ -76,7 +80,7 @@ where
         Col::WindowKind::conv_get(get)
     }
     
-    fn scan(&self) -> impl Iterator<Item = Self::Key> {
+    fn scan(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
         0..(*self.max_key)
     }
 }
@@ -87,7 +91,7 @@ where
     Col: Column,
     Col::WindowKind<'imm>: AssocWindow<'imm, ImmData, MutData>,
 {
-    fn append(&mut self, val: Data<ImmData, MutData>) -> Self::Key {
+    fn append(&mut self, val: Data<ImmData, MutData>) -> <Self::Col as Keyable>::Key {
         let key = *self.max_key;
         *self.max_key += 1;
         self.col.append(val);

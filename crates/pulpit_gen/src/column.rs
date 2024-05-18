@@ -1,7 +1,13 @@
 use crate::{
-    access::FieldState,
-    table::{Namer, PushVec},
+    namer::Namer,
+    table::{PushVec},
 };
+
+pub struct FieldState {
+    pub datatype: Tokens<Type>,
+    pub init: Tokens<ExprBlock>,
+}
+
 use quote::quote;
 use quote_debug::Tokens;
 use syn::{Type, ExprBlock, ExprClosure, ExprStruct, Ident, Item};

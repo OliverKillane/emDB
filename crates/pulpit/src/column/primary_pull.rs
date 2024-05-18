@@ -2,61 +2,64 @@ use std::marker::PhantomData;
 
 use super::*;
 
+#[derive(Clone, Copy)]
 enum GenEntry {
     Generation(usize),
+    Hidden(usize),
     NextFree(Option<usize>),
-}
-
-type GenEntryEncoded = usize;
-
-impl GenEntry {
-    fn decode(val: &GenEntryEncoded) -> GenEntry {
-        if val % 2 == 0 {
-            GenEntry::Generation(val / 2)
-        } else {
-            let opt = val / 2;
-            GenEntry::NextFree(if opt == 0 { None } else { Some(opt - 1) })
-        }
-    }
-
-    fn encode(&self) -> GenEntryEncoded {
-        match self {
-            GenEntry::Generation(val) => {
-                debug_assert!(*val <= usize::MAX / 2);
-                val * 2
-            }
-            GenEntry::NextFree(opt) => opt
-                .map(|val| {
-                    debug_assert!(val < ((usize::MAX - 1) / 2));
-                    (val + 1) * 2 + 1
-                })
-                .unwrap_or(1),
-        }
-    }
 }
 
 struct GenInfo {
     next_free: Option<usize>,
     gen_counter: usize,
-    generations: Vec<GenEntryEncoded>,
+    generations: Vec<GenEntry>,
 }
 
 impl GenInfo {
     fn lookup_key<Store>(&self, key: GenKey<Store, usize>) -> Result<UnsafeIndex, KeyError> {
-        match self.generations.get(key.index).map(GenEntry::decode) {
-            Some(GenEntry::Generation(g)) if key.generation == g => Ok(key.index),
+        match self.generations.get(key.index) {
+            Some(GenEntry::Generation(g)) if key.generation == *g => Ok(key.index),
             _ => Err(KeyError),
         }
     }
 
     fn pull_key<Store>(&mut self, key: GenKey<Store, usize>) -> Result<UnsafeIndex, KeyError> {
         if let Some(entry) = self.generations.get_mut(key.index) {
-            match GenEntry::decode(&*entry) {
-                GenEntry::Generation(g) if g == key.generation => {
-                    *entry = GenEntry::NextFree(self.next_free).encode();
+            match *entry {
+                GenEntry::Generation( g) | GenEntry::Hidden(g) if g == key.generation 
+                 => {
+                    *entry = GenEntry::NextFree(self.next_free);
                     self.next_free = Some(key.index);
                     self.gen_counter += 1;
                     Ok(key.index)
+                 },
+                _ => Err(KeyError),
+            }
+        } else {
+            Err(KeyError)
+        }
+    }
+
+    fn hide_key<Store>(&mut self, key: GenKey<Store, usize>) -> Result<(), KeyError> {
+        if let Some(entry) = self.generations.get_mut(key.index) {
+            match *entry {
+                GenEntry::Generation(g) if g == key.generation => {
+                    *entry = GenEntry::Hidden(g);
+                    Ok(())
+                }
+                _ => Err(KeyError),
+            }
+        } else {
+            Err(KeyError)
+        }
+    }
+
+    fn reveal_key<Store>(&mut self, key: GenKey<Store, usize>) -> Result<(), KeyError> {
+        if let Some(entry) = self.generations.get_mut(key.index) {
+            match *entry {
+                GenEntry::Hidden(g) if g == key.generation => {
+                    *entry = GenEntry::Generation(g);
+                    Ok(())
                 }
                 _ => Err(KeyError),
             }
@@ -69,13 +72,13 @@ impl GenInfo {
         self.generations
             .iter()
             .enumerate()
-            .filter_map(|(i, e)| match GenEntry::decode(e) {
+            .filter_map(|(i, e)| match e {
                 GenEntry::Generation(g) => Some(GenKey {
                     index: i,
-                    generation: g,
+                    generation: *g,
                     phantom: PhantomData,
                 }),
-                GenEntry::NextFree(_) => None,
+                GenEntry::NextFree(_) | GenEntry::Hidden(_) => None,
             })
     }
 
@@ -83,10 +86,10 @@ impl GenInfo {
         if let Some(k) = self.next_free {
             // TODO: could use unchecked here
             let entry = self.generations.get_mut(k).unwrap();
-            match GenEntry::decode(&*entry) {
+            match *entry {
                 GenEntry::NextFree(opt) => {
                     self.next_free = opt;
-                    *entry = GenEntry::Generation(self.gen_counter).encode();
+                    *entry = GenEntry::Generation(self.gen_counter);
                     (
                         GenKey {
                             index: k,
@@ -101,7 +104,7 @@ impl GenInfo {
         } else {
             let index = self.generations.len();
             self.generations
-                .push(GenEntry::Generation(self.gen_counter).encode());
+                .push(GenEntry::Generation(self.gen_counter));
             (
                 GenKey {
                     index,
@@ -118,6 +121,10 @@ impl GenInfo {
 pub struct PrimaryPull<Col> {
     col: Col,
     gen: GenInfo,
+}
+
+impl <Col> Keyable for PrimaryPull<Col> {
+    type Key = GenKey<PrimaryPull<Col>, usize>;
 }
 
 impl<Col: Column> Column for PrimaryPull<Col> {
@@ -154,9 +161,9 @@ where
     Col::WindowKind<'imm>: AssocWindow<'imm, ImmData, MutData>,
 {
     type ImmGet = <Col::WindowKind<'imm> as AssocWindow<'imm, ImmData, MutData>>::ImmGet;
-    type Key = GenKey<PrimaryPull<Col>, usize>;
+    type Col = PrimaryPull<Col>;
 
-    fn get(&self, key: Self::Key) -> Access<Self::ImmGet, MutData> {
+    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, MutData> {
         let index = self.gen.lookup_key(key)?;
         Ok(Entry {
             index,
@@ -164,7 +171,7 @@ where
         })
     }
 
-    fn brw(&self, key: Self::Key) -> Access<&ImmData, &MutData> {
+    fn brw(&self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &MutData> {
         let index = self.gen.lookup_key(key)?;
         Ok(Entry {
             index,
@@ -172,7 +179,7 @@ where
         })
     }
 
-    fn brw_mut(&mut self, key: Self::Key) -> Access<&ImmData, &mut MutData> {
+    fn brw_mut(&mut self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &mut MutData> {
         let index = self.gen.lookup_key(key)?;
         Ok(Entry {
             index,
@@ -184,7 +191,7 @@ where
         Col::WindowKind::conv_get(get)
     }
     
-    fn scan(&self) -> impl Iterator<Item = Self::Key> {
+    fn scan(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
         self.gen.scan()
     }
 }
@@ -197,7 +204,7 @@ where
 {
     type ImmPull = <Col::WindowKind<'imm> as AssocWindowPull<'imm, ImmData, MutData>>::ImmPull;
 
-    fn pull(&mut self, key: Self::Key) -> Access<Self::ImmPull, MutData> {
+    fn pull(&mut self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmPull, MutData> {
         let index = self.gen.pull_key(key)?;
         Ok(Entry {
             index,
@@ -205,7 +212,7 @@ where
         })
     }
 
-    fn insert(&mut self, val: Data<ImmData, MutData>) -> (Self::Key, InsertAction) {
+    fn insert(&mut self, val: Data<ImmData, MutData>) -> (<Self::Col as Keyable>::Key, InsertAction) {
         let (key, action) = self.gen.insert();
         match &action {
             InsertAction::Place(ind) => unsafe { self.col.place(*ind, val) },
@@ -216,5 +223,20 @@ where
 
     fn conv_pull(pull: Self::ImmPull) -> ImmData {
         Col::WindowKind::conv_pull(pull)
+    }
+}
+
+impl<'imm, ImmData, MutData, Col> PrimaryWindowHide<'imm, ImmData, MutData>
+    for WindowPrimaryPull<'imm, Col>
+where
+    Col: Column,
+    Col::WindowKind<'imm>: AssocWindowPull<'imm, ImmData, MutData>,
+{
+    fn hide(&mut self, key: <Self::Col as Keyable>::Key) -> Result<(), KeyError> {
+        self.gen.hide_key(key)
+    }
+
+    fn reveal(&mut self, key: <Self::Col as Keyable>::Key) -> Result<(), KeyError> {
+        self.gen.reveal_key(key)
     }
 }

@@ -163,6 +163,12 @@ pub trait Column {
     fn window(&mut self) -> Self::WindowKind<'_>;
 }
 
+/// In order to get the Key (without needing the `'imm` lifetime parameter) it is 
+/// kept separate from the window, referenced through the column in the window.
+pub trait Keyable {
+    type Key: Copy + Eq;
+}
+
 /// The raw column index type (used for unchecked indexes)
 pub type UnsafeIndex = usize;
 
@@ -196,21 +202,22 @@ pub trait PrimaryWindow<'imm, ImmData, MutData> {
     ///   or any [`PrimaryWindowPull`] operations.
     type ImmGet: 'imm;
 
-    /// The key type for the primary index.
-    type Key: Copy + Eq;
+    /// The key type of backing column, used to get the type needed for key (which 
+    /// does not need the `'imm` lifetime parameter)
+    type Col: Keyable + Column;
 
-    fn get(&self, key: Self::Key) -> Access<Self::ImmGet, MutData>;
-    fn brw(&self, key: Self::Key) -> Access<&ImmData, &MutData>;
-    fn brw_mut(&mut self, key: Self::Key) -> Access<&ImmData, &mut MutData>;
+    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, MutData>;
+    fn brw(&self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &MutData>;
+    fn brw_mut(&mut self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &mut MutData>;
 
     /// For testing include a conversion for the immutable value
     fn conv_get(get: Self::ImmGet) -> ImmData;
 
-    fn scan(&self) -> impl Iterator<Item = Self::Key>;
+    fn scan(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key>;
 }
 
 pub trait PrimaryWindowApp<'imm, ImmData, MutData>: PrimaryWindow<'imm, ImmData, MutData> {
-    fn append(&mut self, val: Data<ImmData, MutData>) -> Self::Key;
+    fn append(&mut self, val: Data<ImmData, MutData>) -> <Self::Col as Keyable>::Key;
 
     /// To allow for transactions to remove data from the table
     /// 
@@ -228,11 +235,30 @@ pub trait PrimaryWindowPull<'imm, ImmData, MutData>: PrimaryWindow<'imm, ImmData
 
     /// n insert must track if old [`UnsafeIndex`] is to be overwritten in
     /// [`AssocWindowPull`] or an append is required.
-    fn insert(&mut self, val: Data<ImmData, MutData>) -> (Self::Key, InsertAction);
-    fn pull(&mut self, key: Self::Key) -> Access<Self::ImmPull, MutData>;
+    fn insert(&mut self, val: Data<ImmData, MutData>) -> (<Self::Col as Keyable>::Key, InsertAction);
+
+    /// Pull data from a column (removes it from the column)
+    /// For tables implementing [`PrimaryWindowHide`], this can include hidden 
+    /// values.
+    fn pull(&mut self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmPull, MutData>;
 
     /// For testing include a conversion for the immutable value pulled
     fn conv_pull(pull: Self::ImmPull) -> ImmData;
+}
+
+/// Hides a given key temporarily, until revealed or removed.
+/// - Allows for 'deletions' that are not actually enforced until commit.
+/// - Allows the deletion from other associated columns to be postponed till the 
+///   end of a transaction. 
+pub trait PrimaryWindowHide<'imm, ImmData, MutData>: PrimaryWindowPull<'imm, ImmData, MutData> {
+    /// Hide a value from get and brw access.
+    /// - Can be pulled from the table, or releaved (back to normal row)
+    /// - Cannot be hidden twice
+    fn hide(&mut self, key: <Self::Col as Keyable>::Key) -> Result<(), KeyError>;
+
+    /// Un-Hide a value to return it to its normal state
+    /// - Panics be called on a currently available row
+    fn reveal(&mut self, key: <Self::Col as Keyable>::Key) -> Result<(), KeyError>;
 }
 
 pub trait AssocWindow<'imm, ImmData, MutData> {
@@ -505,7 +531,7 @@ mod verif {
     struct CheckPrimary<'imm, ImmData, MutData, ColWindow, RefMap>
     where
         ColWindow: PrimaryWindow<'imm, ImmData, MutData>,
-        RefMap: ReferenceMap<ColWindow::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
+        RefMap: ReferenceMap<<ColWindow::Col as Keyable>::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
     {
         colwindow: ColWindow,
         items: RefMap,
@@ -515,11 +541,11 @@ mod verif {
     impl<'imm, ImmData, MutData, ColWindow, RefMap>
         CheckPrimary<'imm, ImmData, MutData, ColWindow, RefMap>
     where
-        RefMap: ReferenceMap<ColWindow::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
+        RefMap: ReferenceMap<<ColWindow::Col as Keyable>::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
         ColWindow: PrimaryWindow<'imm, ImmData, MutData>,
         ImmData: Clone + Eq + std::fmt::Debug,
         MutData: Clone + Eq + std::fmt::Debug,
-        <ColWindow as PrimaryWindow<'imm, ImmData, MutData>>::Key: Eq + Hash,
+        <ColWindow::Col as Keyable>::Key: Eq + Hash,
     {
         fn new(size_hint: usize, colwindow: ColWindow) -> Self {
             Self {
@@ -529,7 +555,7 @@ mod verif {
             }
         }
 
-        fn check_get(&self, key: ColWindow::Key) {
+        fn check_get(&self, key: <ColWindow::Col as Keyable>::Key) {
             if let Some((unsafeindex, data)) = self.items.get(&key) {
                 let entry = self
                     .colwindow
@@ -549,11 +575,11 @@ mod verif {
     impl<'imm, ImmData, MutData, ColWindow, RefMap>
         CheckPrimary<'imm, ImmData, MutData, ColWindow, RefMap>
     where
-        RefMap: ReferenceMap<ColWindow::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
+        RefMap: ReferenceMap<<ColWindow::Col as Keyable>::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
         ColWindow: PrimaryWindowApp<'imm, ImmData, MutData>,
         ImmData: Clone + Eq + std::fmt::Debug,
         MutData: Clone + Eq + std::fmt::Debug,
-        <ColWindow as PrimaryWindow<'imm, ImmData, MutData>>::Key: Eq + Hash,
+        <ColWindow::Col as Keyable>::Key: Eq + Hash,
     {
         fn check_append(&mut self, data: Data<ImmData, MutData>) {
             let key = self.colwindow.append(data.clone());
@@ -570,13 +596,13 @@ mod verif {
     impl<'imm, ImmData, MutData, ColWindow, RefMap>
         CheckPrimary<'imm, ImmData, MutData, ColWindow, RefMap>
     where
-        RefMap: ReferenceMap<ColWindow::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
+        RefMap: ReferenceMap<<ColWindow::Col as Keyable>::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
         ColWindow: PrimaryWindowPull<'imm, ImmData, MutData>,
         ImmData: Clone + Eq + std::fmt::Debug,
         MutData: Clone + Eq + std::fmt::Debug,
-        <ColWindow as PrimaryWindow<'imm, ImmData, MutData>>::Key: Eq + Hash,
+        <ColWindow::Col as Keyable>::Key: Eq + Hash,
     {
-        fn check_pull(&mut self, key: ColWindow::Key) {
+        fn check_pull(&mut self, key: <ColWindow::Col as Keyable>::Key) {
             if let Some((unsafeindex, data)) = self.items.remove(&key) {
                 let entry = self
                     .colwindow
@@ -624,7 +650,7 @@ mod verif {
         where
             Col: Column,
             for<'a> Col::WindowKind<'a>: PrimaryWindowPull<'a, usize, usize>,
-            for<'a> <Col::WindowKind<'a> as PrimaryWindow<'a, usize, usize>>::Key: Eq + Hash,
+            for<'a> <<Col::WindowKind<'a> as PrimaryWindow<'a, usize, usize>>::Col as Keyable>::Key: Eq + Hash,
         {
             const ITERS: usize = 100000;
             let mut col = Col::new(ITERS);
@@ -654,7 +680,7 @@ mod verif {
         where
             Col: Column,
             for<'a> Col::WindowKind<'a>: PrimaryWindowApp<'a, usize, usize>,
-            for<'a> <Col::WindowKind<'a> as PrimaryWindow<'a, usize, usize>>::Key: Eq + Hash,
+            for<'a> <<Col::WindowKind<'a> as PrimaryWindow<'a, usize, usize>>::Col as Keyable>::Key: Eq + Hash,
         {
             const ITERS: usize = 100000;
             let mut col = Col::new(ITERS);

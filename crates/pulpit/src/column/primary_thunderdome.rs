@@ -24,6 +24,10 @@ impl<ImmData, MutData> Column for PrimaryThunderDome<ImmData, MutData> {
     }
 }
 
+impl <ImmData, MutData> Keyable for PrimaryThunderDome<ImmData, MutData> {
+    type Key = ThunderIndex;
+}
+
 impl<'imm, ImmData, MutData> PrimaryWindow<'imm, ImmData, MutData>
     for Window<'imm, PrimaryThunderDome<ImmData, MutData>>
 where
@@ -31,9 +35,9 @@ where
     MutData: Clone,
 {
     type ImmGet = ImmData;
-    type Key = ThunderIndex;
+    type Col = PrimaryThunderDome<ImmData, MutData>;
 
-    fn get(&self, key: Self::Key) -> Access<Self::ImmGet, MutData> {
+    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, MutData> {
         let Entry {
             data: Data { imm_data, mut_data },
             index,
@@ -47,7 +51,7 @@ where
         })
     }
 
-    fn brw(&self, key: Self::Key) -> Access<&ImmData, &MutData> {
+    fn brw(&self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &MutData> {
         match self.inner.arena.get(key) {
             Some(Data { imm_data, mut_data }) => Ok(Entry {
                 index: key.slot() as usize,
@@ -57,7 +61,7 @@ where
         }
     }
 
-    fn brw_mut(&mut self, key: Self::Key) -> Access<&ImmData, &mut MutData> {
+    fn brw_mut(&mut self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &mut MutData> {
         match self.inner.arena.get_mut(key) {
             Some(Data { imm_data, mut_data }) => Ok(Entry {
                 index: key.slot() as usize,
@@ -71,7 +75,7 @@ where
         get
     }
     
-    fn scan(&self) -> impl Iterator<Item = Self::Key> {
+    fn scan(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
         self.inner.arena.iter().map(|(i, _)| i)
     }
 }
@@ -84,7 +88,7 @@ where
 {
     type ImmPull = ImmData;
 
-    fn insert(&mut self, val: Data<ImmData, MutData>) -> (Self::Key, InsertAction) {
+    fn insert(&mut self, val: Data<ImmData, MutData>) -> (<Self::Col as Keyable>::Key, InsertAction) {
         let curr_max = self.inner.arena.len();
         let key = self.inner.arena.insert(val);
         let index = key.slot() as usize;
@@ -98,7 +102,7 @@ where
         )
     }
 
-    fn pull(&mut self, key: Self::Key) -> Access<Self::ImmPull, MutData> {
+    fn pull(&mut self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmPull, MutData> {
         match self.inner.arena.remove(key) {
             Some(Data { imm_data, mut_data }) => Ok(Entry {
                 index: key.slot() as usize,

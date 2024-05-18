@@ -15,38 +15,40 @@
 
 use std::{collections::HashMap, hash::Hash};
  
-struct MissingValue;
-struct Conflict;
+#[derive(Debug)]
+pub struct MissingUniqueValue;
+#[derive(Debug)]
+pub struct UniqueConflict;
 
 /// A simple wrapper for storing copies of keys and associated unique values in 
 /// an index.
-struct Unique<Field, Key> {
+pub struct Unique<Field, Key> {
     mapping: HashMap<Field, Key>,
 }
 
 impl <Field: Eq + Hash, Key: Copy> Unique<Field, Key> {
-    fn new(size_hint: usize) -> Self {
+    pub fn new(size_hint: usize) -> Self {
         Self { mapping: HashMap::with_capacity(size_hint) }
     }
 
-    fn lookup(&self, value: &Field) -> Result<Key, MissingValue> {
+    pub fn lookup(&self, value: &Field) -> Result<Key, MissingUniqueValue> {
         match self.mapping.get(value) {
             Some(k) => Ok(*k),
-            None => Err(MissingValue),
+            None => Err(MissingUniqueValue),
         }
     }
 
-    fn insert(&mut self, field: Field, key: Key) -> Result<(), Conflict> {
+    pub fn insert(&mut self, field: Field, key: Key) -> Result<(), UniqueConflict> {
         match self.mapping.insert(field, key) {
-            Some(_) => Err(Conflict),
+            Some(_) => Err(UniqueConflict),
             None => Ok(()),
         }
     }
 
-    fn pull(&mut self, field: Field) -> Result<(), MissingValue> {
-        match self.mapping.remove(&field) {
+    pub fn pull(&mut self, field: &Field) -> Result<(), MissingUniqueValue> {
+        match self.mapping.remove(field) {
             Some(_) => Ok(()),
-            None => Err(MissingValue),
+            None => Err(MissingUniqueValue),
         }
     }
 }
