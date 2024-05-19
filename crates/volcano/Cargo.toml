@@ -1,0 +1,17 @@
+[package]
+name = "volcano"
+version = "0.1.0"
+edition = "2021"
+
+readme = "README.md"
+description = "A crate for operator abstractions"
+keywords = ["performance", "traits"]
+categories = ["data"]
+
+repository.workspace = true
+homepage.workspace = true
+license-file.workspace = true
+
+[dependencies]
+
+[dev-dependencies]

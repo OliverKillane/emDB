@@ -20,15 +20,14 @@
 //! insert as ins,
 //! ```
 
+use my_table::Transactions;
+
+enum MyEnum {
+    Blagh,
+    Cool,
+}
 mod my_table {
-    use std::ops::Add;
-
-    use pulpit::{
-        self,
-        column::{AssocWindow, AssocWindowPull, Column, PrimaryWindow, PrimaryWindowHide, PrimaryWindowPull},
-    };
-
-    use self::transactions::LogItem;
+    use pulpit::column::{AssocWindow, AssocWindowPull, Column, PrimaryWindow, PrimaryWindowHide, PrimaryWindowPull};
 
     mod column_types {
         pub mod primary {
@@ -84,17 +83,19 @@ mod my_table {
         }
     }
 
-    pub mod inserts {
-        pub mod ins {
-            pub struct Insert {
-                pub a: i32,
-                pub b: usize,
-                pub c: Option<String>,
-                pub d: char,
-                pub e: String,
-            }
-            pub type Error = pulpit::access::UniqueConflict;
+    pub mod insert {
+        pub struct Insert {
+            pub a: i32,
+            pub b: usize,
+            pub c: Option<String>,
+            pub d: char,
+            pub e: String,
         }
+        pub type Error = pulpit::access::UniqueConflict;
+    }
+
+    trait Insert {
+        fn insert(&mut self, arg: insert::Insert) -> Result<Key, insert::Error>; 
     }
 
     pub mod gets {
@@ -113,8 +114,6 @@ mod my_table {
             }
         }
     }
-
-    pub mod deletes {}
 
     mod transactions {
         use super::{updates, Key};
@@ -187,13 +186,88 @@ mod my_table {
         columns: ColumnsWindow<'imm>,
     }
 
-    impl<'imm> Window<'imm> {
-        pub fn ins(&mut self, arg: inserts::ins::Insert) -> Result<Key, inserts::ins::Error> {
+    trait Deletion {
+        fn hide(&mut self, key: Key) -> Result<(), pulpit::column::KeyError>;
+        fn delete(&mut self, key: Key);
+        fn reveal(&mut self, key: Key);
+    }
+
+    pub trait Transactions {
+        fn commit(&mut self);
+        fn abort(&mut self);
+    }
+
+    impl <'imm> Deletion for Window<'imm> {
+        fn hide(&mut self, key: Key) -> Result<(), pulpit::column::KeyError> {
+            
+            let pulpit::column::Entry { index, data } = self.columns.primary.get(key)?;
+            let assoc_0_data = unsafe { self.columns.assoc_0.get(index) };
+            
+            // remove from unique_e
+            let unique_e = assoc_0_data.mut_data.e;
+            self.additional.unique_e.pull(&unique_e).unwrap();
+
+            self.columns.primary.hide(key).unwrap();
+
+            if self.additional.transaction_append {
+                self.additional.transaction_log.push(transactions::LogItem::Hide(key));
+            }
+
+            Ok(())
+        }
+
+        fn delete(&mut self, key: Key) {
+            let pulpit::column::Entry { index, data } = self.columns.primary.pull(key).unwrap();
+
+            unsafe {
+                self.columns.assoc_0.pull(index);
+            }
+        }
+
+        fn reveal(&mut self, key: Key) {
+
+            // place back in unique_e
+            self.columns.primary.reveal(key).unwrap();
+            
+            let pulpit::column::Entry { index, data } = self.columns.primary.get(key).unwrap();
+            
+            let assoc_0_data = unsafe { self.columns.assoc_0.get(index) };
+            let unique_e = assoc_0_data.mut_data.e;
+            self.additional.unique_e.insert(unique_e, key).unwrap();
+        }
+    }
+
+    impl <'imm> Transactions for Window<'imm> {
+        fn commit(&mut self) {
+            while let Some(op) = self.additional.transaction_log.pop() {
+                match op {
+                    transactions::LogItem::Hide(key) => <Self as Deletion>::delete(self, key),
+                    _ => ()
+                }
+            }
+        }
+
+        fn abort(&mut self) {
+            while let Some(op) = self.additional.transaction_log.pop() {
+                match op {
+                    transactions::LogItem::Insert(key) => <Self as Deletion>::delete(self, key),
+                    transactions::LogItem::Hide(key) => <Self as Deletion>::reveal(self, key),
+                    transactions::LogItem::Update { key, update } => match update {
+                        transactions::UpdateKinds::update_a(data) => {self.update_a(key, data).unwrap();},
+                        transactions::UpdateKinds::update_ace(data) => {self.update_ace(key, data).unwrap();},
+                    },
+                }
+            }
+        }
+    }
+
+    impl <'imm> Insert for Window<'imm> {
+        fn insert(&mut self, arg: insert::Insert) -> Result<Key, insert::Error> {
             let unique_e_val = arg.e.clone();
 
             // get fields
             let (primary_imm, primary_mut, assoc_0_imm, assoc_0_mut) = {
-                let inserts::ins::Insert { a, b, c, d, e } = arg;
+                let insert::Insert { a, b, c, d, e } = arg;
                 (
                     column_types::primary::Imm { b },
                     column_types::primary::Mut { a, c },
@@ -242,6 +316,12 @@ mod my_table {
             }
 
             Ok(key)
+        }
+    }
+
+    impl<'imm> Window<'imm> {
+        pub fn ins(&mut self, arg: insert::Insert) -> Result<Key, insert::Error> {
+            <Self as Insert>::insert(self, arg)
         }
 
         pub fn get_abe(
@@ -335,45 +415,7 @@ mod my_table {
         }
 
         pub fn del(&mut self, key: Key) -> Result<(), pulpit::column::KeyError> {
-            self.columns.primary.hide(key)?;
-
-            // remove from unique_e
-
-
-
-            if self.additional.transaction_append {
-                self.additional.transaction_log.push(transactions::LogItem::Hide(key));
-            }
-
-            Ok(())
-        }
-
-        pub fn commit(&mut self) {
-            for item in self.additional.transaction_log.iter().rev() {
-                match item {
-                    LogItem::Hide(key) => {
-                        let pulpit::column::Entry { index, data } = self.columns.primary.pull(*key).unwrap();
-                        unsafe {self.columns.assoc_0.pull(index);}
-                    }
-                    _ => ()
-                }
-            }
-            self.additional.transaction_log.clear();
-        }
-
-        pub fn abort(&mut self) {
-            while let Some(op) = self.additional.transaction_log.pop() {
-                match op {
-                    LogItem::Insert(key) => {
-
-                    },
-                    LogItem::Hide(_) => todo!(),
-                    LogItem::Update { key, update } => match update {
-                        transactions::UpdateKinds::update_a(data) => {self.update_a(key, data).unwrap();},
-                        transactions::UpdateKinds::update_ace(data) => {self.update_ace(key, data).unwrap();},
-                    },
-                }
-            }
+            <Self as Deletion>::hide(self, key)
         }
     }
 }
@@ -382,7 +424,7 @@ fn check() {
     let mut t = my_table::Table::new(0);
     let mut w = t.window();
     
-    w.ins(my_table::inserts::ins::Insert {
+    let k = w.ins(my_table::insert::Insert {
         a: 0,
         b: 0,
         c: None,
@@ -390,7 +432,9 @@ fn check() {
         e: "a".to_string(),
     }).unwrap();
 
+    let vs = w.get_abe(k).unwrap();
+    
+    w.del(k);
 
-    // w.update_ace(, update)
-
+    w.commit();
 }
