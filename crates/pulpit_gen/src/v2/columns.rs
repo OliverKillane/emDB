@@ -1,39 +1,75 @@
 use std::{collections::HashMap, iter::once};
 
-use bimap::BiMap;
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote_debug::Tokens;
-use syn::{Ident, ItemFn, ItemImpl, ItemMod, ItemStruct, ItemType, Path, Type};
+use syn::{Ident, ItemFn, ItemImpl, ItemMod, ItemStruct, ItemType, Type};
 
 use super::namer::CodeNamer;
 
 pub type FieldName = Ident;
 
 pub struct MutImmut<Data> {
-    imm_fields: Data,
-    mut_fields: Data,
+    pub imm_fields: Data,
+    pub mut_fields: Data,
 }
 
 pub struct Field {
-    name: FieldName,
-    ty: Tokens<Type>,
+    pub name: FieldName,
+    pub ty: Tokens<Type>,
 }
 
 pub struct Group<Col: ColKind> {
-    col: Col,
-    fields: MutImmut<Vec<Field>>,
+    pub col: Col,
+    pub fields: MutImmut<Vec<Field>>,
+}
+
+impl<Col: ColKind> Group<Col> {
+    fn get_type<'a>(&'a self, index: &FieldIndexInner) -> Option<&'a Tokens<Type>> {
+        if index.imm {
+            &self.fields.imm_fields
+        } else {
+            &self.fields.mut_fields
+        }
+        .get(index.field_num)
+        .map(|f| &f.ty)
+    }
 }
 
 pub struct Groups<Primary: PrimaryKind> {
-    pub idents: BiMap<Ident, FieldIndex>,
+    pub idents: HashMap<Ident, FieldIndex>,
     pub primary: Group<Primary>,
     pub assoc: Vec<Group<Primary::Assoc>>,
 }
 
+impl<Primary: PrimaryKind> Groups<Primary> {
+    // get type from field
+
+    pub fn get_field_index(&self, field: &FieldName) -> Option<&FieldIndex> {
+        self.idents.get(field)
+    }
+
+    pub fn get_type(&self, index: &FieldIndex) -> Option<&Tokens<Type>> {
+        match index {
+            FieldIndex::Primary(inner) => self.primary.get_type(inner),
+            FieldIndex::Assoc { assoc_ind, inner } => self
+                .assoc
+                .get(*assoc_ind)
+                .map(|f| f.get_type(inner))
+                .flatten(),
+        }
+    }
+
+    pub fn get_typefield(&self, field: &FieldName) -> Option<&Tokens<Type>> {
+        self.get_field_index(field)
+            .map(|f| self.get_type(f))
+            .flatten()
+    }
+}
+
 pub struct FieldIndexInner {
-    imm: bool,
-    field_num: usize,
+    pub imm: bool,
+    pub field_num: usize,
 }
 
 pub enum FieldIndex {
@@ -44,10 +80,19 @@ pub enum FieldIndex {
     },
 }
 
-struct GroupsDef {
-    columns_struct: Tokens<ItemStruct>,
-    columns_impl: Tokens<ItemImpl>,
-    window_struct: Tokens<ItemStruct>,
+impl FieldIndex {
+    pub fn is_imm(&self) -> bool {
+        match self {
+            FieldIndex::Primary(inner) => inner.imm,
+            FieldIndex::Assoc { inner, .. } => inner.imm,
+        }
+    }
+}
+
+pub struct GroupsDef {
+    pub columns_struct: Tokens<ItemStruct>,
+    pub columns_impl: Tokens<ItemImpl>,
+    pub window_struct: Tokens<ItemStruct>,
 }
 
 struct ImmConversion {
@@ -66,20 +111,18 @@ trait ColKind {
     fn convert_imm(&self, namer: &CodeNamer, imm_fields: &[Field]) -> ImmConversion;
 }
 
-pub trait AssocKind: ColKind {
-    const DELETIONS: bool;
-}
+pub trait AssocKind: ColKind {}
 
 pub trait PrimaryKind: ColKind {
     const TRANSACTIONS: bool;
     const DELETIONS: bool;
-    type Assoc: AssocKind<DELETIONS=Self::DELETIONS>;
+    type Assoc: AssocKind;
 }
 
 impl<Col: ColKind> Group<Col> {
     fn column_type(&self, group_name: Ident, namer: &CodeNamer) -> Tokens<ItemMod> {
-        let imm_struct_name = namer.column_types_imm_struct();
-        let mut_struct_name = namer.column_types_mut_struct();
+        let imm_struct_name = namer.mod_columns_struct_imm();
+        let mut_struct_name = namer.mod_columns_struct_mut();
 
         let MutImmut {
             imm_fields: imm_derives,
@@ -124,21 +167,18 @@ impl<Col: ColKind> Group<Col> {
 }
 
 impl<Primary: PrimaryKind> Groups<Primary> {
-    fn column_types(&self, namer: &CodeNamer) -> Tokens<ItemMod> {
-        let mod_name = namer.column_types_mod();
+    pub fn column_types(&self, namer: &CodeNamer) -> Tokens<ItemMod> {
+        let mod_name = namer.mod_columns();
 
-        let primary_mod = self
-            .primary
-            .column_type(namer.column_types_primary_mod(), namer);
+        let primary_mod = self.primary.column_type(namer.name_primary_column(), namer);
         let assoc_mods = self
             .assoc
             .iter()
             .enumerate()
-            .map(|(ind, grp)| grp.column_type(namer.column_types_assoc_mod(ind), namer));
+            .map(|(ind, grp)| grp.column_type(namer.name_assoc_column(ind), namer));
         quote! {
             mod #mod_name {
                 //! Column types to be used for storage in each column.
-
                 #primary_mod
                 #(#assoc_mods)*
             }
@@ -146,31 +186,31 @@ impl<Primary: PrimaryKind> Groups<Primary> {
         .into()
     }
 
-    fn key_type(&self, namer: &CodeNamer) -> Tokens<ItemType> {
-        let col_types = namer.column_types_mod();
-        let primary_mod = namer.column_types_primary_mod();
-        let imm_struct_name = namer.column_types_imm_struct();
-        let mut_struct_name = namer.column_types_mut_struct();
+    pub fn key_type(&self, namer: &CodeNamer) -> Tokens<ItemType> {
+        let col_types = namer.mod_columns();
+        let primary_mod = namer.name_primary_column();
+        let imm_struct_name = namer.mod_columns_struct_imm();
+        let mut_struct_name = namer.mod_columns_struct_mut();
         let primary_type = self.primary.col.generate_column_type(
             namer,
             quote!(#col_types::#primary_mod::#imm_struct_name).into(),
             quote!(#col_types::#primary_mod::#mut_struct_name).into(),
         );
         let pulpit_path = namer.pulpit_path();
-
+        let key_type = namer.type_key();
         quote! {
             /// The key for accessing rows (delete, update, get)
-            pub type Key = <#primary_type as #pulpit_path::column::Keyable>::Key;
+            pub type #key_type = <#primary_type as #pulpit_path::column::Keyable>::Key;
         }
         .into()
     }
 
-    fn columns_definition(&self, namer: &CodeNamer) -> GroupsDef {
-        let col_types = namer.column_types_mod();
-        let primary_mod = namer.column_types_primary_mod();
+    pub fn columns_definition(&self, namer: &CodeNamer) -> GroupsDef {
+        let col_types = namer.mod_columns();
+        let primary_mod = namer.name_primary_column();
 
-        let imm_struct_name = namer.column_types_imm_struct();
-        let mut_struct_name = namer.column_types_mut_struct();
+        let imm_struct_name = namer.mod_columns_struct_imm();
+        let mut_struct_name = namer.mod_columns_struct_mut();
 
         let pulpit_path = namer.pulpit_path();
 
@@ -185,7 +225,7 @@ impl<Primary: PrimaryKind> Groups<Primary> {
             .iter()
             .enumerate()
             .map(|(ind, Group { col, fields })| {
-                let assoc_name = namer.column_types_assoc_mod(ind);
+                let assoc_name = namer.name_assoc_column(ind);
                 (
                     col.generate_column_type(
                         namer,
@@ -211,8 +251,8 @@ impl<Primary: PrimaryKind> Groups<Primary> {
             news.push(quote!(#member: #ty::new(size_hint)));
         }
 
-        let column_holder = namer.column_holder();
-        let window_holder = namer.window_holder();
+        let column_holder = namer.struct_column_holder();
+        let window_holder = namer.struct_window_holder();
 
         GroupsDef {
             columns_struct: quote! {

@@ -1,8 +1,6 @@
-use std::collections::HashSet;
-
-mod columns;
-mod namer;
-mod updates;
-mod borrow;
-mod uniques;
-mod predicates;
+pub mod columns;
+pub mod namer;
+pub mod operations;
+pub mod predicates;
+mod table;
+pub mod uniques;

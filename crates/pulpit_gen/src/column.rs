@@ -1,7 +1,4 @@
-use crate::{
-    namer::Namer,
-    table::{PushVec},
-};
+use crate::{namer::Namer, table::PushVec};
 
 pub struct FieldState {
     pub datatype: Tokens<Type>,
@@ -10,7 +7,7 @@ pub struct FieldState {
 
 use quote::quote;
 use quote_debug::Tokens;
-use syn::{Type, ExprBlock, ExprClosure, ExprStruct, Ident, Item};
+use syn::{ExprBlock, ExprClosure, ExprStruct, Ident, Item, Type};
 
 pub struct ColumnsConfig {
     pub primary_col: Column<PrimaryColumn>,
@@ -173,12 +170,17 @@ pub struct ColumnTypes {
     pub kind_trait: Tokens<Type>,
 
     /// PrimaryWindowPull, PrimaryWindowAppend, AssocWindowPull, AssocWindow etc.
-    pub access_trait: Tokens<Type>
+    pub access_trait: Tokens<Type>,
 }
 
 #[enumtrait::store(column_gen_trait)]
 pub trait ColumnGenerate {
-    fn generate(&self, namer: &Namer, fields: &ColFields, prelude: &mut PushVec<Tokens<Item>>) -> ColumnTypes;
+    fn generate(
+        &self,
+        namer: &Namer,
+        fields: &ColFields,
+        prelude: &mut PushVec<Tokens<Item>>,
+    ) -> ColumnTypes;
 
     fn decouple_imm(&self, imm_fields: &[Field], namer: &Namer) -> Decoupling;
     fn decouple_pull(&self, imm_fields: &[Field], namer: &Namer) -> Decoupling;
@@ -191,8 +193,8 @@ impl ColumnGenerate for PrimaryColumn {}
 impl ColumnGenerate for AssocColumn {}
 
 pub struct Field {
-    ty: Tokens<Type>,
-    name: Ident,
+    pub ty: Tokens<Type>,
+    pub name: Ident,
 }
 pub struct FieldList {
     fields: Vec<(Ident, Tokens<Type>)>,
@@ -220,7 +222,12 @@ pub struct PrimaryRetain {
 }
 
 impl ColumnGenerate for PrimaryRetain {
-    fn generate(&self, namer: &Namer, fields: &ColFields, prelude: &mut PushVec<Tokens<Item>>) -> ColumnTypes {
+    fn generate(
+        &self,
+        namer: &Namer,
+        fields: &ColFields,
+        prelude: &mut PushVec<Tokens<Item>>,
+    ) -> ColumnTypes {
         let block_size = self.block_size;
         let imm_data = utils::tuple_type(&fields.imm_data);
         let mut_data = utils::tuple_type(&fields.mut_data);
@@ -246,7 +253,12 @@ pub struct AssocBlocks {
 }
 
 impl ColumnGenerate for AssocBlocks {
-    fn generate(&self, namer: &Namer, fields: &ColFields, prelude: &mut PushVec<Tokens<Item>>) -> ColumnTypes {
+    fn generate(
+        &self,
+        namer: &Namer,
+        fields: &ColFields,
+        prelude: &mut PushVec<Tokens<Item>>,
+    ) -> ColumnTypes {
         let block_size = self.block_size;
         let imm_data = utils::tuple_type(&fields.imm_data);
         let mut_data = utils::tuple_type(&fields.mut_data);

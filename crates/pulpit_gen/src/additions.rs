@@ -1,9 +1,13 @@
-use std::collections::{HashMap, HashSet};
-use quote_debug::Tokens;
 use quote::quote;
+use quote_debug::Tokens;
+use std::collections::{HashMap, HashSet};
 use syn::{Ident, Item, ItemMod, ItemStruct};
 
-use crate::{namer::Namer, ops::OperationKind, table::{PushVec, Table}};
+use crate::{
+    namer::Namer,
+    ops::OperationKind,
+    table::{PushVec, Table},
+};
 
 pub struct Additionals {
     transactions: bool,
@@ -30,10 +34,5 @@ impl ...  {
 
 */
 
-/// Generate the struct 'Additonals' 
-fn generate_additionals(
-    table: &Table,
-    namer: &Namer,
-) -> Tokens<ItemMod> {
-    
-}
+/// Generate the struct 'Additonals'
+fn generate_additionals(table: &Table, namer: &Namer) -> Tokens<ItemMod> {}

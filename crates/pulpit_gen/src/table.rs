@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use crate::{
-    additions::Additionals, column::{AssocInd, ColumnGenerate, ColumnTypes, ColumnsConfig, FieldState}, namer::Namer, ops::{OpGen, OperationKind}
+    additions::Additionals,
+    column::{AssocInd, ColumnGenerate, ColumnTypes, ColumnsConfig, FieldState},
+    namer::Namer,
+    ops::{OpGen, OperationKind},
 };
 use bimap::BiHashMap;
 use proc_macro2::TokenStream;
@@ -40,11 +43,15 @@ impl Table {
         let mut prelude = PushVec::new();
         let mut methods = PushVec::new();
 
-        let ColumnTypes{ concrete_type: primary_type, kind_trait:primarykind, access_trait:_ } = self
-            .columns
-            .primary_col
-            .col
-            .generate(namer, &self.columns.primary_col.fields, &mut prelude);
+        let ColumnTypes {
+            concrete_type: primary_type,
+            kind_trait: primarykind,
+            access_trait: _,
+        } = self.columns.primary_col.col.generate(
+            namer,
+            &self.columns.primary_col.fields,
+            &mut prelude,
+        );
         let primary_name = namer.primary_column();
 
         let (assoc_fields_types, assoc_field_numbers): (Vec<_>, Vec<_>) = self
@@ -52,7 +59,15 @@ impl Table {
             .assoc_columns
             .iter()
             .enumerate()
-            .map(|(ind, assoc_col)| (assoc_col.col.generate(namer, &assoc_col.fields, &mut prelude).concrete_type, ind))
+            .map(|(ind, assoc_col)| {
+                (
+                    assoc_col
+                        .col
+                        .generate(namer, &assoc_col.fields, &mut prelude)
+                        .concrete_type,
+                    ind,
+                )
+            })
             .unzip();
         let assoc_cols_name = namer.associated_column_tuple();
 

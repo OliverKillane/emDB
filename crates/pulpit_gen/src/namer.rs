@@ -1,5 +1,5 @@
-use quote_debug::Tokens;
 use quote::quote;
+use quote_debug::Tokens;
 use syn::{ExprBlock, ExprClosure, Ident, ItemMod, Lifetime, Type};
 
 pub struct Namer {
