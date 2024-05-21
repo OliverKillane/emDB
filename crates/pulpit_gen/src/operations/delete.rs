@@ -1,5 +1,5 @@
 use super::SingleOp;
-use crate::v2::{columns::PrimaryKind, namer::CodeNamer};
+use crate::{columns::PrimaryKind, namer::CodeNamer};
 use quote::quote;
 
 pub fn generate(namer: &CodeNamer) -> SingleOp {

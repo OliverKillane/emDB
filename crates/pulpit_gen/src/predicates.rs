@@ -4,7 +4,7 @@ use quote::quote;
 use quote_debug::Tokens;
 use syn::{ExprCall, ExprTuple, Ident, ItemFn, ItemMod};
 
-use crate::v2::columns::{Field, Group};
+use crate::columns::{Field, Group};
 
 use super::{
     columns::{FieldName, Groups, PrimaryKind},

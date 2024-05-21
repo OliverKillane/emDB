@@ -1,122 +1,90 @@
-use std::collections::HashMap;
-
-use crate::{
-    additions::Additionals,
-    column::{AssocInd, ColumnGenerate, ColumnTypes, ColumnsConfig, FieldState},
-    namer::Namer,
-    ops::{OpGen, OperationKind},
-};
-use bimap::BiHashMap;
-use proc_macro2::TokenStream;
+use crate::operations;
 use quote::quote;
 use quote_debug::Tokens;
-use syn::{ExprBlock, ExprClosure, Ident, ItemMod, Lifetime, Type};
+use std::collections::{HashMap, HashSet};
+use syn::{Ident, ItemMod};
 
-pub struct Table {
-    pub columns: ColumnsConfig,
-    pub additions: Additionals,
-    pub user_ops: HashMap<Ident, OperationKind>,
-    pub access_ops: Vec<OperationKind>,
+use super::{
+    columns::{FieldName, Groups, GroupsDef, PrimaryKind},
+    namer::CodeNamer,
+    operations::{update::Update, SingleOp},
+    predicates::{self, Predicate},
+    uniques::{self, Unique},
+};
+
+struct Table<Primary: PrimaryKind> {
+    groups: Groups<Primary>,
+    uniques: HashMap<FieldName, Unique>,
+    predicates: Vec<Predicate>,
+    updates: Vec<Update>,
+    name: Ident,
 }
 
-pub struct PushVec<T>(Vec<T>);
-impl<T> Default for PushVec<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+impl<Primary: PrimaryKind> Table<Primary> {
+    fn generate(&self, namer: &CodeNamer) -> Tokens<ItemMod> {
+        let Self {
+            groups,
+            uniques,
+            predicates,
+            updates,
+            name,
+        } = self;
 
-impl<T> PushVec<T> {
-    pub fn new() -> Self {
-        Self(Vec::new())
-    }
-    pub fn push(&mut self, data: T) {
-        self.0.push(data)
-    }
-    pub fn open(self) -> Vec<T> {
-        self.0
-    }
-}
+        let column_types = groups.column_types(namer);
+        let key_type = groups.key_type(namer);
+        let GroupsDef {
+            columns_struct,
+            columns_impl,
+            window_struct,
+        } = groups.columns_definition(namer);
 
-impl Table {
-    pub fn generate(&self, namer: &Namer) -> Tokens<ItemMod> {
-        let mut prelude = PushVec::new();
-        let mut methods = PushVec::new();
+        let predicate_mod = predicates::generate(predicates, groups, namer);
+        let unique_struct = uniques::generate(uniques, groups, namer);
 
-        let ColumnTypes {
-            concrete_type: primary_type,
-            kind_trait: primarykind,
-            access_trait: _,
-        } = self.columns.primary_col.col.generate(
-            namer,
-            &self.columns.primary_col.fields,
-            &mut prelude,
-        );
-        let primary_name = namer.primary_column();
-
-        let (assoc_fields_types, assoc_field_numbers): (Vec<_>, Vec<_>) = self
-            .columns
-            .assoc_columns
-            .iter()
-            .enumerate()
-            .map(|(ind, assoc_col)| {
-                (
-                    assoc_col
-                        .col
-                        .generate(namer, &assoc_col.fields, &mut prelude)
-                        .concrete_type,
-                    ind,
-                )
-            })
-            .unzip();
-        let assoc_cols_name = namer.associated_column_tuple();
-
-        for (id, op) in &self.user_ops {
-            methods.push(op.generate(id, self, namer, &mut prelude));
+        let mut ops_code = Vec::new();
+        ops_code.push(operations::borrow::generate(groups, namer));
+        ops_code.push(operations::get::generate(groups, namer));
+        ops_code.push(operations::update::generate(
+            updates, groups, uniques, predicates, namer,
+        ));
+        ops_code.push(operations::insert::generate(groups, namer));
+        if Primary::TRANSACTIONS {
+            ops_code.push(operations::transact::generate(groups, updates, namer))
         }
 
-        let mod_name = namer.mod_name();
-        let prelude = prelude.open();
-        let methods = methods.open();
-        let window_lifetime = namer.window_lifetime();
+        if Primary::DELETIONS {
+            ops_code.push(operations::delete::generate(namer))
+        }
+
+        let ops_tokens = ops_code.into_iter().map(
+            |SingleOp {
+                 op_mod,
+                 op_trait,
+                 op_impl,
+             }| {
+                quote! {
+                    #op_mod
+                    #op_trait
+                    #op_impl
+                }
+            },
+        );
 
         quote! {
-            mod #mod_name {
-                #(#prelude)*
+            mod #name {
+                #column_types
 
-                pub type Key<#window_lifetime> = <<#primary_type as Column>::WindowKind<#window_lifetime> as #primarykind>::Key;
+                #(#ops_tokens)*
 
-                pub struct Table {
-                    #primary_name : #primary_type,
-                    #assoc_cols_name : (#(#assoc_fields_types),*),
-                }
+                #key_type
 
-                pub struct Window<#window_lifetime> {
-                    #primary_name : <#primary_type as Column>::WindowKind<#window_lifetime>,
-                    #assoc_cols_name : (#(<#assoc_fields_types as Column>::WindowKind<#window_lifetime> ),*),
-                }
+                #predicate_mod
+                #unique_struct
 
-                impl Table {
-                    pub fn new() -> Self {
-                        Self {
-                            #primary_name: <#primary_type as Column>::new(0),
-                            #assoc_cols_name : (#(<#assoc_fields_types as Column>::new(0)),*),
-                        }
-                    }
-                    pub fn window(&mut self) -> Window<'_> {
-                        let Self {
-                            #primary_name,
-                            #assoc_cols_name,
-                        } = self;
-                        Window {
-                            #primary_name: #primary_name.window(),
-                            #assoc_cols_name: (#(#assoc_cols_name.#assoc_field_numbers.window()),*),
-                        }
-                    }
-                }
-                impl <#window_lifetime> Window<#window_lifetime> {
-                    #(#methods)*
-                }
+                #columns_struct
+                #columns_impl
+                #window_struct
+
             }
         }
         .into()

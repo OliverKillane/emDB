@@ -1,5 +1,5 @@
 use super::SingleOp;
-use crate::v2::{
+use crate::{
     columns::{Groups, PrimaryKind},
     namer::CodeNamer,
 };
@@ -10,31 +10,29 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
     let key_type = namer.type_key();
     let window_struct = namer.struct_window();
 
-    let mut include_lifetime = true; // TODO: implement
-    let lifetime = if include_lifetime {
-        quote!('imm)
-    } else {
-        quote!()
-    };
+    let struct_fields = groups.idents.iter().map(|(field_name, field_index)| {
+        let field_ty = groups.get_type(field_index).unwrap();
+        quote!(#field_name: &'brw #field_ty)
+    });
 
     SingleOp {
         op_mod: quote! {
-            pub mod get {
-                pub struct Get #lifetime {
-                    unimplemented!()
+            pub borrow {
+                pub struct Borrow<'brw> {
+                    #(#struct_fields),*
                 }
             }
         }
         .into(),
         op_trait: quote! {
-            pub trait Get #lifetime {
-                fn get(&self, key: #key_type) -> Result<get::Get #lifetime, #key_error>;
+            pub trait Borrow {
+                fn borrow(&'brw self, key: #key_type) -> Result<Borrow<'brw>, #key_error>;
             }
         }
         .into(),
         op_impl: quote! {
-            impl <'imm> Get #lifetime for #window_struct<'imm> {
-                fn get(&self, key: #key_type) -> Result<get::Get #lifetime, #key_error> {
+            impl <'imm> Borrow for #window_struct<'imm> {
+                fn borrow(&'brw self, key: #key_type) -> Result<Borrow<'brw>, #key_error> {
                     todo!()
                 }
             }

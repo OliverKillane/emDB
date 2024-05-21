@@ -7,7 +7,7 @@ use syn::{
     ItemTrait, TraitItemFn, Variant,
 };
 
-use crate::v2::{
+use crate::{
     columns::{FieldIndex, FieldName, Groups, PrimaryKind},
     namer::CodeNamer,
     predicates::{generate_update_predicate_access, Predicate},
