@@ -1,8 +1,5 @@
 use super::SingleOp;
-use crate::{
-    columns::{Groups, PrimaryKind},
-    namer::CodeNamer,
-};
+use crate::{columns::PrimaryKind, groups::Groups, namer::CodeNamer};
 use quote::quote;
 
 pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeNamer) -> SingleOp {
@@ -13,12 +10,12 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
     SingleOp {
         op_mod: quote! {
             pub mod insert {
+                /// TODO
                 pub struct Insert {
-                    unimplemented!()
                 }
 
+                /// TODO
                 pub enum Error {
-                    unimplemented!()
                 }
             }
         }

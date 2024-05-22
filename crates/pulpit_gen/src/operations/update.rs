@@ -3,12 +3,13 @@ use quote::quote;
 use quote_debug::Tokens;
 use std::collections::{HashMap, HashSet};
 use syn::{
-    ExprAssign, ExprMethodCall, Ident, ImplItemFn, ItemEnum, ItemImpl, ItemMod, ItemStruct,
+    ExprLet, ExprMethodCall, Ident, ImplItemFn, ItemEnum, ItemImpl, ItemMod, ItemStruct,
     ItemTrait, TraitItemFn, Variant,
 };
 
 use crate::{
-    columns::{FieldIndex, FieldName, Groups, PrimaryKind},
+    columns::PrimaryKind,
+    groups::{FieldIndex, FieldName, Groups},
     namer::CodeNamer,
     predicates::{generate_update_predicate_access, Predicate},
     uniques::Unique,
@@ -50,7 +51,7 @@ pub fn generate<Primary: PrimaryKind>(
         }
         .into(),
         op_trait: quote! {
-            pub trait #trait_name {
+            pub trait #trait_name : Sized {
                 #(#trait_fns)*
             }
         }
@@ -76,12 +77,11 @@ impl Update {
             unique_indexes: impl Iterator<Item = (&'a Ident, &'a Unique)>,
             namer: &CodeNamer,
         ) -> Vec<Tokens<Variant>> {
-            let pulpit_path = namer.pulpit_path();
             unique_indexes
                 .map(|(_, unique)| {
                     let variant = &unique.alias;
                     quote!(
-                        #variant(#pulpit_path::access::UniqueConflict)
+                        #variant
                     )
                     .into()
                 })
@@ -121,11 +121,17 @@ impl Update {
             quote!(#f : #ty)
         });
 
+        let extra_comma = if unique_errors.is_empty() || predicate_errors.is_empty() {
+            quote!()
+        } else {
+            quote!(,)
+        };
+
         quote! {
             pub mod #update_name {
                 pub enum #update_error {
                     #key_error,
-                    #(#unique_errors),*
+                    #(#unique_errors),* #extra_comma
                     #(#predicate_errors),*
                 }
 
@@ -138,12 +144,15 @@ impl Update {
     }
 
     fn generate_trait_fn(&self, namer: &CodeNamer) -> Tokens<TraitItemFn> {
+        let update_mod = namer.mod_update();
+        let this_update = &self.alias;
         let update_struct_name = namer.mod_update_struct_update();
         let update_error = namer.mod_update_enum_error();
         let update_name = &self.alias;
+        let key_type = namer.type_key();
 
         quote! {
-            fn #update_name(&mut self, update: #update_struct_name) -> Result<(), #update_error>;
+            fn #update_name(&mut self, update: #update_mod::#this_update::#update_struct_name, key: #key_type) -> Result<(), #update_mod::#this_update::#update_error>;
         }
         .into()
     }
@@ -155,6 +164,7 @@ impl Update {
         uniques: &HashMap<FieldName, Unique>,
         predicates: &[Predicate],
     ) -> Tokens<ImplItemFn> {
+        let update_mod = namer.mod_update();
         let update_struct_name = namer.mod_update_struct_update();
         let update_error = namer.mod_update_enum_error();
         let update_name = &self.alias;
@@ -164,17 +174,18 @@ impl Update {
         let predicate_mod = namer.mod_predicates();
         let key_error = namer.type_key_error();
         let update_var = Ident::new("update", Span::call_site());
+        let pulpit_path = namer.pulpit_path();
 
         // Generate the table access to primary, and all associated!
         let assoc_brw_muts = (0..groups.assoc.len()).map(|ind| {
             let name = namer.name_assoc_column(ind);
-            quote!(let #name = self.#columns.#name.brw_mut(index))
+            quote!(let #name = unsafe { self.#columns.#name.brw_mut(index) } )
         });
         let table_access = quote! {
-            let Entry { index, data: #primary } = match self.#columns.#primary.brw_mut(key) {
+            let #pulpit_path::column::Entry { index, data: #primary } = match self.#columns.#primary.brw_mut(key) {
                 Ok(entry) => entry,
-                Err(e) => return Err(#update_error::#key_error),
-            }
+                Err(e) => return Err(#update_mod::#update_name::#update_error::#key_error),
+            };
             #(#assoc_brw_muts;)*
         };
 
@@ -186,15 +197,15 @@ impl Update {
             let pred = &pred.alias;
             quote! {
                 if !#predicate_mod::#pred #predicate_args {
-                    return Err(#update_error::#pred);
+                    return Err(#update_mod::#update_name::#update_error::#pred);
                 }
             }
         });
 
         let uniques_member = namer.table_member_uniques();
         let mut undo_prev_fields: Vec<Tokens<ExprMethodCall>> = Vec::new();
-        let mut unique_updates: Vec<Tokens<ExprAssign>> = Vec::new();
-        for (field, Unique { alias }) in uniques.iter() {
+        let mut unique_updates: Vec<Tokens<ExprLet>> = Vec::new();
+        for (field, Unique { alias }) in uniques.iter().filter(|(field, _)| self.fields.contains(field) ) {
             let field_index = groups.idents.get(field).unwrap();
             let from_data = match field_index {
                 FieldIndex::Primary(_) => namer.name_primary_column(),
@@ -208,18 +219,18 @@ impl Update {
             };
 
             unique_updates.push(quote!{
-                let #alias = match self.#uniques_member.#alias.replace(&update.#field, &#from_data.#mutability.#field, key) {
+                let #alias = match self.#uniques_member.#field.replace(&update.#field, &#from_data.#mutability.#field, key) {
                     Ok(old_val) => old_val,
                     Err(_) => {
                         #(#undo_prev_fields;)*
-                        return Err(#update_error::#alias)
+                        return Err(#update_mod::#update_name::#update_error::#alias)
                     },
                 }
             }.into());
 
             undo_prev_fields.push(
                 quote! {
-                    self.#uniques_member.#alias.undo_replace(#alias, &update.#field, key)
+                    self.#uniques_member.#field.undo_replace(#alias, &update.#field, key)
                 }
                 .into(),
             )
@@ -242,16 +253,18 @@ impl Update {
                 }
             });
 
-            let log_type = namer.mod_transactions_enum_log();
+            let log_type = namer.mod_transactions_enum_logitem();
             let trans_mod = namer.mod_transactions();
             let transactions_member = namer.table_member_transactions();
             let transaction_update_type = namer.mod_transactions_enum_update();
+            let rollback_name = namer.mod_transactions_struct_data_member_rollback();
+    let log_name = namer.mod_transactions_struct_data_member_log();
             quote! {
                 let mut update = update;
                 #(#updates;)*
 
-                if self.#transactions_member.append {
-                    self.#transactions_member.log.push(#trans_mod::#log_type::Update(#trans_mod::#transaction_update_type::#update_name(update)));
+                if !self.#transactions_member.#rollback_name {
+                    self.#transactions_member.#log_name.push(#trans_mod::#log_type::Update(#trans_mod::#transaction_update_type::#update_name(update)));
                 }
             }
         } else {
@@ -266,10 +279,10 @@ impl Update {
         };
 
         quote! {
-            fn #update_name(&mut self, #update_var: #update_struct_name, key: #key_type) -> Result<(), #update_error> {
+            fn #update_name(&mut self, #update_var: #update_mod::#update_name::#update_struct_name, key: #key_type) -> Result<(), #update_mod::#update_name::#update_error> {
                 #table_access
                 #(#predicate_checks)*
-                #(#unique_updates)*
+                #(#unique_updates;)*
                 #commit_updates
                 Ok(())
             }

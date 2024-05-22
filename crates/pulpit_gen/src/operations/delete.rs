@@ -1,5 +1,5 @@
 use super::SingleOp;
-use crate::{columns::PrimaryKind, namer::CodeNamer};
+use crate::{columns::PrimaryKind, groups::Groups, namer::CodeNamer};
 use quote::quote;
 
 pub fn generate(namer: &CodeNamer) -> SingleOp {
@@ -14,12 +14,12 @@ pub fn generate(namer: &CodeNamer) -> SingleOp {
         }.into(),
         op_trait: quote! {
             pub trait Delete {
-                fn delete(&'brw self, key: #key_type) -> Result<#borrow_struct_name<'brw>, #key_error>;
+                fn delete(&mut self, key: #key_type) -> Result<(), #key_error>;
             }
         }.into(),
         op_impl: quote! {
             impl <'imm> Delete for #window_struct<'imm> {
-                fn borrow(&'brw self, key: #key_type) -> Result<(), #key_error> {
+                fn delete(&mut self, key: #key_type) -> Result<(), #key_error> {
                     todo!()
                 }
             }

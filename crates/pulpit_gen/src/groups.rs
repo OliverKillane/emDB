@@ -3,9 +3,12 @@ use std::{collections::HashMap, iter::once};
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote_debug::Tokens;
-use syn::{Ident, ItemFn, ItemImpl, ItemMod, ItemStruct, ItemType, Type};
+use syn::{Ident, ItemFn, ItemImpl, ItemMod, ItemStruct, ItemType, ItemUse, Type};
 
-use super::namer::CodeNamer;
+use crate::{
+    columns::{AssocKind, ColKind, ImmConversion, PrimaryKind},
+    namer::CodeNamer,
+};
 
 pub type FieldName = Ident;
 
@@ -33,6 +36,37 @@ impl<Col: ColKind> Group<Col> {
         }
         .get(index.field_num)
         .map(|f| &f.ty)
+    }
+
+    fn get_members(&self, placement: impl Fn(FieldIndexInner) -> FieldIndex, mapping: &mut HashMap<FieldName, FieldIndex>) {
+        for (ind, field) in self.fields.imm_fields.iter().enumerate() {
+            mapping.insert(field.name.clone(), placement(FieldIndexInner { imm: true, field_num: ind }));
+        }
+        for (ind, field) in self.fields.mut_fields.iter().enumerate() {
+            mapping.insert(field.name.clone(), placement(FieldIndexInner { imm: false, field_num: ind }));
+        }
+    }
+}
+
+pub struct GroupConfig<Primary: PrimaryKind> {
+    pub primary: Group<Primary>,
+    pub assoc: Vec<Group<Primary::Assoc>>,
+}
+
+impl <Primary: PrimaryKind> From<GroupConfig<Primary>> for Groups<Primary> {
+    fn from(GroupConfig{ primary, assoc }: GroupConfig<Primary>) -> Self {
+
+        let mut idents = HashMap::new();
+        primary.get_members(|index| FieldIndex::Primary(index), &mut idents);
+        for (ind, group) in assoc.iter().enumerate() {
+            group.get_members(|index| FieldIndex::Assoc { assoc_ind: ind, inner: index }, &mut idents);
+        }
+
+        Groups {
+            idents,
+            primary,
+            assoc,
+        }
     }
 }
 
@@ -92,31 +126,7 @@ impl FieldIndex {
 pub struct GroupsDef {
     pub columns_struct: Tokens<ItemStruct>,
     pub columns_impl: Tokens<ItemImpl>,
-    pub window_struct: Tokens<ItemStruct>,
-}
-
-struct ImmConversion {
-    imm_unpacked: Tokens<ItemStruct>,
-    unpacker: Tokens<ItemFn>,
-}
-
-trait ColKind {
-    fn derives(&self) -> MutImmut<Vec<Ident>>;
-    fn generate_column_type(
-        &self,
-        namer: &CodeNamer,
-        imm_type: Tokens<Type>,
-        mut_type: Tokens<Type>,
-    ) -> Tokens<Type>;
-    fn convert_imm(&self, namer: &CodeNamer, imm_fields: &[Field]) -> ImmConversion;
-}
-
-pub trait AssocKind: ColKind {}
-
-pub trait PrimaryKind: ColKind {
-    const TRANSACTIONS: bool;
-    const DELETIONS: bool;
-    type Assoc: AssocKind;
+    pub window_holder_struct: Tokens<ItemStruct>,
 }
 
 impl<Col: ColKind> Group<Col> {
@@ -130,7 +140,7 @@ impl<Col: ColKind> Group<Col> {
         } = self.col.derives();
 
         fn get_tks(Field { name, ty }: &Field) -> TokenStream {
-            quote!(#name: #ty)
+            quote!(pub #name: #ty)
         }
 
         let MutImmut {
@@ -220,7 +230,7 @@ impl<Primary: PrimaryKind> Groups<Primary> {
         let mut converts = Vec::with_capacity(num_members);
         let mut news = Vec::with_capacity(num_members);
 
-        for (ty, member) in self
+        for (ty, ty_no_gen, member) in self
             .assoc
             .iter()
             .enumerate()
@@ -232,6 +242,7 @@ impl<Primary: PrimaryKind> Groups<Primary> {
                         quote!(#col_types::#assoc_name::#imm_struct_name).into(),
                         quote!(#col_types::#assoc_name::#mut_struct_name).into(),
                     ),
+                    col.generate_column_type_no_generics(namer),
                     assoc_name,
                 )
             })
@@ -241,6 +252,7 @@ impl<Primary: PrimaryKind> Groups<Primary> {
                     quote!(#col_types::#primary_mod::#imm_struct_name).into(),
                     quote!(#col_types::#primary_mod::#mut_struct_name).into(),
                 ),
+                self.primary.col.generate_column_type_no_generics(namer),
                 primary_mod,
             )))
         {
@@ -248,7 +260,7 @@ impl<Primary: PrimaryKind> Groups<Primary> {
             window_defs
                 .push(quote!(#member: <#ty as #pulpit_path::column::Column>::WindowKind<'imm>));
             converts.push(quote!(#member: self.#member.window()));
-            news.push(quote!(#member: #ty::new(size_hint)));
+            news.push(quote!(#member: #ty_no_gen::new(size_hint)));
         }
 
         let column_holder = namer.struct_column_holder();
@@ -277,7 +289,7 @@ impl<Primary: PrimaryKind> Groups<Primary> {
                 }
             }
             .into(),
-            window_struct: quote! {
+            window_holder_struct: quote! {
                 struct #window_holder<'imm> {
                     #(#window_defs),*
                 }

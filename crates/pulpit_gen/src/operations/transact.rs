@@ -1,8 +1,5 @@
 use super::{update::Update, SingleOp};
-use crate::{
-    columns::{Groups, PrimaryKind},
-    namer::CodeNamer,
-};
+use crate::{columns::PrimaryKind, groups::Groups, namer::CodeNamer};
 use quote::quote;
 
 pub fn generate<Primary: PrimaryKind>(
@@ -13,24 +10,38 @@ pub fn generate<Primary: PrimaryKind>(
     let window_struct = namer.struct_window();
 
     // TODO: naming
+    let data_struct = namer.mod_transactions_struct_data();
+    let log_item = namer.mod_transactions_enum_logitem();
+    let update_enum = namer.mod_transactions_enum_update();
+
+    let trans_mod = namer.mod_transactions();
+
+    let rollback_name = namer.mod_transactions_struct_data_member_rollback();
+    let log_name = namer.mod_transactions_struct_data_member_log();
 
     SingleOp {
         op_mod: quote! {
-            pub mod transaction {
-                pub enum LogItem {
-                    unimplemented!()
+            mod #trans_mod {
+                ///TODO
+                pub enum #update_enum {
+
+                }
+                
+                /// TODO
+                pub enum #log_item {
+                    
                 }
 
-                pub struct Data {
-                    log: Vec<LogItem>,
-                    rollback: bool,
+                pub struct #data_struct {
+                    pub #log_name: Vec<#log_item>,
+                    pub #rollback_name: bool,
                 }
 
-                impl Data {
+                impl #data_struct {
                     pub fn new() -> Self {
                         Self {
-                            log: Vec::new(),
-                            rollback: false,
+                            #log_name: Vec::new(),
+                            #rollback_name: false,
                         }
                     }
                 }

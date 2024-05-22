@@ -2,18 +2,19 @@ use std::{collections::HashSet, iter::once};
 
 use quote::quote;
 use quote_debug::Tokens;
-use syn::{ExprCall, ExprTuple, Ident, ItemFn, ItemMod};
+use syn::{Expr, ExprTuple, Ident, ItemFn, ItemMod};
 
-use crate::columns::{Field, Group};
+use crate::groups::{Field, Group};
 
 use super::{
-    columns::{FieldName, Groups, PrimaryKind},
+    columns::PrimaryKind,
+    groups::{FieldName, Groups},
     namer::CodeNamer,
 };
 
 pub struct Predicate {
     pub alias: Ident,
-    pub tokens: Tokens<ItemFn>,
+    pub tokens: Tokens<Expr>,
 }
 
 impl Predicate {
@@ -37,7 +38,7 @@ impl Predicate {
         let body = &self.tokens;
 
         quote! {
-            fn #name(#(#args),*) -> bool {
+            pub fn #name(#(#args),*) -> bool {
                 #body
             }
         }
@@ -55,7 +56,7 @@ pub fn generate<Primary: PrimaryKind>(
     let predicates_mod = namer.mod_predicates();
 
     quote! {
-        pub mod #predicates_mod {
+        mod #predicates_mod {
             #(#functions)*
         }
     }
@@ -88,7 +89,7 @@ pub fn generate_update_predicate_access<'a, Primary: PrimaryKind>(
                 .chain(fields.mut_fields.iter().map(|f| (quote!(mut_data), f)))
                 .map(move |(access, Field { name, ty })| {
                     if new_fields.contains(&name) {
-                        quote!(#update_value_name.#name)
+                        quote!(&#update_value_name.#name)
                     } else {
                         quote!(&#var_name.#access.#name)
                     }

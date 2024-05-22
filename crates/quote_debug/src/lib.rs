@@ -12,12 +12,17 @@ pub struct Tokens<T: syn::parse::Parse + ToTokens> {
 
 impl<T: syn::parse::Parse + ToTokens> From<TokenStream> for Tokens<T> {
     fn from(value: TokenStream) -> Self {
-        debug_assert!(
-            parse2::<T>(value.clone()).is_ok(),
-            "Attempted to parse as `{}` but failed. Tokens: `{}`",
-            type_name::<T>(),
-            value
-        );
+        #[cfg(debug_assertions)]
+        {
+            if let Err(err) =  parse2::<T>(value.clone()) {
+                panic!(
+                    "Attempted to parse as `{}` but failed with message:\n`{}`\nTokens: `{}`",
+                    type_name::<T>(),
+                    err,
+                    value
+                )
+            }
+        }
         Self {
             tks: value,
             phantom: PhantomData,

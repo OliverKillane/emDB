@@ -86,7 +86,7 @@ impl CodeNamer {
         Ident::new("transactions", Span::call_site())
     }
 
-    pub fn mod_transactions_enum_log(&self) -> Ident {
+    pub fn mod_transactions_enum_logitem(&self) -> Ident {
         Ident::new("LogItem", Span::call_site())
     }
 
@@ -148,5 +148,21 @@ impl CodeNamer {
 
     pub fn trait_insert(&self) -> Ident {
         Ident::new("Insert", Span::call_site())
+    }
+
+    pub fn struct_unique(&self) -> Ident {
+        Ident::new("Uniques", Span::call_site())
+    } 
+
+    pub fn mod_transactions_struct_data(&self) -> Ident {
+        Ident::new("Data", Span::call_site())
+    }
+
+    pub fn mod_transactions_struct_data_member_log(&self) -> Ident {
+        Ident::new("log", Span::call_site())
+    }
+
+    pub fn mod_transactions_struct_data_member_rollback(&self) -> Ident {
+        Ident::new("rollback", Span::call_site())
     }
 }

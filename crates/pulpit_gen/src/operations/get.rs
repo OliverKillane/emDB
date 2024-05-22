@@ -1,8 +1,5 @@
 use super::SingleOp;
-use crate::{
-    columns::{Groups, PrimaryKind},
-    namer::CodeNamer,
-};
+use crate::{columns::PrimaryKind, groups::Groups, namer::CodeNamer};
 use quote::quote;
 
 pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeNamer) -> SingleOp {
@@ -12,7 +9,7 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
 
     let mut include_lifetime = true; // TODO: implement
     let lifetime = if include_lifetime {
-        quote!('imm)
+        quote!(<'imm>)
     } else {
         quote!()
     };
@@ -20,8 +17,9 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
     SingleOp {
         op_mod: quote! {
             pub mod get {
+                /// TODO
                 pub struct Get #lifetime {
-                    unimplemented!()
+                    
                 }
             }
         }

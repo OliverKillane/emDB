@@ -1,8 +1,5 @@
 use super::SingleOp;
-use crate::{
-    columns::{Groups, PrimaryKind},
-    namer::CodeNamer,
-};
+use crate::{columns::PrimaryKind, groups::Groups, namer::CodeNamer};
 use quote::quote;
 
 pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeNamer) -> SingleOp {
@@ -17,7 +14,7 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
 
     SingleOp {
         op_mod: quote! {
-            pub borrow {
+            pub mod borrow {
                 pub struct Borrow<'brw> {
                     #(#struct_fields),*
                 }
@@ -26,13 +23,13 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
         .into(),
         op_trait: quote! {
             pub trait Borrow {
-                fn borrow(&'brw self, key: #key_type) -> Result<Borrow<'brw>, #key_error>;
+                fn borrow<'brw>(&'brw self, key: #key_type) -> Result<borrow::Borrow<'brw>, #key_error>;
             }
         }
         .into(),
         op_impl: quote! {
             impl <'imm> Borrow for #window_struct<'imm> {
-                fn borrow(&'brw self, key: #key_type) -> Result<Borrow<'brw>, #key_error> {
+                fn borrow<'brw>(&'brw self, key: #key_type) -> Result<borrow::Borrow<'brw>, #key_error> {
                     todo!()
                 }
             }
