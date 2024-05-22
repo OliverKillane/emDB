@@ -42,11 +42,11 @@ mod my_table {
     }
     pub mod borrow {
         pub struct Borrow<'brw> {
-            a: &'brw i32,
             e: &'brw String,
-            c: &'brw Option<String>,
-            b: &'brw usize,
+            a: &'brw i32,
             d: &'brw char,
+            b: &'brw usize,
+            c: &'brw Option<String>,
         }
     }
     pub trait Borrow {
@@ -71,6 +71,7 @@ mod my_table {
     }
     pub mod updates {
         pub mod update_ace {
+            #[derive(Debug)]
             pub enum UpdateError {
                 KeyError,
                 e_unique,
@@ -85,6 +86,7 @@ mod my_table {
             }
         }
         pub mod update_a {
+            #[derive(Debug)]
             pub enum UpdateError {
                 KeyError,
                 a_unique,
@@ -169,6 +171,7 @@ mod my_table {
                     .log
                     .push(
                         transactions::LogItem::Update(
+                            key,
                             transactions::Updates::update_ace(update),
                         ),
                     );
@@ -222,6 +225,7 @@ mod my_table {
                     .log
                     .push(
                         transactions::LogItem::Update(
+                            key,
                             transactions::Updates::update_a(update),
                         ),
                     );
@@ -233,21 +237,29 @@ mod my_table {
         /// TODO
         pub struct Insert {}
         /// TODO
+        #[derive(Debug)]
         pub enum Error {}
     }
     pub trait Insert {
-        fn get(&self, insert: insert::Insert) -> Result<Key, insert::Error>;
+        fn insert(&self, insert: insert::Insert) -> Result<Key, insert::Error>;
     }
     impl<'imm> Insert for Window<'imm> {
-        fn get(&self, insert: insert::Insert) -> Result<Key, insert::Error> {
+        fn insert(&self, insert: insert::Insert) -> Result<Key, insert::Error> {
             todo!()
         }
     }
     mod transactions {
         ///TODO
-        pub enum Updates {}
+        pub enum Updates {
+            update_ace(super::updates::update_ace::Update),
+            update_a(super::updates::update_a::Update),
+        }
         /// TODO
-        pub enum LogItem {}
+        pub enum LogItem {
+            Update(super::Key, Updates),
+            Insert(super::Key),
+            Delete(super::Key),
+        }
         pub struct Data {
             pub log: Vec<LogItem>,
             pub rollback: bool,
@@ -266,11 +278,60 @@ mod my_table {
         fn abort(&mut self);
     }
     impl<'imm> Transact for Window<'imm> {
+        /// Commit all current changes
+        /// - Requires concretely applying deletions (which until commit
+        ///   or abort simply hide keys from the table)
         fn commit(&mut self) {
-            todo!()
+            debug_assert!(! self.transactions.rollback);
+            while let Some(entry) = self.transactions.log.pop() {
+                match entry {
+                    transactions::LogItem::Delete(key) => {
+                        let pulpit::column::Entry { index, data: _ } = self
+                            .columns
+                            .primary
+                            .pull(key)
+                            .unwrap();
+                        unsafe {
+                            self.columns.assoc_0.pull(index);
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
+        /// Undo the transactions applied since the last commit
+        /// - Requires re-applying all updates, deleting inserts and undoing deletes
+        ///   (deletes' keys are actually just hidden until commit or abort)
         fn abort(&mut self) {
-            todo!()
+            self.transactions.rollback = true;
+            while let Some(entry) = self.transactions.log.pop() {
+                match entry {
+                    transactions::LogItem::Delete(key) => {
+                        self.columns.primary.reveal(key).unwrap();
+                    }
+                    transactions::LogItem::Insert(key) => {
+                        let pulpit::column::Entry { index, data: _ } = self
+                            .columns
+                            .primary
+                            .pull(key)
+                            .unwrap();
+                        unsafe {
+                            self.columns.assoc_0.pull(index);
+                        }
+                    }
+                    transactions::LogItem::Update(key, update) => {
+                        match update {
+                            transactions::Updates::update_ace(update) => {
+                                <Self as Update>::update_ace(self, update, key).unwrap();
+                            }
+                            transactions::Updates::update_a(update) => {
+                                <Self as Update>::update_a(self, update, key).unwrap();
+                            }
+                        }
+                    }
+                }
+            }
+            self.transactions.rollback = false;
         }
     }
     mod delete {}
@@ -362,14 +423,14 @@ mod my_table {
         transactions: transactions::Data,
     }
     impl Table {
-        fn new(size_hint: usize) -> Self {
+        pub fn new(size_hint: usize) -> Self {
             Self {
                 columns: ColumnHolder::new(size_hint),
                 uniques: Uniques::new(size_hint),
                 transactions: transactions::Data::new(),
             }
         }
-        fn window(&mut self) -> Window<'_> {
+        pub fn window(&mut self) -> Window<'_> {
             Window {
                 columns: self.columns.window(),
                 uniques: &mut self.uniques,

@@ -152,7 +152,7 @@ impl CodeNamer {
 
     pub fn struct_unique(&self) -> Ident {
         Ident::new("Uniques", Span::call_site())
-    } 
+    }
 
     pub fn mod_transactions_struct_data(&self) -> Ident {
         Ident::new("Data", Span::call_site())
@@ -164,5 +164,21 @@ impl CodeNamer {
 
     pub fn mod_transactions_struct_data_member_rollback(&self) -> Ident {
         Ident::new("rollback", Span::call_site())
+    }
+
+    pub fn mod_transactions_enum_logitem_variant_update(&self) -> Ident {
+        Ident::new("Update", Span::call_site())
+    }
+
+    pub fn mod_transactions_enum_logitem_variant_insert(&self) -> Ident {
+        Ident::new("Insert", Span::call_site())
+    }
+
+    pub fn mod_transactions_enum_logitem_variant_append(&self) -> Ident {
+        Ident::new("Append", Span::call_site())
+    }
+
+    pub fn mod_transactions_enum_logitem_variant_delete(&self) -> Ident {
+        Ident::new("Delete", Span::call_site())
     }
 }

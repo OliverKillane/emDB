@@ -38,12 +38,28 @@ impl<Col: ColKind> Group<Col> {
         .map(|f| &f.ty)
     }
 
-    fn get_members(&self, placement: impl Fn(FieldIndexInner) -> FieldIndex, mapping: &mut HashMap<FieldName, FieldIndex>) {
+    fn get_members(
+        &self,
+        placement: impl Fn(FieldIndexInner) -> FieldIndex,
+        mapping: &mut HashMap<FieldName, FieldIndex>,
+    ) {
         for (ind, field) in self.fields.imm_fields.iter().enumerate() {
-            mapping.insert(field.name.clone(), placement(FieldIndexInner { imm: true, field_num: ind }));
+            mapping.insert(
+                field.name.clone(),
+                placement(FieldIndexInner {
+                    imm: true,
+                    field_num: ind,
+                }),
+            );
         }
         for (ind, field) in self.fields.mut_fields.iter().enumerate() {
-            mapping.insert(field.name.clone(), placement(FieldIndexInner { imm: false, field_num: ind }));
+            mapping.insert(
+                field.name.clone(),
+                placement(FieldIndexInner {
+                    imm: false,
+                    field_num: ind,
+                }),
+            );
         }
     }
 }
@@ -53,13 +69,18 @@ pub struct GroupConfig<Primary: PrimaryKind> {
     pub assoc: Vec<Group<Primary::Assoc>>,
 }
 
-impl <Primary: PrimaryKind> From<GroupConfig<Primary>> for Groups<Primary> {
-    fn from(GroupConfig{ primary, assoc }: GroupConfig<Primary>) -> Self {
-
+impl<Primary: PrimaryKind> From<GroupConfig<Primary>> for Groups<Primary> {
+    fn from(GroupConfig { primary, assoc }: GroupConfig<Primary>) -> Self {
         let mut idents = HashMap::new();
         primary.get_members(|index| FieldIndex::Primary(index), &mut idents);
         for (ind, group) in assoc.iter().enumerate() {
-            group.get_members(|index| FieldIndex::Assoc { assoc_ind: ind, inner: index }, &mut idents);
+            group.get_members(
+                |index| FieldIndex::Assoc {
+                    assoc_ind: ind,
+                    inner: index,
+                },
+                &mut idents,
+            );
         }
 
         Groups {

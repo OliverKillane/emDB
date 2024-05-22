@@ -34,7 +34,7 @@ pub fn generate_table_and_window(transactions: bool, namer: &CodeNamer) -> Table
     let columns_member = namer.table_member_columns();
     let columns_holder = namer.struct_column_holder();
     let window_holder = namer.struct_window_holder();
-    
+
     let uniques = namer.table_member_uniques();
     let uniques_type = namer.struct_unique();
 
@@ -46,23 +46,24 @@ pub fn generate_table_and_window(transactions: bool, namer: &CodeNamer) -> Table
             quote!(#trans_member: #transactions_mod::#transaction_type ),
             quote!(#trans_member: #transactions_mod::#transaction_type::new() ),
             quote!(#trans_member: &mut self.#trans_member),
-            quote!(#trans_member: &'imm mut #transactions_mod::#transaction_type)
+            quote!(#trans_member: &'imm mut #transactions_mod::#transaction_type),
         )
     } else {
-        (quote!(),quote!(),quote!(),quote!())
+        (quote!(), quote!(), quote!(), quote!())
     };
 
-    TableDec { 
-        table_struct: quote!{
+    TableDec {
+        table_struct: quote! {
             pub struct #table_name {
                 #columns_member: #columns_holder,
                 #uniques: #uniques_type,
                 #trans_table
             }
-        }.into(), 
-        table_impl: quote!{
+        }
+        .into(),
+        table_impl: quote! {
             impl #table_name {
-                fn new(size_hint: usize) -> Self {
+                pub fn new(size_hint: usize) -> Self {
                     Self {
                         #columns_member: #columns_holder::new(size_hint),
                         #uniques: #uniques_type::new(size_hint),
@@ -70,7 +71,7 @@ pub fn generate_table_and_window(transactions: bool, namer: &CodeNamer) -> Table
                     }
                 }
 
-                fn window(&mut self) -> #window_name<'_> {
+                pub fn window(&mut self) -> #window_name<'_> {
                     #window_name {
                         #columns_member: self.#columns_member.window(),
                         #uniques: &mut self.#uniques,
@@ -78,14 +79,16 @@ pub fn generate_table_and_window(transactions: bool, namer: &CodeNamer) -> Table
                     }
                 }
             }
-        }.into(), 
-        window_struct: quote!{
+        }
+        .into(),
+        window_struct: quote! {
             pub struct #window_name<'imm> {
                 #columns_member: #window_holder<'imm>,
                 #uniques: &'imm mut #uniques_type,
                 #trans_wind_def
             }
-        }.into() 
+        }
+        .into(),
     }
 }
 
@@ -108,7 +111,10 @@ impl<Primary: PrimaryKind> Table<Primary> {
         } = groups.columns_definition(namer);
 
         let predicate_mod = predicates::generate(predicates, groups, namer);
-        let UniqueDec{ unique_struct, unique_impl } = uniques::generate(uniques, groups, namer);
+        let UniqueDec {
+            unique_struct,
+            unique_impl,
+        } = uniques::generate(uniques, groups, namer);
 
         let mut ops_code = Vec::new();
         ops_code.push(operations::borrow::generate(groups, namer));
@@ -125,7 +131,11 @@ impl<Primary: PrimaryKind> Table<Primary> {
             ops_code.push(operations::delete::generate(namer))
         }
 
-        let TableDec { table_struct, table_impl, window_struct } = generate_table_and_window(Primary::TRANSACTIONS, namer);
+        let TableDec {
+            table_struct,
+            table_impl,
+            window_struct,
+        } = generate_table_and_window(Primary::TRANSACTIONS, namer);
 
         let ops_tokens = ops_code.into_iter().map(
             |SingleOp {

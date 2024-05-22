@@ -15,6 +15,7 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
                 }
 
                 /// TODO
+                #[derive(Debug)]
                 pub enum Error {
                 }
             }
@@ -22,13 +23,13 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
         .into(),
         op_trait: quote! {
             pub trait Insert {
-                fn get(&self, insert: insert::Insert) -> Result<#key_type, insert::Error>;
+                fn insert(&self, insert: insert::Insert) -> Result<#key_type, insert::Error>;
             }
         }
         .into(),
         op_impl: quote! {
             impl <'imm> Insert for #window_struct<'imm> {
-                fn get(&self, insert: insert::Insert) -> Result<#key_type, insert::Error> {
+                fn insert(&self, insert: insert::Insert) -> Result<#key_type, insert::Error> {
                     todo!()
                 }
             }

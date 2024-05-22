@@ -1,11 +1,11 @@
-use proc_macro2::Span;
-use quote_debug::Tokens;
-use syn::{Ident, ItemFn, ItemStruct, Type};
-use quote::quote;
 use crate::{
     groups::{Field, MutImmut},
     namer::CodeNamer,
 };
+use proc_macro2::Span;
+use quote::quote;
+use quote_debug::Tokens;
+use syn::{Ident, ItemFn, ItemStruct, Type};
 
 pub struct ImmConversion {
     pub imm_unpacked: Tokens<ItemStruct>,
@@ -21,10 +21,7 @@ pub trait ColKind {
         mut_type: Tokens<Type>,
     ) -> Tokens<Type>;
 
-    fn generate_column_type_no_generics(
-        &self,
-        namer: &CodeNamer,
-    ) -> Tokens<Type>;
+    fn generate_column_type_no_generics(&self, namer: &CodeNamer) -> Tokens<Type>;
 
     fn convert_imm(&self, namer: &CodeNamer, imm_fields: &[Field]) -> ImmConversion;
 }
@@ -37,9 +34,10 @@ pub trait PrimaryKind: ColKind {
     type Assoc: AssocKind;
 }
 
-mod primary_retain; pub use primary_retain::*;
-mod assoc_vec; pub use assoc_vec::*;
-
+mod primary_retain;
+pub use primary_retain::*;
+mod assoc_vec;
+pub use assoc_vec::*;
 
 // TODO: remove (for testing)
 impl AssocKind for AssocVec {}

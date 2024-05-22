@@ -3,8 +3,8 @@ use quote::quote;
 use quote_debug::Tokens;
 use std::collections::{HashMap, HashSet};
 use syn::{
-    ExprLet, ExprMethodCall, Ident, ImplItemFn, ItemEnum, ItemImpl, ItemMod, ItemStruct,
-    ItemTrait, TraitItemFn, Variant,
+    ExprLet, ExprMethodCall, Ident, ImplItemFn, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemTrait,
+    TraitItemFn, Variant,
 };
 
 use crate::{
@@ -129,6 +129,7 @@ impl Update {
 
         quote! {
             pub mod #update_name {
+                #[derive(Debug)]
                 pub enum #update_error {
                     #key_error,
                     #(#unique_errors),* #extra_comma
@@ -205,7 +206,10 @@ impl Update {
         let uniques_member = namer.table_member_uniques();
         let mut undo_prev_fields: Vec<Tokens<ExprMethodCall>> = Vec::new();
         let mut unique_updates: Vec<Tokens<ExprLet>> = Vec::new();
-        for (field, Unique { alias }) in uniques.iter().filter(|(field, _)| self.fields.contains(field) ) {
+        for (field, Unique { alias }) in uniques
+            .iter()
+            .filter(|(field, _)| self.fields.contains(field))
+        {
             let field_index = groups.idents.get(field).unwrap();
             let from_data = match field_index {
                 FieldIndex::Primary(_) => namer.name_primary_column(),
@@ -255,16 +259,17 @@ impl Update {
 
             let log_type = namer.mod_transactions_enum_logitem();
             let trans_mod = namer.mod_transactions();
+            let trans_update_kind = namer.mod_transactions_enum_logitem_variant_update();
             let transactions_member = namer.table_member_transactions();
             let transaction_update_type = namer.mod_transactions_enum_update();
             let rollback_name = namer.mod_transactions_struct_data_member_rollback();
-    let log_name = namer.mod_transactions_struct_data_member_log();
+            let log_name = namer.mod_transactions_struct_data_member_log();
             quote! {
                 let mut update = update;
                 #(#updates;)*
 
                 if !self.#transactions_member.#rollback_name {
-                    self.#transactions_member.#log_name.push(#trans_mod::#log_type::Update(#trans_mod::#transaction_update_type::#update_name(update)));
+                    self.#transactions_member.#log_name.push(#trans_mod::#log_type::#trans_update_kind(key, #trans_mod::#transaction_update_type::#update_name(update)));
                 }
             }
         } else {

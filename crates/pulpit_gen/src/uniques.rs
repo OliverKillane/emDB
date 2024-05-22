@@ -31,9 +31,9 @@ pub fn generate<Primary: PrimaryKind>(
         let ty = groups.get_typefield(&alias).unwrap();
         quote!(#alias: #pulpit_path::access::Unique<#ty, #key_type>)
     });
-    let unique_fields_impl = uniques.iter().map(|(alias, _)| {
-        quote!(#alias: #pulpit_path::access::Unique::new(size_hint))
-    });
+    let unique_fields_impl = uniques
+        .iter()
+        .map(|(alias, _)| quote!(#alias: #pulpit_path::access::Unique::new(size_hint)));
 
     UniqueDec {
         unique_struct: quote! {
@@ -42,7 +42,7 @@ pub fn generate<Primary: PrimaryKind>(
             }
         }
         .into(),
-        unique_impl: quote!{
+        unique_impl: quote! {
             impl #unique_struct {
                 fn new(size_hint: usize) -> Self {
                     Self {
@@ -50,6 +50,7 @@ pub fn generate<Primary: PrimaryKind>(
                     }
                 }
             }
-        }.into(),
+        }
+        .into(),
     }
 }

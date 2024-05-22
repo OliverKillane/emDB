@@ -11,18 +11,21 @@ pub fn generate(namer: &CodeNamer) -> SingleOp {
     SingleOp {
         op_mod: quote! {
             mod delete {}
-        }.into(),
+        }
+        .into(),
         op_trait: quote! {
             pub trait Delete {
                 fn delete(&mut self, key: #key_type) -> Result<(), #key_error>;
             }
-        }.into(),
+        }
+        .into(),
         op_impl: quote! {
             impl <'imm> Delete for #window_struct<'imm> {
                 fn delete(&mut self, key: #key_type) -> Result<(), #key_error> {
                     todo!()
                 }
             }
-        }.into(),
+        }
+        .into(),
     }
 }

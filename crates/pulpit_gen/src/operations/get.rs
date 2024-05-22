@@ -19,7 +19,7 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
             pub mod get {
                 /// TODO
                 pub struct Get #lifetime {
-                    
+
                 }
             }
         }
