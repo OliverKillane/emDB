@@ -31,6 +31,10 @@ pub fn generate<Primary: PrimaryKind>(
     predicates: &[Predicate],
     namer: &CodeNamer,
 ) -> SingleOp {
+    let trait_update = namer.trait_update();
+    let mod_update = namer.mod_update();
+    let struct_window = namer.struct_window();
+
     let modules = updates
         .iter()
         .map(|update| update.generate_mod(groups, uniques, predicates, namer));
@@ -39,25 +43,21 @@ pub fn generate<Primary: PrimaryKind>(
         .iter()
         .map(|update| update.generate_trait_impl_fn(namer, groups, uniques, predicates));
 
-    let trait_name = namer.trait_update();
-    let update_mod = namer.mod_update();
-    let window_struct = namer.struct_window();
-
     SingleOp {
         op_mod: quote! {
-            pub mod #update_mod {
+            pub mod #mod_update {
                 #(#modules)*
             }
         }
         .into(),
         op_trait: quote! {
-            pub trait #trait_name : Sized {
+            pub trait #trait_update : Sized {
                 #(#trait_fns)*
             }
         }
         .into(),
         op_impl: quote! {
-            impl <'imm> #trait_name for #window_struct<'imm> {
+            impl <'imm> #trait_update for #struct_window<'imm> {
                 #(#impl_fns)*
             }
         }
@@ -101,20 +101,18 @@ impl Update {
                 .collect()
         }
 
-        // names for code generation
-        let pulpit_path = namer.pulpit_path();
-        let update_error = namer.mod_update_enum_error();
-        let key_error = namer.type_key_error();
-        let update_struct_name = namer.mod_update_struct_update();
+        let mod_update_enum_error = namer.mod_update_enum_error();
+        let type_key_error = namer.type_key_error();
+        let mod_update_struct_update = namer.mod_update_struct_update();
         let update_name = &self.alias;
 
         // get the unique error types
         let unique_indexes = uniques
             .iter()
             .filter(|(field, _)| self.fields.contains(field));
-
         let unique_errors = generate_unique_error_variants(unique_indexes, namer);
         let predicate_errors = generate_predicate_error_variants(predicates);
+
 
         let struct_fields = self.fields.iter().map(|f| {
             let ty = groups.get_type(groups.get_field_index(f).unwrap()).unwrap();
@@ -130,13 +128,13 @@ impl Update {
         quote! {
             pub mod #update_name {
                 #[derive(Debug)]
-                pub enum #update_error {
-                    #key_error,
+                pub enum #mod_update_enum_error {
+                    #type_key_error,
                     #(#unique_errors),* #extra_comma
                     #(#predicate_errors),*
                 }
 
-                pub struct #update_struct_name {
+                pub struct #mod_update_struct_update {
                     #(pub #struct_fields),*
                 }
             }
@@ -145,15 +143,16 @@ impl Update {
     }
 
     fn generate_trait_fn(&self, namer: &CodeNamer) -> Tokens<TraitItemFn> {
-        let update_mod = namer.mod_update();
+        let mod_update = namer.mod_update();
+        let mod_update_struct_update = namer.mod_update_struct_update();
+        let mod_update_enum_error = namer.mod_update_enum_error();
+        let type_key = namer.type_key();
+        
         let this_update = &self.alias;
-        let update_struct_name = namer.mod_update_struct_update();
-        let update_error = namer.mod_update_enum_error();
         let update_name = &self.alias;
-        let key_type = namer.type_key();
 
         quote! {
-            fn #update_name(&mut self, update: #update_mod::#this_update::#update_struct_name, key: #key_type) -> Result<(), #update_mod::#this_update::#update_error>;
+            fn #update_name(&mut self, update: #mod_update::#this_update::#mod_update_struct_update, key: #type_key) -> Result<(), #mod_update::#this_update::#mod_update_enum_error>;
         }
         .into()
     }
@@ -165,27 +164,35 @@ impl Update {
         uniques: &HashMap<FieldName, Unique>,
         predicates: &[Predicate],
     ) -> Tokens<ImplItemFn> {
-        let update_mod = namer.mod_update();
-        let update_struct_name = namer.mod_update_struct_update();
-        let update_error = namer.mod_update_enum_error();
-        let update_name = &self.alias;
-        let primary = namer.name_primary_column();
-        let columns = namer.table_member_columns();
-        let key_type = namer.type_key();
-        let predicate_mod = namer.mod_predicates();
-        let key_error = namer.type_key_error();
-        let update_var = Ident::new("update", Span::call_site());
+        let mod_update = namer.mod_update();
+        let mod_update_struct_update = namer.mod_update_struct_update();
+        let mod_update_enum_error = namer.mod_update_enum_error();
+        let name_primary_column = namer.name_primary_column();
+        let table_member_columns = namer.table_member_columns();
+        let type_key = namer.type_key();
+        let mod_predicates = namer.mod_predicates();
+        let type_key_error = namer.type_key_error();
         let pulpit_path = namer.pulpit_path();
+        let mod_transactions_enum_logitem = namer.mod_transactions_enum_logitem();
+        let mod_transactions = namer.mod_transactions();
+        let mod_transactions_enum_logitem_variant_update = namer.mod_transactions_enum_logitem_variant_update();
+        let table_member_transactions = namer.table_member_transactions();
+        let mod_transactions_enum_update = namer.mod_transactions_enum_update();
+        let mod_transactions_struct_data_member_rollback = namer.mod_transactions_struct_data_member_rollback();
+        let mod_transactions_struct_data_member_log = namer.mod_transactions_struct_data_member_log();
+
+        let update_var = Ident::new("update", Span::call_site());
+        let update_name = &self.alias;
 
         // Generate the table access to primary, and all associated!
         let assoc_brw_muts = (0..groups.assoc.len()).map(|ind| {
             let name = namer.name_assoc_column(ind);
-            quote!(let #name = unsafe { self.#columns.#name.brw_mut(index) } )
+            quote!(let #name = unsafe { self.#table_member_columns.#name.brw_mut(index) } )
         });
         let table_access = quote! {
-            let #pulpit_path::column::Entry { index, data: #primary } = match self.#columns.#primary.brw_mut(key) {
+            let #pulpit_path::column::Entry { index, data: #name_primary_column } = match self.#table_member_columns.#name_primary_column.brw_mut(key) {
                 Ok(entry) => entry,
-                Err(e) => return Err(#update_mod::#update_name::#update_error::#key_error),
+                Err(e) => return Err(#mod_update::#update_name::#mod_update_enum_error::#type_key_error),
             };
             #(#assoc_brw_muts;)*
         };
@@ -197,8 +204,8 @@ impl Update {
         let predicate_checks = predicates.iter().map(|pred| {
             let pred = &pred.alias;
             quote! {
-                if !#predicate_mod::#pred #predicate_args {
-                    return Err(#update_mod::#update_name::#update_error::#pred);
+                if !#mod_predicates::#pred(#predicate_args) {
+                    return Err(#mod_update::#update_name::#mod_update_enum_error::#pred);
                 }
             }
         });
@@ -227,7 +234,7 @@ impl Update {
                     Ok(old_val) => old_val,
                     Err(_) => {
                         #(#undo_prev_fields;)*
-                        return Err(#update_mod::#update_name::#update_error::#alias)
+                        return Err(#mod_update::#update_name::#mod_update_enum_error::#alias)
                     },
                 }
             }.into());
@@ -256,20 +263,12 @@ impl Update {
                     std::mem::swap(&mut #mut_access, &mut update.#field);
                 }
             });
-
-            let log_type = namer.mod_transactions_enum_logitem();
-            let trans_mod = namer.mod_transactions();
-            let trans_update_kind = namer.mod_transactions_enum_logitem_variant_update();
-            let transactions_member = namer.table_member_transactions();
-            let transaction_update_type = namer.mod_transactions_enum_update();
-            let rollback_name = namer.mod_transactions_struct_data_member_rollback();
-            let log_name = namer.mod_transactions_struct_data_member_log();
             quote! {
                 let mut update = update;
                 #(#updates;)*
 
-                if !self.#transactions_member.#rollback_name {
-                    self.#transactions_member.#log_name.push(#trans_mod::#log_type::#trans_update_kind(key, #trans_mod::#transaction_update_type::#update_name(update)));
+                if !self.#table_member_transactions.#mod_transactions_struct_data_member_rollback {
+                    self.#table_member_transactions.#mod_transactions_struct_data_member_log.push(#mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_update(key, #mod_transactions::#mod_transactions_enum_update::#update_name(update)));
                 }
             }
         } else {
@@ -284,7 +283,7 @@ impl Update {
         };
 
         quote! {
-            fn #update_name(&mut self, #update_var: #update_mod::#update_name::#update_struct_name, key: #key_type) -> Result<(), #update_mod::#update_name::#update_error> {
+            fn #update_name(&mut self, #update_var: #mod_update::#update_name::#mod_update_struct_update, key: #type_key) -> Result<(), #mod_update::#update_name::#mod_update_enum_error> {
                 #table_access
                 #(#predicate_checks)*
                 #(#unique_updates;)*

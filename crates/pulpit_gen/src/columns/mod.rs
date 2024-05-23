@@ -5,7 +5,7 @@ use crate::{
 use proc_macro2::Span;
 use quote::quote;
 use quote_debug::Tokens;
-use syn::{Ident, ItemFn, ItemStruct, Type};
+use syn::{Ident, ItemFn, ItemStruct, Lifetime, Type};
 
 pub struct ImmConversion {
     pub imm_unpacked: Tokens<ItemStruct>,
@@ -22,8 +22,9 @@ pub trait ColKind {
     ) -> Tokens<Type>;
 
     fn generate_column_type_no_generics(&self, namer: &CodeNamer) -> Tokens<Type>;
-
+    fn requires_get_lifetime(&self) -> bool;
     fn convert_imm(&self, namer: &CodeNamer, imm_fields: &[Field]) -> ImmConversion;
+    fn convert_imm_type(&self, field: &Field, namer: &CodeNamer) -> Tokens<Type>;
 }
 
 pub trait AssocKind: ColKind {}

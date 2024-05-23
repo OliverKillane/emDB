@@ -1,11 +1,15 @@
 use proc_macro2::Span;
 use quote::quote;
 use quote_debug::Tokens;
-use syn::{Ident, Path};
+use syn::{Ident, Lifetime, Path};
 
 pub struct CodeNamer;
 
 impl CodeNamer {
+    pub fn lifetime_imm(&self) -> Tokens<Lifetime> {
+        quote! {'imm}.into()
+    }
+
     pub fn mod_columns(&self) -> Ident {
         Ident::new("column_types", Span::call_site())
     }
@@ -122,6 +126,8 @@ impl CodeNamer {
         Ident::new("borrows", Span::call_site())
     }
 
+
+
     pub fn mod_get(&self) -> Ident {
         Ident::new("get", Span::call_site())
     }
@@ -179,6 +185,14 @@ impl CodeNamer {
     }
 
     pub fn mod_transactions_enum_logitem_variant_delete(&self) -> Ident {
+        Ident::new("Delete", Span::call_site())
+    }
+
+    pub fn mod_delete(&self) -> Ident {
+        Ident::new("delete", Span::call_site())
+    }
+
+    pub fn trait_delete(&self) -> Ident {
         Ident::new("Delete", Span::call_site())
     }
 }

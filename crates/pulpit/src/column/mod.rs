@@ -178,6 +178,13 @@ pub struct Data<ImmData, MutData> {
     pub mut_data: MutData,
 }
 
+impl <ImmData, MutData> Data<ImmData, MutData> {
+    pub fn convert_imm<ImmDataProcessed>(self, trans: impl Fn(ImmData) -> ImmDataProcessed) -> Data<ImmDataProcessed, MutData> {
+        let Self { imm_data, mut_data } = self;
+        Data { imm_data: trans(imm_data), mut_data }
+    }
+}
+
 pub struct Entry<ImmData, MutData> {
     pub index: UnsafeIndex,
     pub data: Data<ImmData, MutData>,

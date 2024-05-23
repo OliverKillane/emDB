@@ -152,8 +152,8 @@ pub struct GroupsDef {
 
 impl<Col: ColKind> Group<Col> {
     fn column_type(&self, group_name: Ident, namer: &CodeNamer) -> Tokens<ItemMod> {
-        let imm_struct_name = namer.mod_columns_struct_imm();
-        let mut_struct_name = namer.mod_columns_struct_mut();
+        let mod_columns_struct_imm = namer.mod_columns_struct_imm();
+        let mod_columns_struct_mut = namer.mod_columns_struct_mut();
 
         let MutImmut {
             imm_fields: imm_derives,
@@ -179,12 +179,12 @@ impl<Col: ColKind> Group<Col> {
         quote! {
             pub mod #group_name {
                 #[derive(#(#imm_derives),*)]
-                pub struct #imm_struct_name {
+                pub struct #mod_columns_struct_imm {
                     #(#imm_fields),*
                 }
 
                 #[derive(#(#mut_derives),*)]
-                pub struct #mut_struct_name {
+                pub struct #mod_columns_struct_mut {
                     #(#mut_fields),*
                 }
 
@@ -199,7 +199,7 @@ impl<Col: ColKind> Group<Col> {
 
 impl<Primary: PrimaryKind> Groups<Primary> {
     pub fn column_types(&self, namer: &CodeNamer) -> Tokens<ItemMod> {
-        let mod_name = namer.mod_columns();
+        let mod_columns = namer.mod_columns();
 
         let primary_mod = self.primary.column_type(namer.name_primary_column(), namer);
         let assoc_mods = self
@@ -208,7 +208,7 @@ impl<Primary: PrimaryKind> Groups<Primary> {
             .enumerate()
             .map(|(ind, grp)| grp.column_type(namer.name_assoc_column(ind), namer));
         quote! {
-            mod #mod_name {
+            mod #mod_columns {
                 //! Column types to be used for storage in each column.
                 #primary_mod
                 #(#assoc_mods)*
@@ -218,32 +218,33 @@ impl<Primary: PrimaryKind> Groups<Primary> {
     }
 
     pub fn key_type(&self, namer: &CodeNamer) -> Tokens<ItemType> {
-        let col_types = namer.mod_columns();
-        let primary_mod = namer.name_primary_column();
-        let imm_struct_name = namer.mod_columns_struct_imm();
-        let mut_struct_name = namer.mod_columns_struct_mut();
+        let mod_columns = namer.mod_columns();
+        let name_primary_column = namer.name_primary_column();
+        let mod_columns_struct_imm = namer.mod_columns_struct_imm();
+        let mod_columns_struct_mut = namer.mod_columns_struct_mut();
+        let pulpit_path = namer.pulpit_path();
+        let type_key = namer.type_key();
+
         let primary_type = self.primary.col.generate_column_type(
             namer,
-            quote!(#col_types::#primary_mod::#imm_struct_name).into(),
-            quote!(#col_types::#primary_mod::#mut_struct_name).into(),
+            quote!(#mod_columns::#name_primary_column::#mod_columns_struct_imm).into(),
+            quote!(#mod_columns::#name_primary_column::#mod_columns_struct_mut).into(),
         );
-        let pulpit_path = namer.pulpit_path();
-        let key_type = namer.type_key();
         quote! {
             /// The key for accessing rows (delete, update, get)
-            pub type #key_type = <#primary_type as #pulpit_path::column::Keyable>::Key;
+            pub type #type_key = <#primary_type as #pulpit_path::column::Keyable>::Key;
         }
         .into()
     }
 
     pub fn columns_definition(&self, namer: &CodeNamer) -> GroupsDef {
-        let col_types = namer.mod_columns();
-        let primary_mod = namer.name_primary_column();
-
-        let imm_struct_name = namer.mod_columns_struct_imm();
-        let mut_struct_name = namer.mod_columns_struct_mut();
-
+        let mod_columns = namer.mod_columns();
+        let name_primary_column = namer.name_primary_column();
+        let mod_columns_struct_imm = namer.mod_columns_struct_imm();
+        let mod_columns_struct_mut = namer.mod_columns_struct_mut();
         let pulpit_path = namer.pulpit_path();
+        let struct_column_holder = namer.struct_column_holder();
+        let struct_window_holder = namer.struct_window_holder();
 
         let num_members = self.assoc.len() + 1;
         let mut col_defs = Vec::with_capacity(num_members);
@@ -260,8 +261,8 @@ impl<Primary: PrimaryKind> Groups<Primary> {
                 (
                     col.generate_column_type(
                         namer,
-                        quote!(#col_types::#assoc_name::#imm_struct_name).into(),
-                        quote!(#col_types::#assoc_name::#mut_struct_name).into(),
+                        quote!(#mod_columns::#assoc_name::#mod_columns_struct_imm).into(),
+                        quote!(#mod_columns::#assoc_name::#mod_columns_struct_mut).into(),
                     ),
                     col.generate_column_type_no_generics(namer),
                     assoc_name,
@@ -270,11 +271,11 @@ impl<Primary: PrimaryKind> Groups<Primary> {
             .chain(once((
                 self.primary.col.generate_column_type(
                     namer,
-                    quote!(#col_types::#primary_mod::#imm_struct_name).into(),
-                    quote!(#col_types::#primary_mod::#mut_struct_name).into(),
+                    quote!(#mod_columns::#name_primary_column::#mod_columns_struct_imm).into(),
+                    quote!(#mod_columns::#name_primary_column::#mod_columns_struct_mut).into(),
                 ),
                 self.primary.col.generate_column_type_no_generics(namer),
-                primary_mod,
+                name_primary_column,
             )))
         {
             col_defs.push(quote!(#member: #ty));
@@ -284,26 +285,23 @@ impl<Primary: PrimaryKind> Groups<Primary> {
             news.push(quote!(#member: #ty_no_gen::new(size_hint)));
         }
 
-        let column_holder = namer.struct_column_holder();
-        let window_holder = namer.struct_window_holder();
-
         GroupsDef {
             columns_struct: quote! {
-                struct #column_holder {
+                struct #struct_column_holder {
                     #(#col_defs),*
                 }
             }
             .into(),
             columns_impl: quote! {
-                impl #column_holder {
+                impl #struct_column_holder {
                     fn new(size_hint: usize) -> Self {
                         Self {
                             #(#news),*
                         }
                     }
 
-                    fn window(&mut self) -> #window_holder<'_> {
-                        #window_holder {
+                    fn window(&mut self) -> #struct_window_holder<'_> {
+                        #struct_window_holder {
                             #(#converts),*
                         }
                     }
@@ -311,7 +309,7 @@ impl<Primary: PrimaryKind> Groups<Primary> {
             }
             .into(),
             window_holder_struct: quote! {
-                struct #window_holder<'imm> {
+                struct #struct_window_holder<'imm> {
                     #(#window_defs),*
                 }
             }

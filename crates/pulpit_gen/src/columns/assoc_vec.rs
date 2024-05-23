@@ -23,7 +23,7 @@ impl ColKind for AssocVec {
     fn convert_imm(&self, namer: &CodeNamer, imm_fields: &[Field]) -> ImmConversion {
         let field_defs = imm_fields.iter().map(|Field { name, ty }| {
             quote! {
-                #name : #ty
+                pub #name : #ty
             }
         });
         let fields = imm_fields.iter().map(|Field { name, ty }| name);
@@ -41,7 +41,7 @@ impl ColKind for AssocVec {
             }
             .into(),
             unpacker: quote! {
-                fn #unpacking_fn(#imm_name { #(#fields),* }: #imm_name) -> #unpacked_name {
+                pub fn #unpacking_fn(#imm_name { #(#fields),* }: #imm_name) -> #unpacked_name {
                     #unpacked_name { #(#unpack_fields),* }
                 }
             }
@@ -52,5 +52,13 @@ impl ColKind for AssocVec {
     fn generate_column_type_no_generics(&self, namer: &CodeNamer) -> Tokens<Type> {
         let pulpit_path = namer.pulpit_path();
         quote! { #pulpit_path::column::AssocVec }.into()
+    }
+
+    fn requires_get_lifetime(&self) -> bool {
+        false
+    }
+
+    fn convert_imm_type(&self, field: &Field, namer: &CodeNamer) -> Tokens<Type> {
+        field.ty.clone().into()
     }
 }

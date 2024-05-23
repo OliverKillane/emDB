@@ -38,10 +38,11 @@ impl <Field: Eq + Hash + Clone, Key: Copy + Eq> Unique<Field, Key> {
         }
     }
 
-    pub fn insert(&mut self, field: &Field, key: Key) -> Result<(), UniqueConflict> {
+    // TODO: avoid copies
+    pub fn insert(&mut self, field: Field, key: Key) -> Result<(), UniqueConflict> {
         match self.mapping.insert(field.clone(), key) {
             Some(old_key) => {
-                *self.mapping.get_mut(field).unwrap() = old_key;
+                *self.mapping.get_mut(&field).unwrap() = old_key;
                 Err(UniqueConflict)
             },
             None => Ok(()),

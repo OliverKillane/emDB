@@ -2,7 +2,7 @@ use std::{collections::HashSet, iter::once};
 
 use quote::quote;
 use quote_debug::Tokens;
-use syn::{Expr, ExprTuple, Ident, ItemFn, ItemMod};
+use syn::{Expr, ExprStruct, ExprTuple, Ident, ItemFn, ItemMod};
 
 use crate::groups::{Field, Group};
 
@@ -22,23 +22,16 @@ impl Predicate {
     pub fn generate_function<Primary: PrimaryKind>(
         &self,
         groups: &Groups<Primary>,
+        namer: &CodeNamer,
     ) -> Tokens<ItemFn> {
-        let args = once(&groups.primary.fields)
-            .chain(groups.assoc.iter().map(|grp| &grp.fields))
-            .map(|fields| {
-                fields
-                    .imm_fields
-                    .iter()
-                    .chain(fields.mut_fields.iter())
-                    .map(|Field { ty, name }| quote!(#name: &#ty))
-            })
-            .flatten();
-
+        let mod_borrow = namer.mod_borrow();
+        let mod_borrow_struct_borrow = namer.mod_borrow_struct_borrow();
+        
+        let args = groups.idents.keys();
         let name = &self.alias;
         let body = &self.tokens;
-
         quote! {
-            pub fn #name(#(#args),*) -> bool {
+            pub fn #name(super::#mod_borrow::#mod_borrow_struct_borrow {#(#args),*}: super::#mod_borrow::#mod_borrow_struct_borrow) -> bool {
                 #body
             }
         }
@@ -52,11 +45,13 @@ pub fn generate<Primary: PrimaryKind>(
     groups: &Groups<Primary>,
     namer: &CodeNamer,
 ) -> Tokens<ItemMod> {
-    let functions = predicates.iter().map(|pred| pred.generate_function(groups));
-    let predicates_mod = namer.mod_predicates();
+    let functions = predicates
+        .iter()
+        .map(|pred| pred.generate_function(groups, namer));
+    let mod_predicates = namer.mod_predicates();
 
     quote! {
-        mod #predicates_mod {
+        mod #mod_predicates {
             #(#functions)*
         }
     }
@@ -72,7 +67,10 @@ pub fn generate_update_predicate_access<'a, Primary: PrimaryKind>(
     new_fields: &HashSet<FieldName>,
     update_value_name: &Ident,
     namer: &CodeNamer,
-) -> Tokens<ExprTuple> {
+) -> Tokens<ExprStruct> {
+    let mod_borrow = namer.mod_borrow();
+    let mod_borrow_struct_borrow = namer.mod_borrow_struct_borrow();
+
     let accesses = once((namer.name_primary_column(), &groups.primary.fields))
         .chain(
             groups
@@ -89,16 +87,17 @@ pub fn generate_update_predicate_access<'a, Primary: PrimaryKind>(
                 .chain(fields.mut_fields.iter().map(|f| (quote!(mut_data), f)))
                 .map(move |(access, Field { name, ty })| {
                     if new_fields.contains(&name) {
-                        quote!(&#update_value_name.#name)
+                        quote!(#name: &#update_value_name.#name)
                     } else {
-                        quote!(&#var_name.#access.#name)
+                        quote!(#name: &#var_name.#access.#name)
                     }
                 })
         })
         .flatten();
-
     quote! {
-        (#(#accesses),*)
+        #mod_borrow::#mod_borrow_struct_borrow {
+            #(#accesses),*
+        }
     }
     .into()
 }

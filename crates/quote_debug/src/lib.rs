@@ -2,7 +2,7 @@
 
 use proc_macro2::TokenStream;
 use quote::ToTokens;
-use std::{any::type_name, marker::PhantomData};
+use std::{any::type_name, marker::PhantomData, ops::Deref};
 use syn::parse2;
 
 pub struct Tokens<T: syn::parse::Parse + ToTokens> {
@@ -27,6 +27,14 @@ impl<T: syn::parse::Parse + ToTokens> From<TokenStream> for Tokens<T> {
             tks: value,
             phantom: PhantomData,
         }
+    }
+}
+
+impl<T: syn::parse::Parse + ToTokens> Deref for Tokens<T> {
+    type Target = TokenStream;
+
+    fn deref(&self) -> &Self::Target {
+        &self.tks
     }
 }
 

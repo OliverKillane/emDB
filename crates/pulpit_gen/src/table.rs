@@ -28,25 +28,23 @@ struct TableDec {
 }
 
 pub fn generate_table_and_window(transactions: bool, namer: &CodeNamer) -> TableDec {
-    let window_name = namer.struct_window();
-    let table_name = namer.struct_table();
-
-    let columns_member = namer.table_member_columns();
-    let columns_holder = namer.struct_column_holder();
-    let window_holder = namer.struct_window_holder();
-
-    let uniques = namer.table_member_uniques();
-    let uniques_type = namer.struct_unique();
+    let struct_window = namer.struct_window();
+    let struct_table = namer.struct_table();
+    let table_member_columns = namer.table_member_columns();
+    let struct_column_holder = namer.struct_column_holder();
+    let struct_window_holder = namer.struct_window_holder();
+    let table_member_uniques = namer.table_member_uniques();
+    let struct_unique = namer.struct_unique();
+    let mod_transactions = namer.mod_transactions();
+    let mod_transactions_struct_data = namer.mod_transactions_struct_data();
+    let table_member_transactions = namer.table_member_transactions();
 
     let (trans_table, trans_new, trans_wind, trans_wind_def) = if transactions {
-        let transactions_mod = namer.mod_transactions();
-        let transaction_type = namer.mod_transactions_struct_data();
-        let trans_member = namer.table_member_transactions();
         (
-            quote!(#trans_member: #transactions_mod::#transaction_type ),
-            quote!(#trans_member: #transactions_mod::#transaction_type::new() ),
-            quote!(#trans_member: &mut self.#trans_member),
-            quote!(#trans_member: &'imm mut #transactions_mod::#transaction_type),
+            quote!(#table_member_transactions: #mod_transactions::#mod_transactions_struct_data ),
+            quote!(#table_member_transactions: #mod_transactions::#mod_transactions_struct_data::new() ),
+            quote!(#table_member_transactions: &mut self.#table_member_transactions),
+            quote!(#table_member_transactions: &'imm mut #mod_transactions::#mod_transactions_struct_data),
         )
     } else {
         (quote!(), quote!(), quote!(), quote!())
@@ -54,27 +52,27 @@ pub fn generate_table_and_window(transactions: bool, namer: &CodeNamer) -> Table
 
     TableDec {
         table_struct: quote! {
-            pub struct #table_name {
-                #columns_member: #columns_holder,
-                #uniques: #uniques_type,
+            pub struct #struct_table {
+                #table_member_columns: #struct_column_holder,
+                #table_member_uniques: #struct_unique,
                 #trans_table
             }
         }
         .into(),
         table_impl: quote! {
-            impl #table_name {
+            impl #struct_table {
                 pub fn new(size_hint: usize) -> Self {
                     Self {
-                        #columns_member: #columns_holder::new(size_hint),
-                        #uniques: #uniques_type::new(size_hint),
+                        #table_member_columns: #struct_column_holder::new(size_hint),
+                        #table_member_uniques: #struct_unique::new(size_hint),
                         #trans_new
                     }
                 }
 
-                pub fn window(&mut self) -> #window_name<'_> {
-                    #window_name {
-                        #columns_member: self.#columns_member.window(),
-                        #uniques: &mut self.#uniques,
+                pub fn window(&mut self) -> #struct_window<'_> {
+                    #struct_window {
+                        #table_member_columns: self.#table_member_columns.window(),
+                        #table_member_uniques: &mut self.#table_member_uniques,
                         #trans_wind
                     }
                 }
@@ -82,9 +80,9 @@ pub fn generate_table_and_window(transactions: bool, namer: &CodeNamer) -> Table
         }
         .into(),
         window_struct: quote! {
-            pub struct #window_name<'imm> {
-                #columns_member: #window_holder<'imm>,
-                #uniques: &'imm mut #uniques_type,
+            pub struct #struct_window<'imm> {
+                #table_member_columns: #struct_window_holder<'imm>,
+                #table_member_uniques: &'imm mut #struct_unique,
                 #trans_wind_def
             }
         }
@@ -101,9 +99,14 @@ impl<Primary: PrimaryKind> Table<Primary> {
             updates,
             name,
         } = self;
+        
         let pulpit_path = namer.pulpit_path();
+
+        
         let column_types = groups.column_types(namer);
         let key_type = groups.key_type(namer);
+
+
         let GroupsDef {
             columns_struct,
             columns_impl,
@@ -122,13 +125,15 @@ impl<Primary: PrimaryKind> Table<Primary> {
         ops_code.push(operations::update::generate(
             updates, groups, uniques, predicates, namer,
         ));
-        ops_code.push(operations::insert::generate(groups, namer));
+        ops_code.push(operations::insert::generate(
+            groups, uniques, predicates, namer,
+        ));
         if Primary::TRANSACTIONS {
             ops_code.push(operations::transact::generate(groups, updates, namer))
         }
 
         if Primary::DELETIONS {
-            ops_code.push(operations::delete::generate(namer))
+            ops_code.push(operations::delete::generate(namer, Primary::TRANSACTIONS))
         }
 
         let TableDec {

@@ -7,86 +7,74 @@ pub fn generate<Primary: PrimaryKind>(
     updates: &[Update],
     namer: &CodeNamer,
 ) -> SingleOp {
-    let window_struct = namer.struct_window();
-
-    // TODO: naming
-    let data_struct = namer.mod_transactions_struct_data();
-    let log_item = namer.mod_transactions_enum_logitem();
-    let update_enum = namer.mod_transactions_enum_update();
-
-    let trans_mod = namer.mod_transactions();
-
-    let rollback_name = namer.mod_transactions_struct_data_member_rollback();
-    let log_name = namer.mod_transactions_struct_data_member_log();
-
-    let updates_mod = namer.mod_update();
-    let update_struct = namer.mod_update_struct_update();
+    let struct_window = namer.struct_window();
+    let mod_transactions_struct_data = namer.mod_transactions_struct_data();
+    let mod_transactions_enum_logitem = namer.mod_transactions_enum_logitem();
+    let mod_transactions_enum_update = namer.mod_transactions_enum_update();
+    let mod_transactions = namer.mod_transactions();
+    let mod_update = namer.mod_update();
+    let mod_update_struct_update = namer.mod_update_struct_update();
+    let mod_transactions_enum_logitem_variant_update = namer.mod_transactions_enum_logitem_variant_update();
+    let mod_transactions_enum_logitem_variant_insert = namer.mod_transactions_enum_logitem_variant_insert();
+    let mod_transactions_enum_logitem_variant_append = namer.mod_transactions_enum_logitem_variant_append();
+    let mod_transactions_enum_logitem_variant_delete = namer.mod_transactions_enum_logitem_variant_delete();
+    let table_member_transactions = namer.table_member_transactions();
+    let mod_transactions_struct_data_member_log = namer.mod_transactions_struct_data_member_log();
+    let mod_transactions_struct_data_member_rollback = namer.mod_transactions_struct_data_member_rollback();
+    let table_member_columns = namer.table_member_columns();
+    let trait_update = namer.trait_update();
+    let type_key = namer.type_key();
+    let name_primary_column = namer.name_primary_column();
+    let pulpit_path = namer.pulpit_path();
 
     let updates_variants = updates.iter().map(
-        |Update { fields: _, alias }| quote!(#alias(super::#updates_mod::#alias::#update_struct)),
+        |Update { fields: _, alias }| quote!(#alias(super::#mod_update::#alias::#mod_update_struct_update)),
     );
-
-    let variant_update = namer.mod_transactions_enum_logitem_variant_update();
-    let variant_insert = namer.mod_transactions_enum_logitem_variant_insert();
-    let variant_append = namer.mod_transactions_enum_logitem_variant_append();
-    let variant_delete = namer.mod_transactions_enum_logitem_variant_delete();
-
-    let key_type = namer.type_key();
 
     let log_variants = if Primary::DELETIONS {
         quote! {
-            #variant_update(super::#key_type, #update_enum),
-            #variant_insert(super::#key_type),
-            #variant_delete(super::#key_type),
+            #mod_transactions_enum_logitem_variant_update(super::#type_key, #mod_transactions_enum_update),
+            #mod_transactions_enum_logitem_variant_insert(super::#type_key),
+            #mod_transactions_enum_logitem_variant_delete(super::#type_key),
         }
     } else {
         quote! {
-            #variant_update(#update_enum),
-            #variant_append,
+            #mod_transactions_enum_logitem_variant_update(#mod_transactions_enum_update),
+            #mod_transactions_enum_logitem_variant_append,
         }
     };
 
-    let trans_member = namer.table_member_transactions();
-    let log_name = namer.mod_transactions_struct_data_member_log();
-    let rollback_name = namer.mod_transactions_struct_data_member_rollback();
-
-    let col_member = namer.table_member_columns();
-
-    let update_trait = namer.trait_update();
     let abort_update = updates.iter().map(|Update { fields: _, alias }| {
         quote! {
-            #trans_mod::#update_enum::#alias(update) => {
-                <Self as #update_trait>::#alias(self, update, key).unwrap();
+            #mod_transactions::#mod_transactions_enum_update::#alias(update) => {
+                <Self as #trait_update>::#alias(self, update, key).unwrap();
             }
         }
     });
-    let update_rollback_case = quote! {#trans_mod::#log_item::#variant_update(key, update) => {
+    let update_rollback_case = quote! {#mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_update(key, update) => {
         match update {
             #(#abort_update,)*
         }
     }};
 
-    let primary_name = namer.name_primary_column();
-
     let op_impl = if Primary::DELETIONS {
-        let pulpit_path = namer.pulpit_path();
         let assoc_cols = (0..groups.assoc.len()).map(|ind| {
             let name = namer.name_assoc_column(ind);
-            quote!(self.#col_member.#name.pull(index))
+            quote!(self.#table_member_columns.#name.pull(index))
         });
         let assoc_cols_abrt_del = assoc_cols.clone();
 
         quote! {
-            impl <'imm> Transact for #window_struct<'imm> {
+            impl <'imm> Transact for #struct_window<'imm> {
                 /// Commit all current changes
                 /// - Requires concretely applying deletions (which until commit 
                 ///   or abort simply hide keys from the table)
                 fn commit(&mut self) {
-                    debug_assert!(!self.#trans_member.#rollback_name);
-                    while let Some(entry) = self.#trans_member.#log_name.pop() {
+                    debug_assert!(!self.#table_member_transactions.#mod_transactions_struct_data_member_rollback);
+                    while let Some(entry) = self.#table_member_transactions.#mod_transactions_struct_data_member_log.pop() {
                         match entry {
-                            #trans_mod::#log_item::#variant_delete(key) => {
-                                let #pulpit_path::column::Entry{ index, data:_ } = self.#col_member.#primary_name.pull(key).unwrap();
+                            #mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_delete(key) => {
+                                let #pulpit_path::column::Entry{ index, data:_ } = self.#table_member_columns.#name_primary_column.pull(key).unwrap();
                                 unsafe {
                                     #(#assoc_cols;)*
                                 }
@@ -100,14 +88,14 @@ pub fn generate<Primary: PrimaryKind>(
                 /// - Requires re-applying all updates, deleting inserts and undoing deletes 
                 ///   (deletes' keys are actually just hidden until commit or abort)
                 fn abort(&mut self) {
-                    self.#trans_member.#rollback_name = true;
-                    while let Some(entry) = self.#trans_member.#log_name.pop() {
+                    self.#table_member_transactions.#mod_transactions_struct_data_member_rollback = true;
+                    while let Some(entry) = self.#table_member_transactions.#mod_transactions_struct_data_member_log.pop() {
                         match entry {
-                            #trans_mod::#log_item::#variant_delete(key) => {
-                                self.#col_member.#primary_name.reveal(key).unwrap();
+                            #mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_delete(key) => {
+                                self.#table_member_columns.#name_primary_column.reveal(key).unwrap();
                             },
-                            #trans_mod::#log_item::#variant_insert(key) => {
-                                let #pulpit_path::column::Entry{ index, data:_ } = self.#col_member.#primary_name.pull(key).unwrap();
+                            #mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_insert(key) => {
+                                let #pulpit_path::column::Entry{ index, data:_ } = self.#table_member_columns.#name_primary_column.pull(key).unwrap();
                                 unsafe {
                                     #(#assoc_cols_abrt_del;)*
                                 }
@@ -115,7 +103,7 @@ pub fn generate<Primary: PrimaryKind>(
                             #update_rollback_case
                         }
                     }
-                    self.#trans_member.#rollback_name = false;
+                    self.#table_member_transactions.#mod_transactions_struct_data_member_rollback = false;
                 }
             }
         }
@@ -123,35 +111,35 @@ pub fn generate<Primary: PrimaryKind>(
     } else {
         let assoc_cols = (0..groups.assoc.len()).map(|ind| {
             let name = namer.name_assoc_column(ind);
-            quote!(self.#col_member.#name.unppend())
+            quote!(self.#table_member_columns.#name.unppend())
         });
 
         quote! {
-            impl <'imm> Transact for #window_struct<'imm> {
+            impl <'imm> Transact for #struct_window<'imm> {
                 /// Commit all current changes
                 /// - Clears the rollback log
                 fn commit(&mut self) {
-                    debug_assert!(!self.#trans_member.#rollback_name);
-                    self.#trans_member.#log_name.clear()
+                    debug_assert!(!self.#table_member_transactions.#mod_transactions_struct_data_member_rollback);
+                    self.#table_member_transactions.#mod_transactions_struct_data_member_log.clear()
                 }
 
                 /// Undo the transactions applied since the last commit
                 /// - Requires re-applying all updates, deleting inserts and undoing deletes
                 ///   (deletes' keys are actually just hidden until commit or abort)
                 fn abort(&mut self) {
-                    self.#trans_member.#rollback_name = true;
-                    while let Some(entry) = self.#trans_member.#log_name.pop() {
+                    self.#table_member_transactions.#mod_transactions_struct_data_member_rollback = true;
+                    while let Some(entry) = self.#table_member_transactions.#mod_transactions_struct_data_member_log.pop() {
                         match entry {
-                            #trans_mod::#log_item::#variant_append => {
+                            #mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_append => {
                                 unsafe{
-                                    self.#trans_member.#primary_name.unppend();
+                                    self.#table_member_transactions.#name_primary_column.unppend();
                                     #(#assoc_cols;)*
                                 }
                             },
                             #update_rollback_case
                         }
                     }
-                    self.#trans_member.#rollback_name = false;
+                    self.#table_member_transactions.#mod_transactions_struct_data_member_rollback = false;
                 }
             }
         }
@@ -160,27 +148,27 @@ pub fn generate<Primary: PrimaryKind>(
 
     SingleOp {
         op_mod: quote! {
-            mod #trans_mod {
+            mod #mod_transactions {
                 ///TODO
-                pub enum #update_enum {
+                pub enum #mod_transactions_enum_update {
                     #(#updates_variants,)*
                 }
 
                 /// TODO
-                pub enum #log_item {
+                pub enum #mod_transactions_enum_logitem {
                     #log_variants
                 }
 
-                pub struct #data_struct {
-                    pub #log_name: Vec<#log_item>,
-                    pub #rollback_name: bool,
+                pub struct #mod_transactions_struct_data {
+                    pub #mod_transactions_struct_data_member_log: Vec<#mod_transactions_enum_logitem>,
+                    pub #mod_transactions_struct_data_member_rollback: bool,
                 }
 
-                impl #data_struct {
+                impl #mod_transactions_struct_data {
                     pub fn new() -> Self {
                         Self {
-                            #log_name: Vec::new(),
-                            #rollback_name: false,
+                            #mod_transactions_struct_data_member_log: Vec::new(),
+                            #mod_transactions_struct_data_member_rollback: false,
                         }
                     }
                 }

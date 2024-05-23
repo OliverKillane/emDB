@@ -25,11 +25,12 @@ pub fn generate<Primary: PrimaryKind>(
     namer: &CodeNamer,
 ) -> UniqueDec {
     let pulpit_path = namer.pulpit_path();
-    let unique_struct = namer.struct_unique();
-    let key_type = namer.type_key();
+    let struct_unique = namer.struct_unique();
+    let type_key = namer.type_key();
+
     let unique_fields_def = uniques.iter().map(|(alias, _)| {
         let ty = groups.get_typefield(&alias).unwrap();
-        quote!(#alias: #pulpit_path::access::Unique<#ty, #key_type>)
+        quote!(#alias: #pulpit_path::access::Unique<#ty, #type_key>)
     });
     let unique_fields_impl = uniques
         .iter()
@@ -37,13 +38,13 @@ pub fn generate<Primary: PrimaryKind>(
 
     UniqueDec {
         unique_struct: quote! {
-            struct #unique_struct {
+            struct #struct_unique {
                 #(#unique_fields_def),*
             }
         }
         .into(),
         unique_impl: quote! {
-            impl #unique_struct {
+            impl #struct_unique {
                 fn new(size_hint: usize) -> Self {
                     Self {
                         #(#unique_fields_impl),*
