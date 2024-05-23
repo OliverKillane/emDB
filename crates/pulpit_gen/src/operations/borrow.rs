@@ -13,8 +13,11 @@ fn generate_borrow_fields<'a, Primary: PrimaryKind>(
 ) -> impl Iterator<Item = TokenStream> + 'a {
     groups.idents.iter().map(|(field_name, field_index)| {
         let data = match field_index {
-            FieldIndex::Primary(_) => namer.name_primary_column(),
-            FieldIndex::Assoc { assoc_ind, inner } => namer.name_assoc_column(*assoc_ind),
+            FieldIndex::Primary(_) => namer.name_primary_column.clone(),
+            FieldIndex::Assoc {
+                assoc_ind,
+                inner: _,
+            } => namer.name_assoc_column(*assoc_ind),
         };
 
         let imm_access = if field_index.is_imm() {
@@ -28,15 +31,18 @@ fn generate_borrow_fields<'a, Primary: PrimaryKind>(
 }
 
 pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeNamer) -> SingleOp {
-    let type_key = namer.type_key();
-    let struct_window = namer.struct_window();
-    let pulpit_path = namer.pulpit_path();
-    let name_primary_column = namer.name_primary_column();
-    let type_key_error = namer.type_key_error();
-    let table_member_columns = namer.table_member_columns();
-    let mod_borrow = namer.mod_borrow();
-    let trait_borrow = namer.trait_borrow();
-    let mod_borrow_struct_borrow = namer.mod_borrow_struct_borrow();
+    let CodeNamer {
+        type_key,
+        struct_window,
+        pulpit_path,
+        name_primary_column,
+        type_key_error,
+        table_member_columns,
+        mod_borrow,
+        trait_borrow,
+        mod_borrow_struct_borrow,
+        ..
+    } = namer;
 
     let borrowed_fields = generate_borrow_fields(groups, namer);
     let struct_fields = groups.idents.iter().map(|(field_name, field_index)| {

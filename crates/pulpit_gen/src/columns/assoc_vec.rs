@@ -16,7 +16,7 @@ impl ColKind for AssocVec {
         imm_type: Tokens<Type>,
         mut_type: Tokens<Type>,
     ) -> Tokens<Type> {
-        let pulpit_path = namer.pulpit_path();
+        let pulpit_path = &namer.pulpit_path;
         quote! { #pulpit_path::column::AssocVec<#imm_type, #mut_type> }.into()
     }
 
@@ -26,23 +26,26 @@ impl ColKind for AssocVec {
                 pub #name : #ty
             }
         });
-        let fields = imm_fields.iter().map(|Field { name, ty }| name);
+        let fields = imm_fields.iter().map(|Field { name, ty: _ }| name);
         let unpack_fields = fields.clone();
 
-        let unpacked_name = namer.mod_columns_struct_imm_unpacked();
-        let unpacking_fn = namer.mod_columns_fn_imm_unpack();
-        let imm_name = namer.mod_columns_struct_imm();
+        let CodeNamer {
+            mod_columns_struct_imm_unpacked,
+            mod_columns_fn_imm_unpack,
+            mod_columns_struct_imm,
+            ..
+        } = namer;
 
         ImmConversion {
             imm_unpacked: quote! {
-                pub struct #unpacked_name {
+                pub struct #mod_columns_struct_imm_unpacked {
                     #(#field_defs),*
                 }
             }
             .into(),
             unpacker: quote! {
-                pub fn #unpacking_fn(#imm_name { #(#fields),* }: #imm_name) -> #unpacked_name {
-                    #unpacked_name { #(#unpack_fields),* }
+                pub fn #mod_columns_fn_imm_unpack(#mod_columns_struct_imm { #(#fields),* }: #mod_columns_struct_imm) -> #mod_columns_struct_imm_unpacked {
+                    #mod_columns_struct_imm_unpacked { #(#unpack_fields),* }
                 }
             }
             .into(),
@@ -50,7 +53,7 @@ impl ColKind for AssocVec {
     }
 
     fn generate_column_type_no_generics(&self, namer: &CodeNamer) -> Tokens<Type> {
-        let pulpit_path = namer.pulpit_path();
+        let pulpit_path = &namer.pulpit_path;
         quote! { #pulpit_path::column::AssocVec }.into()
     }
 
@@ -58,7 +61,7 @@ impl ColKind for AssocVec {
         false
     }
 
-    fn convert_imm_type(&self, field: &Field, namer: &CodeNamer) -> Tokens<Type> {
+    fn convert_imm_type(&self, field: &Field, _: &CodeNamer) -> Tokens<Type> {
         field.ty.clone().into()
     }
 }

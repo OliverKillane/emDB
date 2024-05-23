@@ -13,8 +13,11 @@ fn generate_get_fields<'a, Primary: PrimaryKind>(
 ) -> impl Iterator<Item = TokenStream> + 'a {
     groups.idents.iter().map(|(field_name, field_index)| {
         let data = match field_index {
-            FieldIndex::Primary(_) => namer.name_primary_column(),
-            FieldIndex::Assoc { assoc_ind, inner } => namer.name_assoc_column(*assoc_ind),
+            FieldIndex::Primary(_) => namer.name_primary_column.clone(),
+            FieldIndex::Assoc {
+                assoc_ind,
+                inner: _,
+            } => namer.name_assoc_column(*assoc_ind),
         };
 
         let imm_access = if field_index.is_imm() {
@@ -59,17 +62,21 @@ pub fn generate_get_struct_fields<'a, Primary: PrimaryKind>(
 }
 
 pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeNamer) -> SingleOp {
-    let type_key_error = namer.type_key_error();
-    let type_key = namer.type_key();
-    let struct_window = namer.struct_window();
-    let pulpit_path = namer.pulpit_path();
-    let name_primary_column = namer.name_primary_column();
-    let table_member_columns = namer.table_member_columns();
-    let mod_columns = namer.mod_columns();
-    let mod_columns_fn_imm_unpack = namer.mod_columns_fn_imm_unpack();
-    let mod_get = namer.mod_get();
-    let mod_get_struct_get = namer.mod_get_struct_get();
-    let trait_get = namer.trait_get();
+    let CodeNamer {
+        type_key_error,
+        type_key,
+        struct_window,
+        pulpit_path,
+        name_primary_column,
+        table_member_columns,
+        mod_columns,
+        mod_columns_fn_imm_unpack,
+        mod_get,
+        mod_get_struct_get,
+        trait_get,
+        lifetime_imm,
+        ..
+    } = namer;
 
     let include_lifetime = groups.primary.col.requires_get_lifetime()
         || groups
@@ -77,8 +84,7 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
             .iter()
             .any(|Group { col, fields: _ }| col.requires_get_lifetime()); // TODO: implement
     let lifetime = if include_lifetime {
-        let lf = namer.lifetime_imm();
-        quote!(<#lf>)
+        quote!(<#lifetime_imm>)
     } else {
         quote!()
     };
@@ -102,6 +108,7 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
         .into(),
         op_trait: quote! {
             pub trait #trait_get #lifetime {
+                /// Get the value of a row, not as a borrow, but as a value lasting at least as long as the window.
                 fn get(&self, key: #type_key) -> Result<#mod_get::#mod_get_struct_get #lifetime, #type_key_error>;
             }
         }

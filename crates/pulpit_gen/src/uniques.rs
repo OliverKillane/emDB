@@ -24,12 +24,15 @@ pub fn generate<Primary: PrimaryKind>(
     groups: &Groups<Primary>,
     namer: &CodeNamer,
 ) -> UniqueDec {
-    let pulpit_path = namer.pulpit_path();
-    let struct_unique = namer.struct_unique();
-    let type_key = namer.type_key();
+    let CodeNamer {
+        pulpit_path,
+        struct_unique,
+        type_key,
+        ..
+    } = namer;
 
     let unique_fields_def = uniques.iter().map(|(alias, _)| {
-        let ty = groups.get_typefield(&alias).unwrap();
+        let ty = groups.get_typefield(alias).unwrap();
         quote!(#alias: #pulpit_path::access::Unique<#ty, #type_key>)
     });
     let unique_fields_impl = uniques

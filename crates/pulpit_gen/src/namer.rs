@@ -3,196 +3,117 @@ use quote::quote;
 use quote_debug::Tokens;
 use syn::{Ident, Lifetime, Path};
 
-pub struct CodeNamer;
+pub struct CodeNamer {
+    pub lifetime_imm: Tokens<Lifetime>,
+    pub mod_columns: Ident,
+    pub name_primary_column: Ident,
+    pub mod_columns_struct_imm: Ident,
+    pub mod_columns_struct_mut: Ident,
+    pub mod_columns_struct_imm_unpacked: Ident,
+    pub mod_columns_fn_imm_unpack: Ident,
+    pub pulpit_path: Tokens<Path>,
+    pub struct_column_holder: Ident,
+    pub struct_window_holder: Ident,
+    pub mod_update_struct_update: Ident,
+    pub mod_update_enum_error: Ident,
+    pub type_key_error: Ident,
+    pub table_member_columns: Ident,
+    pub type_key: Ident,
+    pub mod_predicates: Ident,
+    pub struct_uniques_holder: Ident,
+    pub table_member_uniques: Ident,
+    pub table_member_transactions: Ident,
+    pub mod_transactions: Ident,
+    pub mod_transactions_enum_logitem: Ident,
+    pub mod_transactions_enum_update: Ident,
+    pub trait_update: Ident,
+    pub mod_update: Ident,
+    pub mod_borrow_struct_borrow: Ident,
+    pub trait_borrow: Ident,
+    pub struct_window: Ident,
+    pub struct_table: Ident,
+    pub mod_borrow: Ident,
+    pub mod_get: Ident,
+    pub mod_get_struct_get: Ident,
+    pub trait_get: Ident,
+    pub mod_insert: Ident,
+    pub mod_insert_struct_insert: Ident,
+    pub mod_insert_enum_error: Ident,
+    pub trait_insert: Ident,
+    pub struct_unique: Ident,
+    pub mod_transactions_struct_data: Ident,
+    pub mod_transactions_struct_data_member_log: Ident,
+    pub mod_transactions_struct_data_member_rollback: Ident,
+    pub mod_transactions_enum_logitem_variant_update: Ident,
+    pub mod_transactions_enum_logitem_variant_insert: Ident,
+    pub mod_transactions_enum_logitem_variant_append: Ident,
+    pub mod_transactions_enum_logitem_variant_delete: Ident,
+    pub mod_delete: Ident,
+    pub trait_delete: Ident,
+}
+
+fn new_id(id: &str) -> Ident {
+    Ident::new(id, Span::call_site())
+}
+
+impl Default for CodeNamer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl CodeNamer {
-    pub fn lifetime_imm(&self) -> Tokens<Lifetime> {
-        quote! {'imm}.into()
+    pub fn new() -> Self {
+        Self {
+            lifetime_imm: quote! {'imm}.into(),
+            mod_columns: new_id("column_types"),
+            name_primary_column: new_id("primary"),
+            mod_columns_struct_imm: new_id("Imm"),
+            mod_columns_struct_mut: new_id("Mut"),
+            mod_columns_struct_imm_unpacked: new_id("ImmUnpack"),
+            mod_columns_fn_imm_unpack: new_id("imm_unpack"),
+            pulpit_path: quote!(pulpit).into(),
+            struct_column_holder: new_id("ColumnHolder"),
+            struct_window_holder: new_id("WindowHolder"),
+            mod_update_struct_update: new_id("Update"),
+            mod_update_enum_error: new_id("UpdateError"),
+            type_key_error: new_id("KeyError"),
+            table_member_columns: new_id("columns"),
+            type_key: new_id("Key"),
+            mod_predicates: new_id("predicates"),
+            struct_uniques_holder: new_id("Uniques"),
+            table_member_uniques: new_id("uniques"),
+            table_member_transactions: new_id("transactions"),
+            mod_transactions: new_id("transactions"),
+            mod_transactions_enum_logitem: new_id("LogItem"),
+            mod_transactions_enum_update: new_id("Updates"),
+            trait_update: new_id("Update"),
+            mod_update: new_id("updates"),
+            mod_borrow_struct_borrow: new_id("Borrows"),
+            trait_borrow: new_id("Borrow"),
+            struct_window: new_id("Window"),
+            struct_table: new_id("Table"),
+            mod_borrow: new_id("borrows"),
+            mod_get: new_id("get"),
+            mod_get_struct_get: new_id("Get"),
+            trait_get: new_id("Get"),
+            mod_insert: new_id("insert"),
+            mod_insert_struct_insert: new_id("Insert"),
+            mod_insert_enum_error: new_id("Error"),
+            trait_insert: new_id("Insert"),
+            struct_unique: new_id("Uniques"),
+            mod_transactions_struct_data: new_id("Data"),
+            mod_transactions_struct_data_member_log: new_id("log"),
+            mod_transactions_struct_data_member_rollback: new_id("rollback"),
+            mod_transactions_enum_logitem_variant_update: new_id("Update"),
+            mod_transactions_enum_logitem_variant_insert: new_id("Insert"),
+            mod_transactions_enum_logitem_variant_append: new_id("Append"),
+            mod_transactions_enum_logitem_variant_delete: new_id("Delete"),
+            mod_delete: new_id("delete"),
+            trait_delete: new_id("Delete"),
+        }
     }
-
-    pub fn mod_columns(&self) -> Ident {
-        Ident::new("column_types", Span::call_site())
-    }
-
-    pub fn name_primary_column(&self) -> Ident {
-        Ident::new("primary", Span::call_site())
-    }
-
     pub fn name_assoc_column(&self, assoc_ind: usize) -> Ident {
         Ident::new(&format!("assoc_{assoc_ind}"), Span::call_site())
-    }
-
-    pub fn mod_columns_struct_imm(&self) -> Ident {
-        Ident::new("Imm", Span::call_site())
-    }
-
-    pub fn mod_columns_struct_mut(&self) -> Ident {
-        Ident::new("Mut", Span::call_site())
-    }
-
-    pub fn mod_columns_struct_imm_unpacked(&self) -> Ident {
-        Ident::new("ImmUnpack", Span::call_site())
-    }
-
-    pub fn mod_columns_fn_imm_unpack(&self) -> Ident {
-        Ident::new("imm_unpack", Span::call_site())
-    }
-
-    pub fn pulpit_path(&self) -> Tokens<Path> {
-        quote! {pulpit}.into()
-    }
-
-    pub fn struct_column_holder(&self) -> Ident {
-        Ident::new("ColumnHolder", Span::call_site())
-    }
-
-    pub fn struct_window_holder(&self) -> Ident {
-        Ident::new("WindowHolder", Span::call_site())
-    }
-
-    pub fn mod_update_struct_update(&self) -> Ident {
-        Ident::new("Update", Span::call_site())
-    }
-
-    pub fn mod_update_enum_error(&self) -> Ident {
-        Ident::new("UpdateError", Span::call_site())
-    }
-
-    pub fn type_key_error(&self) -> Ident {
-        Ident::new("KeyError", Span::call_site())
-    }
-
-    pub fn table_member_columns(&self) -> Ident {
-        Ident::new("columns", Span::call_site())
-    }
-
-    pub fn type_key(&self) -> Ident {
-        Ident::new("Key", Span::call_site())
-    }
-
-    pub fn mod_predicates(&self) -> Ident {
-        Ident::new("predicates", Span::call_site())
-    }
-
-    pub fn struct_uniques_holder(&self) -> Ident {
-        Ident::new("Uniques", Span::call_site())
-    }
-
-    pub fn table_member_uniques(&self) -> Ident {
-        Ident::new("uniques", Span::call_site())
-    }
-
-    pub fn table_member_transactions(&self) -> Ident {
-        Ident::new("transactions", Span::call_site())
-    }
-
-    pub fn mod_transactions(&self) -> Ident {
-        Ident::new("transactions", Span::call_site())
-    }
-
-    pub fn mod_transactions_enum_logitem(&self) -> Ident {
-        Ident::new("LogItem", Span::call_site())
-    }
-
-    pub fn mod_transactions_enum_update(&self) -> Ident {
-        Ident::new("Updates", Span::call_site())
-    }
-
-    pub fn trait_update(&self) -> Ident {
-        Ident::new("Update", Span::call_site())
-    }
-
-    pub fn mod_update(&self) -> Ident {
-        Ident::new("updates", Span::call_site())
-    }
-
-    pub fn mod_borrow_struct_borrow(&self) -> Ident {
-        Ident::new("Borrows", Span::call_site())
-    }
-
-    pub fn trait_borrow(&self) -> Ident {
-        Ident::new("Borrow", Span::call_site())
-    }
-
-    pub fn struct_window(&self) -> Ident {
-        Ident::new("Window", Span::call_site())
-    }
-
-    pub fn struct_table(&self) -> Ident {
-        Ident::new("Table", Span::call_site())
-    }
-
-    pub fn mod_borrow(&self) -> Ident {
-        Ident::new("borrows", Span::call_site())
-    }
-
-
-
-    pub fn mod_get(&self) -> Ident {
-        Ident::new("get", Span::call_site())
-    }
-
-    pub fn mod_get_struct_get(&self) -> Ident {
-        Ident::new("Get", Span::call_site())
-    }
-
-    pub fn trait_get(&self) -> Ident {
-        Ident::new("Get", Span::call_site())
-    }
-
-    pub fn mod_insert(&self) -> Ident {
-        Ident::new("insert", Span::call_site())
-    }
-
-    pub fn mod_insert_struct_insert(&self) -> Ident {
-        Ident::new("Insert", Span::call_site())
-    }
-
-    pub fn mod_insert_enum_error(&self) -> Ident {
-        Ident::new("Error", Span::call_site())
-    }
-
-    pub fn trait_insert(&self) -> Ident {
-        Ident::new("Insert", Span::call_site())
-    }
-
-    pub fn struct_unique(&self) -> Ident {
-        Ident::new("Uniques", Span::call_site())
-    }
-
-    pub fn mod_transactions_struct_data(&self) -> Ident {
-        Ident::new("Data", Span::call_site())
-    }
-
-    pub fn mod_transactions_struct_data_member_log(&self) -> Ident {
-        Ident::new("log", Span::call_site())
-    }
-
-    pub fn mod_transactions_struct_data_member_rollback(&self) -> Ident {
-        Ident::new("rollback", Span::call_site())
-    }
-
-    pub fn mod_transactions_enum_logitem_variant_update(&self) -> Ident {
-        Ident::new("Update", Span::call_site())
-    }
-
-    pub fn mod_transactions_enum_logitem_variant_insert(&self) -> Ident {
-        Ident::new("Insert", Span::call_site())
-    }
-
-    pub fn mod_transactions_enum_logitem_variant_append(&self) -> Ident {
-        Ident::new("Append", Span::call_site())
-    }
-
-    pub fn mod_transactions_enum_logitem_variant_delete(&self) -> Ident {
-        Ident::new("Delete", Span::call_site())
-    }
-
-    pub fn mod_delete(&self) -> Ident {
-        Ident::new("delete", Span::call_site())
-    }
-
-    pub fn trait_delete(&self) -> Ident {
-        Ident::new("Delete", Span::call_site())
     }
 }

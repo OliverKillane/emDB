@@ -98,7 +98,7 @@ fn main() {
         name: Ident::new("my_table", Span::call_site()),
     };
 
-    let tks = table.generate(&CodeNamer);
+    let tks = table.generate(&CodeNamer::new());
 
     fs::write(
         "../pulpit/tests/output.rs",

@@ -2,10 +2,7 @@ use proc_macro2::Span;
 use quote::quote;
 use quote_debug::Tokens;
 use std::collections::{HashMap, HashSet};
-use syn::{
-    ExprLet, ExprMethodCall, Ident, ImplItemFn, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemTrait,
-    TraitItemFn, Variant,
-};
+use syn::{ExprLet, ExprMethodCall, Ident, ImplItemFn, ItemMod, TraitItemFn, Variant};
 
 use crate::{
     columns::PrimaryKind,
@@ -31,9 +28,12 @@ pub fn generate<Primary: PrimaryKind>(
     predicates: &[Predicate],
     namer: &CodeNamer,
 ) -> SingleOp {
-    let trait_update = namer.trait_update();
-    let mod_update = namer.mod_update();
-    let struct_window = namer.struct_window();
+    let CodeNamer {
+        trait_update,
+        mod_update,
+        struct_window,
+        ..
+    } = namer;
 
     let modules = updates
         .iter()
@@ -75,7 +75,6 @@ impl Update {
     ) -> Tokens<ItemMod> {
         fn generate_unique_error_variants<'a>(
             unique_indexes: impl Iterator<Item = (&'a Ident, &'a Unique)>,
-            namer: &CodeNamer,
         ) -> Vec<Tokens<Variant>> {
             unique_indexes
                 .map(|(_, unique)| {
@@ -100,19 +99,21 @@ impl Update {
                 })
                 .collect()
         }
+        let CodeNamer {
+            mod_update_enum_error,
+            type_key_error,
+            mod_update_struct_update,
+            ..
+        } = namer;
 
-        let mod_update_enum_error = namer.mod_update_enum_error();
-        let type_key_error = namer.type_key_error();
-        let mod_update_struct_update = namer.mod_update_struct_update();
         let update_name = &self.alias;
 
         // get the unique error types
         let unique_indexes = uniques
             .iter()
             .filter(|(field, _)| self.fields.contains(field));
-        let unique_errors = generate_unique_error_variants(unique_indexes, namer);
+        let unique_errors = generate_unique_error_variants(unique_indexes);
         let predicate_errors = generate_predicate_error_variants(predicates);
-
 
         let struct_fields = self.fields.iter().map(|f| {
             let ty = groups.get_type(groups.get_field_index(f).unwrap()).unwrap();
@@ -143,15 +144,19 @@ impl Update {
     }
 
     fn generate_trait_fn(&self, namer: &CodeNamer) -> Tokens<TraitItemFn> {
-        let mod_update = namer.mod_update();
-        let mod_update_struct_update = namer.mod_update_struct_update();
-        let mod_update_enum_error = namer.mod_update_enum_error();
-        let type_key = namer.type_key();
-        
+        let CodeNamer {
+            mod_update,
+            mod_update_struct_update,
+            mod_update_enum_error,
+            type_key,
+            ..
+        } = namer;
+
         let this_update = &self.alias;
         let update_name = &self.alias;
 
         quote! {
+            /// Update the table with the new values.
             fn #update_name(&mut self, update: #mod_update::#this_update::#mod_update_struct_update, key: #type_key) -> Result<(), #mod_update::#this_update::#mod_update_enum_error>;
         }
         .into()
@@ -164,22 +169,26 @@ impl Update {
         uniques: &HashMap<FieldName, Unique>,
         predicates: &[Predicate],
     ) -> Tokens<ImplItemFn> {
-        let mod_update = namer.mod_update();
-        let mod_update_struct_update = namer.mod_update_struct_update();
-        let mod_update_enum_error = namer.mod_update_enum_error();
-        let name_primary_column = namer.name_primary_column();
-        let table_member_columns = namer.table_member_columns();
-        let type_key = namer.type_key();
-        let mod_predicates = namer.mod_predicates();
-        let type_key_error = namer.type_key_error();
-        let pulpit_path = namer.pulpit_path();
-        let mod_transactions_enum_logitem = namer.mod_transactions_enum_logitem();
-        let mod_transactions = namer.mod_transactions();
-        let mod_transactions_enum_logitem_variant_update = namer.mod_transactions_enum_logitem_variant_update();
-        let table_member_transactions = namer.table_member_transactions();
-        let mod_transactions_enum_update = namer.mod_transactions_enum_update();
-        let mod_transactions_struct_data_member_rollback = namer.mod_transactions_struct_data_member_rollback();
-        let mod_transactions_struct_data_member_log = namer.mod_transactions_struct_data_member_log();
+        let CodeNamer {
+            mod_update,
+            mod_update_struct_update,
+            mod_update_enum_error,
+            name_primary_column,
+            table_member_columns,
+            type_key,
+            mod_predicates,
+            type_key_error,
+            pulpit_path,
+            mod_transactions_enum_logitem,
+            mod_transactions,
+            mod_transactions_enum_logitem_variant_update,
+            table_member_transactions,
+            mod_transactions_enum_update,
+            mod_transactions_struct_data_member_rollback,
+            mod_transactions_struct_data_member_log,
+            table_member_uniques,
+            ..
+        } = namer;
 
         let update_var = Ident::new("update", Span::call_site());
         let update_name = &self.alias;
@@ -210,7 +219,6 @@ impl Update {
             }
         });
 
-        let uniques_member = namer.table_member_uniques();
         let mut undo_prev_fields: Vec<Tokens<ExprMethodCall>> = Vec::new();
         let mut unique_updates: Vec<Tokens<ExprLet>> = Vec::new();
         for (field, Unique { alias }) in uniques
@@ -219,7 +227,7 @@ impl Update {
         {
             let field_index = groups.idents.get(field).unwrap();
             let from_data = match field_index {
-                FieldIndex::Primary(_) => namer.name_primary_column(),
+                FieldIndex::Primary(_) => namer.name_primary_column.clone(),
                 FieldIndex::Assoc { assoc_ind, .. } => namer.name_assoc_column(*assoc_ind),
             };
 
@@ -230,7 +238,7 @@ impl Update {
             };
 
             unique_updates.push(quote!{
-                let #alias = match self.#uniques_member.#field.replace(&update.#field, &#from_data.#mutability.#field, key) {
+                let #alias = match self.#table_member_uniques.#field.replace(&update.#field, &#from_data.#mutability.#field, key) {
                     Ok(old_val) => old_val,
                     Err(_) => {
                         #(#undo_prev_fields;)*
@@ -241,7 +249,7 @@ impl Update {
 
             undo_prev_fields.push(
                 quote! {
-                    self.#uniques_member.#field.undo_replace(#alias, &update.#field, key)
+                    self.#table_member_uniques.#field.undo_replace(#alias, &update.#field, key)
                 }
                 .into(),
             )
@@ -250,7 +258,7 @@ impl Update {
         let update_pairs = self.fields.iter().map(|field| {
             let field_index = groups.idents.get(field).unwrap();
             let name_id = match field_index {
-                FieldIndex::Primary(_) => namer.name_primary_column(),
+                FieldIndex::Primary(_) => namer.name_primary_column.clone(),
                 FieldIndex::Assoc { assoc_ind, .. } => namer.name_assoc_column(*assoc_ind),
             };
 

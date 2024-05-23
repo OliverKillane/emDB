@@ -7,25 +7,28 @@ pub fn generate<Primary: PrimaryKind>(
     updates: &[Update],
     namer: &CodeNamer,
 ) -> SingleOp {
-    let struct_window = namer.struct_window();
-    let mod_transactions_struct_data = namer.mod_transactions_struct_data();
-    let mod_transactions_enum_logitem = namer.mod_transactions_enum_logitem();
-    let mod_transactions_enum_update = namer.mod_transactions_enum_update();
-    let mod_transactions = namer.mod_transactions();
-    let mod_update = namer.mod_update();
-    let mod_update_struct_update = namer.mod_update_struct_update();
-    let mod_transactions_enum_logitem_variant_update = namer.mod_transactions_enum_logitem_variant_update();
-    let mod_transactions_enum_logitem_variant_insert = namer.mod_transactions_enum_logitem_variant_insert();
-    let mod_transactions_enum_logitem_variant_append = namer.mod_transactions_enum_logitem_variant_append();
-    let mod_transactions_enum_logitem_variant_delete = namer.mod_transactions_enum_logitem_variant_delete();
-    let table_member_transactions = namer.table_member_transactions();
-    let mod_transactions_struct_data_member_log = namer.mod_transactions_struct_data_member_log();
-    let mod_transactions_struct_data_member_rollback = namer.mod_transactions_struct_data_member_rollback();
-    let table_member_columns = namer.table_member_columns();
-    let trait_update = namer.trait_update();
-    let type_key = namer.type_key();
-    let name_primary_column = namer.name_primary_column();
-    let pulpit_path = namer.pulpit_path();
+    let CodeNamer {
+        struct_window,
+        mod_transactions_struct_data,
+        mod_transactions_enum_logitem,
+        mod_transactions_enum_update,
+        mod_transactions,
+        mod_update,
+        mod_update_struct_update,
+        mod_transactions_enum_logitem_variant_update,
+        mod_transactions_enum_logitem_variant_insert,
+        mod_transactions_enum_logitem_variant_append,
+        mod_transactions_enum_logitem_variant_delete,
+        table_member_transactions,
+        mod_transactions_struct_data_member_log,
+        mod_transactions_struct_data_member_rollback,
+        table_member_columns,
+        trait_update,
+        type_key,
+        name_primary_column,
+        pulpit_path,
+        ..
+    } = namer;
 
     let updates_variants = updates.iter().map(
         |Update { fields: _, alias }| quote!(#alias(super::#mod_update::#alias::#mod_update_struct_update)),
@@ -149,21 +152,16 @@ pub fn generate<Primary: PrimaryKind>(
     SingleOp {
         op_mod: quote! {
             mod #mod_transactions {
-                ///TODO
                 pub enum #mod_transactions_enum_update {
                     #(#updates_variants,)*
                 }
-
-                /// TODO
                 pub enum #mod_transactions_enum_logitem {
                     #log_variants
                 }
-
                 pub struct #mod_transactions_struct_data {
                     pub #mod_transactions_struct_data_member_log: Vec<#mod_transactions_enum_logitem>,
                     pub #mod_transactions_struct_data_member_rollback: bool,
                 }
-
                 impl #mod_transactions_struct_data {
                     pub fn new() -> Self {
                         Self {
@@ -177,7 +175,9 @@ pub fn generate<Primary: PrimaryKind>(
         .into(),
         op_trait: quote! {
             pub trait Transact {
+                /// Commit all current changes permenantly.
                 fn commit(&mut self);
+                /// Roll back all changes since the last abort.
                 fn abort(&mut self);
             }
         }

@@ -2,9 +2,9 @@ use std::{collections::HashSet, iter::once};
 
 use quote::quote;
 use quote_debug::Tokens;
-use syn::{Expr, ExprStruct, ExprTuple, Ident, ItemFn, ItemMod};
+use syn::{Expr, ExprStruct, Ident, ItemFn, ItemMod};
 
-use crate::groups::{Field, Group};
+use crate::groups::Field;
 
 use super::{
     columns::PrimaryKind,
@@ -24,9 +24,11 @@ impl Predicate {
         groups: &Groups<Primary>,
         namer: &CodeNamer,
     ) -> Tokens<ItemFn> {
-        let mod_borrow = namer.mod_borrow();
-        let mod_borrow_struct_borrow = namer.mod_borrow_struct_borrow();
-        
+        let CodeNamer {
+            mod_borrow,
+            mod_borrow_struct_borrow,
+            ..
+        } = namer;
         let args = groups.idents.keys();
         let name = &self.alias;
         let body = &self.tokens;
@@ -48,7 +50,7 @@ pub fn generate<Primary: PrimaryKind>(
     let functions = predicates
         .iter()
         .map(|pred| pred.generate_function(groups, namer));
-    let mod_predicates = namer.mod_predicates();
+    let mod_predicates = &namer.mod_predicates;
 
     quote! {
         mod #mod_predicates {
@@ -62,16 +64,19 @@ pub fn generate<Primary: PrimaryKind>(
 /// but for fields in `new_fields` it uses the `update_value_name` struct instead.
 /// - Allows for the row to be checked by predicates before it is committed to
 ///   the table entry.
-pub fn generate_update_predicate_access<'a, Primary: PrimaryKind>(
+pub fn generate_update_predicate_access<Primary: PrimaryKind>(
     groups: &Groups<Primary>,
     new_fields: &HashSet<FieldName>,
     update_value_name: &Ident,
     namer: &CodeNamer,
 ) -> Tokens<ExprStruct> {
-    let mod_borrow = namer.mod_borrow();
-    let mod_borrow_struct_borrow = namer.mod_borrow_struct_borrow();
+    let CodeNamer {
+        mod_borrow,
+        mod_borrow_struct_borrow,
+        ..
+    } = namer;
 
-    let accesses = once((namer.name_primary_column(), &groups.primary.fields))
+    let accesses = once((namer.name_primary_column.clone(), &groups.primary.fields))
         .chain(
             groups
                 .assoc
@@ -79,21 +84,20 @@ pub fn generate_update_predicate_access<'a, Primary: PrimaryKind>(
                 .enumerate()
                 .map(|(ind, grp)| (namer.name_assoc_column(ind), &grp.fields)),
         )
-        .map(|(var_name, fields)| {
+        .flat_map(|(var_name, fields)| {
             fields
                 .imm_fields
                 .iter()
                 .map(|f| (quote!(imm_data), f))
                 .chain(fields.mut_fields.iter().map(|f| (quote!(mut_data), f)))
-                .map(move |(access, Field { name, ty })| {
-                    if new_fields.contains(&name) {
+                .map(move |(access, Field { name, ty: _ })| {
+                    if new_fields.contains(name) {
                         quote!(#name: &#update_value_name.#name)
                     } else {
                         quote!(#name: &#var_name.#access.#name)
                     }
                 })
-        })
-        .flatten();
+        });
     quote! {
         #mod_borrow::#mod_borrow_struct_borrow {
             #(#accesses),*

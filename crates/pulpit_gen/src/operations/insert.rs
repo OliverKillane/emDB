@@ -26,11 +26,14 @@ pub fn generate_column_assignments<Col: ColKind>(
         quote! {#name: #insert_val.#name}
     });
 
-    let mod_columns = namer.mod_columns();
-    let mod_columns_struct_imm = namer.mod_columns_struct_imm();
-    let mod_columns_struct_mut = namer.mod_columns_struct_mut();
+    let CodeNamer {
+        mod_columns,
+        mod_columns_struct_imm,
+        mod_columns_struct_mut,
+        pulpit_path,
+        ..
+    } = namer;
 
-    let pulpit_path = namer.pulpit_path();
     quote! {
         let #name = (#pulpit_path::column::Data {
             imm_data: #mod_columns::#name::#mod_columns_struct_imm {
@@ -50,29 +53,29 @@ pub fn generate<Primary: PrimaryKind>(
     predicates: &[Predicate],
     namer: &CodeNamer,
 ) -> SingleOp {
-    let type_key = namer.type_key();
-    let struct_window = namer.struct_window();
-    let mod_insert = namer.mod_insert();
-    let mod_insert_struct_insert = namer.mod_insert_struct_insert();
-    let mod_insert_enum_error = namer.mod_insert_enum_error();
-    let trait_insert = namer.trait_insert();
-    let borrow_mod = namer.mod_borrow();
-    let mod_borrow_struct_borrow = namer.mod_borrow_struct_borrow();
-    let mod_predicates = namer.mod_predicates();
-    let table_member_uniques = namer.table_member_uniques();
-    let table_member_columns = namer.table_member_columns();
-    let pulpit_path = namer.pulpit_path();
-    let name_primary_column = namer.name_primary_column();
-    let mod_transactions_enum_logitem = namer.mod_transactions_enum_logitem();
-    let mod_transactions_enum_logitem_variant_insert =
-        namer.mod_transactions_enum_logitem_variant_insert();
-    let mod_transactions_enum_logitem_variant_append =
-        namer.mod_transactions_enum_logitem_variant_append();
-    let mod_transactions = namer.mod_transactions();
-    let table_member_transactions = namer.table_member_transactions();
-    let mod_transactions_struct_data_member_rollback =
-        namer.mod_transactions_struct_data_member_rollback();
-    let mod_transactions_struct_data_member_log = namer.mod_transactions_struct_data_member_log();
+    let CodeNamer {
+        type_key,
+        struct_window,
+        mod_insert,
+        mod_insert_struct_insert,
+        mod_insert_enum_error,
+        trait_insert,
+        mod_borrow,
+        mod_borrow_struct_borrow,
+        mod_predicates,
+        table_member_uniques,
+        table_member_columns,
+        pulpit_path,
+        name_primary_column,
+        mod_transactions_enum_logitem,
+        mod_transactions_enum_logitem_variant_insert,
+        mod_transactions_enum_logitem_variant_append,
+        mod_transactions,
+        table_member_transactions,
+        mod_transactions_struct_data_member_rollback,
+        mod_transactions_struct_data_member_log,
+        ..
+    } = namer;
 
     let insert_val = Ident::new("insert_val", Span::call_site());
     let key_var = Ident::new("key", Span::call_site());
@@ -88,18 +91,19 @@ pub fn generate<Primary: PrimaryKind>(
         .map(|k| quote! {#k : &#insert_val.#k})
         .collect::<Vec<_>>();
 
-    let predicate_checks = predicates.iter().map(|Predicate { alias, tokens }| {
+    let predicate_checks = predicates.iter().map(|Predicate { alias, tokens: _ }| {
         quote! {
-            if !#mod_predicates::#alias(#borrow_mod::#mod_borrow_struct_borrow{#(#predicate_args),*}) {
+            if !#mod_predicates::#alias(#mod_borrow::#mod_borrow_struct_borrow{#(#predicate_args),*}) {
                 return Err(#mod_insert::#mod_insert_enum_error::#alias);
             }
         }
     });
 
-    let errors = uniques
-        .iter()
-        .map(|(_, Unique { alias })| alias)
-        .chain(predicates.iter().map(|Predicate { alias, tokens }| alias));
+    let errors = uniques.iter().map(|(_, Unique { alias })| alias).chain(
+        predicates
+            .iter()
+            .map(|Predicate { alias, tokens: _ }| alias),
+    );
 
     let unique_checks = uniques.iter().map(|(field, Unique { alias })| {
         quote! {
@@ -117,7 +121,7 @@ pub fn generate<Primary: PrimaryKind>(
     });
 
     let splitting = once(generate_column_assignments(
-        &namer.name_primary_column(),
+        &namer.name_primary_column.clone(),
         &insert_val,
         &groups.primary,
         namer,
@@ -199,6 +203,8 @@ pub fn generate<Primary: PrimaryKind>(
             .into(),
             op_trait: quote! {
                 pub trait #trait_insert {
+                    /// Insert a new item into the table.
+                    /// - as this table has no constraints, no errors are possible
                     fn insert(&mut self, #insert_val: #mod_insert::#mod_insert_struct_insert) -> #type_key;
                 }
             }
@@ -219,11 +225,9 @@ pub fn generate<Primary: PrimaryKind>(
         SingleOp {
             op_mod: quote! {
                 pub mod #mod_insert {
-                    /// TODO
                     pub struct #mod_insert_struct_insert {
                         #(#insert_struct_fields,)*
                     }
-                    /// TODO
                     #[derive(Debug)]
                     pub enum #mod_insert_enum_error {
                         #(#errors,)*
@@ -233,6 +237,8 @@ pub fn generate<Primary: PrimaryKind>(
             .into(),
             op_trait: quote! {
                 pub trait #trait_insert {
+                    /// Insert the a value into the table
+                    /// - Returns an error if any constraints are not met.
                     fn insert(&mut self, #insert_val: #mod_insert::#mod_insert_struct_insert) -> Result<#type_key, #mod_insert::#mod_insert_enum_error>;
                 }
             }

@@ -1,7 +1,7 @@
 use crate::{operations, uniques::UniqueDec};
 use quote::quote;
 use quote_debug::Tokens;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use syn::{Ident, ItemImpl, ItemMod, ItemStruct};
 
 use super::{
@@ -27,17 +27,20 @@ struct TableDec {
     window_struct: Tokens<ItemStruct>,
 }
 
-pub fn generate_table_and_window(transactions: bool, namer: &CodeNamer) -> TableDec {
-    let struct_window = namer.struct_window();
-    let struct_table = namer.struct_table();
-    let table_member_columns = namer.table_member_columns();
-    let struct_column_holder = namer.struct_column_holder();
-    let struct_window_holder = namer.struct_window_holder();
-    let table_member_uniques = namer.table_member_uniques();
-    let struct_unique = namer.struct_unique();
-    let mod_transactions = namer.mod_transactions();
-    let mod_transactions_struct_data = namer.mod_transactions_struct_data();
-    let table_member_transactions = namer.table_member_transactions();
+fn generate_table_and_window(transactions: bool, namer: &CodeNamer) -> TableDec {
+    let CodeNamer {
+        struct_window,
+        struct_table,
+        table_member_columns,
+        struct_column_holder,
+        struct_window_holder,
+        table_member_uniques,
+        struct_unique,
+        mod_transactions,
+        mod_transactions_struct_data,
+        table_member_transactions,
+        ..
+    } = namer;
 
     let (trans_table, trans_new, trans_wind, trans_wind_def) = if transactions {
         (
@@ -99,13 +102,15 @@ impl<Primary: PrimaryKind> Table<Primary> {
             updates,
             name,
         } = self;
-        
-        let pulpit_path = namer.pulpit_path();
 
-        
+        let CodeNamer {
+            pulpit_path,
+            type_key_error,
+            ..
+        } = namer;
+
         let column_types = groups.column_types(namer);
         let key_type = groups.key_type(namer);
-
 
         let GroupsDef {
             columns_struct,
@@ -119,15 +124,12 @@ impl<Primary: PrimaryKind> Table<Primary> {
             unique_impl,
         } = uniques::generate(uniques, groups, namer);
 
-        let mut ops_code = Vec::new();
-        ops_code.push(operations::borrow::generate(groups, namer));
-        ops_code.push(operations::get::generate(groups, namer));
-        ops_code.push(operations::update::generate(
-            updates, groups, uniques, predicates, namer,
-        ));
-        ops_code.push(operations::insert::generate(
-            groups, uniques, predicates, namer,
-        ));
+        let mut ops_code = vec![
+            operations::borrow::generate(groups, namer),
+            operations::get::generate(groups, namer),
+            operations::update::generate(updates, groups, uniques, predicates, namer),
+            operations::insert::generate(groups, uniques, predicates, namer),
+        ];
         if Primary::TRANSACTIONS {
             ops_code.push(operations::transact::generate(groups, updates, namer))
         }
@@ -156,8 +158,6 @@ impl<Primary: PrimaryKind> Table<Primary> {
             },
         );
 
-        let key_error_name = namer.type_key_error();
-
         quote! {
             mod #name {
                 use #pulpit_path::column::{
@@ -170,7 +170,7 @@ impl<Primary: PrimaryKind> Table<Primary> {
                     Column,
                 };
 
-                pub struct #key_error_name;
+                pub struct #type_key_error;
 
                 #column_types
 

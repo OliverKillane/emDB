@@ -3,19 +3,22 @@ use crate::namer::CodeNamer;
 use quote::quote;
 
 pub fn generate(namer: &CodeNamer, transactions: bool) -> SingleOp {
-    let type_key_error = namer.type_key_error();
-    let type_key = namer.type_key();
-    let struct_window = namer.struct_window();
-    let name_primary_column = namer.name_primary_column();
-    let table_member_columns = namer.table_member_columns();
-    let mod_transactions_enum_logitem = namer.mod_transactions_enum_logitem();
-    let mod_transactions_enum_logitem_variant_delete = namer.mod_transactions_enum_logitem_variant_delete();
-    let mod_transactions = namer.mod_transactions();
-    let table_member_transactions = namer.table_member_transactions();
-    let mod_transactions_struct_data_member_rollback = namer.mod_transactions_struct_data_member_rollback();
-    let mod_transactions_struct_data_member_log = namer.mod_transactions_struct_data_member_log();
-    let mod_delete = namer.mod_delete();
-    let trait_delete = namer.trait_delete();
+    let CodeNamer {
+        type_key_error,
+        type_key,
+        struct_window,
+        name_primary_column,
+        table_member_columns,
+        mod_transactions_enum_logitem,
+        mod_transactions_enum_logitem_variant_delete,
+        mod_transactions,
+        table_member_transactions,
+        mod_transactions_struct_data_member_rollback,
+        mod_transactions_struct_data_member_log,
+        mod_delete,
+        trait_delete,
+        ..
+    } = namer;
 
     let transactional = if transactions {
         quote! {
@@ -34,6 +37,7 @@ pub fn generate(namer: &CodeNamer, transactions: bool) -> SingleOp {
         .into(),
         op_trait: quote! {
             pub trait #trait_delete {
+                /// Remove the key from the table and drop the contents.
                 fn delete(&mut self, key: #type_key) -> Result<(), #type_key_error>;
             }
         }

@@ -5,7 +5,7 @@ use crate::{
 use proc_macro2::Span;
 use quote::quote;
 use quote_debug::Tokens;
-use syn::{Ident, ItemFn, ItemStruct, Lifetime, Type};
+use syn::{Ident, ItemFn, ItemStruct, Type};
 
 pub struct ImmConversion {
     pub imm_unpacked: Tokens<ItemStruct>,

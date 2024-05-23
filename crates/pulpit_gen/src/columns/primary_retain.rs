@@ -19,7 +19,7 @@ impl ColKind for PrimaryRetain {
         mut_type: Tokens<Type>,
     ) -> Tokens<Type> {
         let Self { block_size } = self;
-        let pulpit_path = namer.pulpit_path();
+        let pulpit_path = &namer.pulpit_path;
         quote! { #pulpit_path::column::PrimaryRetain<#imm_type, #mut_type, #block_size> }.into()
     }
 
@@ -30,29 +30,32 @@ impl ColKind for PrimaryRetain {
             }
         });
 
-        let unpacked_name = namer.mod_columns_struct_imm_unpacked();
-        let unpacking_fn = namer.mod_columns_fn_imm_unpack();
-        let imm_name = namer.mod_columns_struct_imm();
+        let CodeNamer {
+            mod_columns_struct_imm_unpacked,
+            mod_columns_fn_imm_unpack,
+            mod_columns_struct_imm,
+            ..
+        } = namer;
 
-        let fields = imm_fields.iter().map(|Field { name, ty }| name);
+        let fields = imm_fields.iter().map(|Field { name, ty: _ }| name);
         let unpack_fields = fields.clone();
 
         ImmConversion {
             imm_unpacked: quote!{
-                pub struct #unpacked_name<'imm> {
+                pub struct #mod_columns_struct_imm_unpacked<'imm> {
                     #(#field_defs),*
                 }
             }.into(),
             unpacker:  quote!{
-                pub fn #unpacking_fn<'imm>(#imm_name { #(#fields),* }: &'imm #imm_name) -> #unpacked_name<'imm> {
-                    #unpacked_name { #(#unpack_fields),* }
+                pub fn #mod_columns_fn_imm_unpack<'imm>(#mod_columns_struct_imm { #(#fields),* }: &'imm #mod_columns_struct_imm) -> #mod_columns_struct_imm_unpacked<'imm> {
+                    #mod_columns_struct_imm_unpacked { #(#unpack_fields),* }
                 }
             }.into()
         }
     }
 
     fn generate_column_type_no_generics(&self, namer: &CodeNamer) -> Tokens<Type> {
-        let pulpit_path = namer.pulpit_path();
+        let pulpit_path = &namer.pulpit_path;
         quote! { #pulpit_path::column::PrimaryRetain }.into()
     }
 
@@ -62,7 +65,7 @@ impl ColKind for PrimaryRetain {
 
     fn convert_imm_type(&self, field: &Field, namer: &CodeNamer) -> Tokens<Type> {
         let ty = &field.ty;
-        let lifetime = namer.lifetime_imm();
+        let lifetime = &namer.lifetime_imm;
         quote!(&#lifetime #ty).into()
     }
 }

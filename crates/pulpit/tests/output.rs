@@ -43,10 +43,10 @@ mod my_table {
     pub mod borrows {
         pub struct Borrows<'brw> {
             pub a: &'brw i32,
-            pub b: &'brw usize,
             pub e: &'brw String,
-            pub d: &'brw char,
             pub c: &'brw Option<String>,
+            pub d: &'brw char,
+            pub b: &'brw usize,
         }
     }
     pub trait Borrow {
@@ -72,10 +72,10 @@ mod my_table {
             let assoc_0 = unsafe { self.columns.assoc_0.brw(index) };
             Ok(borrows::Borrows {
                 a: &primary.mut_data.a,
-                b: &primary.imm_data.b,
                 e: &assoc_0.mut_data.e,
-                d: &assoc_0.imm_data.d,
                 c: &primary.mut_data.c,
+                d: &assoc_0.imm_data.d,
+                b: &primary.imm_data.b,
             })
         }
     }
@@ -106,10 +106,10 @@ mod my_table {
                 .convert_imm(column_types::assoc_0::imm_unpack);
             Ok(get::Get {
                 a: primary.mut_data.a,
-                b: primary.imm_data.b,
                 e: assoc_0.mut_data.e,
-                d: assoc_0.imm_data.d,
                 c: primary.mut_data.c,
+                d: assoc_0.imm_data.d,
+                b: primary.imm_data.b,
             })
         }
     }
@@ -118,15 +118,15 @@ mod my_table {
             #[derive(Debug)]
             pub enum UpdateError {
                 KeyError,
-                a_unique,
                 e_unique,
+                a_unique,
                 check_b,
                 check_e_len,
             }
             pub struct Update {
-                pub a: i32,
                 pub c: Option<String>,
                 pub e: String,
+                pub a: i32,
             }
         }
         pub mod update_a {
@@ -187,29 +187,29 @@ mod my_table {
             }) {
                 return Err(updates::update_ace::UpdateError::check_e_len);
             }
-            let a_unique = match self
-                .uniques
-                .a
-                .replace(&update.a, &primary.mut_data.a, key)
-            {
-                Ok(old_val) => old_val,
-                Err(_) => return Err(updates::update_ace::UpdateError::a_unique),
-            };
             let e_unique = match self
                 .uniques
                 .e
                 .replace(&update.e, &assoc_0.mut_data.e, key)
             {
                 Ok(old_val) => old_val,
+                Err(_) => return Err(updates::update_ace::UpdateError::e_unique),
+            };
+            let a_unique = match self
+                .uniques
+                .a
+                .replace(&update.a, &primary.mut_data.a, key)
+            {
+                Ok(old_val) => old_val,
                 Err(_) => {
-                    self.uniques.a.undo_replace(a_unique, &update.a, key);
-                    return Err(updates::update_ace::UpdateError::e_unique);
+                    self.uniques.e.undo_replace(e_unique, &update.e, key);
+                    return Err(updates::update_ace::UpdateError::a_unique);
                 }
             };
             let mut update = update;
-            std::mem::swap(&mut primary.mut_data.a, &mut update.a);
             std::mem::swap(&mut primary.mut_data.c, &mut update.c);
             std::mem::swap(&mut assoc_0.mut_data.e, &mut update.e);
+            std::mem::swap(&mut primary.mut_data.a, &mut update.a);
             if !self.transactions.rollback {
                 self.transactions
                     .log
@@ -281,16 +281,16 @@ mod my_table {
         /// TODO
         pub struct Insert {
             pub a: i32,
-            pub b: usize,
             pub e: String,
-            pub d: char,
             pub c: Option<String>,
+            pub d: char,
+            pub b: usize,
         }
         /// TODO
         #[derive(Debug)]
         pub enum Error {
-            a_unique,
             e_unique,
+            a_unique,
             check_b,
             check_e_len,
         }
@@ -302,29 +302,29 @@ mod my_table {
         fn insert(&mut self, insert_val: insert::Insert) -> Result<Key, insert::Error> {
             if !predicates::check_b(borrows::Borrows {
                 a: &insert_val.a,
-                b: &insert_val.b,
                 e: &insert_val.e,
-                d: &insert_val.d,
                 c: &insert_val.c,
+                d: &insert_val.d,
+                b: &insert_val.b,
             }) {
                 return Err(insert::Error::check_b);
             }
             if !predicates::check_e_len(borrows::Borrows {
                 a: &insert_val.a,
-                b: &insert_val.b,
                 e: &insert_val.e,
-                d: &insert_val.d,
                 c: &insert_val.c,
+                d: &insert_val.d,
+                b: &insert_val.b,
             }) {
                 return Err(insert::Error::check_e_len);
             }
-            let a_unique = match self.uniques.a.lookup(&insert_val.a) {
-                Ok(_) => return Err(insert::Error::a_unique),
-                Err(_) => insert_val.a.clone(),
-            };
             let e_unique = match self.uniques.e.lookup(&insert_val.e) {
                 Ok(_) => return Err(insert::Error::e_unique),
                 Err(_) => insert_val.e.clone(),
+            };
+            let a_unique = match self.uniques.a.lookup(&insert_val.a) {
+                Ok(_) => return Err(insert::Error::a_unique),
+                Err(_) => insert_val.a.clone(),
             };
             let primary = (pulpit::column::Data {
                 imm_data: column_types::primary::Imm {
@@ -354,8 +354,8 @@ mod my_table {
                     self.columns.assoc_0.append(assoc_0);
                 }
             }
-            self.uniques.a.insert(a_unique, key).unwrap();
             self.uniques.e.insert(e_unique, key).unwrap();
+            self.uniques.a.insert(a_unique, key).unwrap();
             if !self.transactions.rollback {
                 self.transactions.log.push(transactions::LogItem::Insert(key));
             }
@@ -472,25 +472,25 @@ mod my_table {
     > as pulpit::column::Keyable>::Key;
     mod predicates {
         pub fn check_b(
-            super::borrows::Borrows { a, b, e, d, c }: super::borrows::Borrows,
+            super::borrows::Borrows { a, e, c, d, b }: super::borrows::Borrows,
         ) -> bool {
             *b < 1045
         }
         pub fn check_e_len(
-            super::borrows::Borrows { a, b, e, d, c }: super::borrows::Borrows,
+            super::borrows::Borrows { a, e, c, d, b }: super::borrows::Borrows,
         ) -> bool {
             e.len() > *b
         }
     }
     struct Uniques {
-        a: pulpit::access::Unique<i32, Key>,
         e: pulpit::access::Unique<String, Key>,
+        a: pulpit::access::Unique<i32, Key>,
     }
     impl Uniques {
         fn new(size_hint: usize) -> Self {
             Self {
-                a: pulpit::access::Unique::new(size_hint),
                 e: pulpit::access::Unique::new(size_hint),
+                a: pulpit::access::Unique::new(size_hint),
             }
         }
     }
