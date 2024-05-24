@@ -1,8 +1,10 @@
 mod my_table {
+    #![allow(unused, non_camel_case_types)]
     use pulpit::column::{
         PrimaryWindow, PrimaryWindowApp, PrimaryWindowPull, PrimaryWindowHide,
         AssocWindow, AssocWindowPull, Column,
     };
+    #[derive(Debug)]
     pub struct KeyError;
     mod column_types {
         //! Column types to be used for storage in each column.
@@ -42,22 +44,15 @@ mod my_table {
     }
     pub mod borrows {
         pub struct Borrows<'brw> {
-            pub a: &'brw i32,
-            pub e: &'brw String,
-            pub c: &'brw Option<String>,
             pub d: &'brw char,
             pub b: &'brw usize,
+            pub a: &'brw i32,
+            pub c: &'brw Option<String>,
+            pub e: &'brw String,
         }
     }
-    pub trait Borrow {
-        /// Gets an immutable borrow of all fields.
-        fn borrow<'brw>(
-            &'brw self,
-            key: Key,
-        ) -> Result<borrows::Borrows<'brw>, KeyError>;
-    }
-    impl<'imm> Borrow for Window<'imm> {
-        fn borrow<'brw>(
+    impl<'imm> Window<'imm> {
+        pub fn borrow<'brw>(
             &'brw self,
             key: Key,
         ) -> Result<borrows::Borrows<'brw>, KeyError> {
@@ -67,15 +62,15 @@ mod my_table {
                 .brw(key)
             {
                 Ok(entry) => entry,
-                Err(e) => return Err(KeyError),
+                Err(_) => return Err(KeyError),
             };
             let assoc_0 = unsafe { self.columns.assoc_0.brw(index) };
             Ok(borrows::Borrows {
-                a: &primary.mut_data.a,
-                e: &assoc_0.mut_data.e,
-                c: &primary.mut_data.c,
                 d: &assoc_0.imm_data.d,
                 b: &primary.imm_data.b,
+                a: &primary.mut_data.a,
+                c: &primary.mut_data.c,
+                e: &assoc_0.mut_data.e,
             })
         }
     }
@@ -88,28 +83,25 @@ mod my_table {
             pub d: char,
         }
     }
-    pub trait Get<'imm> {
-        fn get(&self, key: Key) -> Result<get::Get<'imm>, KeyError>;
-    }
-    impl<'imm> Get<'imm> for Window<'imm> {
-        fn get(&self, key: Key) -> Result<get::Get<'imm>, KeyError> {
+    impl<'imm> Window<'imm> {
+        pub fn get(&self, key: Key) -> Result<get::Get<'imm>, KeyError> {
             let pulpit::column::Entry { index, data: primary } = match self
                 .columns
                 .primary
                 .get(key)
             {
                 Ok(entry) => entry,
-                Err(e) => return Err(KeyError),
+                Err(_) => return Err(KeyError),
             };
             let primary = primary.convert_imm(column_types::primary::imm_unpack);
             let assoc_0 = unsafe { self.columns.assoc_0.get(index) }
                 .convert_imm(column_types::assoc_0::imm_unpack);
             Ok(get::Get {
-                a: primary.mut_data.a,
-                e: assoc_0.mut_data.e,
-                c: primary.mut_data.c,
                 d: assoc_0.imm_data.d,
                 b: primary.imm_data.b,
+                a: primary.mut_data.a,
+                c: primary.mut_data.c,
+                e: assoc_0.mut_data.e,
             })
         }
     }
@@ -124,9 +116,9 @@ mod my_table {
                 check_e_len,
             }
             pub struct Update {
+                pub a: i32,
                 pub c: Option<String>,
                 pub e: String,
-                pub a: i32,
             }
         }
         pub mod update_a {
@@ -142,20 +134,8 @@ mod my_table {
             }
         }
     }
-    pub trait Update: Sized {
-        fn update_ace(
-            &mut self,
-            update: updates::update_ace::Update,
-            key: Key,
-        ) -> Result<(), updates::update_ace::UpdateError>;
-        fn update_a(
-            &mut self,
-            update: updates::update_a::Update,
-            key: Key,
-        ) -> Result<(), updates::update_a::UpdateError>;
-    }
-    impl<'imm> Update for Window<'imm> {
-        fn update_ace(
+    impl<'imm> Window<'imm> {
+        pub fn update_ace(
             &mut self,
             update: updates::update_ace::Update,
             key: Key,
@@ -166,7 +146,7 @@ mod my_table {
                 .brw_mut(key)
             {
                 Ok(entry) => entry,
-                Err(e) => return Err(updates::update_ace::UpdateError::KeyError),
+                Err(_) => return Err(updates::update_ace::UpdateError::KeyError),
             };
             let assoc_0 = unsafe { self.columns.assoc_0.brw_mut(index) };
             if !predicates::check_b(borrows::Borrows {
@@ -206,23 +186,12 @@ mod my_table {
                     return Err(updates::update_ace::UpdateError::a_unique);
                 }
             };
-            let mut update = update;
-            std::mem::swap(&mut primary.mut_data.c, &mut update.c);
-            std::mem::swap(&mut assoc_0.mut_data.e, &mut update.e);
-            std::mem::swap(&mut primary.mut_data.a, &mut update.a);
-            if !self.transactions.rollback {
-                self.transactions
-                    .log
-                    .push(
-                        transactions::LogItem::Update(
-                            key,
-                            transactions::Updates::update_ace(update),
-                        ),
-                    );
-            }
+            *(&mut primary.mut_data.a) = update.a;
+            *(&mut primary.mut_data.c) = update.c;
+            *(&mut assoc_0.mut_data.e) = update.e;
             Ok(())
         }
-        fn update_a(
+        pub fn update_a(
             &mut self,
             update: updates::update_a::Update,
             key: Key,
@@ -233,7 +202,7 @@ mod my_table {
                 .brw_mut(key)
             {
                 Ok(entry) => entry,
-                Err(e) => return Err(updates::update_a::UpdateError::KeyError),
+                Err(_) => return Err(updates::update_a::UpdateError::KeyError),
             };
             let assoc_0 = unsafe { self.columns.assoc_0.brw_mut(index) };
             if !predicates::check_b(borrows::Borrows {
@@ -262,31 +231,18 @@ mod my_table {
                 Ok(old_val) => old_val,
                 Err(_) => return Err(updates::update_a::UpdateError::a_unique),
             };
-            let mut update = update;
-            std::mem::swap(&mut primary.mut_data.a, &mut update.a);
-            if !self.transactions.rollback {
-                self.transactions
-                    .log
-                    .push(
-                        transactions::LogItem::Update(
-                            key,
-                            transactions::Updates::update_a(update),
-                        ),
-                    );
-            }
+            *(&mut primary.mut_data.a) = update.a;
             Ok(())
         }
     }
     pub mod insert {
-        /// TODO
         pub struct Insert {
-            pub a: i32,
-            pub e: String,
-            pub c: Option<String>,
             pub d: char,
             pub b: usize,
+            pub a: i32,
+            pub c: Option<String>,
+            pub e: String,
         }
-        /// TODO
         #[derive(Debug)]
         pub enum Error {
             e_unique,
@@ -295,26 +251,26 @@ mod my_table {
             check_e_len,
         }
     }
-    pub trait Insert {
-        fn insert(&mut self, insert_val: insert::Insert) -> Result<Key, insert::Error>;
-    }
-    impl<'imm> Insert for Window<'imm> {
-        fn insert(&mut self, insert_val: insert::Insert) -> Result<Key, insert::Error> {
+    impl<'imm> Window<'imm> {
+        pub fn insert(
+            &mut self,
+            insert_val: insert::Insert,
+        ) -> Result<Key, insert::Error> {
             if !predicates::check_b(borrows::Borrows {
-                a: &insert_val.a,
-                e: &insert_val.e,
-                c: &insert_val.c,
                 d: &insert_val.d,
                 b: &insert_val.b,
+                a: &insert_val.a,
+                c: &insert_val.c,
+                e: &insert_val.e,
             }) {
                 return Err(insert::Error::check_b);
             }
             if !predicates::check_e_len(borrows::Borrows {
-                a: &insert_val.a,
-                e: &insert_val.e,
-                c: &insert_val.c,
                 d: &insert_val.d,
                 b: &insert_val.b,
+                a: &insert_val.a,
+                c: &insert_val.c,
+                e: &insert_val.e,
             }) {
                 return Err(insert::Error::check_e_len);
             }
@@ -343,141 +299,29 @@ mod my_table {
                     e: insert_val.e,
                 },
             });
-            let (key, action) = self.columns.primary.insert(primary);
-            match action {
-                pulpit::column::InsertAction::Place(index) => {
-                    unsafe {
-                        self.columns.assoc_0.place(index, assoc_0);
-                    }
-                }
-                pulpit::column::InsertAction::Append => {
-                    self.columns.assoc_0.append(assoc_0);
-                }
-            }
+            let key = self.columns.primary.append(primary);
+            self.columns.assoc_0.append(assoc_0);
             self.uniques.e.insert(e_unique, key).unwrap();
             self.uniques.a.insert(a_unique, key).unwrap();
-            if !self.transactions.rollback {
-                self.transactions.log.push(transactions::LogItem::Insert(key));
-            }
             Ok(key)
         }
     }
-    mod transactions {
-        ///TODO
-        pub enum Updates {
-            update_ace(super::updates::update_ace::Update),
-            update_a(super::updates::update_a::Update),
-        }
-        /// TODO
-        pub enum LogItem {
-            Update(super::Key, Updates),
-            Insert(super::Key),
-            Delete(super::Key),
-        }
-        pub struct Data {
-            pub log: Vec<LogItem>,
-            pub rollback: bool,
-        }
-        impl Data {
-            pub fn new() -> Self {
-                Self {
-                    log: Vec::new(),
-                    rollback: false,
-                }
-            }
-        }
-    }
-    pub trait Transact {
-        fn commit(&mut self);
-        fn abort(&mut self);
-    }
-    impl<'imm> Transact for Window<'imm> {
-        /// Commit all current changes
-        /// - Requires concretely applying deletions (which until commit
-        ///   or abort simply hide keys from the table)
-        fn commit(&mut self) {
-            debug_assert!(! self.transactions.rollback);
-            while let Some(entry) = self.transactions.log.pop() {
-                match entry {
-                    transactions::LogItem::Delete(key) => {
-                        let pulpit::column::Entry { index, data: _ } = self
-                            .columns
-                            .primary
-                            .pull(key)
-                            .unwrap();
-                        unsafe {
-                            self.columns.assoc_0.pull(index);
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-        /// Undo the transactions applied since the last commit
-        /// - Requires re-applying all updates, deleting inserts and undoing deletes
-        ///   (deletes' keys are actually just hidden until commit or abort)
-        fn abort(&mut self) {
-            self.transactions.rollback = true;
-            while let Some(entry) = self.transactions.log.pop() {
-                match entry {
-                    transactions::LogItem::Delete(key) => {
-                        self.columns.primary.reveal(key).unwrap();
-                    }
-                    transactions::LogItem::Insert(key) => {
-                        let pulpit::column::Entry { index, data: _ } = self
-                            .columns
-                            .primary
-                            .pull(key)
-                            .unwrap();
-                        unsafe {
-                            self.columns.assoc_0.pull(index);
-                        }
-                    }
-                    transactions::LogItem::Update(key, update) => {
-                        match update {
-                            transactions::Updates::update_ace(update) => {
-                                <Self as Update>::update_ace(self, update, key).unwrap();
-                            }
-                            transactions::Updates::update_a(update) => {
-                                <Self as Update>::update_a(self, update, key).unwrap();
-                            }
-                        }
-                    }
-                }
-            }
-            self.transactions.rollback = false;
-        }
-    }
-    mod delete {}
-    pub trait Delete {
-        fn delete(&mut self, key: Key) -> Result<(), KeyError>;
-    }
-    impl<'imm> Delete for Window<'imm> {
-        fn delete(&mut self, key: Key) -> Result<(), KeyError> {
-            match self.columns.primary.hide(key) {
-                Ok(()) => {}
-                Err(e) => return Err(KeyError),
-            }
-            if !self.transactions.rollback {
-                self.transactions.log.push(transactions::LogItem::Delete(key));
-            }
-            Ok(())
-        }
-    }
     /// The key for accessing rows (delete, update, get)
-    pub type Key = <pulpit::column::PrimaryRetain<
-        column_types::primary::Imm,
-        column_types::primary::Mut,
-        1024usize,
+    pub type Key = <pulpit::column::PrimaryAppend<
+        pulpit::column::AssocBlocks<
+            column_types::primary::Imm,
+            column_types::primary::Mut,
+            1024usize,
+        >,
     > as pulpit::column::Keyable>::Key;
     mod predicates {
         pub fn check_b(
-            super::borrows::Borrows { a, e, c, d, b }: super::borrows::Borrows,
+            super::borrows::Borrows { d, b, a, c, e }: super::borrows::Borrows,
         ) -> bool {
             *b < 1045
         }
         pub fn check_e_len(
-            super::borrows::Borrows { a, e, c, d, b }: super::borrows::Borrows,
+            super::borrows::Borrows { d, b, a, c, e }: super::borrows::Borrows,
         ) -> bool {
             e.len() > *b
         }
@@ -499,17 +343,19 @@ mod my_table {
             column_types::assoc_0::Imm,
             column_types::assoc_0::Mut,
         >,
-        primary: pulpit::column::PrimaryRetain<
-            column_types::primary::Imm,
-            column_types::primary::Mut,
-            1024usize,
+        primary: pulpit::column::PrimaryAppend<
+            pulpit::column::AssocBlocks<
+                column_types::primary::Imm,
+                column_types::primary::Mut,
+                1024usize,
+            >,
         >,
     }
     impl ColumnHolder {
         fn new(size_hint: usize) -> Self {
             Self {
                 assoc_0: pulpit::column::AssocVec::new(size_hint),
-                primary: pulpit::column::PrimaryRetain::new(size_hint),
+                primary: pulpit::column::PrimaryAppend::new(size_hint),
             }
         }
         fn window(&mut self) -> WindowHolder<'_> {
@@ -524,36 +370,34 @@ mod my_table {
             column_types::assoc_0::Imm,
             column_types::assoc_0::Mut,
         > as pulpit::column::Column>::WindowKind<'imm>,
-        primary: <pulpit::column::PrimaryRetain<
-            column_types::primary::Imm,
-            column_types::primary::Mut,
-            1024usize,
+        primary: <pulpit::column::PrimaryAppend<
+            pulpit::column::AssocBlocks<
+                column_types::primary::Imm,
+                column_types::primary::Mut,
+                1024usize,
+            >,
         > as pulpit::column::Column>::WindowKind<'imm>,
     }
     pub struct Table {
         columns: ColumnHolder,
         uniques: Uniques,
-        transactions: transactions::Data,
     }
     impl Table {
         pub fn new(size_hint: usize) -> Self {
             Self {
                 columns: ColumnHolder::new(size_hint),
                 uniques: Uniques::new(size_hint),
-                transactions: transactions::Data::new(),
             }
         }
         pub fn window(&mut self) -> Window<'_> {
             Window {
                 columns: self.columns.window(),
                 uniques: &mut self.uniques,
-                transactions: &mut self.transactions,
             }
         }
     }
     pub struct Window<'imm> {
         columns: WindowHolder<'imm>,
         uniques: &'imm mut Uniques,
-        transactions: &'imm mut transactions::Data,
     }
 }

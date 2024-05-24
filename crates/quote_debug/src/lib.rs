@@ -30,6 +30,15 @@ impl<T: syn::parse::Parse + ToTokens> From<TokenStream> for Tokens<T> {
     }
 }
 
+impl <T: syn::parse::Parse + ToTokens> Clone for Tokens<T> {
+    fn clone(&self) -> Self {
+        Self {
+            tks: self.tks.clone(),
+            phantom: PhantomData,
+        }
+    }
+}
+
 impl<T: syn::parse::Parse + ToTokens> Deref for Tokens<T> {
     type Target = TokenStream;
 

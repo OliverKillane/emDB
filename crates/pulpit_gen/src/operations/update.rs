@@ -1,12 +1,12 @@
 use proc_macro2::Span;
 use quote::quote;
 use quote_debug::Tokens;
-use std::collections::{HashMap, HashSet};
-use syn::{ExprLet, ExprMethodCall, Ident, ImplItemFn, ItemMod, TraitItemFn, Variant};
+use std::collections::HashSet;
+use syn::{ExprLet, ExprMethodCall, Ident, ImplItemFn, ItemMod, Variant};
 
 use crate::{
     columns::PrimaryKind,
-    groups::{FieldIndex, FieldName, Groups},
+    groups::{FieldIndex, Groups},
     namer::CodeNamer,
     predicates::{generate_update_predicate_access, Predicate},
     uniques::Unique,
@@ -24,12 +24,11 @@ pub struct Update {
 pub fn generate<Primary: PrimaryKind>(
     updates: &[Update],
     groups: &Groups<Primary>,
-    uniques: &HashMap<FieldName, Unique>,
+    uniques: &[Unique],
     predicates: &[Predicate],
     namer: &CodeNamer,
 ) -> SingleOp {
     let CodeNamer {
-        trait_update,
         mod_update,
         struct_window,
         ..
@@ -38,7 +37,6 @@ pub fn generate<Primary: PrimaryKind>(
     let modules = updates
         .iter()
         .map(|update| update.generate_mod(groups, uniques, predicates, namer));
-    let trait_fns = updates.iter().map(|update| update.generate_trait_fn(namer));
     let impl_fns = updates
         .iter()
         .map(|update| update.generate_trait_impl_fn(namer, groups, uniques, predicates));
@@ -50,14 +48,8 @@ pub fn generate<Primary: PrimaryKind>(
             }
         }
         .into(),
-        op_trait: quote! {
-            pub trait #trait_update : Sized {
-                #(#trait_fns)*
-            }
-        }
-        .into(),
         op_impl: quote! {
-            impl <'imm> #trait_update for #struct_window<'imm> {
+            impl <'imm> #struct_window<'imm> {
                 #(#impl_fns)*
             }
         }
@@ -69,15 +61,15 @@ impl Update {
     fn generate_mod<Primary: PrimaryKind>(
         &self,
         groups: &Groups<Primary>,
-        uniques: &HashMap<FieldName, Unique>,
+        uniques: &[Unique],
         predicates: &[Predicate],
         namer: &CodeNamer,
     ) -> Tokens<ItemMod> {
         fn generate_unique_error_variants<'a>(
-            unique_indexes: impl Iterator<Item = (&'a Ident, &'a Unique)>,
+            unique_indexes: impl Iterator<Item = &'a Unique>,
         ) -> Vec<Tokens<Variant>> {
             unique_indexes
-                .map(|(_, unique)| {
+                .map(|unique| {
                     let variant = &unique.alias;
                     quote!(
                         #variant
@@ -111,7 +103,7 @@ impl Update {
         // get the unique error types
         let unique_indexes = uniques
             .iter()
-            .filter(|(field, _)| self.fields.contains(field));
+            .filter(|uniq| self.fields.contains(&uniq.field));
         let unique_errors = generate_unique_error_variants(unique_indexes);
         let predicate_errors = generate_predicate_error_variants(predicates);
 
@@ -143,30 +135,11 @@ impl Update {
         .into()
     }
 
-    fn generate_trait_fn(&self, namer: &CodeNamer) -> Tokens<TraitItemFn> {
-        let CodeNamer {
-            mod_update,
-            mod_update_struct_update,
-            mod_update_enum_error,
-            type_key,
-            ..
-        } = namer;
-
-        let this_update = &self.alias;
-        let update_name = &self.alias;
-
-        quote! {
-            /// Update the table with the new values.
-            fn #update_name(&mut self, update: #mod_update::#this_update::#mod_update_struct_update, key: #type_key) -> Result<(), #mod_update::#this_update::#mod_update_enum_error>;
-        }
-        .into()
-    }
-
     fn generate_trait_impl_fn<Primary: PrimaryKind>(
         &self,
         namer: &CodeNamer,
         groups: &Groups<Primary>,
-        uniques: &HashMap<FieldName, Unique>,
+        uniques: &[Unique],
         predicates: &[Predicate],
     ) -> Tokens<ImplItemFn> {
         let CodeNamer {
@@ -201,7 +174,7 @@ impl Update {
         let table_access = quote! {
             let #pulpit_path::column::Entry { index, data: #name_primary_column } = match self.#table_member_columns.#name_primary_column.brw_mut(key) {
                 Ok(entry) => entry,
-                Err(e) => return Err(#mod_update::#update_name::#mod_update_enum_error::#type_key_error),
+                Err(_) => return Err(#mod_update::#update_name::#mod_update_enum_error::#type_key_error),
             };
             #(#assoc_brw_muts;)*
         };
@@ -221,9 +194,9 @@ impl Update {
 
         let mut undo_prev_fields: Vec<Tokens<ExprMethodCall>> = Vec::new();
         let mut unique_updates: Vec<Tokens<ExprLet>> = Vec::new();
-        for (field, Unique { alias }) in uniques
+        for Unique { alias, field } in uniques
             .iter()
-            .filter(|(field, _)| self.fields.contains(field))
+            .filter(|uniq| self.fields.contains(&uniq.field))
         {
             let field_index = groups.idents.get(field).unwrap();
             let from_data = match field_index {
@@ -282,7 +255,7 @@ impl Update {
         } else {
             let updates = update_pairs.map(|(field, mut_access)| {
                 quote! {
-                    *#mut_access = update.#field
+                    *(&mut #mut_access) = update.#field
                 }
             });
             quote! {
@@ -291,7 +264,7 @@ impl Update {
         };
 
         quote! {
-            fn #update_name(&mut self, #update_var: #mod_update::#update_name::#mod_update_struct_update, key: #type_key) -> Result<(), #mod_update::#update_name::#mod_update_enum_error> {
+            pub fn #update_name(&mut self, #update_var: #mod_update::#update_name::#mod_update_struct_update, key: #type_key) -> Result<(), #mod_update::#update_name::#mod_update_enum_error> {
                 #table_access
                 #(#predicate_checks)*
                 #(#unique_updates;)*

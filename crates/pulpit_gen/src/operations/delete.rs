@@ -1,8 +1,8 @@
 use super::SingleOp;
-use crate::namer::CodeNamer;
+use crate::{columns::PrimaryKind, groups::Groups, namer::CodeNamer};
 use quote::quote;
 
-pub fn generate(namer: &CodeNamer, transactions: bool) -> SingleOp {
+pub fn generate<Primary: PrimaryKind>(namer: &CodeNamer, groups: &Groups<Primary>,) -> SingleOp {
     let CodeNamer {
         type_key_error,
         type_key,
@@ -16,44 +16,58 @@ pub fn generate(namer: &CodeNamer, transactions: bool) -> SingleOp {
         mod_transactions_struct_data_member_rollback,
         mod_transactions_struct_data_member_log,
         mod_delete,
-        trait_delete,
+        method_delete,
+        pulpit_path,
         ..
     } = namer;
 
-    let transactional = if transactions {
-        quote! {
+    assert!(Primary::DELETIONS);
+
+    let op_impl = if Primary::TRANSACTIONS {
+        let transactional = quote! {
             if !self.#table_member_transactions.#mod_transactions_struct_data_member_rollback {
                 self.#table_member_transactions.#mod_transactions_struct_data_member_log.push(#mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_delete(key));
             }
-        }
-    } else {
-        quote!()
-    };
+        };
 
-    SingleOp {
-        op_mod: quote! {
-            mod #mod_delete {}
-        }
-        .into(),
-        op_trait: quote! {
-            pub trait #trait_delete {
-                /// Remove the key from the table and drop the contents.
-                fn delete(&mut self, key: #type_key) -> Result<(), #type_key_error>;
-            }
-        }
-        .into(),
-        op_impl: quote! {
-            impl <'imm> #trait_delete for #struct_window<'imm> {
-                fn delete(&mut self, key: #type_key) -> Result<(), #type_key_error> {
+        quote! {
+            impl <'imm> #struct_window<'imm> {
+                pub fn #method_delete(&mut self, key: #type_key) -> Result<(), #type_key_error> {
                     match self.#table_member_columns.#name_primary_column.hide(key) {
                         Ok(()) => (),
-                        Err(e) => return Err(#type_key_error),
+                        Err(_) => return Err(#type_key_error),
                     }
                     #transactional
                     Ok(())
                 }
             }
         }
-        .into(),
+        .into()
+    } else {
+        let assoc_cols = (0..groups.assoc.len()).map(|ind| {
+            let name = namer.name_assoc_column(ind);
+            quote!(self.#table_member_columns.#name.pull(index))
+        });
+
+        quote!{
+            impl <'imm> #struct_window<'imm> {
+                pub fn #method_delete(&mut self, key: #type_key) -> Result<(), #type_key_error> {
+                    match self.#table_member_columns.#name_primary_column.pull(key) {
+                        Ok(#pulpit_path::column::Entry{ index, data:_ }) => {
+                            unsafe {
+                                #(#assoc_cols;)*
+                            }
+                            Ok(())
+                        },
+                        Err(_) => Err(#type_key_error),
+                    }
+                }
+            }
+        }.into()
+    };
+
+    SingleOp {
+        op_mod: quote! { mod #mod_delete {} }.into(),
+        op_impl,
     }
 }

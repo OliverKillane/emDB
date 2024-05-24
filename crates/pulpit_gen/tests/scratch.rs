@@ -1,8 +1,8 @@
 use prettyplease::unparse;
 use proc_macro2::Span;
 use pulpit_gen::{
-    columns::{AssocVec, PrimaryRetain},
-    groups::{Field, Group, GroupConfig, Groups, MutImmut},
+    columns::{Append, AppendTrans, AssocBlocks, AssocVec, PrimaryNoPull, PrimaryRetain, PrimaryThunderdome, Pull, PullTrans},
+    groups::{Field, Group, GroupConfig, MutImmut},
     namer::CodeNamer,
     operations::update::Update,
     predicates::Predicate,
@@ -11,10 +11,7 @@ use pulpit_gen::{
 };
 use quote::quote;
 use quote::ToTokens;
-use std::{
-    collections::{HashMap, HashSet},
-    fs,
-};
+use std::{collections::HashSet, fs};
 use syn::{parse2, Ident};
 
 #[test]
@@ -25,10 +22,10 @@ fn main() {
     let d = Ident::new("d", Span::call_site());
     let e = Ident::new("e", Span::call_site());
 
-    let table = Table {
+    let table = Table::<Append> {
         groups: GroupConfig {
             primary: Group {
-                col: PrimaryRetain { block_size: 1024 },
+                col: PrimaryNoPull(AssocBlocks{ block_size: 1024 }.into()).into(),
                 fields: MutImmut {
                     imm_fields: vec![Field {
                         name: b.clone(),
@@ -47,7 +44,7 @@ fn main() {
                 },
             },
             assoc: vec![Group {
-                col: AssocVec,
+                col: AssocVec.into(),
                 fields: MutImmut {
                     imm_fields: vec![Field {
                         name: d.clone(),
@@ -61,20 +58,16 @@ fn main() {
             }],
         }
         .into(),
-        uniques: HashMap::from([
-            (
-                e.clone(),
-                Unique {
-                    alias: Ident::new("e_unique", Span::call_site()),
-                },
-            ),
-            (
-                a.clone(),
-                Unique {
-                    alias: Ident::new("a_unique", Span::call_site()),
-                },
-            ),
-        ]),
+        uniques: vec![
+            Unique {
+                alias: Ident::new("e_unique", Span::call_site()),
+                field: e.clone(),
+            },
+            Unique {
+                alias: Ident::new("a_unique", Span::call_site()),
+                field: a.clone(),
+            },
+        ],
         predicates: vec![
             Predicate {
                 alias: Ident::new("check_b", Span::call_site()),
@@ -106,5 +99,3 @@ fn main() {
     )
     .unwrap();
 }
-
-// fn update_ace (& mut self , update : Update , key : Key) -> Result < () , UpdateError > { let Entry { index , data : primary } = match self . columns . primary . brw_mut (key) { Ok (entry) => entry , Err (e) => return Err (UpdateError :: KeyError) , } let assoc_0 = self . columns . assoc_0 . brw_mut (index) ; if ! predicates :: check_b (& primary . imm_data . b , update . a , update . c , update . e , & assoc_0 . mut_data . d) { return Err (UpdateError :: check_b) ; } if ! predicates :: check_e_len (& primary . imm_data . b , update . a , update . c , update . e , & assoc_0 . mut_data . d) { return Err (UpdateError :: check_e_len) ; } let e_unique = match self . uniques . e_unique . replace (& update . e , & assoc_0 . imm_data . e , key) { Ok (old_val) => old_val , Err (_) => { return Err (UpdateError :: e_unique) } , } ; let mut update = update ; std :: mem :: swap (& mut primary . mut_data . c , & mut update . c) ; ; std :: mem :: swap (& mut assoc_0 . mut_data . e , & mut update . e) ; ; std :: mem :: swap (& mut primary . mut_data . a , & mut update . a) ; ; if self . transactions . append { self . transactions . log . push (transactions :: LogItem :: Update (transactions :: Updates :: update_ace (update))) ; } Ok (()) }

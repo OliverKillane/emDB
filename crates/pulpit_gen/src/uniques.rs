@@ -1,17 +1,12 @@
-use std::collections::HashMap;
-
 use quote::quote;
 use quote_debug::Tokens;
 use syn::{Ident, ItemImpl, ItemStruct};
 
-use super::{
-    columns::PrimaryKind,
-    groups::{FieldName, Groups},
-    namer::CodeNamer,
-};
+use super::{columns::PrimaryKind, groups::Groups, namer::CodeNamer};
 
 pub struct Unique {
     pub alias: Ident,
+    pub field: Ident,
 }
 
 pub struct UniqueDec {
@@ -20,7 +15,7 @@ pub struct UniqueDec {
 }
 
 pub fn generate<Primary: PrimaryKind>(
-    uniques: &HashMap<FieldName, Unique>,
+    uniques: &[Unique],
     groups: &Groups<Primary>,
     namer: &CodeNamer,
 ) -> UniqueDec {
@@ -31,13 +26,13 @@ pub fn generate<Primary: PrimaryKind>(
         ..
     } = namer;
 
-    let unique_fields_def = uniques.iter().map(|(alias, _)| {
-        let ty = groups.get_typefield(alias).unwrap();
-        quote!(#alias: #pulpit_path::access::Unique<#ty, #type_key>)
+    let unique_fields_def = uniques.iter().map(|Unique { alias: _, field }| {
+        let ty = groups.get_typefield(field).unwrap();
+        quote!(#field: #pulpit_path::access::Unique<#ty, #type_key>)
     });
-    let unique_fields_impl = uniques
-        .iter()
-        .map(|(alias, _)| quote!(#alias: #pulpit_path::access::Unique::new(size_hint)));
+    let unique_fields_impl = uniques.iter().map(
+        |Unique { alias: _, field }| quote!(#field: #pulpit_path::access::Unique::new(size_hint)),
+    );
 
     UniqueDec {
         unique_struct: quote! {

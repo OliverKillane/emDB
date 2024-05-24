@@ -73,8 +73,8 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
         mod_columns_fn_imm_unpack,
         mod_get,
         mod_get_struct_get,
-        trait_get,
         lifetime_imm,
+        method_get,
         ..
     } = namer;
 
@@ -106,19 +106,12 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
             }
         }
         .into(),
-        op_trait: quote! {
-            pub trait #trait_get #lifetime {
-                /// Get the value of a row, not as a borrow, but as a value lasting at least as long as the window.
-                fn get(&self, key: #type_key) -> Result<#mod_get::#mod_get_struct_get #lifetime, #type_key_error>;
-            }
-        }
-        .into(),
         op_impl: quote! {
-            impl <'imm> #trait_get #lifetime for #struct_window<'imm> {
-                fn get(&self, key: #type_key) -> Result<#mod_get::#mod_get_struct_get #lifetime, #type_key_error> {
+            impl <'imm> #struct_window<'imm> {
+                pub fn #method_get(&self, key: #type_key) -> Result<#mod_get::#mod_get_struct_get #lifetime, #type_key_error> {
                     let #pulpit_path::column::Entry {index, data: #name_primary_column} = match self.#table_member_columns.#name_primary_column.get(key) {
                         Ok(entry) => entry,
-                        Err(e) => return Err(#type_key_error),
+                        Err(_) => return Err(#type_key_error),
                     };
                     let #name_primary_column = #name_primary_column.convert_imm(#mod_columns::#name_primary_column::#mod_columns_fn_imm_unpack);
                     #(#assoc_cols;)*

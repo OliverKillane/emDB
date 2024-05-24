@@ -6,10 +6,9 @@ pub mod transact;
 pub mod update;
 
 use quote_debug::Tokens;
-use syn::{ItemImpl, ItemMod, ItemTrait};
+use syn::{ItemImpl, ItemMod};
 
 pub struct SingleOp {
     pub op_mod: Tokens<ItemMod>,
-    pub op_trait: Tokens<ItemTrait>,
     pub op_impl: Tokens<ItemImpl>,
 }

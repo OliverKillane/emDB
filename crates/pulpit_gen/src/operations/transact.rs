@@ -23,10 +23,11 @@ pub fn generate<Primary: PrimaryKind>(
         mod_transactions_struct_data_member_log,
         mod_transactions_struct_data_member_rollback,
         table_member_columns,
-        trait_update,
         type_key,
         name_primary_column,
         pulpit_path,
+        method_commit,
+        method_abort,
         ..
     } = namer;
 
@@ -42,7 +43,7 @@ pub fn generate<Primary: PrimaryKind>(
         }
     } else {
         quote! {
-            #mod_transactions_enum_logitem_variant_update(#mod_transactions_enum_update),
+            #mod_transactions_enum_logitem_variant_update(super::#type_key, #mod_transactions_enum_update),
             #mod_transactions_enum_logitem_variant_append,
         }
     };
@@ -50,7 +51,7 @@ pub fn generate<Primary: PrimaryKind>(
     let abort_update = updates.iter().map(|Update { fields: _, alias }| {
         quote! {
             #mod_transactions::#mod_transactions_enum_update::#alias(update) => {
-                <Self as #trait_update>::#alias(self, update, key).unwrap();
+                self.#alias(update, key).unwrap();
             }
         }
     });
@@ -68,11 +69,11 @@ pub fn generate<Primary: PrimaryKind>(
         let assoc_cols_abrt_del = assoc_cols.clone();
 
         quote! {
-            impl <'imm> Transact for #struct_window<'imm> {
+            impl <'imm> #struct_window<'imm> {
                 /// Commit all current changes
                 /// - Requires concretely applying deletions (which until commit 
                 ///   or abort simply hide keys from the table)
-                fn commit(&mut self) {
+                pub fn #method_commit(&mut self) {
                     debug_assert!(!self.#table_member_transactions.#mod_transactions_struct_data_member_rollback);
                     while let Some(entry) = self.#table_member_transactions.#mod_transactions_struct_data_member_log.pop() {
                         match entry {
@@ -90,7 +91,7 @@ pub fn generate<Primary: PrimaryKind>(
                 /// Undo the transactions applied since the last commit
                 /// - Requires re-applying all updates, deleting inserts and undoing deletes 
                 ///   (deletes' keys are actually just hidden until commit or abort)
-                fn abort(&mut self) {
+                pub fn #method_abort(&mut self) {
                     self.#table_member_transactions.#mod_transactions_struct_data_member_rollback = true;
                     while let Some(entry) = self.#table_member_transactions.#mod_transactions_struct_data_member_log.pop() {
                         match entry {
@@ -118,10 +119,10 @@ pub fn generate<Primary: PrimaryKind>(
         });
 
         quote! {
-            impl <'imm> Transact for #struct_window<'imm> {
+            impl <'imm> #struct_window<'imm> {
                 /// Commit all current changes
                 /// - Clears the rollback log
-                fn commit(&mut self) {
+                pub fn #method_commit(&mut self) {
                     debug_assert!(!self.#table_member_transactions.#mod_transactions_struct_data_member_rollback);
                     self.#table_member_transactions.#mod_transactions_struct_data_member_log.clear()
                 }
@@ -129,13 +130,13 @@ pub fn generate<Primary: PrimaryKind>(
                 /// Undo the transactions applied since the last commit
                 /// - Requires re-applying all updates, deleting inserts and undoing deletes
                 ///   (deletes' keys are actually just hidden until commit or abort)
-                fn abort(&mut self) {
+                pub fn #method_abort(&mut self) {
                     self.#table_member_transactions.#mod_transactions_struct_data_member_rollback = true;
                     while let Some(entry) = self.#table_member_transactions.#mod_transactions_struct_data_member_log.pop() {
                         match entry {
                             #mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_append => {
                                 unsafe{
-                                    self.#table_member_transactions.#name_primary_column.unppend();
+                                    self.#table_member_columns.#name_primary_column.unppend();
                                     #(#assoc_cols;)*
                                 }
                             },
@@ -170,15 +171,6 @@ pub fn generate<Primary: PrimaryKind>(
                         }
                     }
                 }
-            }
-        }
-        .into(),
-        op_trait: quote! {
-            pub trait Transact {
-                /// Commit all current changes permenantly.
-                fn commit(&mut self);
-                /// Roll back all changes since the last abort.
-                fn abort(&mut self);
             }
         }
         .into(),

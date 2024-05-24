@@ -1,9 +1,9 @@
-use std::{collections::HashMap, iter::once};
+use std::iter::once;
 
 use super::SingleOp;
 use crate::{
     columns::{ColKind, PrimaryKind},
-    groups::{Field, FieldName, Group, Groups},
+    groups::{Field, Group, Groups},
     namer::CodeNamer,
     predicates::Predicate,
     uniques::Unique,
@@ -34,6 +34,8 @@ pub fn generate_column_assignments<Col: ColKind>(
         ..
     } = namer;
 
+    // TODO: remove extra brackets, as ExprLet parsing of struct literals has 
+    //       been fixed in syn (see https://github.com/dtolnay/syn/issues/1670)
     quote! {
         let #name = (#pulpit_path::column::Data {
             imm_data: #mod_columns::#name::#mod_columns_struct_imm {
@@ -49,7 +51,7 @@ pub fn generate_column_assignments<Col: ColKind>(
 
 pub fn generate<Primary: PrimaryKind>(
     groups: &Groups<Primary>,
-    uniques: &HashMap<FieldName, Unique>,
+    uniques: &[Unique],
     predicates: &[Predicate],
     namer: &CodeNamer,
 ) -> SingleOp {
@@ -59,7 +61,6 @@ pub fn generate<Primary: PrimaryKind>(
         mod_insert,
         mod_insert_struct_insert,
         mod_insert_enum_error,
-        trait_insert,
         mod_borrow,
         mod_borrow_struct_borrow,
         mod_predicates,
@@ -74,6 +75,7 @@ pub fn generate<Primary: PrimaryKind>(
         table_member_transactions,
         mod_transactions_struct_data_member_rollback,
         mod_transactions_struct_data_member_log,
+        method_insert,
         ..
     } = namer;
 
@@ -99,13 +101,13 @@ pub fn generate<Primary: PrimaryKind>(
         }
     });
 
-    let errors = uniques.iter().map(|(_, Unique { alias })| alias).chain(
+    let errors = uniques.iter().map(|Unique { alias, .. }| alias).chain(
         predicates
             .iter()
             .map(|Predicate { alias, tokens: _ }| alias),
     );
 
-    let unique_checks = uniques.iter().map(|(field, Unique { alias })| {
+    let unique_checks = uniques.iter().map(|Unique { alias, field }| {
         quote! {
             let #alias = match self.#table_member_uniques.#field.lookup(&#insert_val.#field) {
                 Ok(_) => return Err(#mod_insert::#mod_insert_enum_error::#alias),
@@ -114,7 +116,7 @@ pub fn generate<Primary: PrimaryKind>(
         }
     });
 
-    let unique_updates = uniques.iter().map(|(field, Unique { alias })| {
+    let unique_updates = uniques.iter().map(|Unique { alias, field }| {
         quote! {
             self.#table_member_uniques.#field.insert(#alias, #key_var).unwrap();
         }
@@ -175,7 +177,7 @@ pub fn generate<Primary: PrimaryKind>(
     } else {
         (
             quote! {
-                self.#table_member_columns.#name_primary_column.append(#name_primary_column);
+                let #key_var = self.#table_member_columns.#name_primary_column.append(#name_primary_column);
                 #(#appends)*
             },
             if Primary::TRANSACTIONS {
@@ -194,24 +196,15 @@ pub fn generate<Primary: PrimaryKind>(
         SingleOp {
             op_mod: quote! {
                 pub mod #mod_insert {
-                    /// TODO
                     pub struct #mod_insert_struct_insert {
                         #(#insert_struct_fields,)*
                     }
                 }
             }
             .into(),
-            op_trait: quote! {
-                pub trait #trait_insert {
-                    /// Insert a new item into the table.
-                    /// - as this table has no constraints, no errors are possible
-                    fn insert(&mut self, #insert_val: #mod_insert::#mod_insert_struct_insert) -> #type_key;
-                }
-            }
-            .into(),
             op_impl: quote! {
-                impl <'imm> #trait_insert for #struct_window<'imm> {
-                    fn insert(&mut self, #insert_val: #mod_insert::#mod_insert_struct_insert) -> #type_key {
+                impl <'imm> #struct_window<'imm> {
+                    pub fn #method_insert(&mut self, #insert_val: #mod_insert::#mod_insert_struct_insert) -> #type_key {
                         #(#splitting;)*
                         #add_action
                         #add_trans
@@ -235,17 +228,9 @@ pub fn generate<Primary: PrimaryKind>(
                 }
             }
             .into(),
-            op_trait: quote! {
-                pub trait #trait_insert {
-                    /// Insert the a value into the table
-                    /// - Returns an error if any constraints are not met.
-                    fn insert(&mut self, #insert_val: #mod_insert::#mod_insert_struct_insert) -> Result<#type_key, #mod_insert::#mod_insert_enum_error>;
-                }
-            }
-            .into(),
             op_impl: quote! {
-                impl <'imm> #trait_insert for #struct_window<'imm> {
-                    fn insert(&mut self, #insert_val: #mod_insert::#mod_insert_struct_insert) -> Result<#type_key, #mod_insert::#mod_insert_enum_error> {
+                impl <'imm> #struct_window<'imm> {
+                    pub fn #method_insert(&mut self, #insert_val: #mod_insert::#mod_insert_struct_insert) -> Result<#type_key, #mod_insert::#mod_insert_enum_error> {
                         #(#predicate_checks)*
                         #(#unique_checks)*
                         #(#splitting;)*

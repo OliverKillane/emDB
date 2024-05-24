@@ -271,7 +271,7 @@ impl<Primary: PrimaryKind> Groups<Primary> {
                         quote!(#mod_columns::#assoc_name::#mod_columns_struct_imm).into(),
                         quote!(#mod_columns::#assoc_name::#mod_columns_struct_mut).into(),
                     ),
-                    col.generate_column_type_no_generics(namer),
+                    col.generate_base_type(namer),
                     assoc_name,
                 )
             })
@@ -281,7 +281,7 @@ impl<Primary: PrimaryKind> Groups<Primary> {
                     quote!(#mod_columns::#name_primary_column::#mod_columns_struct_imm).into(),
                     quote!(#mod_columns::#name_primary_column::#mod_columns_struct_mut).into(),
                 ),
-                self.primary.col.generate_column_type_no_generics(namer),
+                self.primary.col.generate_base_type(namer),
                 name_primary_column.clone(),
             )))
         {

@@ -39,8 +39,8 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
         type_key_error,
         table_member_columns,
         mod_borrow,
-        trait_borrow,
         mod_borrow_struct_borrow,
+        method_borrow,
         ..
     } = namer;
 
@@ -63,19 +63,12 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
             }
         }
         .into(),
-        op_trait: quote! {
-            pub trait #trait_borrow {
-                /// Gets an immutable borrow of all fields.
-                fn borrow<'brw>(&'brw self, key: #type_key) -> Result<#mod_borrow::#mod_borrow_struct_borrow<'brw>, #type_key_error>;
-            }
-        }
-        .into(),
         op_impl: quote! {
-            impl <'imm> #trait_borrow for #struct_window<'imm> {
-                fn borrow<'brw>(&'brw self, key: #type_key) -> Result<#mod_borrow::#mod_borrow_struct_borrow<'brw>, #type_key_error> {
+            impl <'imm> #struct_window<'imm> {
+                pub fn #method_borrow<'brw>(&'brw self, key: #type_key) -> Result<#mod_borrow::#mod_borrow_struct_borrow<'brw>, #type_key_error> {
                     let #pulpit_path::column::Entry {index, data: #name_primary_column} = match self.#table_member_columns.#name_primary_column.brw(key) {
                         Ok(entry) => entry,
-                        Err(e) => return Err(#type_key_error),
+                        Err(_) => return Err(#type_key_error),
                     };
                     #(#assoc_brws;)*
 

@@ -1,10 +1,9 @@
 use super::*;
-
-pub struct PrimaryRetain {
+pub struct AssocBlocks {
     pub block_size: usize,
 }
 
-impl ColKind for PrimaryRetain {
+impl ColKind for AssocBlocks {
     fn derives(&self) -> MutImmut<Vec<Ident>> {
         MutImmut {
             imm_fields: vec![Ident::new("Clone", Span::call_site())],
@@ -45,7 +44,7 @@ impl ColKind for PrimaryRetain {
 
     fn generate_base_type(&self, namer: &CodeNamer) -> Tokens<Type> {
         let pulpit_path = &namer.pulpit_path;
-        quote! { #pulpit_path::column::PrimaryRetain }.into()
+        quote! { #pulpit_path::column::AssocBlocks }.into()
     }
 
     fn generate_generics(

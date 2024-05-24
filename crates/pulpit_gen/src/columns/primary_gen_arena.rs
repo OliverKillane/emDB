@@ -1,8 +1,8 @@
 use super::*;
 
-pub struct AssocVec;
+pub struct PrimaryGenArena;
 
-impl ColKind for AssocVec {
+impl ColKind for PrimaryGenArena {
     fn derives(&self) -> MutImmut<Vec<Ident>> {
         MutImmut {
             imm_fields: vec![Ident::new("Clone", Span::call_site())],
@@ -11,7 +11,7 @@ impl ColKind for AssocVec {
     }
 
     fn generate_base_type(&self, namer: &CodeNamer) -> Tokens<Type> {
-        let pulpit_path = &namer.pulpit_path;
-        quote! { #pulpit_path::column::AssocVec }.into()
+        let CodeNamer { pulpit_path, .. } = namer;
+        quote! { #pulpit_path::column::PrimaryGenerationalArena }.into()
     }
 }

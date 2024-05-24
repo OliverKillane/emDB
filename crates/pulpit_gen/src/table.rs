@@ -1,12 +1,11 @@
 use crate::{operations, uniques::UniqueDec};
 use quote::quote;
 use quote_debug::Tokens;
-use std::collections::HashMap;
 use syn::{Ident, ItemImpl, ItemMod, ItemStruct};
 
 use super::{
     columns::PrimaryKind,
-    groups::{FieldName, Groups, GroupsDef},
+    groups::{Groups, GroupsDef},
     namer::CodeNamer,
     operations::{update::Update, SingleOp},
     predicates::{self, Predicate},
@@ -15,7 +14,7 @@ use super::{
 
 pub struct Table<Primary: PrimaryKind> {
     pub groups: Groups<Primary>,
-    pub uniques: HashMap<FieldName, Unique>,
+    pub uniques: Vec<Unique>,
     pub predicates: Vec<Predicate>,
     pub updates: Vec<Update>,
     pub name: Ident,
@@ -135,7 +134,7 @@ impl<Primary: PrimaryKind> Table<Primary> {
         }
 
         if Primary::DELETIONS {
-            ops_code.push(operations::delete::generate(namer, Primary::TRANSACTIONS))
+            ops_code.push(operations::delete::generate(namer, groups))
         }
 
         let TableDec {
@@ -144,22 +143,17 @@ impl<Primary: PrimaryKind> Table<Primary> {
             window_struct,
         } = generate_table_and_window(Primary::TRANSACTIONS, namer);
 
-        let ops_tokens = ops_code.into_iter().map(
-            |SingleOp {
-                 op_mod,
-                 op_trait,
-                 op_impl,
-             }| {
-                quote! {
-                    #op_mod
-                    #op_trait
-                    #op_impl
-                }
-            },
-        );
+        let ops_tokens = ops_code.into_iter().map(|SingleOp { op_mod, op_impl }| {
+            quote! {
+                #op_mod
+                #op_impl
+            }
+        });
 
         quote! {
             mod #name {
+                #![allow(unused, non_camel_case_types)]
+                
                 use #pulpit_path::column::{
                     PrimaryWindow,
                     PrimaryWindowApp,
@@ -170,6 +164,7 @@ impl<Primary: PrimaryKind> Table<Primary> {
                     Column,
                 };
 
+                #[derive(Debug)]
                 pub struct #type_key_error;
 
                 #column_types
