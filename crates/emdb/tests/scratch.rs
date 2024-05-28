@@ -4,7 +4,7 @@
 //!   hover over `rust-analyzer` and click `Rebuild Proc Macros`
 //! - Saving this file should re-run the emql macro, to generate outputs.
 #![allow(unreachable_code)]
-use emdb::emql;
+use emdb::macros::emql;
 
 emql! {
     impl debug_code as SemCheck{debug_file = "emdb/tests/debug/code.rs"};

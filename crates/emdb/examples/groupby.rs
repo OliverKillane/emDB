@@ -1,5 +1,5 @@
 #![allow(unused_variables)]
-use emdb::emql;
+use emdb::macros::emql;
 
 emql! {
     impl my_db as SemCheck;

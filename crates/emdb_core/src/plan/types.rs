@@ -126,7 +126,7 @@ pub enum ScalarTypeConc {
     /// A reference to a row in a table, allows the user to interact wit row
     /// references while still allowing the backend to decide what they are.
     /// ```
-    /// # use emdb::emql;
+    /// # use emdb_core::emql;
     /// # emql! {
     /// #     table foos { x: i32 }
     /// #     query foo_query() {
@@ -145,7 +145,7 @@ pub enum ScalarTypeConc {
     /// implementation.
     ///
     /// ```
-    /// # use emdb::emql;
+    /// # use emdb_core::emql;
     /// # emql! {
     /// #     table foos { x: i32 }
     /// #     query foo_query() {
@@ -158,7 +158,7 @@ pub enum ScalarTypeConc {
     /// ```
     ///
     /// ```
-    /// # use emdb::emql;
+    /// # use emdb_core::emql;
     /// # emql! {
     /// #     table foos { x: i32 }
     /// #     query foo_query() {

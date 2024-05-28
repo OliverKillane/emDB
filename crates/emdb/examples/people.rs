@@ -1,5 +1,5 @@
 #![allow(unused_variables)]
-use emdb::emql;
+use emdb::macros::emql;
 
 #[allow(dead_code)]
 enum RGB {

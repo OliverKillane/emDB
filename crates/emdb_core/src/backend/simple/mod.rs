@@ -1,5 +1,13 @@
 //! A simple reference backend using basic volcano operators
 
+/*
+pulpit_gen
+mod name
+window name
+generate impl (currently todo with the closure generation)
+minister with holding types
+*/
+
 use super::EMDBBackend;
 
 mod buffers;
