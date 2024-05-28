@@ -13,6 +13,7 @@ struct GenInfo {
     next_free: Option<usize>,
     gen_counter: usize,
     generations: Vec<GenEntry>,
+    visible_count: usize,
 }
 
 impl GenInfo {
@@ -25,14 +26,16 @@ impl GenInfo {
 
     fn pull_key<Store>(&mut self, key: GenKey<Store, usize>) -> Result<UnsafeIndex, KeyError> {
         if let Some(entry) = self.generations.get_mut(key.index) {
+            if let GenEntry::Generation(_) = entry {
+                self.visible_count -= 1;
+            }
             match *entry {
-                GenEntry::Generation( g) | GenEntry::Hidden(g) if g == key.generation 
-                 => {
+                GenEntry::Generation(g) | GenEntry::Hidden(g) if g == key.generation => {
                     *entry = GenEntry::NextFree(self.next_free);
                     self.next_free = Some(key.index);
                     self.gen_counter += 1;
                     Ok(key.index)
-                 },
+                }
                 _ => Err(KeyError),
             }
         } else {
@@ -45,6 +48,7 @@ impl GenInfo {
             match *entry {
                 GenEntry::Generation(g) if g == key.generation => {
                     *entry = GenEntry::Hidden(g);
+                    self.visible_count -= 1;
                     Ok(())
                 }
                 _ => Err(KeyError),
@@ -59,6 +63,7 @@ impl GenInfo {
             match *entry {
                 GenEntry::Hidden(g) if g == key.generation => {
                     *entry = GenEntry::Generation(g);
+                    self.visible_count += 1;
                     Ok(())
                 }
                 _ => Err(KeyError),
@@ -115,6 +120,10 @@ impl GenInfo {
             )
         }
     }
+
+    fn count(&self) -> usize {
+        self.visible_count
+    }
 }
 
 /// An adapter to convert an [`AssocWindowPull`] into a [`PrimaryWindowPull`] with generational indices.
@@ -123,7 +132,7 @@ pub struct PrimaryPull<Col> {
     gen: GenInfo,
 }
 
-impl <Col> Keyable for PrimaryPull<Col> {
+impl<Col> Keyable for PrimaryPull<Col> {
     type Key = GenKey<PrimaryPull<Col>, usize>;
 }
 
@@ -137,6 +146,7 @@ impl<Col: Column> Column for PrimaryPull<Col> {
                 next_free: None,
                 generations: Vec::with_capacity(size_hint),
                 gen_counter: 0,
+                visible_count: 0,
             },
         }
     }
@@ -190,9 +200,13 @@ where
     fn conv_get(get: Self::ImmGet) -> ImmData {
         Col::WindowKind::conv_get(get)
     }
-    
+
     fn scan(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
         self.gen.scan()
+    }
+
+    fn count(&self) -> usize {
+        self.gen.count()
     }
 }
 
@@ -212,7 +226,10 @@ where
         })
     }
 
-    fn insert(&mut self, val: Data<ImmData, MutData>) -> (<Self::Col as Keyable>::Key, InsertAction) {
+    fn insert(
+        &mut self,
+        val: Data<ImmData, MutData>,
+    ) -> (<Self::Col as Keyable>::Key, InsertAction) {
         let (key, action) = self.gen.insert();
         match &action {
             InsertAction::Place(ind) => unsafe { self.col.place(*ind, val) },

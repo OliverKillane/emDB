@@ -1,5 +1,6 @@
 //! Compare access performance from separate vectors versus a single vector.
 use divan;
+
 trait Access<A, B>
 where
     A: Clone,

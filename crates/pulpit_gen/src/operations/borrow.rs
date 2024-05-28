@@ -37,10 +37,10 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
         pulpit_path,
         name_primary_column,
         type_key_error,
-        table_member_columns,
+        struct_table_member_columns: table_member_columns,
         mod_borrow,
         mod_borrow_struct_borrow,
-        method_borrow,
+        struct_window_method_borrow: method_borrow,
         ..
     } = namer;
 

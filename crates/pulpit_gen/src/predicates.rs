@@ -1,4 +1,4 @@
-use std::{collections::HashSet, iter::once};
+use std::iter::once;
 
 use quote::quote;
 use quote_debug::Tokens;
@@ -66,7 +66,7 @@ pub fn generate<Primary: PrimaryKind>(
 ///   the table entry.
 pub fn generate_update_predicate_access<Primary: PrimaryKind>(
     groups: &Groups<Primary>,
-    new_fields: &HashSet<FieldName>,
+    new_fields: &[FieldName],
     update_value_name: &Ident,
     namer: &CodeNamer,
 ) -> Tokens<ExprStruct> {

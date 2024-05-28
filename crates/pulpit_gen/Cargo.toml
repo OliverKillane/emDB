@@ -19,6 +19,8 @@ quote = "1.0.33"
 bimap = "0.6.3"
 enumtrait = { path = "../enumtrait" }
 quote_debug = { path = "../quote_debug" }
+proc-macro-error = "1.0.4"
+combi = { path = "../combi" }
 
 [dev-dependencies]
 prettyplease = "0.2"

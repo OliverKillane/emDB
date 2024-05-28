@@ -68,13 +68,13 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
         struct_window,
         pulpit_path,
         name_primary_column,
-        table_member_columns,
+        struct_table_member_columns: table_member_columns,
         mod_columns,
         mod_columns_fn_imm_unpack,
         mod_get,
         mod_get_struct_get,
         lifetime_imm,
-        method_get,
+        struct_window_method_get: method_get,
         ..
     } = namer;
 

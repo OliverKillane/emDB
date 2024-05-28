@@ -1,7 +1,6 @@
 use proc_macro2::Span;
 use quote::quote;
 use quote_debug::Tokens;
-use std::collections::HashSet;
 use syn::{ExprLet, ExprMethodCall, Ident, ImplItemFn, ItemMod, Variant};
 
 use crate::{
@@ -17,7 +16,7 @@ use super::SingleOp;
 /// An update operation, replacing [`Update::fields`] with new values.
 /// - Named for the user by [`Update::alias`]
 pub struct Update {
-    pub fields: HashSet<Ident>,
+    pub fields: Vec<Ident>,
     pub alias: Ident,
 }
 
@@ -147,7 +146,7 @@ impl Update {
             mod_update_struct_update,
             mod_update_enum_error,
             name_primary_column,
-            table_member_columns,
+            struct_table_member_columns: table_member_columns,
             type_key,
             mod_predicates,
             type_key_error,
@@ -155,11 +154,11 @@ impl Update {
             mod_transactions_enum_logitem,
             mod_transactions,
             mod_transactions_enum_logitem_variant_update,
-            table_member_transactions,
+            struct_table_member_transactions: table_member_transactions,
             mod_transactions_enum_update,
             mod_transactions_struct_data_member_rollback,
             mod_transactions_struct_data_member_log,
-            table_member_uniques,
+            struct_table_member_uniques: table_member_uniques,
             ..
         } = namer;
 

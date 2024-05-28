@@ -24,7 +24,7 @@ impl<ImmData, MutData> Column for PrimaryThunderDome<ImmData, MutData> {
     }
 }
 
-impl <ImmData, MutData> Keyable for PrimaryThunderDome<ImmData, MutData> {
+impl<ImmData, MutData> Keyable for PrimaryThunderDome<ImmData, MutData> {
     type Key = ThunderIndex;
 }
 
@@ -40,7 +40,7 @@ where
     fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, MutData> {
         let Entry {
             data: Data { imm_data, mut_data },
-            index,
+            index: _,
         } = self.brw(key)?;
         Ok(Entry {
             index: key.slot() as usize,
@@ -74,9 +74,13 @@ where
     fn conv_get(get: Self::ImmGet) -> ImmData {
         get
     }
-    
+
     fn scan(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
         self.inner.arena.iter().map(|(i, _)| i)
+    }
+
+    fn count(&self) -> usize {
+        self.inner.arena.len()
     }
 }
 
@@ -88,7 +92,10 @@ where
 {
     type ImmPull = ImmData;
 
-    fn insert(&mut self, val: Data<ImmData, MutData>) -> (<Self::Col as Keyable>::Key, InsertAction) {
+    fn insert(
+        &mut self,
+        val: Data<ImmData, MutData>,
+    ) -> (<Self::Col as Keyable>::Key, InsertAction) {
         let curr_max = self.inner.arena.len();
         let key = self.inner.arena.insert(val);
         let index = key.slot() as usize;

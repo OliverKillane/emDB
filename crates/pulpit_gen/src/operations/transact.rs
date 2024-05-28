@@ -19,15 +19,17 @@ pub fn generate<Primary: PrimaryKind>(
         mod_transactions_enum_logitem_variant_insert,
         mod_transactions_enum_logitem_variant_append,
         mod_transactions_enum_logitem_variant_delete,
-        table_member_transactions,
+        struct_table_member_transactions: table_member_transactions,
         mod_transactions_struct_data_member_log,
         mod_transactions_struct_data_member_rollback,
-        table_member_columns,
+        struct_table_member_columns: table_member_columns,
         type_key,
         name_primary_column,
-        pulpit_path,
-        method_commit,
-        method_abort,
+        struct_window_method_commit: method_commit,
+        struct_window_method_abort: method_abort,
+        struct_window_method_delete_hidden,
+        struct_window_method_reverse_insert,
+        struct_window_method_restore_hidden,
         ..
     } = namer;
 
@@ -62,12 +64,6 @@ pub fn generate<Primary: PrimaryKind>(
     }};
 
     let op_impl = if Primary::DELETIONS {
-        let assoc_cols = (0..groups.assoc.len()).map(|ind| {
-            let name = namer.name_assoc_column(ind);
-            quote!(self.#table_member_columns.#name.pull(index))
-        });
-        let assoc_cols_abrt_del = assoc_cols.clone();
-
         quote! {
             impl <'imm> #struct_window<'imm> {
                 /// Commit all current changes
@@ -78,10 +74,7 @@ pub fn generate<Primary: PrimaryKind>(
                     while let Some(entry) = self.#table_member_transactions.#mod_transactions_struct_data_member_log.pop() {
                         match entry {
                             #mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_delete(key) => {
-                                let #pulpit_path::column::Entry{ index, data:_ } = self.#table_member_columns.#name_primary_column.pull(key).unwrap();
-                                unsafe {
-                                    #(#assoc_cols;)*
-                                }
+                                self.#struct_window_method_restore_hidden(key);
                             },
                             _ => (),
                         }
@@ -96,13 +89,10 @@ pub fn generate<Primary: PrimaryKind>(
                     while let Some(entry) = self.#table_member_transactions.#mod_transactions_struct_data_member_log.pop() {
                         match entry {
                             #mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_delete(key) => {
-                                self.#table_member_columns.#name_primary_column.reveal(key).unwrap();
+                                self.#struct_window_method_delete_hidden(key);
                             },
                             #mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_insert(key) => {
-                                let #pulpit_path::column::Entry{ index, data:_ } = self.#table_member_columns.#name_primary_column.pull(key).unwrap();
-                                unsafe {
-                                    #(#assoc_cols_abrt_del;)*
-                                }
+                                self.#struct_window_method_reverse_insert(key);
                             },
                             #update_rollback_case
                         }

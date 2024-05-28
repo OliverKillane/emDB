@@ -14,7 +14,7 @@ impl<T: syn::parse::Parse + ToTokens> From<TokenStream> for Tokens<T> {
     fn from(value: TokenStream) -> Self {
         #[cfg(debug_assertions)]
         {
-            if let Err(err) =  parse2::<T>(value.clone()) {
+            if let Err(err) = parse2::<T>(value.clone()) {
                 panic!(
                     "Attempted to parse as `{}` but failed with message:\n`{}`\nTokens: `{}`",
                     type_name::<T>(),
@@ -30,7 +30,7 @@ impl<T: syn::parse::Parse + ToTokens> From<TokenStream> for Tokens<T> {
     }
 }
 
-impl <T: syn::parse::Parse + ToTokens> Clone for Tokens<T> {
+impl<T: syn::parse::Parse + ToTokens> Clone for Tokens<T> {
     fn clone(&self) -> Self {
         Self {
             tks: self.tks.clone(),

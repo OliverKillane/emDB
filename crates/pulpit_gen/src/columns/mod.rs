@@ -5,7 +5,7 @@ use crate::{
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use quote_debug::Tokens;
-use syn::{Generics, Ident, ItemFn, ItemStruct, Type};
+use syn::{Ident, ItemFn, ItemStruct, Type};
 
 pub struct ImmConversion {
     pub imm_unpacked: Tokens<ItemStruct>,
@@ -30,7 +30,7 @@ pub trait ColKind {
 
     fn generate_generics(
         &self,
-        namer: &CodeNamer,
+        _namer: &CodeNamer,
         imm_type: Tokens<Type>,
         mut_type: Tokens<Type>,
     ) -> TokenStream {
@@ -71,7 +71,7 @@ pub trait ColKind {
             .into(),
         }
     }
-    fn convert_imm_type(&self, field: &Field, namer: &CodeNamer) -> Tokens<Type> {
+    fn convert_imm_type(&self, field: &Field, _namer: &CodeNamer) -> Tokens<Type> {
         field.ty.clone()
     }
 }

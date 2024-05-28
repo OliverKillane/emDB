@@ -6,3 +6,4 @@ members = ["combi", "emdb", "enumtrait", "pulpit", "pulpit_gen", "pulpit_macro",
 homepage = "https://github.com/OliverKillane/emDB"
 repository = "https://github.com/OliverKillane/emDB"
 license-file = "LICENSE"
+

@@ -1,6 +1,6 @@
 //! # Primary and Associated Index Columns
 //! Each pulpit table is composed of a primary column (accessed through user-visible
-//! [keys](PrimaryWindow::Key)) and associated columns (accessed without bounds
+//! [keys](Keyable::Key)) and associated columns (accessed without bounds
 //! checks through raw column indexes).
 //!
 //! ## Immutability Advantage
@@ -31,7 +31,7 @@
 //!    (use different kinds of references)
 //! 3. Limit the reference to the lifetime that the column is not moved (difficult)
 //!
-//! In order to achieve (3.) we need to attah the lifetime of the column to
+//! In order to achieve (3.) we need to attach the lifetime of the column to
 //! returned references.
 //!
 //! ### Using the [interior mutability pattern](https://doc.rust-lang.org/reference/interior-mutability.html)
@@ -128,7 +128,7 @@
 //! I originally considered having the index entirely separate to the data
 //! storage, however as demonstrated in the `col_vs_tup` benchmark, the cost of
 //! separate inserts (required for an index that need to keep generations) is high.
-//! - Allows for other optimisations, such as in [`RetainArena`]'s reuse of space for
+//! - Allows for other optimisations, such as in [`PrimaryRetain`]'s reuse of space for
 //!   data, and for the mutable data for generation & free slot storage.
 
 use std::{hash::Hash, marker::PhantomData, mem::transmute};
@@ -163,7 +163,7 @@ pub trait Column {
     fn window(&mut self) -> Self::WindowKind<'_>;
 }
 
-/// In order to get the Key (without needing the `'imm` lifetime parameter) it is 
+/// In order to get the Key (without needing the `'imm` lifetime parameter) it is
 /// kept separate from the window, referenced through the column in the window.
 pub trait Keyable {
     type Key: Copy + Eq;
@@ -178,10 +178,16 @@ pub struct Data<ImmData, MutData> {
     pub mut_data: MutData,
 }
 
-impl <ImmData, MutData> Data<ImmData, MutData> {
-    pub fn convert_imm<ImmDataProcessed>(self, trans: impl Fn(ImmData) -> ImmDataProcessed) -> Data<ImmDataProcessed, MutData> {
+impl<ImmData, MutData> Data<ImmData, MutData> {
+    pub fn convert_imm<ImmDataProcessed>(
+        self,
+        trans: impl Fn(ImmData) -> ImmDataProcessed,
+    ) -> Data<ImmDataProcessed, MutData> {
         let Self { imm_data, mut_data } = self;
-        Data { imm_data: trans(imm_data), mut_data }
+        Data {
+            imm_data: trans(imm_data),
+            mut_data,
+        }
     }
 }
 
@@ -209,7 +215,7 @@ pub trait PrimaryWindow<'imm, ImmData, MutData> {
     ///   or any [`PrimaryWindowPull`] operations.
     type ImmGet: 'imm;
 
-    /// The key type of backing column, used to get the type needed for key (which 
+    /// The key type of backing column, used to get the type needed for key (which
     /// does not need the `'imm` lifetime parameter)
     type Col: Keyable + Column;
 
@@ -221,15 +227,16 @@ pub trait PrimaryWindow<'imm, ImmData, MutData> {
     fn conv_get(get: Self::ImmGet) -> ImmData;
 
     fn scan(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key>;
+    fn count(&self) -> usize;
 }
 
 pub trait PrimaryWindowApp<'imm, ImmData, MutData>: PrimaryWindow<'imm, ImmData, MutData> {
     fn append(&mut self, val: Data<ImmData, MutData>) -> <Self::Col as Keyable>::Key;
 
     /// To allow for transactions to remove data from the table
-    /// 
+    ///
     /// # Safety
-    /// - All [`PrimaryWindow::get`] values must not be accessed from this call, 
+    /// - All [`PrimaryWindow::get`] values must not be accessed from this call,
     ///   to when they are dropped.
     unsafe fn unppend(&mut self);
 }
@@ -242,10 +249,13 @@ pub trait PrimaryWindowPull<'imm, ImmData, MutData>: PrimaryWindow<'imm, ImmData
 
     /// n insert must track if old [`UnsafeIndex`] is to be overwritten in
     /// [`AssocWindowPull`] or an append is required.
-    fn insert(&mut self, val: Data<ImmData, MutData>) -> (<Self::Col as Keyable>::Key, InsertAction);
+    fn insert(
+        &mut self,
+        val: Data<ImmData, MutData>,
+    ) -> (<Self::Col as Keyable>::Key, InsertAction);
 
     /// Pull data from a column (removes it from the column)
-    /// For tables implementing [`PrimaryWindowHide`], this can include hidden 
+    /// For tables implementing [`PrimaryWindowHide`], this can include hidden
     /// values.
     fn pull(&mut self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmPull, MutData>;
 
@@ -255,9 +265,11 @@ pub trait PrimaryWindowPull<'imm, ImmData, MutData>: PrimaryWindow<'imm, ImmData
 
 /// Hides a given key temporarily, until revealed or removed.
 /// - Allows for 'deletions' that are not actually enforced until commit.
-/// - Allows the deletion from other associated columns to be postponed till the 
-///   end of a transaction. 
-pub trait PrimaryWindowHide<'imm, ImmData, MutData>: PrimaryWindowPull<'imm, ImmData, MutData> {
+/// - Allows the deletion from other associated columns to be postponed till the
+///   end of a transaction.
+pub trait PrimaryWindowHide<'imm, ImmData, MutData>:
+    PrimaryWindowPull<'imm, ImmData, MutData>
+{
     /// Hide a value from get and brw access.
     /// - Can be pulled from the table, or releaved (back to normal row)
     /// - Cannot be hidden twice
@@ -299,9 +311,9 @@ pub trait AssocWindow<'imm, ImmData, MutData> {
     fn append(&mut self, val: Data<ImmData, MutData>);
 
     /// To allow for transactions to remove data from the table
-    /// 
+    ///
     /// # Safety
-    /// - All [`AssocWindow::get`] values must not be accessed from this call, 
+    /// - All [`AssocWindow::get`] values must not be accessed from this call,
     ///   to when they are dropped.
     unsafe fn unppend(&mut self);
 
@@ -420,6 +432,7 @@ mod utils {
     }
 }
 
+#[cfg(any(test, kani))]
 mod verif {
     use super::*;
     use std::collections::HashMap;
@@ -538,7 +551,8 @@ mod verif {
     struct CheckPrimary<'imm, ImmData, MutData, ColWindow, RefMap>
     where
         ColWindow: PrimaryWindow<'imm, ImmData, MutData>,
-        RefMap: ReferenceMap<<ColWindow::Col as Keyable>::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
+        RefMap:
+            ReferenceMap<<ColWindow::Col as Keyable>::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
     {
         colwindow: ColWindow,
         items: RefMap,
@@ -548,7 +562,8 @@ mod verif {
     impl<'imm, ImmData, MutData, ColWindow, RefMap>
         CheckPrimary<'imm, ImmData, MutData, ColWindow, RefMap>
     where
-        RefMap: ReferenceMap<<ColWindow::Col as Keyable>::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
+        RefMap:
+            ReferenceMap<<ColWindow::Col as Keyable>::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
         ColWindow: PrimaryWindow<'imm, ImmData, MutData>,
         ImmData: Clone + Eq + std::fmt::Debug,
         MutData: Clone + Eq + std::fmt::Debug,
@@ -582,7 +597,8 @@ mod verif {
     impl<'imm, ImmData, MutData, ColWindow, RefMap>
         CheckPrimary<'imm, ImmData, MutData, ColWindow, RefMap>
     where
-        RefMap: ReferenceMap<<ColWindow::Col as Keyable>::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
+        RefMap:
+            ReferenceMap<<ColWindow::Col as Keyable>::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
         ColWindow: PrimaryWindowApp<'imm, ImmData, MutData>,
         ImmData: Clone + Eq + std::fmt::Debug,
         MutData: Clone + Eq + std::fmt::Debug,
@@ -603,7 +619,8 @@ mod verif {
     impl<'imm, ImmData, MutData, ColWindow, RefMap>
         CheckPrimary<'imm, ImmData, MutData, ColWindow, RefMap>
     where
-        RefMap: ReferenceMap<<ColWindow::Col as Keyable>::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
+        RefMap:
+            ReferenceMap<<ColWindow::Col as Keyable>::Key, (UnsafeIndex, Data<ImmData, MutData>)>,
         ColWindow: PrimaryWindowPull<'imm, ImmData, MutData>,
         ImmData: Clone + Eq + std::fmt::Debug,
         MutData: Clone + Eq + std::fmt::Debug,
@@ -657,7 +674,8 @@ mod verif {
         where
             Col: Column,
             for<'a> Col::WindowKind<'a>: PrimaryWindowPull<'a, usize, usize>,
-            for<'a> <<Col::WindowKind<'a> as PrimaryWindow<'a, usize, usize>>::Col as Keyable>::Key: Eq + Hash,
+            for<'a> <<Col::WindowKind<'a> as PrimaryWindow<'a, usize, usize>>::Col as Keyable>::Key:
+                Eq + Hash,
         {
             const ITERS: usize = 100000;
             let mut col = Col::new(ITERS);
@@ -687,7 +705,8 @@ mod verif {
         where
             Col: Column,
             for<'a> Col::WindowKind<'a>: PrimaryWindowApp<'a, usize, usize>,
-            for<'a> <<Col::WindowKind<'a> as PrimaryWindow<'a, usize, usize>>::Col as Keyable>::Key: Eq + Hash,
+            for<'a> <<Col::WindowKind<'a> as PrimaryWindow<'a, usize, usize>>::Col as Keyable>::Key:
+                Eq + Hash,
         {
             const ITERS: usize = 100000;
             let mut col = Col::new(ITERS);

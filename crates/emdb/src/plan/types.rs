@@ -23,6 +23,7 @@
 //!    - two different bags of an equal type are equal (use the same bag data structure)
 //!    - two references to the same table are equal (use the same reference type)
 //!    - two records with the same fields are equal (use the same wrapping record data structure)
+//!    
 //!    This is the type of equality we use for semantic analysis.   
 //!
 //! 2. Implementation Type Equality (used for code generation) asks: do the
@@ -71,6 +72,7 @@ pub enum ConcRef<A: Clone> {
 
     /// A reference to another record/type
     /// - Used coalescing different records of the same type to point to the same concrete record
+    ///   
     /// INV: Not self-referential / no recursive types / no cycles
     Ref(Key<ConcRef<A>>),
 }
@@ -135,7 +137,7 @@ pub enum ScalarTypeConc {
     /// # }
     /// ```
     /// - Can use different types of references depending table implementation
-    /// chosen (e.g. key with generation, pointer, etc)
+    ///   chosen (e.g. key with generation, pointer, etc)
     TableRef(Key<Table>),
 
     /// A collection of records in a container to be specified by the chosen

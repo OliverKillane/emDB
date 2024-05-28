@@ -1,4 +1,7 @@
-use crate::{operations, uniques::UniqueDec};
+use crate::{
+    operations::{self, SingleOpFn},
+    uniques::UniqueDec,
+};
 use quote::quote;
 use quote_debug::Tokens;
 use syn::{Ident, ItemImpl, ItemMod, ItemStruct};
@@ -30,14 +33,14 @@ fn generate_table_and_window(transactions: bool, namer: &CodeNamer) -> TableDec 
     let CodeNamer {
         struct_window,
         struct_table,
-        table_member_columns,
+        struct_table_member_columns: table_member_columns,
         struct_column_holder,
         struct_window_holder,
-        table_member_uniques,
+        struct_table_member_uniques: table_member_uniques,
         struct_unique,
         mod_transactions,
         mod_transactions_struct_data,
-        table_member_transactions,
+        struct_table_member_transactions: table_member_transactions,
         ..
     } = namer;
 
@@ -123,18 +126,24 @@ impl<Primary: PrimaryKind> Table<Primary> {
             unique_impl,
         } = uniques::generate(uniques, groups, namer);
 
-        let mut ops_code = vec![
+        let mut ops_mod_code = vec![
             operations::borrow::generate(groups, namer),
             operations::get::generate(groups, namer),
             operations::update::generate(updates, groups, uniques, predicates, namer),
             operations::insert::generate(groups, uniques, predicates, namer),
+            operations::unique_get::generate(groups, uniques, namer),
         ];
         if Primary::TRANSACTIONS {
-            ops_code.push(operations::transact::generate(groups, updates, namer))
+            ops_mod_code.push(operations::transact::generate(groups, updates, namer))
         }
 
+        let mut ops_fn_code = vec![
+            operations::count::generate(namer),
+            operations::scan::generate(namer),
+        ];
+
         if Primary::DELETIONS {
-            ops_code.push(operations::delete::generate(namer, groups))
+            ops_fn_code.push(operations::delete::generate(namer, groups, uniques))
         }
 
         let TableDec {
@@ -143,17 +152,24 @@ impl<Primary: PrimaryKind> Table<Primary> {
             window_struct,
         } = generate_table_and_window(Primary::TRANSACTIONS, namer);
 
-        let ops_tokens = ops_code.into_iter().map(|SingleOp { op_mod, op_impl }| {
-            quote! {
-                #op_mod
-                #op_impl
-            }
-        });
+        let ops_tokens = ops_mod_code
+            .into_iter()
+            .map(|SingleOp { op_mod, op_impl }| {
+                quote! {
+                    #op_mod
+                    #op_impl
+                }
+            })
+            .chain(
+                ops_fn_code
+                    .into_iter()
+                    .map(|SingleOpFn { op_impl }| quote! { #op_impl }),
+            );
 
         quote! {
             mod #name {
                 #![allow(unused, non_camel_case_types)]
-                
+
                 use #pulpit_path::column::{
                     PrimaryWindow,
                     PrimaryWindowApp,

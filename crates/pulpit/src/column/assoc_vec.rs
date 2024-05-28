@@ -2,7 +2,7 @@
 use super::*;
 
 /// An associated, append only [`Column`] storing data in a large vector for faster
-/// lookup than [`ColBlok`], but at the expense of needing copies for [`AssocWindow::get`].
+/// lookup than [`super::AssocBlocks`], but at the expense of needing copies for [`AssocWindow::get`].
 pub struct AssocVec<ImmData, MutData> {
     data: Vec<Option<Data<ImmData, MutData>>>,
 }
@@ -78,7 +78,7 @@ where
 
     unsafe fn pull(&mut self, ind: UnsafeIndex) -> Data<Self::ImmPull, MutData> {
         let val = self.inner.data.get_unchecked_mut(ind);
-        std::mem::replace(val, None).unwrap()
+        val.take().unwrap()
     }
 
     unsafe fn place(&mut self, ind: UnsafeIndex, val: Data<ImmData, MutData>) {

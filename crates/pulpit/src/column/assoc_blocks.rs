@@ -64,7 +64,7 @@ where
     fn conv_get(get: Self::ImmGet) -> ImmData {
         get.clone()
     }
-    
+
     unsafe fn unppend(&mut self) {
         self.inner.blocks.unppend();
     }

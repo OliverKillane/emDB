@@ -89,13 +89,16 @@ impl<ImmData, MutData> Drop for MutEntry<ImmData, MutData> {
 /// ```  
 pub struct PrimaryRetain<ImmData, MutData, const BLOCK_SIZE: usize> {
     mut_data: Vec<MutEntry<ImmData, MutData>>,
+    visible_count: usize,
     next_free_mut: NextFree,
     imm_data: utils::Blocks<ImmData, BLOCK_SIZE>,
     gen_counter: usize,
     dummy_zero_size: (),
 }
 
-impl <ImmData, MutData, const BLOCK_SIZE: usize> Keyable for PrimaryRetain<ImmData, MutData, BLOCK_SIZE> {
+impl<ImmData, MutData, const BLOCK_SIZE: usize> Keyable
+    for PrimaryRetain<ImmData, MutData, BLOCK_SIZE>
+{
     type Key = GenKey<PrimaryRetain<ImmData, MutData, BLOCK_SIZE>, *const ImmData>;
 }
 
@@ -110,6 +113,7 @@ impl<ImmData, MutData, const BLOCK_SIZE: usize> Column
         PrimaryRetain {
             mut_data: Vec::with_capacity(size_hint / BLOCK_SIZE + 1),
             imm_data: utils::Blocks::new(size_hint),
+            visible_count: 0,
             next_free_mut: NextFree(None),
             gen_counter: 1,
             dummy_zero_size: (),
@@ -148,18 +152,15 @@ where
         if let Some(MutEntry { imm_ptr, mut_data }) = self.inner.mut_data.get(key.index) {
             unsafe {
                 if key.generation == *imm_ptr && !mut_data.full.hidden {
-                    
                     Ok(Entry {
                         index: key.index,
                         data: Data {
-                            imm_data: 
-                                if size_of::<ImmData>() == 0 {
-                                    transmute::<&(), &ImmData>(&self.inner.dummy_zero_size)
-                                } else {
-                                    &*(*imm_ptr).cast::<ImmData>()
-                                }
-                            ,
-                            mut_data:  &mut_data.full.data,
+                            imm_data: if size_of::<ImmData>() == 0 {
+                                transmute::<&(), &ImmData>(&self.inner.dummy_zero_size)
+                            } else {
+                                &*(*imm_ptr).cast::<ImmData>()
+                            },
+                            mut_data: &mut_data.full.data,
                         },
                     })
                 } else {
@@ -174,7 +175,7 @@ where
     fn brw_mut(&mut self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &mut MutData> {
         if let Some(MutEntry { imm_ptr, mut_data }) = self.inner.mut_data.get_mut(key.index) {
             unsafe {
-                if key.generation == *imm_ptr  && !mut_data.full.hidden {
+                if key.generation == *imm_ptr && !mut_data.full.hidden {
                     Ok(Entry {
                         index: key.index,
                         data: Data {
@@ -198,19 +199,27 @@ where
     fn conv_get(get: Self::ImmGet) -> ImmData {
         get.clone()
     }
-    
+
     fn scan(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
-        self.inner.mut_data.iter().enumerate().filter_map(|(index, entry)| {
-            if entry.imm_ptr.is_null() {
-                None
-            } else {
-                Some(GenKey {
-                    index,
-                    generation: entry.imm_ptr,
-                    phantom: PhantomData,
-                })
-            }
-        })
+        self.inner
+            .mut_data
+            .iter()
+            .enumerate()
+            .filter_map(|(index, entry)| {
+                if entry.imm_ptr.is_null() {
+                    None
+                } else {
+                    Some(GenKey {
+                        index,
+                        generation: entry.imm_ptr,
+                        phantom: PhantomData,
+                    })
+                }
+            })
+    }
+
+    fn count(&self) -> usize {
+        self.inner.visible_count
     }
 }
 
@@ -227,6 +236,7 @@ where
         Data { imm_data, mut_data }: Data<ImmData, MutData>,
     ) -> (<Self::Col as Keyable>::Key, InsertAction) {
         let imm_ptr = self.inner.imm_data.append(imm_data);
+        self.inner.visible_count += 1;
         if let NextFree(Some(next_free)) = self.inner.next_free_mut {
             unsafe {
                 let mut_entry = self.inner.mut_data.get_unchecked_mut(next_free);
@@ -245,7 +255,10 @@ where
                 *mut_entry = MutEntry {
                     imm_ptr,
                     mut_data: Slot {
-                        full: ManuallyDrop::new(HiddenData { hidden: false, data: mut_data }),
+                        full: ManuallyDrop::new(HiddenData {
+                            hidden: false,
+                            data: mut_data,
+                        }),
                     },
                 };
                 (
@@ -262,7 +275,10 @@ where
             self.inner.mut_data.push(MutEntry {
                 imm_ptr,
                 mut_data: Slot {
-                    full: ManuallyDrop::new(HiddenData { hidden: false, data: mut_data }),
+                    full: ManuallyDrop::new(HiddenData {
+                        hidden: false,
+                        data: mut_data,
+                    }),
                 },
             });
             (
@@ -286,6 +302,9 @@ where
                         &*(mut_entry.imm_ptr).cast::<ImmData>()
                     };
                     let pull_mut_data = ManuallyDrop::take(&mut mut_entry.mut_data.full);
+                    if !pull_mut_data.hidden {
+                        self.inner.visible_count -= 1;
+                    }
                     *mut_entry = MutEntry {
                         imm_ptr: ptr::null(),
                         mut_data: Slot {
@@ -314,17 +333,18 @@ where
     }
 }
 
-
 impl<'imm, ImmData, MutData, const BLOCK_SIZE: usize> PrimaryWindowHide<'imm, ImmData, MutData>
-for Window<'imm, PrimaryRetain<ImmData, MutData, BLOCK_SIZE>>
+    for Window<'imm, PrimaryRetain<ImmData, MutData, BLOCK_SIZE>>
 where
-MutData: Clone,
-ImmData: Clone, {
+    MutData: Clone,
+    ImmData: Clone,
+{
     fn hide(&mut self, key: <Self::Col as Keyable>::Key) -> Result<(), KeyError> {
         if let Some(MutEntry { imm_ptr, mut_data }) = self.inner.mut_data.get_mut(key.index) {
             unsafe {
-                if key.generation == *imm_ptr  && !mut_data.full.hidden {
+                if key.generation == *imm_ptr && !mut_data.full.hidden {
                     mut_data.full.hidden = true;
+                    self.inner.visible_count -= 1;
                     Ok(())
                 } else {
                     Err(KeyError)
@@ -335,11 +355,12 @@ ImmData: Clone, {
         }
     }
 
-    fn reveal(&mut self, key: <Self::Col as Keyable>::Key) -> Result<(), KeyError>{
+    fn reveal(&mut self, key: <Self::Col as Keyable>::Key) -> Result<(), KeyError> {
         if let Some(MutEntry { imm_ptr, mut_data }) = self.inner.mut_data.get_mut(key.index) {
             unsafe {
-                if key.generation == *imm_ptr  && mut_data.full.hidden {
+                if key.generation == *imm_ptr && mut_data.full.hidden {
                     mut_data.full.hidden = false;
+                    self.inner.visible_count += 1;
                     Ok(())
                 } else {
                     Err(KeyError)

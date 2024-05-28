@@ -1,3 +1,4 @@
 //! Additional indexes for access to take keys.
 
-mod unique; pub use unique::*;
+mod unique;
+pub use unique::*;

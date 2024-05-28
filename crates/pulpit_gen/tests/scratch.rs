@@ -1,7 +1,10 @@
 use prettyplease::unparse;
 use proc_macro2::Span;
 use pulpit_gen::{
-    columns::{Append, AppendTrans, AssocBlocks, AssocVec, PrimaryNoPull, PrimaryRetain, PrimaryThunderdome, Pull, PullTrans},
+    columns::{
+        Append, AppendTrans, AssocBlocks, AssocVec, PrimaryNoPull, PrimaryRetain,
+        PrimaryThunderdome, Pull, PullTrans,
+    },
     groups::{Field, Group, GroupConfig, MutImmut},
     namer::CodeNamer,
     operations::update::Update,
@@ -25,7 +28,7 @@ fn main() {
     let table = Table::<Append> {
         groups: GroupConfig {
             primary: Group {
-                col: PrimaryNoPull(AssocBlocks{ block_size: 1024 }.into()).into(),
+                col: PrimaryNoPull(AssocBlocks { block_size: 1024 }.into()).into(),
                 fields: MutImmut {
                     imm_fields: vec![Field {
                         name: b.clone(),
@@ -80,11 +83,11 @@ fn main() {
         ],
         updates: vec![
             Update {
-                fields: HashSet::from([a.clone(), c.clone(), e.clone()]),
+                fields: vec![a.clone(), c.clone(), e.clone()],
                 alias: Ident::new("update_ace", Span::call_site()),
             },
             Update {
-                fields: HashSet::from([a.clone()]),
+                fields: vec![a.clone()],
                 alias: Ident::new("update_a", Span::call_site()),
             },
         ],

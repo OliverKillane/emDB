@@ -2,7 +2,8 @@
 /// Here we compare insert, followed by sequential access.
 use divan;
 use pulpit::column::{
-    Column, Data, Entry, PrimaryGenerationalArena, PrimaryRetain, PrimaryThunderDome, PrimaryWindow, PrimaryWindowPull
+    Column, Data, Entry, PrimaryGenerationalArena, PrimaryRetain, PrimaryThunderDome,
+    PrimaryWindow, PrimaryWindowPull,
 };
 
 /// Sequential insert & access. assumes the user needs to get a value lasting longer than a borrow.   
@@ -20,7 +21,7 @@ where
         let Entry { index: _, data } = win.get(key).unwrap();
         vals.push(data);
     }
-    
+
     divan::black_box_drop(win);
     divan::black_box_drop(vals);
     divan::black_box_drop(col);
@@ -143,7 +144,7 @@ where
 {
     const ELEMENTS: usize = 100000;
     bencher
-    .counter(divan::counter::ItemsCount::new(ELEMENTS))
+        .counter(divan::counter::ItemsCount::new(ELEMENTS))
         .with_inputs(|| {
             (0..ELEMENTS)
                 .map(|_| Data {

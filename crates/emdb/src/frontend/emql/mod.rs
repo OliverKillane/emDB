@@ -51,7 +51,9 @@
 //! 1. Use the rust API to fully analyse passed expressions
 //!    - provides the guarentee that all logical plans contain valid embedded rust
 //!    - allows for type inference on expressions
+//!    
 //!    However it has a significant drawback:
+//!    
 //!    - Cannot analyse code from outside the macro invocation, so cannot use types
 //!      and functions from outside [`emQL`](crate::emql!)
 //!    - the API is exposed compiler library internals, so is subject to change, not ideal for a
@@ -63,7 +65,9 @@
 //!      everywhere in the crate by rustc
 //!    - reduces frontend complexity, and redundant work (analysing code twice, once
 //!      in macro, once for end result)
+//!    
 //!    However
+//!
 //!    - With no backend implementations, no expressions are checked
 //!
 //! I decided to check expression syntax (using syn) in the frontend and use the passthrough design.

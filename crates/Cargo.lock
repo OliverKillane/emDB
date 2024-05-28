@@ -404,6 +404,8 @@ dependencies = [
  "glob",
  "proc-macro-error",
  "proc-macro2 1.0.83",
+ "pulpit_gen",
+ "pulpit_macro",
  "quote 1.0.36",
  "syn 2.0.65",
  "thunderdome",
@@ -416,10 +418,12 @@ name = "pulpit_gen"
 version = "0.1.0"
 dependencies = [
  "bimap",
+ "combi",
  "divan",
  "enumtrait",
  "glob",
  "prettyplease",
+ "proc-macro-error",
  "proc-macro2 1.0.83",
  "quote 1.0.36",
  "quote_debug",
@@ -433,7 +437,9 @@ version = "0.1.0"
 dependencies = [
  "divan",
  "glob",
+ "proc-macro-error",
  "proc-macro2 1.0.83",
+ "pulpit_gen",
  "quote 1.0.36",
  "syn 2.0.65",
  "trybuild",

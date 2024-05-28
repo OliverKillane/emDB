@@ -7,7 +7,7 @@ pub struct PrimaryGenerationalArena<ImmData, MutData> {
     arena: GenArena<Data<ImmData, MutData>>,
 }
 
-impl <ImmData, MutData> Keyable for PrimaryGenerationalArena<ImmData, MutData> {
+impl<ImmData, MutData> Keyable for PrimaryGenerationalArena<ImmData, MutData> {
     type Key = GenIndex<Data<ImmData, MutData>, usize, usize>;
 }
 
@@ -73,9 +73,13 @@ where
     fn conv_get(get: Self::ImmGet) -> ImmData {
         get
     }
-    
+
     fn scan(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
         self.inner.arena.iter().map(|(key, _)| key)
+    }
+
+    fn count(&self) -> usize {
+        self.inner.arena.len()
     }
 }
 
@@ -87,7 +91,10 @@ where
 {
     type ImmPull = ImmData;
 
-    fn insert(&mut self, val: Data<ImmData, MutData>) -> (<Self::Col as Keyable>::Key, InsertAction) {
+    fn insert(
+        &mut self,
+        val: Data<ImmData, MutData>,
+    ) -> (<Self::Col as Keyable>::Key, InsertAction) {
         let curr_max = self.inner.arena.len();
         let key = self.inner.arena.insert(val);
         (

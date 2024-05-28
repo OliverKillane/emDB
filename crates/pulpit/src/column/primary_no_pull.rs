@@ -7,7 +7,7 @@ pub struct PrimaryAppend<Col> {
     max_key: usize,
 }
 
-impl <Col> Keyable for PrimaryAppend<Col> {
+impl<Col> Keyable for PrimaryAppend<Col> {
     type Key = usize;
 }
 
@@ -79,9 +79,13 @@ where
     fn conv_get(get: Self::ImmGet) -> ImmData {
         Col::WindowKind::conv_get(get)
     }
-    
+
     fn scan(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
         0..(*self.max_key)
+    }
+
+    fn count(&self) -> usize {
+        *self.max_key
     }
 }
 
@@ -97,7 +101,7 @@ where
         self.col.append(val);
         key
     }
-    
+
     unsafe fn unppend(&mut self) {
         self.col.unppend();
     }

@@ -34,7 +34,7 @@ pub fn generate_column_assignments<Col: ColKind>(
         ..
     } = namer;
 
-    // TODO: remove extra brackets, as ExprLet parsing of struct literals has 
+    // TODO: remove extra brackets, as ExprLet parsing of struct literals has
     //       been fixed in syn (see https://github.com/dtolnay/syn/issues/1670)
     quote! {
         let #name = (#pulpit_path::column::Data {
@@ -64,18 +64,18 @@ pub fn generate<Primary: PrimaryKind>(
         mod_borrow,
         mod_borrow_struct_borrow,
         mod_predicates,
-        table_member_uniques,
-        table_member_columns,
+        struct_table_member_uniques: table_member_uniques,
+        struct_table_member_columns: table_member_columns,
         pulpit_path,
         name_primary_column,
         mod_transactions_enum_logitem,
         mod_transactions_enum_logitem_variant_insert,
         mod_transactions_enum_logitem_variant_append,
         mod_transactions,
-        table_member_transactions,
+        struct_table_member_transactions: table_member_transactions,
         mod_transactions_struct_data_member_rollback,
         mod_transactions_struct_data_member_log,
-        method_insert,
+        struct_window_method_insert: method_insert,
         ..
     } = namer;
 

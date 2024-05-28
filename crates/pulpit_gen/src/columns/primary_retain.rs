@@ -50,7 +50,7 @@ impl ColKind for PrimaryRetain {
 
     fn generate_generics(
         &self,
-        namer: &CodeNamer,
+        _namer: &CodeNamer,
         imm_type: Tokens<Type>,
         mut_type: Tokens<Type>,
     ) -> TokenStream {
