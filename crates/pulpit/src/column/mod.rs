@@ -489,7 +489,7 @@ mod verif {
 
         fn remove(&mut self, key: &Key) -> Option<Value> {
             let val = self.data.iter_mut().find_map(|entry| {
-                if let Some((k, v)) = entry {
+                if let Some((k, _)) = entry {
                     if k == key {
                         Some(entry)
                     } else {
