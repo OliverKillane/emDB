@@ -125,7 +125,7 @@ pub struct Delete {
 /// - The column used for the row lookup must have the unique constraint
 ///
 /// ```text
-/// RECORD -> unique_ref(use RECORD.{ .. } TABLE at COLUMN ) -> RECORD + TABLE::REF
+/// RECORD [-> or |>] unique_ref(use RECORD.{ .. } TABLE at COLUMN ) [-> or |>] RECORD + TABLE::REF
 /// ```
 pub struct UniqueRef {
     pub input: Key<DataFlow>,
@@ -359,7 +359,7 @@ pub enum Operator {
     Fork,
     Union,
 
-    // control Flow
+    // control flow
     Row,
     Return,
     Discard,

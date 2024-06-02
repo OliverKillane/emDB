@@ -61,11 +61,15 @@ impl EMQLOperator for DeRef {
                             plan::ScalarTypeConc::Record(r) => Err(singlelist(
                                 errors::query_deref_cannot_deref_record(lp, &reference, r),
                             )),
-                            plan::ScalarTypeConc::Rust(rt) => Err(singlelist(
-                                errors::query_deref_cannot_deref_rust_type(&reference, rt),
+                            plan::ScalarTypeConc::Rust { ty, .. } => Err(singlelist(
+                                errors::query_deref_cannot_deref_rust_type(&reference, ty),
                             )),
                             plan::ScalarTypeConc::Bag(b) => Err(singlelist(
                                 errors::query_deref_cannot_deref_bag_type(lp, &reference, b),
+                            )),
+                            
+                            plan::ScalarTypeConc::TableGet { table, field } => Err(singlelist(
+                                errors::query_deref_cannot_deref_table_get(lp, &reference, *table, field)
                             )),
                             plan::ScalarTypeConc::TableRef(table_id) => {
                                 let table_id_copy = *table_id;

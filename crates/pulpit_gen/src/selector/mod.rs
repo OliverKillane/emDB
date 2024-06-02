@@ -10,6 +10,7 @@ pub struct SelectOperations {
     pub uniques: Vec<Unique>,
     pub predicates: Vec<Predicate>,
     pub updates: Vec<Update>,
+    pub public: bool,
 }
 
 use std::collections::HashMap;
@@ -27,11 +28,27 @@ use crate::{
     uniques::Unique,
 };
 
+#[enumtrait::quick_from]
+#[enumtrait::store(enum_backing_kind)]
 pub enum BackingKind {
     Append(Table<Append>),
     AppendTrans(Table<AppendTrans>),
     Pull(Table<Pull>),
     PullTrans(Table<PullTrans>),
+}
+
+impl BackingKind {
+    pub fn generate(self, namer: &CodeNamer) -> Tokens<ItemMod> {
+        enumtrait::gen_match!(enum_backing_kind as self for b => b.generate(namer))
+    }
+
+    pub fn op_get_types(&self, namer: &CodeNamer) -> HashMap<Ident, Tokens<Type>> {
+        enumtrait::gen_match!(enum_backing_kind as self for b => b.op_get_types(namer))
+    }
+
+    pub fn insert_can_error(&self) -> bool {
+        enumtrait::gen_match!(enum_backing_kind as self for b => b.insert_can_error())
+    }
 }
 
 pub fn select_basic(
@@ -43,9 +60,9 @@ pub fn select_basic(
         uniques,
         predicates,
         updates,
+        public
     }: SelectOperations,
-    namer: &CodeNamer,
-) -> Tokens<ItemMod> {
+) -> BackingKind {
     fn convert_fields(fields: HashMap<Ident, Tokens<Type>>) -> Vec<Field> {
         fields
             .into_iter()
@@ -85,8 +102,8 @@ pub fn select_basic(
                 predicates,
                 updates,
                 name,
-            }
-            .generate(namer)
+                public,
+            }.into()
         } else {
             Table::<AppendTrans> {
                 groups: GroupConfig {
@@ -101,8 +118,8 @@ pub fn select_basic(
                 predicates,
                 updates,
                 name,
-            }
-            .generate(namer)
+                public,
+            }.into()
         }
     } else if deletions {
         Table::<Pull> {
@@ -118,8 +135,8 @@ pub fn select_basic(
             predicates,
             updates,
             name,
-        }
-        .generate(namer)
+            public,
+        }.into()
     } else {
         Table::<Append> {
             groups: GroupConfig {
@@ -134,7 +151,7 @@ pub fn select_basic(
             predicates,
             updates,
             name,
-        }
-        .generate(namer)
+            public,
+        }.into()
     }
 }

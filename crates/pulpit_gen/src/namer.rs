@@ -63,14 +63,11 @@ fn new_id(id: &str) -> Ident {
     Ident::new(id, Span::call_site())
 }
 
-impl Default for CodeNamer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl CodeNamer {
-    pub fn new() -> Self {
+    pub fn pulpit() -> Self {
+        Self::new(quote!(pulpit).into())
+    }
+    pub fn new(pulpit_path: Tokens<Path>) -> Self {
         Self {
             lifetime_imm: quote! {'imm}.into(),
             mod_columns: new_id("column_types"),
@@ -79,7 +76,7 @@ impl CodeNamer {
             mod_columns_struct_mut: new_id("Mut"),
             mod_columns_struct_imm_unpacked: new_id("ImmUnpack"),
             mod_columns_fn_imm_unpack: new_id("imm_unpack"),
-            pulpit_path: quote!(pulpit).into(),
+            pulpit_path,
             struct_column_holder: new_id("ColumnHolder"),
             struct_window_holder: new_id("WindowHolder"),
             mod_update_struct_update: new_id("Update"),

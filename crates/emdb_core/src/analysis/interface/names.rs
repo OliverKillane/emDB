@@ -12,6 +12,7 @@ pub trait ItemNamer {
 
     fn table(key: plan::Key<plan::Table>) -> Ident;
     fn table_ref(key: plan::Key<plan::Table>) -> Ident;
+    fn table_field_member(key: plan::Key<plan::Table>, field: &plan::RecordField) -> Ident;
 
     fn context(key: plan::Key<plan::Context>) -> Ident;
     fn context_pattern(key: plan::Key<plan::Context>) -> Ident;
@@ -65,5 +66,9 @@ impl ItemNamer for SimpleNamer {
     }
     fn operator_pattern(key: plan::Key<plan::Operator>) -> Ident {
         name(key, "OperatorPattern")
+    }
+
+    fn table_field_member(key: plan::Key<plan::Table>, field: &plan::RecordField) -> Ident {
+        name(key, &format!("TableField{}", field))
     }
 }

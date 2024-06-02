@@ -1,11 +1,15 @@
+use std::collections::HashMap;
+
 use super::SingleOp;
 use crate::{
     columns::{ColKind, PrimaryKind},
-    groups::{Field, FieldIndex, Group, Groups, MutImmut},
+    groups::{Field, FieldIndex, FieldName, Group, Groups, MutImmut},
     namer::CodeNamer,
 };
 use proc_macro2::TokenStream;
 use quote::quote;
+use quote_debug::Tokens;
+use syn::Type;
 
 fn generate_get_fields<'a, Primary: PrimaryKind>(
     groups: &'a Groups<Primary>,
@@ -29,6 +33,40 @@ fn generate_get_fields<'a, Primary: PrimaryKind>(
         quote!(#field_name: #data.#imm_access.#field_name)
     })
 }
+
+/// Used to generate the field types for get operations on a table
+pub fn get_struct_fields<'a, Primary: PrimaryKind>(
+    groups: &'a Groups<Primary>,
+    namer: &'a CodeNamer,
+) -> HashMap<FieldName, Tokens<Type>> {
+    fn append<Col: ColKind>(
+        fs: &mut HashMap<FieldName, Tokens<Type>>,
+        col: &Col,
+        fields: &MutImmut<Vec<Field>>,
+        namer: &CodeNamer,
+    ) {
+        for Field { name, ty } in &fields.mut_fields {
+            fs.insert( name.clone(), ty.clone() );
+        }
+        for field @ Field { name, .. } in &fields.imm_fields {
+            fs.insert( name.clone(), col.convert_imm_type(field, namer) );
+        }
+    }
+    let mut def_fields = HashMap::with_capacity(groups.idents.len());
+    append(
+        &mut def_fields,
+        &groups.primary.col,
+        &groups.primary.fields,
+        namer,
+    );
+
+    
+    for Group { col, fields } in &groups.assoc {
+        append(&mut def_fields, col, fields, namer);
+    }
+    def_fields
+}
+
 
 pub fn generate_get_struct_fields<'a, Primary: PrimaryKind>(
     groups: &'a Groups<Primary>,
@@ -55,6 +93,8 @@ pub fn generate_get_struct_fields<'a, Primary: PrimaryKind>(
         &groups.primary.fields,
         namer,
     );
+
+
     for Group { col, fields } in &groups.assoc {
         append(&mut def_fields, col, fields, namer);
     }
@@ -107,7 +147,7 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
         }
         .into(),
         op_impl: quote! {
-            impl <'imm> #struct_window<'imm> {
+            impl <#lifetime_imm> #struct_window<#lifetime_imm> {
                 pub fn #method_get(&self, key: #type_key) -> Result<#mod_get::#mod_get_struct_get #lifetime, #type_key_error> {
                     let #pulpit_path::column::Entry {index, data: #name_primary_column} = match self.#table_member_columns.#name_primary_column.get(key) {
                         Ok(entry) => entry,

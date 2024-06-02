@@ -34,7 +34,7 @@ pub(super) enum ConstraintExpr {
 
 #[derive(Debug)]
 pub(super) struct Constraint {
-    pub alias: Option<Ident>,
+    pub alias: Ident,
     pub method_span: Span,
     pub expr: ConstraintExpr,
 }

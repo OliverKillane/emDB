@@ -221,13 +221,10 @@ fn constraint_parser() -> impl TokenParser<ast::Constraint> {
             seqs!(
                 matchident(name),
                 recovgroup(Delimiter::Parenthesis, p),
-                choice(
-                    peekident("as"),
-                    mapsuc(seq(matchident("as"), getident()), |(_, i)| Some(i)),
-                    mapsuc(nothing(), |()| None)
-                )
+                matchident("as"),
+                getident()
             ),
-            |(method, (p, alias))| ast::Constraint {
+            |(method, (p, (_, alias)))| ast::Constraint {
                 alias,
                 method_span: method.span(),
                 expr: p,

@@ -33,7 +33,7 @@ impl EMQLOperator for Row {
             let mut expr_fields = Vec::new();
 
             for (field, (ast_type, expr)) in fields {
-                match ast_typeto_scalar(tn, ts, ast_type, |e| errors::query_nonexistent_table(&call, e), errors::query_no_cust_type_found) {
+                match query_ast_typeto_scalar(tn, ts, ast_type, |e| errors::query_nonexistent_table(&call, e), errors::query_no_cust_type_found) {
                     Ok(t) => {
                         let t_index = lp.scalar_types.insert(t);
                         type_fields.insert(field.clone().into(), t_index);

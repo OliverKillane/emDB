@@ -1,10 +1,13 @@
+use std::collections::HashMap;
+
 use crate::{
-    operations::{self, SingleOpFn},
+    groups::FieldName,
+    operations::{self, get::get_struct_fields, SingleOpFn},
     uniques::UniqueDec,
 };
 use quote::quote;
 use quote_debug::Tokens;
-use syn::{Ident, ItemImpl, ItemMod, ItemStruct};
+use syn::{Ident, ItemImpl, ItemMod, ItemStruct, Type};
 
 use super::{
     columns::PrimaryKind,
@@ -21,6 +24,7 @@ pub struct Table<Primary: PrimaryKind> {
     pub predicates: Vec<Predicate>,
     pub updates: Vec<Update>,
     pub name: Ident,
+    pub public: bool,
 }
 
 struct TableDec {
@@ -96,6 +100,12 @@ fn generate_table_and_window(transactions: bool, namer: &CodeNamer) -> TableDec 
 }
 
 impl<Primary: PrimaryKind> Table<Primary> {
+    pub fn op_get_types(&self, namer: &CodeNamer) -> HashMap<FieldName, Tokens<Type>> {
+        get_struct_fields(&self.groups, namer)
+    }
+    pub fn insert_can_error(&self) -> bool {
+        !self.predicates.is_empty() || !self.uniques.is_empty() 
+    }
     pub fn generate(&self, namer: &CodeNamer) -> Tokens<ItemMod> {
         let Self {
             groups,
@@ -103,6 +113,7 @@ impl<Primary: PrimaryKind> Table<Primary> {
             predicates,
             updates,
             name,
+            public,
         } = self;
 
         let CodeNamer {
@@ -166,8 +177,10 @@ impl<Primary: PrimaryKind> Table<Primary> {
                     .map(|SingleOpFn { op_impl }| quote! { #op_impl }),
             );
 
+        let public_dec = if *public { quote!(pub) } else { quote!() };
+
         quote! {
-            mod #name {
+            #public_dec mod #name {
                 #![allow(unused, non_camel_case_types)]
 
                 use #pulpit_path::column::{

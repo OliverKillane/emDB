@@ -226,7 +226,7 @@ pub trait PrimaryWindow<'imm, ImmData, MutData> {
     /// For testing include a conversion for the immutable value
     fn conv_get(get: Self::ImmGet) -> ImmData;
 
-    fn scan(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key>;
+    fn scan<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw;
     fn count(&self) -> usize;
 }
 

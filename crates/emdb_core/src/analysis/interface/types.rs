@@ -119,11 +119,11 @@ fn add_public_scalar(
     location: plan::Key<plan::ScalarType>,
 ) {
     match lp.get_scalar_type(location) {
-        plan::ConcRef::Conc(scalar) => {
-            if let plan::ScalarTypeConc::Record(r) = scalar {
-                add_public_record(lp, set, *r)
-            }
-        }
+        plan::ConcRef::Conc(scalar) => match scalar {
+            plan::ScalarTypeConc::Record(r) => add_public_record(lp, set, *r),
+            plan::ScalarTypeConc::TableGet { table, field } => {}
+            _ => (),
+        },
         plan::ConcRef::Ref(inner) => add_public_scalar(lp, set, *inner),
     }
 }
@@ -167,7 +167,10 @@ impl<Namer: ItemNamer> TypeImplementor for SimpleTypeImplementor<Namer> {
             plan::ScalarTypeConc::TableRef(t) => Self::Namer::table_ref(*t).to_token_stream(),
             plan::ScalarTypeConc::Bag(b) => quote! {()},
             plan::ScalarTypeConc::Record(r) => Self::Namer::record_type(*r).to_token_stream(),
-            plan::ScalarTypeConc::Rust(ty) => ty.to_token_stream(),
+            plan::ScalarTypeConc::Rust { ty, .. } => ty.to_token_stream(),
+            plan::ScalarTypeConc::TableGet { table, field } => {
+                Self::Namer::table_field_member(*table, field).to_token_stream()
+            }
         };
         quote! {
             type #name = #set_to;

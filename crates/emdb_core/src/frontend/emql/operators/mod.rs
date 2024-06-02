@@ -18,8 +18,8 @@ use crate::frontend::emql::parse::{
     fields_assign, fields_expr, functional_style, type_parser_to_punct, ContextRecurHandle,
 };
 use crate::frontend::emql::sem::{
-    add_streams_to_context, ast_typeto_scalar, create_scanref, discard_ends, extract_fields,
-    generate_access, get_all_cols, get_user_fields, linear_builder, update_incomplete,
+    add_streams_to_context, create_scanref, discard_ends, extract_fields, generate_access,
+    get_all_cols, get_user_fields, linear_builder, query_ast_typeto_scalar, update_incomplete,
     valid_linear_builder, Continue, LinearBuilderState, ReturnVal, StreamContext, VarState,
 };
 use crate::plan;

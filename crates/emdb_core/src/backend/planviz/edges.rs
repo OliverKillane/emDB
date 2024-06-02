@@ -85,6 +85,13 @@ pub struct ScalarToTable {
 }
 
 #[derive(Clone, Debug)]
+pub struct ScalarGetTable {
+    pub scalar: plan::Key<plan::ScalarType>,
+    pub table: plan::Key<plan::Table>,
+    pub field: String,
+}
+
+#[derive(Clone, Debug)]
 pub struct ScalarToScalar {
     pub from: plan::Key<plan::ScalarType>,
     pub to: plan::Key<plan::ScalarType>,
@@ -130,6 +137,7 @@ pub enum PlanEdge {
     // scalar types
     ScalarToRecord,
     ScalarToTable,
+    ScalarGetTable,
     ScalarToScalar,
     RecordToRecord,
     
@@ -206,8 +214,9 @@ impl GetFeature<PlanEdge> for plan::ScalarType {
                 plan::ConcRef::Ref(r) => edges.push(ScalarToScalar {from: self_key, to: *r}.into()),
                 plan::ConcRef::Conc(c) => match c {
                     plan::ScalarTypeConc::TableRef(t) => edges.push(ScalarToTable {scalar: self_key, table: *t}.into()),
+                    plan::ScalarTypeConc::TableGet { table, field } => edges.push(ScalarGetTable { scalar: self_key, table: *table, field: field.to_string() }.into()),
                     plan::ScalarTypeConc::Bag(r) | plan::ScalarTypeConc::Record(r) => edges.push(ScalarToRecord {scalar: self_key, record: *r}.into()),
-                    plan::ScalarTypeConc::Rust(_) => (),
+                    plan::ScalarTypeConc::Rust{..} => (),
                 },
             }
         }
@@ -557,6 +566,36 @@ impl EdgeStyle for ScalarToRecord {
 }
 
 impl EdgeStyle for ScalarToTable {
+    fn end_arrow(&self) -> dot::Arrow {
+        dot::Arrow::normal()
+    }
+
+    fn start_arrow(&self) -> dot::Arrow {
+        dot::Arrow::none()
+    }
+
+    fn edge_style(&self) -> dot::Style {
+        dot::Style::None
+    }
+
+    fn edge_color<'a>(&self) -> Option<dot::LabelText<'a>> {
+        Some(dot::LabelText::label("black"))
+    }
+    
+    fn get_side(&self,source_side:bool) -> PlanNode {
+        if source_side {
+            PlanNode::ScalarType(self.scalar)
+        } else {
+            PlanNode::Table(self.table)
+        }
+    }
+}
+
+impl EdgeStyle for ScalarGetTable {
+    fn label<'a>(&self) -> dot::LabelText<'a> {
+        dot::LabelText::label(self.field.clone())
+    }
+
     fn end_arrow(&self) -> dot::Arrow {
         dot::Arrow::normal()
     }

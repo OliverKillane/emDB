@@ -56,7 +56,7 @@
 //! - Cycles are *very bad*, avoid at all cost. Can cause stackoverflow on
 //!   compilation, [`ConcRef`] are assumed to be non-cyclic.
 
-use super::{GenArena, Key, Plan, Table, With};
+use super::{GenArena, ImmKey, Key, Plan, Table, With};
 use proc_macro2::Ident;
 use quote::ToTokens;
 use std::{
@@ -121,6 +121,34 @@ pub struct Data {
 
 pub type ScalarType = ConcRef<ScalarTypeConc>;
 
+/// Used to label borrows that live as long as the database, or the window into the database.
+/// - Specified here as they could be contained within user specified types, that emdb does not analyse.
+pub const DB_LIFETIME_ID: &str = "db";
+
+/// Used to label borrows that live as long as the reference provided to a query
+/// - Specified here as they could be contained within user specified types, that emdb does not analyse.
+/// - Allows for values to be borrowed temporarily and accessed from outside a query, for the duration
+///   a database is not mutated
+pub const QUERY_LIFETIME_ID: &str = "qy";
+
+/// Used to label the additional info to consider for rust types
+#[derive(PartialEq, Eq, Clone)]
+pub enum TypeContext {
+    /// The type is used within a query context, so needs to have the lifetimes
+    /// of [`QUERY_LIFETIME_ID`] and [`DB_LIFETIME_ID`] present.
+    ///
+    /// The generated code needs to use type aliases like:
+    /// ```
+    /// # type SomeRustTypeTokens = i32
+    /// type TypeAlias<'db, 'qy> = SomeRustTypeTokens;
+    /// ```
+    Query,
+
+    /// The type is used in the data store, so does not have access to [`DB_LIFETIME_ID`]
+    /// and is not contained in any query, so not lifetimes can be wrapper
+    DataStore,
+}
+
 #[derive(PartialEq, Eq, Clone)]
 pub enum ScalarTypeConc {
     /// A reference to a row in a table, allows the user to interact wit row
@@ -139,6 +167,16 @@ pub enum ScalarTypeConc {
     /// - Can use different types of references depending table implementation
     ///   chosen (e.g. key with generation, pointer, etc)
     TableRef(Key<Table>),
+
+    /// A get value for a tabe member
+    /// - This is different from the rust type of a column because the backend
+    ///   provided may use the actions on the table to optimise (e.g. to return a
+    ///   reference rather than copy)
+    /// - Allows the plan's type system to be backend agnostic
+    TableGet {
+        table: Key<Table>,
+        field: RecordField,
+    },
 
     /// A collection of records in a container to be specified by the chosen
     /// backend. Allows the plan to express the type, without specifying its
@@ -175,10 +213,21 @@ pub enum ScalarTypeConc {
     Record(Key<RecordType>),
 
     /// A rust type propagated from the user
-    /// - Can be from the user's code (e.g. a library)
+    /// - Can be from the user's code (e.g. a library or user defined type)
     /// - Can be incorrect (need to propagate spans to backend for rustc to
     ///   report)
-    Rust(Type),
+    ///
+    /// For types in a query context, we can consider the lifetimes of borrows
+    /// (for query), or gets (lifetime for entire database)
+    /// - Types can include the [`DB_LIFETIME_ID`] lifetime to signify they are tied to the
+    ///   lifetime of the database (e.g. getting an immutable value), or the
+    ///   window used for database access.
+    /// - Types can use the [`QUERY_LIFETIME_ID`] lifetime to signify they are tied to the
+    ///   lifetime of the query.
+    ///
+    /// Note: The lifetimes are not applied outside of a query context, namely
+    ///       in the types used for table members
+    Rust { type_context: TypeContext, ty: Type },
 }
 
 /// Check two record types are equal.
@@ -221,7 +270,7 @@ pub fn scalar_type_eq(lp: &Plan, t1: &Key<ScalarType>, t2: &Key<ScalarType>) -> 
             ScalarTypeConc::Bag(r1) | ScalarTypeConc::Record(r1),
             ScalarTypeConc::Bag(r2) | ScalarTypeConc::Record(r2),
         ) => record_type_eq(lp, r1, r2),
-        (ScalarTypeConc::Rust(rt1), ScalarTypeConc::Rust(rt2)) => rt1 == rt2,
+        (ScalarTypeConc::Rust { ty: rt1, .. }, ScalarTypeConc::Rust { ty: rt2, .. }) => rt1 == rt2,
         _ => false,
     }
 }
@@ -292,6 +341,10 @@ impl Plan {
     pub fn get_record_type_conc(&self, k: Key<RecordType>) -> &RecordConc {
         self.get_record_type(k).get_conc(&self.record_types)
     }
+
+    pub fn get_record_conc_index(&self, k: Key<RecordType>) -> ImmKey<'_, RecordType> {
+        ImmKey::new(get_conc_index(&self.record_types, k), self)
+    }
 }
 
 impl Display for RecordField {
@@ -354,7 +407,15 @@ impl<'a, 'b> Display for With<'a, &'b Key<ScalarType>> {
                 extended: r,
             }
             .fmt(f),
-            ScalarTypeConc::Rust(rt) => rt.to_token_stream().fmt(f),
+            ScalarTypeConc::Rust { ty, .. } => ty.to_token_stream().fmt(f),
+            ScalarTypeConc::TableGet { table, field } => {
+                write!(
+                    f,
+                    "get {} from {}",
+                    field,
+                    self.plan.tables.get(*table).unwrap().name
+                )
+            }
         }
     }
 }

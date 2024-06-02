@@ -34,7 +34,8 @@ impl EMQLOperator for Use {
                 let ref_field = plan::RecordField::Internal(0);
                 let rec_field = plan::RecordField::Internal(1);
 
-                let table_fields_type = lp.record_types.insert(get_all_cols(lp, *table_id).into());
+                let cols = get_all_cols(lp, *table_id);
+                let table_fields_type = lp.record_types.insert(cols.into());
                 let table_fields_scalar_type = lp.scalar_types.insert(plan::ScalarTypeConc::Record(table_fields_type).into());
 
                 let scanref_cont = create_scanref(lp, op_ctx, *table_id, ref_field.clone(), call.span());

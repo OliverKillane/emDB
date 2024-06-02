@@ -72,7 +72,8 @@ macro_rules! create_backend {
 create_backend!(
     Backend as planviz::PlanViz,
     semcheck::SemCheck,
-    simple::Simple
+    simple::Simple,
+    simple2::SimpleSerialized
 );
 
 /// Wrapper for the targets to produce

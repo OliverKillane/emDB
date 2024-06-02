@@ -8,7 +8,7 @@ emql! {
         a: i32,
         b: String,
         c: (u32, i32),
-    } @ [unique(a), pred(c.0 > c.1) as c_predicate, pred(b.len() < 10) as b_length]
+    } @ [unique(a) as simple_un, pred(c.0 > c.1) as c_predicate, pred(b.len() < 10) as b_length]
 
     // cool comment here
     query insert(a_initial: i32) {
@@ -17,7 +17,7 @@ emql! {
             ~> return;
     }
 
-    table other {} @ [pred(1 + 1 == 2)]
+    table other {} @ [pred(1 + 1 == 2) as check2]
 
     query update_b(new_b: String) {
         ref simple as simple_ref

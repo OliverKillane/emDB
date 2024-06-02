@@ -24,6 +24,7 @@
 //! }
 //! ```
 
+/// TODO: make this work with the TableGet types
 pub mod asserts;
 pub mod contexts;
 pub mod names;

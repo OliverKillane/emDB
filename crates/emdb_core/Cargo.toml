@@ -28,3 +28,5 @@ combi = { path = "../combi" }
 enumtrait = { path = "../enumtrait" }
 dot = "0.1.4"
 itertools = "0.13.0"
+pulpit = { path = "../pulpit" }
+quote_debug = { path = "../quote_debug" }

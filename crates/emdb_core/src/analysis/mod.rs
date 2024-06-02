@@ -6,4 +6,3 @@ pub mod validity;
 pub mod access;
 pub mod cardinality;
 pub mod concurrency;
-pub mod mutability;

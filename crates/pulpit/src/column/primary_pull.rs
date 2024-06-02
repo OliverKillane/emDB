@@ -201,7 +201,7 @@ where
         Col::WindowKind::conv_get(get)
     }
 
-    fn scan(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
+    fn scan<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
         self.gen.scan()
     }
 

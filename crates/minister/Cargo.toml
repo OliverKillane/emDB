@@ -1,5 +1,5 @@
 [package]
-name = "volcano"
+name = "minister"
 version = "0.1.0"
 edition = "2021"
 
@@ -13,7 +13,5 @@ homepage.workspace = true
 license-file.workspace = true
 
 [dependencies]
-pulpit = { path = "../pulpit" }
-rayon = "1.10.0"
 
 [dev-dependencies]

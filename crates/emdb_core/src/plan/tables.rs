@@ -11,7 +11,7 @@ use syn::Expr;
 use super::{Key, Plan, RecordField, ScalarType};
 
 pub struct Constraint<C> {
-    pub alias: Option<Ident>,
+    pub alias: Ident,
     pub cons: C,
 }
 

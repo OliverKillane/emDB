@@ -7,17 +7,17 @@
 use emdb::macros::emql;
 
 emql! {
-    impl debug_code as SemCheck{debug_file = "emdb/tests/debug/code.rs"};
+    impl debug_code as SimpleSerialized{debug_file = "emdb/tests/code.rs"};
 
     // Use the vscode dots view to see preview update live on save
-    impl debug_graph as PlanViz{path = "emdb/tests/debug/graph.dot", display_types = on, display_ctx_ops = on, display_control = on};
+    // impl debug_graph as PlanViz{path = "emdb/tests/debug/graph.dot", display_types = on, display_ctx_ops = on, display_control = on};
 
     // write query to check here!
     table customers {
         forename: String,
         surname: String,
         age: u8,
-    } @ [ pred(age < 256) as sensible_ages ]
+    } @ [ pred(*age < 120) as sensible_ages ]
 
     query customer_age_brackets() {
         use customers
@@ -31,8 +31,14 @@ emql! {
             |> collect(brackets as type brackets)
             ~> return;
     }
+
+    query foo(k: ref customers) {
+        row(key: ref customers = k) ~> delete(key);
+    }
 }
 
 fn main() {
-    debug_code::customer_age_brackets();
+    let mut d = debug_code::Database::new();
+    let mut w = d.db();
+    let debug_code::RecordTypeAlias6 {brackets, ..} = w.customer_age_brackets();
 }

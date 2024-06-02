@@ -31,73 +31,62 @@ fn redefinition_error(
     .help(format!("Each {def_type} must have a unique name"))
 }
 
-pub(super) fn backend_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
+pub fn backend_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
     redefinition_error(0, "backend", def, original_def)
 }
 
-pub(super) fn table_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
+pub fn table_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
     redefinition_error(1, "table", def, original_def)
 }
 
-pub(super) fn table_column_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
+pub fn table_column_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
     redefinition_error(2, "table column", def, original_def)
 }
 
-pub(super) fn table_constraint_alias_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
+pub fn table_constraint_alias_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
     redefinition_error(3, "constraint alias", def, original_def)
 }
 
-pub(super) fn collect_type_alias_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
+pub fn collect_type_alias_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
     redefinition_error(4, "collect type alias", def, original_def)
 }
 
-pub(super) fn table_constraint_duplicate_unique(
+pub fn table_constraint_duplicate_unique(
     col_name: &Ident,
     method_span: Span,
-    prev_alias: &Option<Ident>,
+    prev_alias: &Ident,
 ) -> Diagnostic {
-    let mut diag = emql_error(
+    emql_error(
         5,
         method_span,
         format!("Duplicate unique constraint on column `{col_name}`"),
-    );
-    if let Some(alias) = prev_alias {
-        diag = diag.span_note(alias.span(), format!("previously defined as {alias} here."));
-    }
-    diag
+    )
+    .span_note(
+        prev_alias.span(),
+        format!("previously defined as {prev_alias} here."),
+    )
 }
 
-pub(super) fn table_constraint_nonexistent_unique_column(
-    alias: &Option<Ident>,
+pub fn table_constraint_nonexistent_unique_column(
+    alias: &Ident,
     col_name: &Ident,
     table_name: &Ident,
     method_span: Span,
 ) -> Diagnostic {
     emql_error(6, method_span, format!(
-        "Column `{col_name}` does not exist in table `{table_name}`, so cannot apply a unique constraint{} to it", if let Some(alias) = alias {
-            format!(" with alias `{alias}`")
-        } else {
-            String::new()
-        }
+        "Column `{col_name}` does not exist in table `{table_name}`, so cannot apply a unique constraint `{alias}` to it"
     )).span_help(table_name.span(), format!("Apply the unique constraint to an available column in {table_name}"))
 }
 
-pub(super) fn table_constraint_duplicate_limit(
-    alias: &Option<Ident>,
+pub fn table_constraint_duplicate_limit(
+    alias: &Ident,
     table_name: &Ident,
     method_span: Span,
 ) -> Diagnostic {
     emql_error(
         7,
         method_span,
-        format!(
-            "Duplicate limit constraint{} on table `{table_name}`",
-            if let Some(alias) = alias {
-                format!(" with alias `{alias}`")
-            } else {
-                String::new()
-            }
-        ),
+        format!("Duplicate limit constraint `{alias}` on table `{table_name}`"),
     )
     .span_help(
         table_name.span(),
@@ -105,11 +94,11 @@ pub(super) fn table_constraint_duplicate_limit(
     )
 }
 
-pub(super) fn query_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
+pub fn query_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
     redefinition_error(8, "query", def, original_def)
 }
 
-pub(super) fn query_multiple_returns(ret: Span, prev_ret: Span, query: &Ident) -> Diagnostic {
+pub fn query_multiple_returns(ret: Span, prev_ret: Span, query: &Ident) -> Diagnostic {
     emql_error(
         9,
         ret,
@@ -118,15 +107,11 @@ pub(super) fn query_multiple_returns(ret: Span, prev_ret: Span, query: &Ident) -
     .span_help(prev_ret, "Previously returned value here".to_string())
 }
 
-pub(super) fn query_operator_field_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
+pub fn query_operator_field_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
     redefinition_error(10, "field", def, original_def)
 }
 
-pub(super) fn query_stream_single_connection(
-    span: Span,
-    last_span: Span,
-    stream: bool,
-) -> Diagnostic {
+pub fn query_stream_single_connection(span: Span, last_span: Span, stream: bool) -> Diagnostic {
     emql_error(
         11,
         span,
@@ -150,11 +135,7 @@ pub(super) fn query_stream_single_connection(
     )
 }
 
-pub(super) fn query_no_data_for_next_operator(
-    conn_span: Span,
-    stream: bool,
-    prev_op: Span,
-) -> Diagnostic {
+pub fn query_no_data_for_next_operator(conn_span: Span, stream: bool, prev_op: Span) -> Diagnostic {
     emql_error(
         12,
         prev_op,
@@ -173,7 +154,7 @@ pub(super) fn query_no_data_for_next_operator(
     )
 }
 
-pub(super) fn query_early_return(conn_span: Span, stream: bool, ret_op: Span) -> Diagnostic {
+pub fn query_early_return(conn_span: Span, stream: bool, ret_op: Span) -> Diagnostic {
     emql_error(13, ret_op, "Early return statement".to_string()).span_note(
         conn_span,
         format!(
@@ -187,11 +168,11 @@ pub(super) fn query_early_return(conn_span: Span, stream: bool, ret_op: Span) ->
     )
 }
 
-pub(super) fn query_parameter_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
+pub fn query_parameter_redefined(def: &Ident, original_def: &Ident) -> Diagnostic {
     redefinition_error(14, "query parameter", def, original_def)
 }
 
-pub(super) fn query_param_ref_table_not_found(query: &Ident, table_ref: &Ident) -> Diagnostic {
+pub fn query_param_ref_table_not_found(query: &Ident, table_ref: &Ident) -> Diagnostic {
     emql_error(
         15,
         table_ref.span(),
@@ -202,7 +183,7 @@ pub(super) fn query_param_ref_table_not_found(query: &Ident, table_ref: &Ident) 
     ))
 }
 
-pub(super) fn access_field_missing(call: &Ident, field: &Ident, fields: Vec<&Ident>) -> Diagnostic {
+pub fn access_field_missing(call: &Ident, field: &Ident, fields: Vec<&Ident>) -> Diagnostic {
     emql_error(
         16,
         field.span(),
@@ -213,7 +194,7 @@ pub(super) fn access_field_missing(call: &Ident, field: &Ident, fields: Vec<&Ide
     )
 }
 
-pub(super) fn query_expected_reference_type_for_update(
+pub fn query_expected_reference_type_for_update(
     lp: &Plan,
     dt: &Key<ScalarType>,
     reference: &Ident,
@@ -231,7 +212,7 @@ pub(super) fn query_expected_reference_type_for_update(
     ))
 }
 
-pub(super) fn query_cannot_start_with_operator(op: &Ident) -> Diagnostic {
+pub fn query_cannot_start_with_operator(op: &Ident) -> Diagnostic {
     emql_error(
         18,
         op.span(),
@@ -240,7 +221,7 @@ pub(super) fn query_cannot_start_with_operator(op: &Ident) -> Diagnostic {
     .help("Instead use operators such as `use ..`, `ref ..`, or `unique(..)`".to_string())
 }
 
-pub(super) fn query_update_field_not_in_table(table_name: &Ident, field: &Ident) -> Diagnostic {
+pub fn query_update_field_not_in_table(table_name: &Ident, field: &Ident) -> Diagnostic {
     emql_error(
         19,
         field.span(),
@@ -252,7 +233,7 @@ pub(super) fn query_update_field_not_in_table(table_name: &Ident, field: &Ident)
     )
 }
 
-pub(super) fn query_update_reference_not_present(
+pub fn query_update_reference_not_present(
     lp: &Plan,
     reference: &Ident,
     prev_span: Span,
@@ -275,7 +256,7 @@ pub(super) fn query_update_reference_not_present(
     )
 }
 
-pub(super) fn query_insert_field_rust_type_mismatch(
+pub fn query_insert_field_rust_type_mismatch(
     lp: &Plan,
     call: &Ident,
     field: &Ident,
@@ -289,7 +270,7 @@ pub(super) fn query_insert_field_rust_type_mismatch(
     .span_note(prev_span, format!("Input to `{call}` comes from here"))
 }
 
-pub(super) fn query_insert_field_type_mismatch(
+pub fn query_insert_field_type_mismatch(
     lp: &Plan,
     call: &Ident,
     field: &Ident,
@@ -313,7 +294,7 @@ pub(super) fn query_insert_field_type_mismatch(
     .span_note(prev_span, format!("Input to `{call}` comes from here"))
 }
 
-pub(super) fn query_insert_field_missing(
+pub fn query_insert_field_missing(
     call: &Ident,
     table_name: &Ident,
     field: &Ident,
@@ -331,11 +312,7 @@ pub(super) fn query_insert_field_missing(
     )
 }
 
-pub(super) fn query_insert_extra_field(
-    call: &Ident,
-    field: &Ident,
-    table_name: &Ident,
-) -> Diagnostic {
+pub fn query_insert_extra_field(call: &Ident, field: &Ident, table_name: &Ident) -> Diagnostic {
     emql_error(
         24,
         call.span(),
@@ -345,7 +322,7 @@ pub(super) fn query_insert_extra_field(
     .span_note(table_name.span(), format!("`{table_name}` defined here"))
 }
 
-pub(super) fn query_nonexistent_table(call: &Ident, table_used: &Ident) -> Diagnostic {
+pub fn query_nonexistent_table(call: &Ident, table_used: &Ident) -> Diagnostic {
     emql_error(25, table_used.span(), format!(
         "Table `{table_used}` does not exist in the query so cannot be accessed through `{call}`",
     )).help(format!(
@@ -353,7 +330,7 @@ pub(super) fn query_nonexistent_table(call: &Ident, table_used: &Ident) -> Diagn
     ))
 }
 
-pub(super) fn query_delete_field_not_present(call: &Ident, field: &Ident) -> Diagnostic {
+pub fn query_delete_field_not_present(call: &Ident, field: &Ident) -> Diagnostic {
     emql_error(
         26,
         field.span(),
@@ -365,7 +342,7 @@ pub(super) fn query_delete_field_not_present(call: &Ident, field: &Ident) -> Dia
     )
 }
 
-pub(super) fn query_delete_field_not_reference(
+pub fn query_delete_field_not_reference(
     lp: &Plan,
     call: &Ident,
     field: &Ident,
@@ -385,7 +362,7 @@ pub(super) fn query_delete_field_not_reference(
     .span_help(call.span(), format!("`{field}` "))
 }
 
-pub(super) fn query_deref_field_already_exists(new: &Ident, existing: &Ident) -> Diagnostic {
+pub fn query_deref_field_already_exists(new: &Ident, existing: &Ident) -> Diagnostic {
     emql_error(28, new.span(), format!("Field `{new}` already exists"))
         .span_note(existing.span(), format!("{existing} defined here"))
         .help(format!(
@@ -393,7 +370,7 @@ pub(super) fn query_deref_field_already_exists(new: &Ident, existing: &Ident) ->
         ))
 }
 
-pub(super) fn query_reference_field_missing(reference: &Ident) -> Diagnostic {
+pub fn query_reference_field_missing(reference: &Ident) -> Diagnostic {
     emql_error(
         29,
         reference.span(),
@@ -405,7 +382,7 @@ pub(super) fn query_reference_field_missing(reference: &Ident) -> Diagnostic {
     )
 }
 
-pub(super) fn query_deref_cannot_deref_rust_type(reference: &Ident, t: &Type) -> Diagnostic {
+pub fn query_deref_cannot_deref_rust_type(reference: &Ident, t: &Type) -> Diagnostic {
     emql_error(
         30,
         reference.span(),
@@ -413,7 +390,7 @@ pub(super) fn query_deref_cannot_deref_rust_type(reference: &Ident, t: &Type) ->
     )
 }
 
-pub(super) fn query_deref_cannot_deref_record(
+pub fn query_deref_cannot_deref_record(
     lp: &Plan,
     reference: &Ident,
     t: &Key<RecordType>,
@@ -431,7 +408,7 @@ pub(super) fn query_deref_cannot_deref_record(
     )
 }
 
-pub(super) fn query_operator_cannot_come_first(call: &Ident) -> Diagnostic {
+pub fn query_operator_cannot_come_first(call: &Ident) -> Diagnostic {
     emql_error(
         32,
         call.span(),
@@ -439,7 +416,7 @@ pub(super) fn query_operator_cannot_come_first(call: &Ident) -> Diagnostic {
     )
 }
 
-pub(super) fn query_unique_table_not_found(table: &Ident) -> Diagnostic {
+pub fn query_unique_table_not_found(table: &Ident) -> Diagnostic {
     emql_error(
         33,
         table.span(),
@@ -450,7 +427,7 @@ pub(super) fn query_unique_table_not_found(table: &Ident) -> Diagnostic {
     ))
 }
 
-pub(super) fn query_unique_no_field_in_table(field: &Ident, table_name: &Ident) -> Diagnostic {
+pub fn query_unique_no_field_in_table(field: &Ident, table_name: &Ident) -> Diagnostic {
     emql_error(
         34,
         field.span(),
@@ -462,7 +439,7 @@ pub(super) fn query_unique_no_field_in_table(field: &Ident, table_name: &Ident) 
     )
 }
 
-pub(super) fn query_unique_field_is_not_unique(field: &Ident, table_name: &Ident) -> Diagnostic {
+pub fn query_unique_field_is_not_unique(field: &Ident, table_name: &Ident) -> Diagnostic {
     emql_error(35, field.span(), format!("Field `{field}` is not unique in table `{table_name}`"))
     .span_help(
         table_name.span(),
@@ -472,11 +449,7 @@ pub(super) fn query_unique_field_is_not_unique(field: &Ident, table_name: &Ident
     )
 }
 
-pub(super) fn query_use_variable_already_used(
-    usage: &Ident,
-    created: Span,
-    used: Span,
-) -> Diagnostic {
+pub fn query_use_variable_already_used(usage: &Ident, created: Span, used: Span) -> Diagnostic {
     emql_error(
         36,
         usage.span(),
@@ -486,7 +459,7 @@ pub(super) fn query_use_variable_already_used(
     .span_error(used, "And consumed here".to_string())
 }
 
-pub(super) fn query_invalid_use(
+pub fn query_invalid_use(
     usage: &Ident,
     tn: &HashMap<Ident, Key<Table>>,
     vs: &HashMap<Ident, VarState>,
@@ -509,10 +482,7 @@ pub(super) fn query_invalid_use(
     ))
 }
 
-pub(super) fn query_invalid_variable_use(
-    usage: &Ident,
-    vs: &HashMap<Ident, VarState>,
-) -> Diagnostic {
+pub fn query_invalid_variable_use(usage: &Ident, vs: &HashMap<Ident, VarState>) -> Diagnostic {
     let vars = vs
         .iter()
         .filter_map(|(var, state)| {
@@ -531,7 +501,7 @@ pub(super) fn query_invalid_variable_use(
     .help(format!("Currently available variables are {vars}"))
 }
 
-pub(super) fn query_let_variable_already_assigned(
+pub fn query_let_variable_already_assigned(
     assign: &Ident,
     created: Span,
     used: Option<Span>,
@@ -549,7 +519,7 @@ pub(super) fn query_let_variable_already_assigned(
     }
 }
 
-pub(super) fn query_deref_cannot_deref_bag_type(
+pub fn query_deref_cannot_deref_bag_type(
     lp: &Plan,
     reference: &Ident,
     t: &Key<RecordType>,
@@ -566,7 +536,7 @@ pub(super) fn query_deref_cannot_deref_bag_type(
         ),
     )
 }
-pub(super) fn query_cannot_return_stream(last: Span, ret: Span) -> Diagnostic {
+pub fn query_cannot_return_stream(last: Span, ret: Span) -> Diagnostic {
     emql_error(41, ret, "Cannot return a stream from a query".to_string())
         .span_note(
             last,
@@ -575,7 +545,7 @@ pub(super) fn query_cannot_return_stream(last: Span, ret: Span) -> Diagnostic {
         .help("Use a `collect` operator to convert the stream into a bag of records".to_string())
 }
 
-pub(super) fn query_table_access_nonexisted_columns(table_name: &Ident, col: &Ident) -> Diagnostic {
+pub fn query_table_access_nonexisted_columns(table_name: &Ident, col: &Ident) -> Diagnostic {
     emql_error(
         42,
         col.span(),
@@ -584,7 +554,7 @@ pub(super) fn query_table_access_nonexisted_columns(table_name: &Ident, col: &Id
     .span_note(table_name.span(), format!("{table_name} defined here"))
 }
 
-pub(super) fn query_invalid_record_type(
+pub fn query_invalid_record_type(
     lp: &Plan,
     op: &Ident,
     prev: Span,
@@ -608,16 +578,16 @@ pub(super) fn query_invalid_record_type(
     )
 }
 
-pub(super) fn query_no_cust_type_found(t: &Ident) -> Diagnostic {
+pub fn query_no_cust_type_found(t: &Ident) -> Diagnostic {
     emql_error(44, t.span(), format!("Cannot find type {t}"))
 }
 
-pub(super) fn table_query_no_such_field(table: &Ident, t: &Ident) -> Diagnostic {
+pub fn table_query_no_such_field(table: &Ident, t: &Ident) -> Diagnostic {
     emql_error(45, t.span(), format!("no such field `{t}` in `{table}`"))
         .span_note(table.span(), format!("`{table}` defined here"))
 }
 
-pub(super) fn query_cannot_append_to_record(new: &Ident, existing: &Ident) -> Diagnostic {
+pub fn query_cannot_append_to_record(new: &Ident, existing: &Ident) -> Diagnostic {
     emql_error(
         46,
         new.span(),
@@ -626,12 +596,12 @@ pub(super) fn query_cannot_append_to_record(new: &Ident, existing: &Ident) -> Di
     .span_note(existing.span(), format!("{existing} defined here"))
 }
 
-pub(super) fn sort_field_used_twice(field: &Ident, dup_field: &Ident) -> Diagnostic {
+pub fn sort_field_used_twice(field: &Ident, dup_field: &Ident) -> Diagnostic {
     emql_error(47, field.span(), format!("Field `{field}` is used twice in th sort order, sorts can only sort of each field once"))
     .span_note(dup_field.span(), format!("`{dup_field}` first used here"))
 }
 
-pub(super) fn union_requires_at_least_one_input(call: &Ident) -> Diagnostic {
+pub fn union_requires_at_least_one_input(call: &Ident) -> Diagnostic {
     emql_error(
         48,
         call.span(),
@@ -639,7 +609,7 @@ pub(super) fn union_requires_at_least_one_input(call: &Ident) -> Diagnostic {
     )
 }
 
-pub(super) fn operator_requires_streams(call: &Ident, var: &Ident) -> Diagnostic {
+pub fn operator_requires_streams(call: &Ident, var: &Ident) -> Diagnostic {
     emql_error(
         49,
         var.span(),
@@ -647,11 +617,11 @@ pub(super) fn operator_requires_streams(call: &Ident, var: &Ident) -> Diagnostic
     )
 }
 
-pub(super) fn operator_requires_streams2(call: &Ident) -> Diagnostic {
+pub fn operator_requires_streams2(call: &Ident) -> Diagnostic {
     emql_error(50, call.span(), format!("`{call}` input must be a stream"))
 }
 
-pub(super) fn no_return_in_context(call: &Ident) -> Diagnostic {
+pub fn no_return_in_context(call: &Ident) -> Diagnostic {
     emql_error(
         51,
         call.span(),
@@ -659,7 +629,7 @@ pub(super) fn no_return_in_context(call: &Ident) -> Diagnostic {
     )
 }
 
-pub(super) fn union_not_same_type(
+pub fn union_not_same_type(
     lp: &plan::Plan,
     call: &Ident,
     var: &Ident,
@@ -668,4 +638,15 @@ pub(super) fn union_not_same_type(
     other_data_type: &plan::Key<plan::RecordType>,
 ) -> Diagnostic {
     emql_error(52, other_var.span(), format!("`{other_var}` has type `{}` but union requires all inputs to be of the same type `{}` (from `{var}`)", plan::With { plan: lp, extended: other_data_type }, plan::With { plan: lp, extended: data_type }))
+}
+
+pub fn query_deref_cannot_deref_table_get(
+    lp: &plan::Plan,
+    reference: &Ident,
+    table: plan::Key<plan::Table>,
+    field: &plan::RecordField,
+) -> Diagnostic {
+    let name = &lp.get_table(table).name;
+    emql_error(53, reference.span(), format!("Cannot dereference a field directly taken from a table (this is `{name}.{field}`). Try mapping this into a table reference"))
+    .note(format!("But what if `{name}.{field}` *is* a table reference? When dereferencing values from a table, the returned value is not the same type as the column, it can be optimised (for example it could be optimised into returning an Rc, a Cow, or a reference to the data). Rather than automatically copying out the value in these cases, it it left to the user to decide how they want to extract this."))
 }

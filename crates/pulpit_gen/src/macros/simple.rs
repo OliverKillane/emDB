@@ -186,6 +186,7 @@ fn analyse(
         uniques,
         predicates,
         updates,
+        public: false,
     })
 }
 

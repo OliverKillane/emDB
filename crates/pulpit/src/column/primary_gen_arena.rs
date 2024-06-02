@@ -74,7 +74,7 @@ where
         get
     }
 
-    fn scan(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
+    fn scan<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
         self.inner.arena.iter().map(|(key, _)| key)
     }
 

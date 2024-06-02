@@ -6,7 +6,7 @@ use quote::ToTokens;
 #[proc_macro]
 pub fn simple(tokens: TokenStream) -> TokenStream {
     match pulpit_gen::macros::simple::simple(tokens.into()) {
-        Ok(ts) => pulpit_gen::selector::select_basic(ts, &pulpit_gen::namer::CodeNamer::new())
+        Ok(ts) => pulpit_gen::selector::select_basic(ts).generate(&pulpit_gen::namer::CodeNamer::pulpit())
             .into_token_stream()
             .into(),
         Err(es) => {

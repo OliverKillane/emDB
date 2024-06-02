@@ -16,7 +16,7 @@ use crate::{
         },
         errors,
     },
-    plan,
+    plan::{self, ConcRef, ScalarTypeConc},
 };
 use proc_macro2::{Ident, Span};
 use proc_macro_error::Diagnostic;
@@ -134,9 +134,12 @@ fn add_table(
                 duplicate.get_field(),
             ));
         } else {
-            let type_index = lp
-                .scalar_types
-                .insert(plan::ConcRef::Conc(plan::ScalarTypeConc::Rust(col_type)));
+            let type_index =
+                lp.scalar_types
+                    .insert(plan::ConcRef::Conc(plan::ScalarTypeConc::Rust {
+                        type_context: plan::TypeContext::DataStore,
+                        ty: col_type,
+                    }));
             columns.insert(
                 col_rf,
                 plan::Column {
@@ -160,13 +163,12 @@ fn add_table(
         expr,
     } in cons
     {
-        if let Some(alias) = &alias {
-            if let Some(duplicate) = constraint_names.get(alias) {
-                errs.push_back(errors::table_constraint_alias_redefined(alias, duplicate));
-            } else {
-                constraint_names.insert(alias.clone());
-            }
+        if let Some(duplicate) = constraint_names.get(&alias) {
+            errs.push_back(errors::table_constraint_alias_redefined(&alias, duplicate));
+        } else {
+            constraint_names.insert(alias.clone());
         }
+
         match expr {
             ConstraintExpr::Unique { field } => {
                 let rf_field = field.clone().into();
@@ -247,21 +249,22 @@ fn add_query(
 
     // Analyse the query parameters
     let (raw_params, mut errors) = extract_fields(params, errors::query_parameter_redefined);
-    let params = raw_params.into_iter().filter_map(|(name, data_type)| {
-        match ast_typeto_scalar(
-            tn,
-            &mut ts,
-            data_type,
-            |e| errors::query_param_ref_table_not_found(&name, e),
-            errors::query_no_cust_type_found,
-        ) {
-            Ok(t) => Some((name, lp.scalar_types.insert(t))),
-            Err(e) => {
-                errors.push_back(e);
-                None
+    let params =
+        raw_params.into_iter().filter_map(|(name, data_type)| {
+            match query_ast_typeto_scalar(
+                tn,
+                &mut ts,
+                data_type,
+                |e| errors::query_param_ref_table_not_found(&name, e),
+                errors::query_no_cust_type_found,
+            ) {
+                Ok(t) => Some((name, lp.scalar_types.insert(t))),
+                Err(e) => {
+                    errors.push_back(e);
+                    None
+                }
             }
-        }
-    });
+        });
 
     // Create and populate the query context
     let op_ctx = lp
@@ -474,7 +477,8 @@ pub fn extract_fields<T>(
     (map_fields, errors)
 }
 
-pub fn ast_typeto_scalar(
+/// Converts an AST type to a scalar type, if a rust type then the [`plan::TypeContext::Query`] context is used.
+pub fn query_ast_typeto_scalar(
     tn: &HashMap<Ident, plan::Key<plan::Table>>,
     ts: &mut HashMap<Ident, plan::Key<plan::ScalarType>>,
     t: AstType,
@@ -482,7 +486,10 @@ pub fn ast_typeto_scalar(
     cust_err_fn: impl Fn(&Ident) -> Diagnostic,
 ) -> Result<plan::ScalarType, Diagnostic> {
     match t {
-        AstType::RsType(t) => Ok(plan::ConcRef::Conc(plan::ScalarTypeConc::Rust(t))),
+        AstType::RsType(ty) => Ok(plan::ConcRef::Conc(plan::ScalarTypeConc::Rust {
+            type_context: plan::TypeContext::Query,
+            ty,
+        })),
         AstType::TableRef(table_ref) => {
             if let Some(table_id) = tn.get(&table_ref) {
                 Ok(plan::ConcRef::Conc(plan::ScalarTypeConc::TableRef(
@@ -580,7 +587,28 @@ pub fn create_scanref(
     }
 }
 
-pub fn get_all_cols(lp: &plan::Plan, table_id: plan::Key<plan::Table>) -> plan::RecordConc {
+pub fn get_all_cols(lp: &mut plan::Plan, table_id: plan::Key<plan::Table>) -> plan::RecordConc {
+    // NOTE: cannot use lp.get_table as borrow checker does not know that does
+    //       not borrow from lp.scalar_types which is mutated later
+    let table = lp.tables.get(table_id).unwrap();
+    plan::RecordConc {
+        fields: table
+            .columns
+            .iter()
+            .map(|(id, plan::Column { cons, data_type })| {
+                (id.clone(), {
+                    let access = ConcRef::Conc(ScalarTypeConc::TableGet {
+                        table: table_id,
+                        field: id.clone(),
+                    });
+                    lp.scalar_types.insert(access)
+                })
+            })
+            .collect(),
+    }
+}
+
+pub fn insert_all_cols(lp: &plan::Plan, table_id: plan::Key<plan::Table>) -> plan::RecordConc {
     let table = lp.get_table(table_id);
     plan::RecordConc {
         fields: table
@@ -620,7 +648,8 @@ pub mod generate_access {
         new_field: Ident,
         include_from: plan::Key<plan::RecordType>,
     ) -> Result<plan::Key<plan::RecordType>, LinkedList<Diagnostic>> {
-        let inner_record = lp.record_types.insert(get_all_cols(lp, table_id).into());
+        let cols = get_all_cols(lp, table_id);
+        let inner_record = lp.record_types.insert(cols.into());
         let scalar_t = lp
             .scalar_types
             .insert(plan::ConcRef::Conc(plan::ScalarTypeConc::Record(
@@ -633,7 +662,7 @@ pub mod generate_access {
         table_id: plan::Key<plan::Table>,
         lp: &mut plan::Plan,
     ) -> plan::Key<plan::RecordType> {
-        lp.record_types.insert(get_all_cols(lp, table_id).into())
+        lp.record_types.insert(insert_all_cols(lp, table_id).into())
     }
 
     pub fn unique(

@@ -4,11 +4,11 @@
 extern crate proc_macro;
 
 mod analysis;
+mod backend;
+mod frontend;
 mod optimise;
 mod plan;
 mod utils;
-mod frontend;
-mod backend;
 
 mod macros {
     use proc_macro2::TokenStream;
@@ -28,21 +28,21 @@ mod macros {
                 let impls = bks
                     .impls
                     .into_iter()
-                    .filter_map(
-                        |(id, backend)| match crate::backend::generate_code(backend, id, &lp) {
+                    .filter_map(|(id, backend)| {
+                        match crate::backend::generate_code(backend, id, &lp) {
                             Ok(code) => Some(code),
                             Err(mut e) => {
                                 errors.append(&mut e);
                                 None
                             }
-                        },
-                    )
+                        }
+                    })
                     .collect::<Vec<_>>();
-    
+
                 for e in errors {
                     e.emit();
                 }
-    
+
                 quote! {
                     #(#impls)*
                 }

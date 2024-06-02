@@ -138,7 +138,8 @@ impl StyleableNode for plan::ScalarType {
                 plan::ScalarTypeConc::TableRef(r) => "ref".to_owned(),
                 plan::ScalarTypeConc::Bag(_) => "bag".to_owned(),
                 plan::ScalarTypeConc::Record(_) => "rec".to_owned(),
-                plan::ScalarTypeConc::Rust(t) => format!("{}", t.to_token_stream()),
+                plan::ScalarTypeConc::Rust{ type_context: query_context, ty } => format!("{}", ty.to_token_stream()),
+                plan::ScalarTypeConc::TableGet { table, field } => format!("get {}.{field}", &plan.get_table(*table).name),
             }),
             plan::ConcRef::Ref(_) => dot::LabelText::label(""),
         }

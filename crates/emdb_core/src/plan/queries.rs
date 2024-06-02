@@ -1,4 +1,4 @@
-use super::{Key, Operator, Plan, ScalarType};
+use super::{Key, Operator, Plan, RecordType, ScalarType};
 use proc_macro2::Ident;
 
 pub struct Query {
@@ -44,6 +44,13 @@ impl Context {
 
     pub fn add_discard(&mut self, operator: Key<Operator>) {
         self.discards.push(operator);
+    }
+
+    pub fn get_return_type(&self, lp: &Plan) -> Option<Key<RecordType>> {
+        self.returnflow.map(|ret| lp.get_dataflow(lp.get_operator(ret).get_return().input)
+                    .get_conn()
+                    .with
+                    .fields)
     }
 }
 
