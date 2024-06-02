@@ -74,14 +74,15 @@ impl EMQLOperator for DeRef {
                             plan::ScalarTypeConc::TableRef(table_id) => {
                                 let table_id_copy = *table_id;
                                 let table_name = lp.get_table(*table_id).name.clone();
-                                let dt = generate_access::dereference(*table_id, lp, named, data_type.fields)?;                                
+                                let generate_access::DereferenceTypes{outer_record: dt, inner_record} = generate_access::dereference(*table_id, lp, named, data_type.fields)?;                                
                                 let new_type = plan::Data { fields: dt, stream: data_type.stream };
     
                                 Ok(
                                     LinearBuilderState {
                                         data_out: new_type, 
                                         op: plan::DeRef { 
-                                            input: prev_edge, reference: rec_reference, named: rec_named, table: table_id_copy, output: next_edge }.into(), 
+                                            input: prev_edge, reference: rec_reference, named: rec_named, table: table_id_copy, output: next_edge,
+                                            named_type: inner_record, }.into(), 
                                         call_span: call.span()
                                     }
                                 )

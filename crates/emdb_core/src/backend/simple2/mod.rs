@@ -89,7 +89,8 @@ impl EMDBBackend for SimpleSerialized {
 
         let tks = quote! {
             mod #impl_name {
-                mod #mod_tables {
+                use emdb::dependencies::minister::Physical; //TODO: remove and use better operator selection
+                pub mod #mod_tables {
                     #(#table_defs)*
                 }
                 #query_mod

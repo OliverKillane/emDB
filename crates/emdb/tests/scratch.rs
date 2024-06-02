@@ -6,39 +6,42 @@
 #![allow(unreachable_code)]
 use emdb::macros::emql;
 
-emql! {
-    impl debug_code as SimpleSerialized{debug_file = "emdb/tests/code.rs"};
+// emql! {
+//     impl debug_code as SimpleSerialized{debug_file = "emdb/tests/code.rs"};
 
-    // Use the vscode dots view to see preview update live on save
-    // impl debug_graph as PlanViz{path = "emdb/tests/debug/graph.dot", display_types = on, display_ctx_ops = on, display_control = on};
+//     // Use the vscode dots view to see preview update live on save
+//     // impl debug_graph as PlanViz{path = "emdb/tests/debug/graph.dot", display_types = on, display_ctx_ops = on, display_control = on};
 
-    // write query to check here!
-    table customers {
-        forename: String,
-        surname: String,
-        age: u8,
-    } @ [ pred(*age < 120) as sensible_ages ]
+//     // write query to check here!
+//     table customers {
+//         forename: String,
+//         surname: String,
+//         age: u8,
+//         id: usize,
+//     } @ [ pred(*age < 120) as sensible_ages, unique(id) as unique_id ]
 
-    query customer_age_brackets() {
-        use customers
-            |> groupby(age for let people in {
-                use people
-                    |> collect(people as type age_group)
-                    ~> map(age_bracket: u8 = age, group: type age_group = people)
-                    ~> return;
-            })
-            |> filter(age_bracket > 16)
-            |> collect(brackets as type brackets)
-            ~> return;
-    }
+//     query get_unique_customer(name: &'qy str, id: usize) {
+//         row(name: &'qy str = name, ident: usize = id) ~> unique(ident for customers.id as ref cust_ref);
+//     }
 
-    query foo(k: ref customers) {
-        row(key: ref customers = k) ~> delete(key);
-    }
-}
+//     query drop_all() {
+//         ref customers as cust |> delete(cust); 
+//     }
 
-fn main() {
-    let mut d = debug_code::Database::new();
-    let mut w = d.db();
-    let debug_code::RecordTypeAlias6 {brackets, ..} = w.customer_age_brackets();
-}
+//     query update_name() {
+//         ref customers as cust_key
+//             |> deref(cust_key as cust_data)
+//             |> update(cust_key use age = cust_data.age + 1);
+//     }
+
+//     query insert_name(fname: String, id: usize, age: u8) {
+//         row(
+//             forename: String = fname,
+//             surname: String = String::from("Smith"),
+//             age: u8 = age,
+//             id: usize = id
+//         )
+//             ~> insert(customers as ref cust_ref)
+//             ;
+//     }
+// }

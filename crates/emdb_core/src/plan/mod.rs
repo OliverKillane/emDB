@@ -23,6 +23,7 @@ pub use types::*;
 /// The basic logical plan
 /// - All components can be accessed via [Key]
 /// - Can be agumented with other data that uses [Key] to reference components
+#[allow(clippy::manual_non_exhaustive)]
 pub struct Plan {
     pub queries: GenArena<Query>,
     pub contexts: GenArena<Context>,

@@ -127,14 +127,21 @@ pub fn generate_scalar_type<'imm>(
             namer.record_name_lifetimes(*lp.get_record_conc_index(*r))
         }
         plan::ScalarTypeConc::Rust {
-            type_context: plan::TypeContext::Query,
+            type_context: _, // can be used on either datastore or query types, wraps in the lifetimes required for query
             ty,
         } => ty.to_token_stream().into(),
-        plan::ScalarTypeConc::Rust {
-            type_context: plan::TypeContext::DataStore,
-            ty: _,
-        } => unreachable!("function only used for query types"),
     }
+}
+
+/// Gets the name of a record type to allow for its construction
+/// - Does not include lifetime parameters, just the struct name.
+pub fn generate_record_name(
+    lp: &plan::Plan,
+    key: plan::Key<plan::RecordType>,
+    namer: &SimpleNamer,
+) -> Tokens<Type> {
+    let index = lp.get_record_conc_index(key);
+    namer.record_name(*index)
 }
 
 /// Generates the definitions for record types

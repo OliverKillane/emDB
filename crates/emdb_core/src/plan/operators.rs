@@ -130,9 +130,14 @@ pub struct Delete {
 pub struct UniqueRef {
     pub input: Key<DataFlow>,
 
+    /// the dataflow field to get the unique value from
     pub from: RecordField,
+
+    /// the table that is being referenced, and the column in that table
     pub table: Key<Table>,
     pub field: RecordField,
+    
+    /// the new field to add to the record
     pub out: RecordField,
 
     pub output: Key<DataFlow>,
@@ -155,8 +160,14 @@ pub struct ScanRefs {
 /// - `INV`: the 'named' not present in the input record
 pub struct DeRef {
     pub input: Key<DataFlow>,
+
+    /// The field input with the key
     pub reference: RecordField,
+
+    /// The field to put the data in
     pub named: RecordField,
+    pub named_type: Key<RecordType>,
+
     pub table: Key<Table>,
     pub output: Key<DataFlow>,
 }

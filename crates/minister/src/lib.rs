@@ -17,10 +17,28 @@ pub trait Physical {
     fn export_stream<Data>(stream: Self::Stream<Data>) -> impl Iterator<Item = Data>;
     fn export_single<Data>(single: Self::Single<Data>) -> Data;
 
+    fn error_stream<Data, Error>(
+        stream: Self::Stream<Result<Data, Error>>,
+    ) -> Result<Self::Stream<Data>, Error>;
+
+    fn error_single<Data, Error>(
+        stream: Self::Single<Result<Data, Error>>,
+    ) -> Result<Self::Single<Data>, Error>;
+
     fn map<InData, OutData>(
         stream: Self::Stream<InData>,
         mapping: impl Fn(InData) -> OutData,
     ) -> Self::Stream<OutData>;
+
+    fn map_seq<InData, OutData>(
+        stream: Self::Stream<InData>,
+        mapping: impl FnMut(InData) -> OutData,
+    ) -> Self::Stream<OutData>;
+
+    fn map_single<InData, OutData>(
+        single: Self::Single<InData>,
+        mapping: impl FnOnce(InData) -> OutData,
+    ) -> Self::Single<OutData>;
 
     fn filter<Data>(
         stream: Self::Stream<Data>,
@@ -89,4 +107,3 @@ pub trait Physical {
         stream: Self::Stream<(LeftData, RightData)>,
     ) -> (Self::Stream<LeftData>, Self::Stream<RightData>);
 }
-

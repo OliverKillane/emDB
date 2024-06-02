@@ -459,6 +459,7 @@ fn recur_stream(
     }
 }
 
+// TODO: be deterministic! By insert order?
 /// helper for extracting a map of unique fields by Ident
 pub fn extract_fields<T>(
     fields: Vec<(Ident, T)>,
@@ -642,12 +643,17 @@ pub mod generate_access {
         )
     }
 
+    pub struct DereferenceTypes {
+        pub outer_record: plan::Key<plan::RecordType>,
+        pub inner_record: plan::Key<plan::RecordType>,
+    }
+
     pub fn dereference(
         table_id: plan::Key<plan::Table>,
         lp: &mut plan::Plan,
         new_field: Ident,
         include_from: plan::Key<plan::RecordType>,
-    ) -> Result<plan::Key<plan::RecordType>, LinkedList<Diagnostic>> {
+    ) -> Result<DereferenceTypes, LinkedList<Diagnostic>> {
         let cols = get_all_cols(lp, table_id);
         let inner_record = lp.record_types.insert(cols.into());
         let scalar_t = lp
@@ -655,7 +661,11 @@ pub mod generate_access {
             .insert(plan::ConcRef::Conc(plan::ScalarTypeConc::Record(
                 inner_record,
             )));
-        append_fields(lp, vec![(new_field, scalar_t)], include_from)
+        let outer_record = append_fields(lp, vec![(new_field, scalar_t)], include_from)?;
+        Ok(DereferenceTypes {
+            outer_record,
+            inner_record,
+        })
     }
 
     pub fn insert(

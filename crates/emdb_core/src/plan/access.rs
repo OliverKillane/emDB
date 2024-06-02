@@ -69,7 +69,7 @@ impl<'imm, T> std::ops::Deref for Idx<'imm, T> {
 
 /// A key with a lifetime binding to prevent mutation of the referenced plan.
 /// - Implements hash (unlike [`typed_generational_arena::Index`] (the generation count is not hashable))
-/// TODO: contribute to [`typed_generational_arena::Index`] to fix this.
+///   TODO: contribute to [`typed_generational_arena::Index`] to fix this.
 pub struct ImmKey<'imm, T> {
     key: Key<T>,
     plan_holder: &'imm (),

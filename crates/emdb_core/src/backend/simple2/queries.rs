@@ -5,20 +5,29 @@ use quote::quote;
 use quote_debug::Tokens;
 use syn::{ExprBlock, Ident, ImplItemFn, ItemEnum, ItemImpl, ItemMod, Path};
 
-use crate::plan;
+use crate::{plan, utils::misc::{PushMap, PushSet}};
 
 use super::{
     closures::{generate_application, generate_context, unwrap_context}, namer::SimpleNamer, tables::GeneratedInfo, types::generate_scalar_type
 };
 
-fn generate_errors(errors: HashMap<Ident, Tokens<Path>>, SimpleNamer{ mod_queries_mod_query_enum_error, .. }: &SimpleNamer) -> Option<Tokens<ItemEnum>> {
+
+
+
+
+fn generate_errors(errors: HashMap<Ident, Option<Tokens<Path>>>, SimpleNamer{ mod_queries_mod_query_enum_error, .. }: &SimpleNamer) -> Option<Tokens<ItemEnum>> {
     if errors.is_empty() {
         None
     } else {
-        let variants = errors.iter().map(|(name, path)| {
-            quote!(#name(#path))
+        let variants = errors.iter().map(|(name, inner)| {
+            if let Some(path) = inner {
+                quote!(#name(#path))
+            } else {
+                quote!(#name)
+            }
         });
         Some(quote! {
+            #[derive(Debug)]
             pub enum #mod_queries_mod_query_enum_error {
                 #(#variants),*
             }
@@ -77,6 +86,7 @@ fn generate_query<'imm>(
         ..
     } = namer;
 
+    
     let context = lp.get_context(*ctx);
     let return_type = if let Some(ret) = context.get_return_type(lp) {
         let ty = namer.record_name(ret);
@@ -96,11 +106,12 @@ fn generate_query<'imm>(
     let mut mutated_tables = HashSet::new();
     let mut errors = HashMap::new();
 
-    let (tks, _) = generate_application(
+    let query_body = generate_application(
         lp,
         context,
-        &mut errors,
-        &mut mutated_tables,
+        &quote!(#mod_queries::#name::#mod_queries_mod_query_enum_error).into(),
+        &mut PushMap::new(&mut errors),
+        &mut PushSet::new(&mut mutated_tables),
         gen_info,
         namer,
     );
@@ -115,7 +126,7 @@ fn generate_query<'imm>(
                 query_impl: quote! {
                     pub fn #name<#qy_lifetime>(&#qy_lifetime self, #(#params),* ) -> #return_type {
                         let #unwrap_top_data = #top_context_data;
-                        #tks
+                        #query_body
                     }
                 }
                 .into(),
@@ -133,7 +144,7 @@ fn generate_query<'imm>(
                 query_impl: quote! {
                     pub fn #name<#qy_lifetime>(&#qy_lifetime mut self, #(#params),* ) -> #return_type {
                         let #unwrap_top_data = #top_context_data;
-                        let result = #tks;
+                        let result = #query_body;
                         #commits
                         result
                     }
@@ -149,7 +160,7 @@ fn generate_query<'imm>(
                 query_impl: quote!{
                     pub fn #name<#qy_lifetime>(&#qy_lifetime self, #(#params),* ) -> Result<#return_type, #mod_queries::#name::#mod_queries_mod_query_enum_error> {
                         let #unwrap_top_data = #top_context_data;
-                        Ok(#tks)
+                        Ok(#query_body)
                     }
                 }.into(),
             }
@@ -164,7 +175,7 @@ fn generate_query<'imm>(
                         // we catch `?` usage as that short circuits the lambda, not the query method
                         match (|| {
                             let #unwrap_top_data = #top_context_data;
-                            Ok(#tks)
+                            Ok(#query_body)
                         })() {
                             Ok(result) => {
                                 #commits
@@ -205,8 +216,8 @@ pub fn generate_queries<'imm>(
     let (mods, impls): (Vec<Tokens<ItemMod>>, Vec<Tokens<ImplItemFn>>) = lp
         .queries
         .iter()
-        .map(move |(key, plan::Query { name, ctx })| {
-            generate_query(lp, gen_info, namer, key, &lp.queries[key]).extract()
+        .map(move |(key, query)| {
+            generate_query(lp, gen_info, namer, key, query).extract()
         })
         .unzip();
 

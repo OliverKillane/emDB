@@ -1,9 +1,9 @@
 //! generate the closures needed to use in the database, which capture parameters from the query.
 //!
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
-use crate::plan;
+use crate::{plan, utils::misc::{PushMap, PushSet}};
 use quote::quote;
 use quote_debug::Tokens;
 use syn::{ExprBlock, ExprClosure, ExprTuple, Ident, Path, Type};
@@ -20,7 +20,7 @@ pub fn unwrap_context(ctx: &plan::Context, namer: &SimpleNamer) -> Tokens<ExprTu
         .map(|id| namer.operator_closure_value_name(*id));
 
     quote! {
-        ( #(#values),* )
+        ( #(#values,)*)
     }
     .into()
 }
@@ -55,7 +55,7 @@ pub fn generate_context<'imm>(
         .iter()
         .map(|op_key| lp.get_operator(*op_key).closure_data(lp, get_types, namer));
     quote! {
-        (#(#data),*)
+        (#(#data,)*)
     }
     .into()
 }
@@ -72,17 +72,17 @@ pub fn generate_context<'imm>(
 pub fn generate_application<'imm>(
     lp: &'imm plan::Plan,
     ctx: &plan::Context,
-    errors: &mut HashMap<Ident, Tokens<Path>>,
-    mutated_tables: &mut HashSet<plan::ImmKey<'imm, plan::Table>>,
+    error_path: &Tokens<Path>,
+    errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
+    mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
     gen_info: &GeneratedInfo<'imm>,
     namer: &SimpleNamer,
-) -> (Tokens<ExprBlock>, bool) {
-    let mut context_errors = false;
+) -> Tokens<ExprBlock> {
+    let num_errors_before = errors.len();
+
     let tokens = ctx.ordering.iter().map(
         |op_key| {
-            let (tks, update) = lp.get_operator(*op_key).apply(*op_key, lp, namer, errors, mutated_tables, gen_info);
-            if update {context_errors = true };
-            tks
+            lp.get_operator(*op_key).apply(*op_key, lp, namer, error_path, errors, mutated_tables, gen_info)
         }
     ).collect::<Vec<_>>();
     let ret_val = if let Some(ret_op) = ctx.returnflow {
@@ -91,17 +91,11 @@ pub fn generate_application<'imm>(
     } else {
         quote!{()}
     };
-    
-    let end_tks = if context_errors {
-        quote!{ Ok(#ret_val) }
-    } else {
-        ret_val
-    };
 
-    (quote!{
+    quote!{
         {
             #(#tokens;)*
-            #end_tks
+            #ret_val
         }
-    }.into(), context_errors)
+    }.into()
 }

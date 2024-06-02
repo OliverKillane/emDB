@@ -51,7 +51,7 @@ impl EMQLOperator for Use {
                                 fields: lp.record_types.insert(plan::RecordConc{ fields: HashMap::from([(rec_field.clone(), table_fields_scalar_type)]) }.into()),
                                 stream: true,
                             },
-                            op: plan::DeRef { input: prev_edge, reference: ref_field, named: rec_field.clone(), table: *table_id, output: next_edge }.into(),
+                            op: plan::DeRef { input: prev_edge, reference: ref_field, named: rec_field.clone(), table: *table_id, output: next_edge, named_type: table_fields_type }.into(),
                             call_span: call.span(),
                         }
                     }
