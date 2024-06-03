@@ -46,10 +46,10 @@ pub fn get_struct_fields<'a, Primary: PrimaryKind>(
         namer: &CodeNamer,
     ) {
         for Field { name, ty } in &fields.mut_fields {
-            fs.insert( name.clone(), ty.clone() );
+            fs.insert(name.clone(), ty.clone());
         }
         for field @ Field { name, .. } in &fields.imm_fields {
-            fs.insert( name.clone(), col.convert_imm_type(field, namer) );
+            fs.insert(name.clone(), col.convert_imm_type(field, namer));
         }
     }
     let mut def_fields = HashMap::with_capacity(groups.idents.len());
@@ -60,13 +60,11 @@ pub fn get_struct_fields<'a, Primary: PrimaryKind>(
         namer,
     );
 
-    
     for Group { col, fields } in &groups.assoc {
         append(&mut def_fields, col, fields, namer);
     }
     def_fields
 }
-
 
 pub fn generate_get_struct_fields<'a, Primary: PrimaryKind>(
     groups: &'a Groups<Primary>,
@@ -93,7 +91,6 @@ pub fn generate_get_struct_fields<'a, Primary: PrimaryKind>(
         &groups.primary.fields,
         namer,
     );
-
 
     for Group { col, fields } in &groups.assoc {
         append(&mut def_fields, col, fields, namer);

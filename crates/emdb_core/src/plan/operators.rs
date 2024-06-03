@@ -136,7 +136,7 @@ pub struct UniqueRef {
     /// the table that is being referenced, and the column in that table
     pub table: Key<Table>,
     pub field: RecordField,
-    
+
     /// the new field to add to the record
     pub out: RecordField,
 
@@ -252,7 +252,7 @@ pub struct Collect {
 /// Take the top n from a stream, discarding the rest
 pub struct Take {
     pub input: Key<DataFlow>,
-    pub top_n: Expr,
+    pub limit: Expr,
     pub output: Key<DataFlow>,
 }
 
@@ -272,10 +272,15 @@ pub enum JoinKind {
     Inner,
 }
 
+pub struct JoinInput {
+    pub identifier: RecordField,
+    pub dataflow: Key<DataFlow>,
+}
+
 /// Join two streams together
 pub struct Join {
-    pub left: Key<DataFlow>,
-    pub right: Key<DataFlow>,
+    pub left: JoinInput,
+    pub right: JoinInput,
     pub match_kind: MatchKind,
     pub join_kind: JoinKind,
     pub output: Key<DataFlow>,

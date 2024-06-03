@@ -104,7 +104,7 @@ impl<Primary: PrimaryKind> Table<Primary> {
         get_struct_fields(&self.groups, namer)
     }
     pub fn insert_can_error(&self) -> bool {
-        !self.predicates.is_empty() || !self.uniques.is_empty() 
+        !self.predicates.is_empty() || !self.uniques.is_empty()
     }
     pub fn generate(&self, namer: &CodeNamer) -> Tokens<ItemMod> {
         let Self {

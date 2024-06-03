@@ -47,10 +47,12 @@ impl Context {
     }
 
     pub fn get_return_type(&self, lp: &Plan) -> Option<Key<RecordType>> {
-        self.returnflow.map(|ret| lp.get_dataflow(lp.get_operator(ret).get_return().input)
-                    .get_conn()
-                    .with
-                    .fields)
+        self.returnflow.map(|ret| {
+            lp.get_dataflow(lp.get_operator(ret).get_return().input)
+                .get_conn()
+                .with
+                .fields
+        })
     }
 }
 

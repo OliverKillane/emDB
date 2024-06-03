@@ -8,7 +8,7 @@ use crate::plan;
 
 pub struct GeneratedInfo<'imm> {
     pub get_types: HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
-    pub insert_can_error: HashMap<plan::Idx<'imm, plan::Table>, bool> // TODO: hashset instead?
+    pub insert_can_error: HashMap<plan::Idx<'imm, plan::Table>, bool>, // TODO: hashset instead?
 }
 
 pub struct TableWindow<'imm> {
@@ -122,12 +122,15 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, namer: &SimpleNamer) -> Table
             let table_impl = pulpit::gen::selector::select_basic(config);
             (
                 (key, table_impl.op_get_types(pulpit_namer)),
-                ((key, table_impl.insert_can_error()), table_impl.generate(pulpit_namer)),
+                (
+                    (key, table_impl.insert_can_error()),
+                    table_impl.generate(pulpit_namer),
+                ),
             )
         })
         .unzip();
 
-    let (insert_can_error, table_defs): (HashMap<_,_>, Vec<_>) = gen_data.into_iter().unzip();
+    let (insert_can_error, table_defs): (HashMap<_, _>, Vec<_>) = gen_data.into_iter().unzip();
 
     let table_names = lp
         .tables

@@ -1,7 +1,7 @@
 use std::cmp::max;
 
-use pulpit::macros::simple;
 use minister::{Basic, Physical};
+use pulpit::macros::simple;
 
 #[allow(dead_code)]
 #[derive(Clone)]
@@ -10,7 +10,6 @@ enum RGB {
     Green,
     Blue,
 }
-
 
 pulpit::macros::simple! {
     fields {
@@ -31,7 +30,7 @@ pulpit::macros::simple! {
     name: bowling_club
 }
 
-impl <'imm> bowling_club::Window<'imm> {
+impl<'imm> bowling_club::Window<'imm> {
     fn get_longest_name(&self) -> usize {
         let keys = Basic::consume_stream(self.scan());
         let vals = Basic::map(keys, |key| self.get(key));

@@ -2,7 +2,7 @@
 use emdb::macros::emql;
 
 emql! {
-    impl my_db as SemCheck;
+    impl my_db as SimpleSerialized;
 
     table people {
         name: String,

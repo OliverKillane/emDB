@@ -2,9 +2,11 @@ use std::iter::once;
 
 use proc_macro2::{Span, TokenStream};
 use quote_debug::Tokens;
-use syn::{Expr, Ident, Lifetime, Path, Type};
+use syn::{Expr, ExprClosure, Ident, Lifetime, Path, Type};
 
-use crate::{plan::{self, RecordConc}, utils::misc::PushMap};
+use crate::{
+    backend::simple::Simple, plan::{self, RecordConc}, utils::misc::PushMap
+};
 use quote::{quote, ToTokens};
 
 const INTERNAL_FIELD_PREFIX: &str = "__internal_";
@@ -107,7 +109,6 @@ impl SimpleNamer {
     }
 }
 
-
 pub struct DataFlowNaming<'plan> {
     pub holding_var: Ident,
     pub stream: bool,
@@ -154,7 +155,7 @@ pub fn dataflow_fields<'plan>(
     }
 }
 
-/// Helper fn for generating the construction for an error, and add it to the query's map of 
+/// Helper fn for generating the construction for an error, and add it to the query's map of
 /// error variants.
 pub fn new_error(
     op_key: plan::Key<plan::Operator>,
@@ -169,7 +170,8 @@ pub fn new_error(
         quote!(Err(#error_path::#variant_name(#param)))
     } else {
         quote!(Err(#error_path::#variant_name))
-    }.into();
+    }
+    .into();
     errors.push(variant_name, error_inner);
     construct_error
 }
@@ -179,12 +181,46 @@ pub fn transfer_fields<'brw>(
     from: &'brw Ident,
     record: &'brw RecordConc,
     namer: &'brw SimpleNamer,
-) -> impl Iterator<Item=TokenStream> + 'brw {
-    record.fields.keys().map(move |id| {
-        let field_name = namer.transform_field_name(id);
-        quote!(#field_name: #from.#field_name)
-    }).chain(once({
-        let phantom_field = &namer.phantom_field;
-        quote!(#phantom_field: std::marker::PhantomData)
-    }))
+) -> impl Iterator<Item = TokenStream> + 'brw {
+    record
+        .fields
+        .keys()
+        .map(move |id| {
+            let field_name = namer.transform_field_name(id);
+            quote!(#field_name: #from.#field_name)
+        })
+        .chain(once({
+            let phantom_field = &namer.phantom_field;
+            quote!(#phantom_field: std::marker::PhantomData)
+        }))
+}
+
+pub fn expose_user_fields<'brw>(record: &'brw plan::RecordConc, namer: &'brw SimpleNamer) -> impl Iterator<Item=TokenStream> + 'brw {
+    let phantomdata: &Ident = &namer.phantom_field;
+    record.fields.keys().map(|rf| {
+        let field_name = namer.transform_field_name(rf);
+        let alias = match rf {
+            plan::RecordField::User(id) => quote! {#id},
+            plan::RecordField::Internal(_) => quote! {_},
+        };
+        quote! {#field_name: #alias}
+    }).chain(once(quote! {#phantomdata: _}))
+}
+
+pub fn boolean_predicate(lp: &plan::Plan, predicate: &Expr, dataflow: plan::Key<plan::DataFlow>, namer: &SimpleNamer) -> Tokens<ExprClosure> {
+    let DataFlowNaming {
+        data_constructor,
+        data_type,
+        record_type,
+        ..
+    } = dataflow_fields(lp, dataflow, namer);
+
+    let input_fields = expose_user_fields(record_type, namer);
+
+    quote! {
+        |#data_constructor { #(#input_fields,)* } : &#data_type | -> bool {
+            #predicate
+        }
+    }
+    .into()
 }

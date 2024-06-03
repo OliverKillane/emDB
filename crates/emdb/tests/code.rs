@@ -1,7 +1,7 @@
-mod debug_code {
+mod my_db {
     use emdb::dependencies::minister::Physical;
     pub mod tables {
-        pub mod customers {
+        pub mod users {
             #![allow(unused, non_camel_case_types)]
             use emdb::dependencies::pulpit::column::{
                 PrimaryWindow, PrimaryWindowApp, PrimaryWindowPull, PrimaryWindowHide,
@@ -14,32 +14,33 @@ mod debug_code {
                 pub mod primary {
                     #[derive(Clone)]
                     pub struct Imm {
-                        pub id: usize,
-                        pub surname: String,
-                        pub forename: String,
+                        pub name: String,
+                        pub premium: bool,
+                        pub credits: i32,
                     }
                     #[derive(Clone)]
-                    pub struct Mut {
-                        pub age: u8,
-                    }
+                    pub struct Mut {}
                     pub struct ImmUnpack<'imm> {
-                        pub id: &'imm usize,
-                        pub surname: &'imm String,
-                        pub forename: &'imm String,
+                        pub name: &'imm String,
+                        pub premium: &'imm bool,
+                        pub credits: &'imm i32,
                     }
                     pub fn imm_unpack<'imm>(
-                        Imm { id, surname, forename }: &'imm Imm,
+                        Imm { name, premium, credits }: &'imm Imm,
                     ) -> ImmUnpack<'imm> {
-                        ImmUnpack { id, surname, forename }
+                        ImmUnpack {
+                            name,
+                            premium,
+                            credits,
+                        }
                     }
                 }
             }
             pub mod borrows {
                 pub struct Borrows<'brw> {
-                    pub surname: &'brw String,
-                    pub forename: &'brw String,
-                    pub age: &'brw u8,
-                    pub id: &'brw usize,
+                    pub credits: &'brw i32,
+                    pub premium: &'brw bool,
+                    pub name: &'brw String,
                 }
             }
             impl<'imm> Window<'imm> {
@@ -55,19 +56,17 @@ mod debug_code {
                         Err(_) => return Err(KeyError),
                     };
                     Ok(borrows::Borrows {
-                        surname: &primary.imm_data.surname,
-                        forename: &primary.imm_data.forename,
-                        age: &primary.mut_data.age,
-                        id: &primary.imm_data.id,
+                        credits: &primary.imm_data.credits,
+                        premium: &primary.imm_data.premium,
+                        name: &primary.imm_data.name,
                     })
                 }
             }
             pub mod get {
                 pub struct Get<'db> {
-                    pub age: u8,
-                    pub id: &'db usize,
-                    pub surname: &'db String,
-                    pub forename: &'db String,
+                    pub name: &'db String,
+                    pub premium: &'db bool,
+                    pub credits: &'db i32,
                 }
             }
             impl<'db> Window<'db> {
@@ -81,74 +80,23 @@ mod debug_code {
                     };
                     let primary = primary.convert_imm(column_types::primary::imm_unpack);
                     Ok(get::Get {
-                        surname: primary.imm_data.surname,
-                        forename: primary.imm_data.forename,
-                        age: primary.mut_data.age,
-                        id: primary.imm_data.id,
+                        credits: primary.imm_data.credits,
+                        premium: primary.imm_data.premium,
+                        name: primary.imm_data.name,
                     })
                 }
             }
-            pub mod updates {
-                pub mod pulpit_access_8 {
-                    #[derive(Debug)]
-                    pub enum UpdateError {
-                        KeyError,
-                        sensible_ages,
-                    }
-                    pub struct Update {
-                        pub age: u8,
-                    }
-                }
-            }
-            impl<'imm> Window<'imm> {
-                pub fn pulpit_access_8(
-                    &mut self,
-                    update: updates::pulpit_access_8::Update,
-                    key: Key,
-                ) -> Result<(), updates::pulpit_access_8::UpdateError> {
-                    let emdb::dependencies::pulpit::column::Entry {
-                        index,
-                        data: primary,
-                    } = match self.columns.primary.brw_mut(key) {
-                        Ok(entry) => entry,
-                        Err(_) => {
-                            return Err(updates::pulpit_access_8::UpdateError::KeyError);
-                        }
-                    };
-                    if !predicates::sensible_ages(borrows::Borrows {
-                        id: &primary.imm_data.id,
-                        surname: &primary.imm_data.surname,
-                        forename: &primary.imm_data.forename,
-                        age: &update.age,
-                    }) {
-                        return Err(updates::pulpit_access_8::UpdateError::sensible_ages);
-                    }
-                    let mut update = update;
-                    std::mem::swap(&mut primary.mut_data.age, &mut update.age);
-                    if !self.transactions.rollback {
-                        self.transactions
-                            .log
-                            .push(
-                                transactions::LogItem::Update(
-                                    key,
-                                    transactions::Updates::pulpit_access_8(update),
-                                ),
-                            );
-                    }
-                    Ok(())
-                }
-            }
+            pub mod updates {}
+            impl<'imm> Window<'imm> {}
             pub mod insert {
                 pub struct Insert {
-                    pub surname: String,
-                    pub forename: String,
-                    pub age: u8,
-                    pub id: usize,
+                    pub credits: i32,
+                    pub premium: bool,
+                    pub name: String,
                 }
                 #[derive(Debug)]
                 pub enum Error {
-                    unique_id,
-                    sensible_ages,
+                    prem_credits,
                 }
             }
             impl<'imm> Window<'imm> {
@@ -156,38 +104,24 @@ mod debug_code {
                     &mut self,
                     insert_val: insert::Insert,
                 ) -> Result<Key, insert::Error> {
-                    if !predicates::sensible_ages(borrows::Borrows {
-                        surname: &insert_val.surname,
-                        forename: &insert_val.forename,
-                        age: &insert_val.age,
-                        id: &insert_val.id,
+                    if !predicates::prem_credits(borrows::Borrows {
+                        credits: &insert_val.credits,
+                        premium: &insert_val.premium,
+                        name: &insert_val.name,
                     }) {
-                        return Err(insert::Error::sensible_ages);
+                        return Err(insert::Error::prem_credits);
                     }
-                    let unique_id = match self.uniques.id.lookup(&insert_val.id) {
-                        Ok(_) => return Err(insert::Error::unique_id),
-                        Err(_) => insert_val.id.clone(),
-                    };
                     let primary = (emdb::dependencies::pulpit::column::Data {
                         imm_data: column_types::primary::Imm {
-                            id: insert_val.id,
-                            surname: insert_val.surname,
-                            forename: insert_val.forename,
+                            name: insert_val.name,
+                            premium: insert_val.premium,
+                            credits: insert_val.credits,
                         },
-                        mut_data: column_types::primary::Mut {
-                            age: insert_val.age,
-                        },
+                        mut_data: column_types::primary::Mut {},
                     });
-                    let (key, action) = self.columns.primary.insert(primary);
-                    match action {
-                        emdb::dependencies::pulpit::column::InsertAction::Place(
-                            index,
-                        ) => unsafe {}
-                        emdb::dependencies::pulpit::column::InsertAction::Append => {}
-                    }
-                    self.uniques.id.insert(unique_id, key).unwrap();
+                    let key = self.columns.primary.append(primary);
                     if !self.transactions.rollback {
-                        self.transactions.log.push(transactions::LogItem::Insert(key));
+                        self.transactions.log.push(transactions::LogItem::Append);
                     }
                     Ok(key)
                 }
@@ -196,22 +130,12 @@ mod debug_code {
                 #[derive(Debug)]
                 pub struct NotFound;
             }
-            impl<'imm> Window<'imm> {
-                pub fn unique_id(&self, value: &usize) -> Result<Key, unique::NotFound> {
-                    match self.uniques.id.lookup(value) {
-                        Ok(k) => Ok(k),
-                        Err(_) => Err(unique::NotFound),
-                    }
-                }
-            }
+            impl<'imm> Window<'imm> {}
             mod transactions {
-                pub enum Updates {
-                    pulpit_access_8(super::updates::pulpit_access_8::Update),
-                }
+                pub enum Updates {}
                 pub enum LogItem {
                     Update(super::Key, Updates),
-                    Insert(super::Key),
-                    Delete(super::Key),
+                    Append,
                 }
                 pub struct Data {
                     pub log: Vec<LogItem>,
@@ -228,18 +152,10 @@ mod debug_code {
             }
             impl<'imm> Window<'imm> {
                 /// Commit all current changes
-                /// - Requires concretely applying deletions (which until commit
-                ///   or abort simply hide keys from the table)
+                /// - Clears the rollback log
                 pub fn commit(&mut self) {
                     debug_assert!(! self.transactions.rollback);
-                    while let Some(entry) = self.transactions.log.pop() {
-                        match entry {
-                            transactions::LogItem::Delete(key) => {
-                                self.restore_hidden(key);
-                            }
-                            _ => {}
-                        }
-                    }
+                    self.transactions.log.clear()
                 }
                 /// Undo the transactions applied since the last commit
                 /// - Requires re-applying all updates, deleting inserts and undoing deletes
@@ -248,19 +164,12 @@ mod debug_code {
                     self.transactions.rollback = true;
                     while let Some(entry) = self.transactions.log.pop() {
                         match entry {
-                            transactions::LogItem::Delete(key) => {
-                                self.delete_hidden(key);
-                            }
-                            transactions::LogItem::Insert(key) => {
-                                self.reverse_insert(key);
-                            }
-                            transactions::LogItem::Update(key, update) => {
-                                match update {
-                                    transactions::Updates::pulpit_access_8(update) => {
-                                        self.pulpit_access_8(update, key).unwrap();
-                                    }
+                            transactions::LogItem::Append => {
+                                unsafe {
+                                    self.columns.primary.unppend();
                                 }
                             }
+                            transactions::LogItem::Update(key, update) => match update {}
                         }
                     }
                     self.transactions.rollback = false;
@@ -276,89 +185,44 @@ mod debug_code {
                     self.columns.primary.scan()
                 }
             }
-            impl<'imm> Window<'imm> {
-                fn reverse_insert(&mut self, key: Key) {
-                    debug_assert!(self.transactions.rollback);
-                    {
-                        match self.columns.primary.pull(key) {
-                            Ok(
-                                emdb::dependencies::pulpit::column::Entry {
-                                    index: index,
-                                    data: primary,
-                                },
-                            ) => {
-                                self.uniques.id.pull(&primary.imm_data.id).unwrap();
-                                Ok(())
-                            }
-                            Err(_) => Err(KeyError),
-                        }
-                    }
-                        .unwrap()
-                }
-                fn delete_hidden(&mut self, key: Key) {
-                    debug_assert!(self.transactions.rollback);
-                    let emdb::dependencies::pulpit::column::Entry {
-                        index: index,
-                        data,
-                    } = self.columns.primary.pull(key).unwrap();
-                    unsafe {}
-                }
-                fn restore_hidden(&mut self, key: Key) {
-                    debug_assert!(self.transactions.rollback);
-                    self.columns.primary.reveal(key).unwrap();
-                    let brw_data = self.borrow(key).unwrap();
-                    self.uniques.id.insert(brw_data.id.clone(), key).unwrap();
-                }
-                pub fn delete(&mut self, key: Key) -> Result<(), KeyError> {
-                    match self.columns.primary.hide(key) {
-                        Ok(()) => {}
-                        Err(_) => return Err(KeyError),
-                    }
-                    if !self.transactions.rollback {
-                        self.transactions.log.push(transactions::LogItem::Delete(key));
-                    }
-                    Ok(())
-                }
-            }
             /// The key for accessing rows (delete, update, get)
-            pub type Key = <emdb::dependencies::pulpit::column::PrimaryRetain<
-                column_types::primary::Imm,
-                column_types::primary::Mut,
-                1024usize,
-            > as emdb::dependencies::pulpit::column::Keyable>::Key;
-            mod predicates {
-                pub fn sensible_ages(
-                    super::borrows::Borrows {
-                        surname,
-                        forename,
-                        age,
-                        id,
-                    }: super::borrows::Borrows,
-                ) -> bool {
-                    *age < 120
-                }
-            }
-            struct Uniques {
-                id: emdb::dependencies::pulpit::access::Unique<usize, Key>,
-            }
-            impl Uniques {
-                fn new(size_hint: usize) -> Self {
-                    Self {
-                        id: emdb::dependencies::pulpit::access::Unique::new(size_hint),
-                    }
-                }
-            }
-            struct ColumnHolder {
-                primary: emdb::dependencies::pulpit::column::PrimaryRetain<
+            pub type Key = <emdb::dependencies::pulpit::column::PrimaryAppend<
+                emdb::dependencies::pulpit::column::AssocBlocks<
                     column_types::primary::Imm,
                     column_types::primary::Mut,
                     1024usize,
+                >,
+            > as emdb::dependencies::pulpit::column::Keyable>::Key;
+            mod predicates {
+                pub fn prem_credits(
+                    super::borrows::Borrows {
+                        credits,
+                        premium,
+                        name,
+                    }: super::borrows::Borrows,
+                ) -> bool {
+                    *premium || *credits > 0
+                }
+            }
+            struct Uniques {}
+            impl Uniques {
+                fn new(size_hint: usize) -> Self {
+                    Self {}
+                }
+            }
+            struct ColumnHolder {
+                primary: emdb::dependencies::pulpit::column::PrimaryAppend<
+                    emdb::dependencies::pulpit::column::AssocBlocks<
+                        column_types::primary::Imm,
+                        column_types::primary::Mut,
+                        1024usize,
+                    >,
                 >,
             }
             impl ColumnHolder {
                 fn new(size_hint: usize) -> Self {
                     Self {
-                        primary: emdb::dependencies::pulpit::column::PrimaryRetain::new(
+                        primary: emdb::dependencies::pulpit::column::PrimaryAppend::new(
                             size_hint,
                         ),
                     }
@@ -370,10 +234,12 @@ mod debug_code {
                 }
             }
             struct WindowHolder<'imm> {
-                primary: <emdb::dependencies::pulpit::column::PrimaryRetain<
-                    column_types::primary::Imm,
-                    column_types::primary::Mut,
-                    1024usize,
+                primary: <emdb::dependencies::pulpit::column::PrimaryAppend<
+                    emdb::dependencies::pulpit::column::AssocBlocks<
+                        column_types::primary::Imm,
+                        column_types::primary::Mut,
+                        1024usize,
+                    >,
                 > as emdb::dependencies::pulpit::column::Column>::WindowKind<'imm>,
             }
             pub struct Table {
@@ -405,354 +271,188 @@ mod debug_code {
         }
     }
     pub mod queries {
-        pub mod get_unique_customer {
+        pub mod total_premium_credits {
             #[derive(Debug)]
             pub enum Error {
-                Error1(super::super::tables::customers::unique::NotFound),
-            }
-        }
-        mod drop_all {}
-        pub mod update_name {
-            #[derive(Debug)]
-            pub enum Error {
-                Error8(
-                    super::super::tables::customers::updates::pulpit_access_8::UpdateError,
-                ),
-                Error7,
-            }
-        }
-        pub mod insert_name {
-            #[derive(Debug)]
-            pub enum Error {
-                Error11(super::super::tables::customers::insert::Error),
+                Error1,
             }
         }
     }
     struct RecordTypeAlias0<'db, 'qy> {
-        name: &'qy str,
-        ident: usize,
+        credits: &'db i32,
+        name: &'db String,
+        premium: &'db bool,
         __internal_phantomdata: std::marker::PhantomData<(&'db (), &'qy ())>,
     }
     struct RecordTypeAlias1<'db, 'qy> {
-        name: &'qy str,
-        cust_ref: tables::customers::Key,
-        ident: usize,
+        __internal_0: tables::users::Key,
         __internal_phantomdata: std::marker::PhantomData<(&'db (), &'qy ())>,
     }
     struct RecordTypeAlias2<'db, 'qy> {
-        cust: tables::customers::Key,
+        __internal_1: RecordTypeAlias0<'db, 'qy>,
+        __internal_0: tables::users::Key,
         __internal_phantomdata: std::marker::PhantomData<(&'db (), &'qy ())>,
     }
     struct RecordTypeAlias3<'db, 'qy> {
-        cust_key: tables::customers::Key,
+        credits: i64,
         __internal_phantomdata: std::marker::PhantomData<(&'db (), &'qy ())>,
     }
-    struct RecordTypeAlias4<'db, 'qy> {
-        surname: &'db String,
-        id: &'db usize,
-        forename: &'db String,
-        age: u8,
-        __internal_phantomdata: std::marker::PhantomData<(&'db (), &'qy ())>,
-    }
-    struct RecordTypeAlias5<'db, 'qy> {
-        cust_key: tables::customers::Key,
-        cust_data: RecordTypeAlias4<'db, 'qy>,
-        __internal_phantomdata: std::marker::PhantomData<(&'db (), &'qy ())>,
-    }
-    struct RecordTypeAlias6<'db, 'qy> {
-        age: u8,
-        __internal_phantomdata: std::marker::PhantomData<(&'db (), &'qy ())>,
-    }
-    struct RecordTypeAlias7<'db, 'qy> {
-        id: usize,
-        age: u8,
-        surname: String,
-        forename: String,
-        __internal_phantomdata: std::marker::PhantomData<(&'db (), &'qy ())>,
-    }
-    struct RecordTypeAlias8<'db, 'qy> {
-        forename: String,
-        id: usize,
-        surname: String,
-        age: u8,
-        __internal_phantomdata: std::marker::PhantomData<(&'db (), &'qy ())>,
-    }
-    struct RecordTypeAlias9<'db, 'qy> {
-        cust_ref: tables::customers::Key,
+    pub struct RecordTypeAlias4<'db, 'qy> {
+        pub sum: i64,
         __internal_phantomdata: std::marker::PhantomData<(&'db (), &'qy ())>,
     }
     pub struct Datastore {
-        customers: tables::customers::Table,
+        users: tables::users::Table,
     }
     impl Datastore {
         pub fn new() -> Self {
             Self {
-                customers: tables::customers::Table::new(1024),
+                users: tables::users::Table::new(1024),
             }
         }
         pub fn db(&mut self) -> Database<'_> {
             Database {
-                customers: self.customers.window(),
+                users: self.users.window(),
             }
         }
     }
     pub struct Database<'db> {
-        customers: tables::customers::Window<'db>,
+        users: tables::users::Window<'db>,
     }
     impl<'db> Database<'db> {
-        pub fn get_unique_customer<'qy>(
+        pub fn total_premium_credits<'qy>(
             &'qy self,
-            name: &'qy str,
-            id: usize,
-        ) -> Result<(), queries::get_unique_customer::Error> {
-            let (operator_closure_value_0, operator_closure_value_1) = (
-                RecordTypeAlias0 {
-                    ident: id,
-                    name: name,
-                    __internal_phantomdata: std::marker::PhantomData,
+        ) -> Result<RecordTypeAlias4, queries::total_premium_credits::Error> {
+            let (
+                operator_closure_value_0,
+                operator_closure_value_1,
+                operator_closure_value_2,
+                operator_closure_value_3,
+                operator_closure_value_4,
+                operator_closure_value_5,
+                operator_closure_value_6,
+            ) = (
+                (),
+                (),
+                (),
+                |
+                    RecordTypeAlias0 {
+                        credits: credits,
+                        name: name,
+                        premium: premium,
+                        __internal_phantomdata: _,
+                    }: &RecordTypeAlias0<'db, 'qy>,
+                | -> bool { *premium },
+                |
+                    RecordTypeAlias0 {
+                        credits: credits,
+                        name: name,
+                        premium: premium,
+                        __internal_phantomdata: _,
+                    }|
+                {
+                    RecordTypeAlias3 {
+                        credits: credits as i64,
+                        __internal_phantomdata: std::marker::PhantomData,
+                    }
                 },
+                (
+                    RecordTypeAlias4 {
+                        sum: 0,
+                        __internal_phantomdata: std::marker::PhantomData,
+                    },
+                    |
+                        RecordTypeAlias4 {
+                            sum: sum,
+                            __internal_phantomdata: _,
+                        }: &mut RecordTypeAlias4<'db, 'qy>,
+                        RecordTypeAlias3 { credits: credits, __internal_phantomdata: _ }|
+                    {
+                        *sum = { sum + credits };
+                    },
+                ),
                 (),
             );
             Ok({
-                let dataflow_value_0: <emdb::dependencies::minister::Basic as emdb::dependencies::minister::Physical>::Single<
-                    RecordTypeAlias0<'db, 'qy>,
-                > = emdb::dependencies::minister::Basic::consume_single(
-                    operator_closure_value_0,
-                );
-                let dataflow_value_1: <emdb::dependencies::minister::Basic as emdb::dependencies::minister::Physical>::Single<
+                let dataflow_value_0: <emdb::dependencies::minister::Basic as emdb::dependencies::minister::Physical>::Stream<
                     RecordTypeAlias1<'db, 'qy>,
                 > = {
-                    let result = emdb::dependencies::minister::Basic::map_single(
-                        dataflow_value_0,
-                        |dataflow_value_0| {
-                            let data = self
-                                .customers
-                                .unique_id(&dataflow_value_0.ident)?;
-                            Ok(RecordTypeAlias1 {
-                                cust_ref: data,
-                                name: dataflow_value_0.name,
-                                ident: dataflow_value_0.ident,
-                                __internal_phantomdata: std::marker::PhantomData,
-                            })
-                        },
-                    );
-                    match emdb::dependencies::minister::Basic::error_single(result) {
-                        Ok(val) => val,
-                        Err(err) => {
-                            return Err(queries::get_unique_customer::Error::Error1(err));
-                        }
-                    }
-                };
-                ()
-            })
-        }
-        pub fn drop_all<'qy>(&'qy self) -> () {
-            let (operator_closure_value_3, operator_closure_value_4) = ((), ());
-            {
-                let dataflow_value_2: <emdb::dependencies::minister::Basic as emdb::dependencies::minister::Physical>::Stream<
-                    RecordTypeAlias2<'db, 'qy>,
-                > = {
                     let stream_values = emdb::dependencies::minister::Basic::consume_stream(
-                        self.customers.scan().collect::<Vec<_>>().into_iter(),
+                        self.users.scan().collect::<Vec<_>>().into_iter(),
                     );
                     emdb::dependencies::minister::Basic::map(
                         stream_values,
-                        |value| RecordTypeAlias2 {
-                            cust: value,
+                        |value| RecordTypeAlias1 {
+                            __internal_0: value,
                             __internal_phantomdata: std::marker::PhantomData,
                         },
                     )
                 };
-                let _ = ();
-                ()
-            }
-        }
-        pub fn update_name<'qy>(
-            &'qy mut self,
-        ) -> Result<(), queries::update_name::Error> {
-            match (|| {
-                let (
-                    operator_closure_value_6,
-                    operator_closure_value_7,
-                    operator_closure_value_8,
-                ) = (
-                    (),
-                    (),
-                    |RecordTypeAlias5 { cust_key, cust_data, .. }| {
-                        (
-                            RecordTypeAlias6 {
-                                age: cust_data.age + 1,
-                                __internal_phantomdata: std::marker::PhantomData,
-                            },
-                            RecordTypeAlias5 {
-                                cust_key,
-                                cust_data,
-                                __internal_phantomdata: std::marker::PhantomData,
-                            },
-                        )
-                    },
-                );
-                Ok({
-                    let dataflow_value_4: <emdb::dependencies::minister::Basic as emdb::dependencies::minister::Physical>::Stream<
-                        RecordTypeAlias3<'db, 'qy>,
-                    > = {
-                        let stream_values = emdb::dependencies::minister::Basic::consume_stream(
-                            self.customers.scan().collect::<Vec<_>>().into_iter(),
-                        );
-                        emdb::dependencies::minister::Basic::map(
-                            stream_values,
-                            |value| RecordTypeAlias3 {
-                                cust_key: value,
-                                __internal_phantomdata: std::marker::PhantomData,
-                            },
-                        )
-                    };
-                    let dataflow_value_5: <emdb::dependencies::minister::Basic as emdb::dependencies::minister::Physical>::Stream<
-                        RecordTypeAlias5<'db, 'qy>,
-                    > = {
-                        let result = emdb::dependencies::minister::Basic::map(
-                            dataflow_value_4,
-                            |dataflow_value_4| {
-                                match self.customers.get(dataflow_value_4.cust_key) {
-                                    Ok(get_value) => {
-                                        Ok(RecordTypeAlias5 {
-                                            cust_data: RecordTypeAlias4 {
-                                                surname: get_value.surname,
-                                                id: get_value.id,
-                                                forename: get_value.forename,
-                                                age: get_value.age,
-                                                __internal_phantomdata: std::marker::PhantomData,
-                                            },
-                                            cust_key: dataflow_value_4.cust_key,
+                let dataflow_value_1: <emdb::dependencies::minister::Basic as emdb::dependencies::minister::Physical>::Stream<
+                    RecordTypeAlias2<'db, 'qy>,
+                > = {
+                    let result = emdb::dependencies::minister::Basic::map(
+                        dataflow_value_0,
+                        |dataflow_value_0| {
+                            match self.users.get(dataflow_value_0.__internal_0) {
+                                Ok(get_value) => {
+                                    Ok(RecordTypeAlias2 {
+                                        __internal_1: RecordTypeAlias0 {
+                                            credits: get_value.credits,
+                                            name: get_value.name,
+                                            premium: get_value.premium,
                                             __internal_phantomdata: std::marker::PhantomData,
-                                        })
-                                    }
-                                    Err(_) => return Err(queries::update_name::Error::Error7),
-                                }
-                            },
-                        );
-                        match emdb::dependencies::minister::Basic::error_stream(result) {
-                            Ok(val) => val,
-                            Err(err) => return Err(queries::update_name::Error::Error7),
-                        }
-                    };
-                    let dataflow_value_6: <emdb::dependencies::minister::Basic as emdb::dependencies::minister::Physical>::Stream<
-                        RecordTypeAlias5<'db, 'qy>,
-                    > = {
-                        let results = emdb::dependencies::minister::Basic::map_seq(
-                            dataflow_value_5,
-                            |dataflow_value_5| {
-                                let (update_struct, continue_struct) = operator_closure_value_8(
-                                    dataflow_value_5,
-                                );
-                                match self
-                                    .customers
-                                    .pulpit_access_8(
-                                        tables::customers::updates::pulpit_access_8::Update {
-                                            age: update_struct.age,
                                         },
-                                        continue_struct.cust_key,
-                                    )
-                                {
-                                    Ok(()) => Ok(continue_struct),
-                                    Err(err) => Err(queries::update_name::Error::Error8(err)),
+                                        __internal_0: dataflow_value_0.__internal_0,
+                                        __internal_phantomdata: std::marker::PhantomData,
+                                    })
                                 }
-                            },
-                        );
-                        emdb::dependencies::minister::Basic::error_stream(results)?
-                    };
-                    ()
-                })
-            })() {
-                Ok(result) => {
-                    {
-                        self.customers.commit();
-                    }
-                    Ok(result)
-                }
-                Err(e) => {
-                    {
-                        self.customers.abort();
-                    }
-                    Err(e)
-                }
-            }
-        }
-        pub fn insert_name<'qy>(
-            &'qy mut self,
-            fname: String,
-            age: u8,
-            id: usize,
-        ) -> Result<(), queries::insert_name::Error> {
-            match (|| {
-                let (operator_closure_value_10, operator_closure_value_11) = (
-                    RecordTypeAlias7 {
-                        id: id,
-                        age: age,
-                        forename: fname,
-                        surname: String::from("Smith"),
-                        __internal_phantomdata: std::marker::PhantomData,
-                    },
-                    (),
-                );
-                Ok({
-                    let dataflow_value_7: <emdb::dependencies::minister::Basic as emdb::dependencies::minister::Physical>::Single<
-                        RecordTypeAlias7<'db, 'qy>,
-                    > = emdb::dependencies::minister::Basic::consume_single(
-                        operator_closure_value_10,
-                    );
-                    let dataflow_value_8: <emdb::dependencies::minister::Basic as emdb::dependencies::minister::Physical>::Single<
-                        RecordTypeAlias9<'db, 'qy>,
-                    > = {
-                        let result = emdb::dependencies::minister::Basic::map_single(
-                            dataflow_value_7,
-                            |dataflow_value_7| {
-                                Ok(RecordTypeAlias9 {
-                                    cust_ref: self
-                                        .customers
-                                        .insert(tables::customers::insert::Insert {
-                                            id: dataflow_value_7.id,
-                                            age: dataflow_value_7.age,
-                                            surname: dataflow_value_7.surname,
-                                            forename: dataflow_value_7.forename,
-                                        })?,
-                                    __internal_phantomdata: std::marker::PhantomData,
-                                })
-                            },
-                        );
-                        match emdb::dependencies::minister::Basic::error_single(result) {
-                            Ok(val) => val,
-                            Err(err) => {
-                                return Err(queries::insert_name::Error::Error11(err));
+                                Err(_) => {
+                                    return Err(queries::total_premium_credits::Error::Error1);
+                                }
                             }
+                        },
+                    );
+                    match emdb::dependencies::minister::Basic::error_stream(result) {
+                        Ok(val) => val,
+                        Err(err) => {
+                            return Err(queries::total_premium_credits::Error::Error1);
                         }
-                    };
-                    ()
-                })
-            })() {
-                Ok(result) => {
-                    {
-                        self.customers.commit();
                     }
-                    Ok(result)
-                }
-                Err(e) => {
-                    {
-                        self.customers.abort();
-                    }
-                    Err(e)
-                }
-            }
+                };
+                let dataflow_value_2: <emdb::dependencies::minister::Basic as emdb::dependencies::minister::Physical>::Stream<
+                    RecordTypeAlias0<'db, 'qy>,
+                > = emdb::dependencies::minister::Basic::map(
+                    dataflow_value_1,
+                    |dataflow_value_1| dataflow_value_1.__internal_1,
+                );
+                let dataflow_value_3: <emdb::dependencies::minister::Basic as emdb::dependencies::minister::Physical>::Stream<
+                    RecordTypeAlias0<'db, 'qy>,
+                > = emdb::dependencies::minister::Basic::filter(
+                    dataflow_value_2,
+                    operator_closure_value_3,
+                );
+                let dataflow_value_4: <emdb::dependencies::minister::Basic as emdb::dependencies::minister::Physical>::Stream<
+                    RecordTypeAlias3<'db, 'qy>,
+                > = emdb::dependencies::minister::Basic::map(
+                    dataflow_value_3,
+                    operator_closure_value_4,
+                );
+                let dataflow_value_5: <emdb::dependencies::minister::Basic as emdb::dependencies::minister::Physical>::Single<
+                    RecordTypeAlias4<'db, 'qy>,
+                > = {
+                    let (init, update) = operator_closure_value_5;
+                    emdb::dependencies::minister::Basic::fold(
+                        dataflow_value_4,
+                        init,
+                        update,
+                    )
+                };
+                let return_value_6: <emdb::dependencies::minister::Basic as emdb::dependencies::minister::Physical>::Single<
+                    RecordTypeAlias4<'db, 'qy>,
+                > = dataflow_value_5;
+                return_value_6
+            })
         }
     }
-}
-
-#[test]
-fn foo() {
-    let mut ds = debug_code::Datastore::new();
-    let mut db = ds.db();
-    db.insert_name("John".to_string(), 1, 20).unwrap();
-    // db.get_unique_customer("John", 19).unwrap();
-    // db.insert_name("John".to_string(), 1, 20).unwrap();
-    // db.insert_name("John".to_string(), 1, 20).unwrap();
 }

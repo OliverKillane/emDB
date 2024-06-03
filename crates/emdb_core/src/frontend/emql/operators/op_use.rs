@@ -34,6 +34,8 @@ impl EMQLOperator for Use {
                 let ref_field = plan::RecordField::Internal(0);
                 let rec_field = plan::RecordField::Internal(1);
 
+                let ref_scalar_type = lp.scalar_types.insert(plan::ConcRef::Conc(plan::ScalarTypeConc::TableRef(*table_id)));
+
                 let cols = get_all_cols(lp, *table_id);
                 let table_fields_type = lp.record_types.insert(cols.into());
                 let table_fields_scalar_type = lp.scalar_types.insert(plan::ScalarTypeConc::Record(table_fields_type).into());
@@ -48,7 +50,7 @@ impl EMQLOperator for Use {
                     }, next_edge| {
                         LinearBuilderState {
                             data_out: plan::Data {
-                                fields: lp.record_types.insert(plan::RecordConc{ fields: HashMap::from([(rec_field.clone(), table_fields_scalar_type)]) }.into()),
+                                fields: lp.record_types.insert(plan::RecordConc{ fields: HashMap::from([(rec_field.clone(), table_fields_scalar_type), (ref_field.clone(), ref_scalar_type) ]) }.into()),
                                 stream: true,
                             },
                             op: plan::DeRef { input: prev_edge, reference: ref_field, named: rec_field.clone(), table: *table_id, output: next_edge, named_type: table_fields_type }.into(),

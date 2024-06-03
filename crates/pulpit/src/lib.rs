@@ -2,8 +2,8 @@
 
 pub mod access;
 pub mod column;
-pub mod value;
 pub mod traits;
+pub mod value;
 
 pub mod gen {
     pub use pulpit_gen::*;

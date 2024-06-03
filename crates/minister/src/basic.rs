@@ -164,26 +164,26 @@ impl Physical for Basic {
     ) -> (Self::Stream<LeftData>, Self::Stream<RightData>) {
         stream.into_iter().unzip()
     }
-    
+
     fn error_stream<Data, Error>(
         stream: Self::Stream<Result<Data, Error>>,
     ) -> Result<Self::Stream<Data>, Error> {
-        stream.into_iter().collect::<Result<_,_>>()
+        stream.into_iter().collect::<Result<_, _>>()
     }
-    
+
     fn error_single<Data, Error>(
         single: Self::Single<Result<Data, Error>>,
     ) -> Result<Self::Single<Data>, Error> {
         single
     }
-    
+
     fn map_seq<InData, OutData>(
         stream: Self::Stream<InData>,
         mapping: impl FnMut(InData) -> OutData,
     ) -> Self::Stream<OutData> {
         stream.into_iter().map(mapping).collect()
     }
-    
+
     fn map_single<InData, OutData>(
         single: Self::Single<InData>,
         mapping: impl FnOnce(InData) -> OutData,

@@ -5,17 +5,25 @@ use quote::quote;
 use quote_debug::Tokens;
 use syn::{ExprBlock, Ident, ImplItemFn, ItemEnum, ItemImpl, ItemMod, Path};
 
-use crate::{plan, utils::misc::{PushMap, PushSet}};
-
-use super::{
-    closures::{generate_application, generate_context, unwrap_context}, namer::SimpleNamer, tables::GeneratedInfo, types::generate_scalar_type
+use crate::{
+    plan,
+    utils::misc::{PushMap, PushSet},
 };
 
+use super::{
+    closures::{generate_application, generate_context, unwrap_context},
+    namer::SimpleNamer,
+    tables::GeneratedInfo,
+    types::generate_scalar_type,
+};
 
-
-
-
-fn generate_errors(errors: HashMap<Ident, Option<Tokens<Path>>>, SimpleNamer{ mod_queries_mod_query_enum_error, .. }: &SimpleNamer) -> Option<Tokens<ItemEnum>> {
+fn generate_errors(
+    errors: HashMap<Ident, Option<Tokens<Path>>>,
+    SimpleNamer {
+        mod_queries_mod_query_enum_error,
+        ..
+    }: &SimpleNamer,
+) -> Option<Tokens<ItemEnum>> {
     if errors.is_empty() {
         None
     } else {
@@ -26,12 +34,15 @@ fn generate_errors(errors: HashMap<Ident, Option<Tokens<Path>>>, SimpleNamer{ mo
                 quote!(#name)
             }
         });
-        Some(quote! {
-            #[derive(Debug)]
-            pub enum #mod_queries_mod_query_enum_error {
-                #(#variants),*
+        Some(
+            quote! {
+                #[derive(Debug)]
+                pub enum #mod_queries_mod_query_enum_error {
+                    #(#variants),*
+                }
             }
-        }.into())
+            .into(),
+        )
     }
 }
 
@@ -40,23 +51,39 @@ struct CommitInfo {
     aborts: Tokens<ExprBlock>,
 }
 
-fn generate_commits<'imm>(lp: &'imm plan::Plan, mutated_tables: HashSet<plan::ImmKey<'imm, plan::Table>>, SimpleNamer {pulpit: CodeNamer { struct_window_method_commit, struct_window_method_abort, .. }, ..}: &SimpleNamer) -> Option<CommitInfo> {
+fn generate_commits<'imm>(
+    lp: &'imm plan::Plan,
+    mutated_tables: HashSet<plan::ImmKey<'imm, plan::Table>>,
+    SimpleNamer {
+        pulpit:
+            CodeNamer {
+                struct_window_method_commit,
+                struct_window_method_abort,
+                ..
+            },
+        ..
+    }: &SimpleNamer,
+) -> Option<CommitInfo> {
     if mutated_tables.is_empty() {
         None
     } else {
-        let (commits, aborts): (Vec<_>, Vec<_>) = mutated_tables.iter().map(|key| {
-            let table_name = &lp.get_table(**key).name;
-            (quote!{
-                self.#table_name.#struct_window_method_commit();
-            },
-            quote!{
-                self.#table_name.#struct_window_method_abort();
-            }
-            )
-        }).unzip();
-        Some(CommitInfo{
-            commits: quote!{ { #(#commits;)* } }.into(),
-            aborts: quote!{ { #(#aborts;)*  } }.into(),
+        let (commits, aborts): (Vec<_>, Vec<_>) = mutated_tables
+            .iter()
+            .map(|key| {
+                let table_name = &lp.get_table(**key).name;
+                (
+                    quote! {
+                        self.#table_name.#struct_window_method_commit();
+                    },
+                    quote! {
+                        self.#table_name.#struct_window_method_abort();
+                    },
+                )
+            })
+            .unzip();
+        Some(CommitInfo {
+            commits: quote! { { #(#commits;)* } }.into(),
+            aborts: quote! { { #(#aborts;)*  } }.into(),
         })
     }
 }
@@ -86,7 +113,6 @@ fn generate_query<'imm>(
         ..
     } = namer;
 
-    
     let context = lp.get_context(*ctx);
     let return_type = if let Some(ret) = context.get_return_type(lp) {
         let ty = namer.record_name(ret);
@@ -193,7 +219,6 @@ fn generate_query<'imm>(
     }
 }
 
-
 pub struct QueriesInfo {
     pub query_mod: Tokens<ItemMod>,
     pub query_impls: Tokens<ItemImpl>,
@@ -216,9 +241,7 @@ pub fn generate_queries<'imm>(
     let (mods, impls): (Vec<Tokens<ItemMod>>, Vec<Tokens<ImplItemFn>>) = lp
         .queries
         .iter()
-        .map(move |(key, query)| {
-            generate_query(lp, gen_info, namer, key, query).extract()
-        })
+        .map(move |(key, query)| generate_query(lp, gen_info, namer, key, query).extract())
         .unzip();
 
     QueriesInfo {

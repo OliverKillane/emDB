@@ -27,7 +27,6 @@ pub trait Update<UpdateKind>: BasicTable {
     fn update(&mut self, update: UpdateKind, key: Self::Key) -> Result<(), Self::UpdateErr>;
 }
 
-
 pub trait Delete: BasicTable {
     fn delete(&mut self, key: Self::Key) -> Result<(), Self::KeyErr>;
 }

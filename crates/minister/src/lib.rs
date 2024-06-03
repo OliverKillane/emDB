@@ -99,7 +99,7 @@ pub trait Physical {
 
     fn union<Data>(left: Self::Stream<Data>, right: Self::Stream<Data>) -> Self::Stream<Data>;
 
-    fn fork<Data, const SPLIT: usize>(stream: Self::Stream<Data>) -> [Self::Stream<Data>; SPLIT]
+    fn fork<Data>(stream: &Self::Stream<Data>) -> Self::Stream<Data>
     where
         Data: Clone;
 

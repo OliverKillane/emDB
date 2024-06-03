@@ -3,7 +3,10 @@
 
 use std::collections::HashMap;
 
-use crate::{plan, utils::misc::{PushMap, PushSet}};
+use crate::{
+    plan,
+    utils::misc::{PushMap, PushSet},
+};
 use quote::quote;
 use quote_debug::Tokens;
 use syn::{ExprBlock, ExprClosure, ExprTuple, Ident, Path, Type};
@@ -65,10 +68,10 @@ pub fn generate_context<'imm>(
 /// 'code_block: {
 ///    let op_1 = scan();
 ///    let op_2 = filter(op_1);
-///    // ... 
+///    // ...
 /// };
 /// ```
-/// 
+///
 pub fn generate_application<'imm>(
     lp: &'imm plan::Plan,
     ctx: &plan::Context,
@@ -80,22 +83,33 @@ pub fn generate_application<'imm>(
 ) -> Tokens<ExprBlock> {
     let num_errors_before = errors.len();
 
-    let tokens = ctx.ordering.iter().map(
-        |op_key| {
-            lp.get_operator(*op_key).apply(*op_key, lp, namer, error_path, errors, mutated_tables, gen_info)
-        }
-    ).collect::<Vec<_>>();
+    let tokens = ctx
+        .ordering
+        .iter()
+        .map(|op_key| {
+            lp.get_operator(*op_key).apply(
+                *op_key,
+                lp,
+                namer,
+                error_path,
+                errors,
+                mutated_tables,
+                gen_info,
+            )
+        })
+        .collect::<Vec<_>>();
     let ret_val = if let Some(ret_op) = ctx.returnflow {
         let return_output = namer.operator_return_value_name(ret_op);
-        quote!{#return_output}
+        quote! {#return_output}
     } else {
-        quote!{()}
+        quote! {()}
     };
 
-    quote!{
+    quote! {
         {
             #(#tokens;)*
             #ret_val
         }
-    }.into()
+    }
+    .into()
 }

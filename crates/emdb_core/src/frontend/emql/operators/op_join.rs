@@ -146,8 +146,8 @@ impl EMQLOperator for Join {
                 if errors.is_empty() {
                     let next_edge = lp.dataflow.insert(plan::DataFlow::Null);
                     let join_op = lp.operators.insert(plan::Join {
-                        left: left_cont.prev_edge,
-                        right: right_cont.prev_edge,
+                        left: plan::JoinInput { identifier: left.clone().into(), dataflow: left_cont.prev_edge},
+                        right: plan::JoinInput { identifier: right.clone().into(), dataflow: right_cont.prev_edge},
                         match_kind: op_matcher,
                         join_kind,
                         output: next_edge

@@ -60,7 +60,7 @@ pub fn select_basic(
         uniques,
         predicates,
         updates,
-        public
+        public,
     }: SelectOperations,
 ) -> BackingKind {
     fn convert_fields(fields: HashMap<Ident, Tokens<Type>>) -> Vec<Field> {
@@ -103,7 +103,8 @@ pub fn select_basic(
                 updates,
                 name,
                 public,
-            }.into()
+            }
+            .into()
         } else {
             Table::<AppendTrans> {
                 groups: GroupConfig {
@@ -119,7 +120,8 @@ pub fn select_basic(
                 updates,
                 name,
                 public,
-            }.into()
+            }
+            .into()
         }
     } else if deletions {
         Table::<Pull> {
@@ -136,7 +138,8 @@ pub fn select_basic(
             updates,
             name,
             public,
-        }.into()
+        }
+        .into()
     } else {
         Table::<Append> {
             groups: GroupConfig {
@@ -152,6 +155,7 @@ pub fn select_basic(
             updates,
             name,
             public,
-        }.into()
+        }
+        .into()
     }
 }
