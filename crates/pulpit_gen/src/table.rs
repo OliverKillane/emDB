@@ -10,7 +10,6 @@ use quote_debug::Tokens;
 use syn::{Ident, ItemImpl, ItemMod, ItemStruct, Type};
 
 use super::{
-    columns::PrimaryKind,
     groups::{Groups, GroupsDef},
     namer::CodeNamer,
     operations::{update::Update, SingleOp},
@@ -18,12 +17,14 @@ use super::{
     uniques::{self, Unique},
 };
 
-pub struct Table<Primary: PrimaryKind> {
-    pub groups: Groups<Primary>,
+pub struct Table {
+    pub groups: Groups,
     pub uniques: Vec<Unique>,
     pub predicates: Vec<Predicate>,
     pub updates: Vec<Update>,
     pub name: Ident,
+    pub transactions: bool,
+    pub deletions: bool,
     pub public: bool,
 }
 
@@ -99,7 +100,7 @@ fn generate_table_and_window(transactions: bool, namer: &CodeNamer) -> TableDec 
     }
 }
 
-impl<Primary: PrimaryKind> Table<Primary> {
+impl Table {
     pub fn op_get_types(&self, namer: &CodeNamer) -> HashMap<FieldName, Tokens<Type>> {
         get_struct_fields(&self.groups, namer)
     }
@@ -114,6 +115,8 @@ impl<Primary: PrimaryKind> Table<Primary> {
             updates,
             name,
             public,
+            transactions,
+            deletions,
         } = self;
 
         let CodeNamer {
@@ -140,12 +143,12 @@ impl<Primary: PrimaryKind> Table<Primary> {
         let mut ops_mod_code = vec![
             operations::borrow::generate(groups, namer),
             operations::get::generate(groups, namer),
-            operations::update::generate(updates, groups, uniques, predicates, namer),
-            operations::insert::generate(groups, uniques, predicates, namer),
+            operations::update::generate(updates, groups, uniques, predicates, namer, *transactions),
+            operations::insert::generate(groups, uniques, predicates, namer, *deletions, *transactions),
             operations::unique_get::generate(groups, uniques, namer),
         ];
-        if Primary::TRANSACTIONS {
-            ops_mod_code.push(operations::transact::generate(groups, updates, namer))
+        if *transactions {
+            ops_mod_code.push(operations::transact::generate(groups, updates, namer, *deletions, *transactions))
         }
 
         let mut ops_fn_code = vec![
@@ -153,15 +156,15 @@ impl<Primary: PrimaryKind> Table<Primary> {
             operations::scan::generate(namer),
         ];
 
-        if Primary::DELETIONS {
-            ops_fn_code.push(operations::delete::generate(namer, groups, uniques))
+        if *deletions {
+            ops_fn_code.push(operations::delete::generate(namer, groups, uniques, *transactions))
         }
 
         let TableDec {
             table_struct,
             table_impl,
             window_struct,
-        } = generate_table_and_window(Primary::TRANSACTIONS, namer);
+        } = generate_table_and_window(*transactions, namer);
 
         let ops_tokens = ops_mod_code
             .into_iter()

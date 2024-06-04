@@ -248,7 +248,7 @@ fn add_query(
     let mut ts = HashMap::new();
 
     // Analyse the query parameters
-    let (raw_params, mut errors) = extract_fields(params, errors::query_parameter_redefined);
+    let (raw_params, mut errors) = extract_fields_ordered(params, errors::query_parameter_redefined);
     let params =
         raw_params.into_iter().filter_map(|(name, data_type)| {
             match query_ast_typeto_scalar(
@@ -459,8 +459,7 @@ fn recur_stream(
     }
 }
 
-// TODO: be deterministic! By insert order?
-/// helper for extracting a map of unique fields by Ident
+/// Creates a hashmap from the fields, with errors for duplicate fields
 pub fn extract_fields<T>(
     fields: Vec<(Ident, T)>,
     err_fn: impl Fn(&Ident, &Ident) -> Diagnostic,
@@ -476,6 +475,29 @@ pub fn extract_fields<T>(
     }
 
     (map_fields, errors)
+}
+
+/// Similar to [extract_fields] but maintains the order of fields from the original vector.
+/// - duplicates of fields are removed
+/// - errors are generated for each duplicate
+pub fn extract_fields_ordered<T>(
+    fields: Vec<(Ident, T)>,
+    err_fn: impl Fn(&Ident, &Ident) -> Diagnostic,
+) -> (Vec<(Ident, T)>, LinkedList<Diagnostic>) {
+    let mut errors = LinkedList::new();
+    let mut used_names = HashSet::with_capacity(fields.len());
+
+    let non_dup_fields = fields.into_iter().filter_map(|(id, content)| {
+        if let Some(other_id) = used_names.get(&id) {
+            errors.push_back(err_fn(&id, other_id));
+            None
+        } else {
+            used_names.insert(id.clone());
+            Some((id, content))
+        }
+    }).collect();
+
+    (non_dup_fields, errors)
 }
 
 /// Converts an AST type to a scalar type, if a rust type then the [`plan::TypeContext::Query`] context is used.

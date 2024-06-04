@@ -14,4 +14,15 @@ impl ColKind for AssocVec {
         let pulpit_path = &namer.pulpit_path;
         quote! { #pulpit_path::column::AssocVec }.into()
     }
+
+    fn check_column_application(
+        &self,
+        error_span: Span,
+        imm_fields: &[Field],
+        mut_fields: &[Field],
+        transactions: bool,
+        deletions: bool,
+    ) -> LinkedList<Diagnostic> {
+        LinkedList::new()
+    }
 }

@@ -1,11 +1,13 @@
 use super::{update::Update, SingleOp};
-use crate::{columns::PrimaryKind, groups::Groups, namer::CodeNamer};
+use crate::{groups::Groups, namer::CodeNamer};
 use quote::quote;
 
-pub fn generate<Primary: PrimaryKind>(
-    groups: &Groups<Primary>,
+pub fn generate(
+    groups: &Groups,
     updates: &[Update],
     namer: &CodeNamer,
+    deletions: bool,
+    transactions: bool,
 ) -> SingleOp {
     let CodeNamer {
         struct_window,
@@ -37,7 +39,7 @@ pub fn generate<Primary: PrimaryKind>(
         |Update { fields: _, alias }| quote!(#alias(super::#mod_update::#alias::#mod_update_struct_update)),
     );
 
-    let log_variants = if Primary::DELETIONS {
+    let log_variants = if deletions {
         quote! {
             #mod_transactions_enum_logitem_variant_update(super::#type_key, #mod_transactions_enum_update),
             #mod_transactions_enum_logitem_variant_insert(super::#type_key),
@@ -63,7 +65,7 @@ pub fn generate<Primary: PrimaryKind>(
         }
     }};
 
-    let op_impl = if Primary::DELETIONS {
+    let op_impl = if deletions {
         quote! {
             impl <'imm> #struct_window<'imm> {
                 /// Commit all current changes

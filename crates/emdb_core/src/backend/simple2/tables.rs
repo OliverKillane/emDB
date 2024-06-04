@@ -119,7 +119,7 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, namer: &SimpleNamer) -> Table
     let (get_types, gen_data): (HashMap<_, _>, Vec<_>) = pulpit_configs
         .into_iter()
         .map(|(key, config)| {
-            let table_impl = pulpit::gen::selector::select_basic(config);
+            let table_impl = pulpit::gen::selector::basic::selector(config);
             (
                 (key, table_impl.op_get_types(pulpit_namer)),
                 (

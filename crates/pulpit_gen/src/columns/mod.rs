@@ -1,8 +1,11 @@
+use std::collections::LinkedList;
+
 use crate::{
     groups::{Field, MutImmut},
     namer::CodeNamer,
 };
 use proc_macro2::{Span, TokenStream};
+use proc_macro_error::{Diagnostic, Level};
 use quote::quote;
 use quote_debug::Tokens;
 use syn::{Ident, ItemFn, ItemStruct, Type};
@@ -12,8 +15,21 @@ pub struct ImmConversion {
     pub unpacker: Tokens<ItemFn>,
 }
 
+// TODO: remove the strongly typed interface and replace with two enum types
+
 #[enumtrait::store(col_kind_trait)]
 pub trait ColKind {
+    /// Required to check columns can be applied with the values provided.
+    /// - Adapters take no values
+    fn check_column_application(
+        &self,
+        error_span: Span,
+        imm_fields: &[Field],
+        mut_fields: &[Field],
+        transactions: bool,
+        deletions: bool,
+    ) -> LinkedList<Diagnostic>;
+
     fn derives(&self) -> MutImmut<Vec<Ident>>;
     fn generate_column_type(
         &self,
@@ -76,124 +92,45 @@ pub trait ColKind {
     }
 }
 
-pub trait AssocKind: ColKind {}
-
-pub trait PrimaryKind: ColKind {
-    const TRANSACTIONS: bool;
-    const DELETIONS: bool;
-    type Assoc: AssocKind;
-}
-
 mod primary_retain;
 pub use primary_retain::*;
 mod assoc_vec;
 pub use assoc_vec::*;
-mod primary_pull;
-pub use primary_pull::*;
+mod primary_pull_adapter;
+pub use primary_pull_adapter::*;
 mod primary_gen_arena;
 pub use primary_gen_arena::*;
 mod primary_thunderdome;
 pub use primary_thunderdome::*;
-mod primary_no_pull;
-pub use primary_no_pull::*;
+mod primary_append_adapter;
+pub use primary_append_adapter::*;
 mod assoc_blocks;
 pub use assoc_blocks::*;
-
-impl AssocKind for AssocVec {}
+mod primary_thunderdome_trans;
+pub use primary_thunderdome_trans::*;
 
 #[enumtrait::quick_enum]
 #[enumtrait::quick_from]
-#[enumtrait::store(assoc_pull_enum)]
-pub enum AssocPull {
-    AssocVec,
+#[enumtrait::store(enum_primary)]
+pub enum Primary {
+    PrimaryAppendAdapter,
+    PrimaryPullAdapter,
+    PrimaryRetain,
+    PrimaryThunderdome,
+    PrimaryThunderDomeTrans,
+    PrimaryGenArena,
 }
 
-impl AssocKind for AssocPull {}
-
-#[enumtrait::impl_trait(col_kind_trait for assoc_pull_enum)]
-impl ColKind for AssocPull {}
+#[enumtrait::impl_trait(col_kind_trait for enum_primary)]
+impl ColKind for Primary {}
 
 #[enumtrait::quick_enum]
 #[enumtrait::quick_from]
-#[enumtrait::store(assoc_app_enum)]
-pub enum AssocApp {
+#[enumtrait::store(enum_associated)]
+pub enum Associated {
     AssocVec,
     AssocBlocks,
 }
 
-impl AssocKind for AssocApp {}
-
-#[enumtrait::impl_trait(col_kind_trait for assoc_app_enum)]
-impl ColKind for AssocApp {}
-
-#[enumtrait::quick_enum]
-#[enumtrait::quick_from]
-#[enumtrait::store(pull_trans_enum)]
-pub enum PullTrans {
-    PrimaryPull,
-    PrimaryRetain,
-}
-
-impl PrimaryKind for PullTrans {
-    const TRANSACTIONS: bool = true;
-    const DELETIONS: bool = true;
-
-    type Assoc = AssocPull;
-}
-
-#[enumtrait::impl_trait(col_kind_trait for pull_trans_enum)]
-impl ColKind for PullTrans {}
-
-#[enumtrait::quick_enum]
-#[enumtrait::quick_from]
-#[enumtrait::store(pull_enum)]
-pub enum Pull {
-    PrimaryGenArena,
-    PrimaryThunderdome,
-    PrimaryRetain,
-    PrimaryPull,
-}
-
-#[enumtrait::impl_trait(col_kind_trait for pull_enum)]
-impl ColKind for Pull {}
-
-impl PrimaryKind for Pull {
-    const TRANSACTIONS: bool = false;
-    const DELETIONS: bool = true;
-
-    type Assoc = AssocPull;
-}
-
-#[enumtrait::quick_enum]
-#[enumtrait::quick_from]
-#[enumtrait::store(app_trans_enum)]
-pub enum AppendTrans {
-    PrimaryNoPull,
-}
-
-impl PrimaryKind for AppendTrans {
-    const TRANSACTIONS: bool = true;
-    const DELETIONS: bool = false;
-
-    type Assoc = AssocApp;
-}
-
-#[enumtrait::impl_trait(col_kind_trait for app_trans_enum)]
-impl ColKind for AppendTrans {}
-
-#[enumtrait::quick_enum]
-#[enumtrait::quick_from]
-#[enumtrait::store(app_enum)]
-pub enum Append {
-    PrimaryNoPull,
-}
-
-impl PrimaryKind for Append {
-    const TRANSACTIONS: bool = false;
-    const DELETIONS: bool = false;
-
-    type Assoc = AssocApp;
-}
-
-#[enumtrait::impl_trait(col_kind_trait for app_enum)]
-impl ColKind for Append {}
+#[enumtrait::impl_trait(col_kind_trait for enum_associated)]
+impl ColKind for Associated {}

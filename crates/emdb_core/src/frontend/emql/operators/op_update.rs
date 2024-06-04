@@ -45,7 +45,7 @@ impl EMQLOperator for Update {
                 op_ctx,
                 cont,
                 |lp, op_ctx, prev, next_edge| {
-                    let (raw_fields, mut errors) = extract_fields(fields, errors::query_operator_field_redefined);
+                    let (raw_fields, mut errors) = extract_fields_ordered(fields, errors::query_operator_field_redefined);
                     
                     let raw_table_id = if let Some(sk) = lp.get_record_type_conc(prev.data_type.fields).fields.get(&rec_reference) {
                         if let plan::ScalarTypeConc::TableRef(table) = lp.get_scalar_type_conc(*sk) { Some(*table) } else {
@@ -68,7 +68,7 @@ impl EMQLOperator for Update {
                         let table = lp.get_table(table_id);
 
                         let mut update_record = plan::RecordConc { fields: HashMap::new() };
-                        for id in nondup_fields.keys() {
+                        for (id,_) in &nondup_fields {
                             match table.columns.get(&id.clone().into()) {
                                 Some(col) => {
                                     update_record.fields.insert(id.clone().into(), col.data_type);

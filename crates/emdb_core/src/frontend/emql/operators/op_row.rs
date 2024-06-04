@@ -27,7 +27,7 @@ impl EMQLOperator for Row {
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, fields } = self;
         if cont.is_none() {
-            let (fields, mut errors) = extract_fields(fields, errors::query_operator_field_redefined);
+            let (fields, mut errors) = extract_fields_ordered(fields, errors::query_operator_field_redefined);
             
             let mut type_fields = HashMap::new();
             let mut expr_fields = Vec::new();

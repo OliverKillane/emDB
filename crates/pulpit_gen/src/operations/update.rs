@@ -4,7 +4,6 @@ use quote_debug::Tokens;
 use syn::{ExprLet, ExprMethodCall, Ident, ImplItemFn, ItemMod, Variant};
 
 use crate::{
-    columns::PrimaryKind,
     groups::{FieldIndex, Groups},
     namer::CodeNamer,
     predicates::{generate_update_predicate_access, Predicate},
@@ -20,12 +19,13 @@ pub struct Update {
     pub alias: Ident,
 }
 
-pub fn generate<Primary: PrimaryKind>(
+pub fn generate(
     updates: &[Update],
-    groups: &Groups<Primary>,
+    groups: &Groups,
     uniques: &[Unique],
     predicates: &[Predicate],
     namer: &CodeNamer,
+    transactions: bool,
 ) -> SingleOp {
     let CodeNamer {
         mod_update,
@@ -38,7 +38,7 @@ pub fn generate<Primary: PrimaryKind>(
         .map(|update| update.generate_mod(groups, uniques, predicates, namer));
     let impl_fns = updates
         .iter()
-        .map(|update| update.generate_trait_impl_fn(namer, groups, uniques, predicates));
+        .map(|update| update.generate_trait_impl_fn(namer, groups, uniques, predicates, transactions));
 
     SingleOp {
         op_mod: quote! {
@@ -57,9 +57,9 @@ pub fn generate<Primary: PrimaryKind>(
 }
 
 impl Update {
-    fn generate_mod<Primary: PrimaryKind>(
+    fn generate_mod(
         &self,
-        groups: &Groups<Primary>,
+        groups: &Groups,
         uniques: &[Unique],
         predicates: &[Predicate],
         namer: &CodeNamer,
@@ -134,12 +134,13 @@ impl Update {
         .into()
     }
 
-    fn generate_trait_impl_fn<Primary: PrimaryKind>(
+    fn generate_trait_impl_fn(
         &self,
         namer: &CodeNamer,
-        groups: &Groups<Primary>,
+        groups: &Groups,
         uniques: &[Unique],
         predicates: &[Predicate],
+        transactions: bool,
     ) -> Tokens<ImplItemFn> {
         let CodeNamer {
             mod_update,
@@ -237,7 +238,7 @@ impl Update {
             (field, quote!(#name_id.mut_data.#field))
         });
 
-        let commit_updates = if Primary::TRANSACTIONS {
+        let commit_updates = if transactions {
             let updates = update_pairs.map(|(field, mut_access)| {
                 quote! {
                     std::mem::swap(&mut #mut_access, &mut update.#field);

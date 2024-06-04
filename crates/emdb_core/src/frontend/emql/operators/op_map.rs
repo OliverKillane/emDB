@@ -32,7 +32,7 @@ impl EMQLOperator for Map {
                 op_ctx,
                 cont,
                 |lp, op_ctx, Continue { data_type, prev_edge, last_span }, next_edge| {
-                    let (fields, mut errors) = extract_fields(new_fields, errors::query_operator_field_redefined);
+                    let (fields, mut errors) = extract_fields_ordered(new_fields, errors::query_operator_field_redefined);
                     let mut type_fields = HashMap::new();
                     let mut expr_fields = Vec::new();
 

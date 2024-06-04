@@ -1,4 +1,7 @@
 use super::*;
+
+/// An append only column of blocks, with pointer stability.
+/// No restrictions on the mutable and immutable
 pub struct AssocBlocks {
     pub block_size: usize,
 }
@@ -12,12 +15,6 @@ impl ColKind for AssocBlocks {
     }
 
     fn convert_imm(&self, namer: &CodeNamer, imm_fields: &[Field]) -> ImmConversion {
-        let field_defs = imm_fields.iter().map(|Field { name, ty }| {
-            quote! {
-                pub #name : &'imm #ty
-            }
-        });
-
         let CodeNamer {
             mod_columns_struct_imm_unpacked,
             mod_columns_fn_imm_unpack,
@@ -25,20 +22,40 @@ impl ColKind for AssocBlocks {
             ..
         } = namer;
 
-        let fields = imm_fields.iter().map(|Field { name, ty: _ }| name);
-        let unpack_fields = fields.clone();
+        if imm_fields.is_empty() {
+            ImmConversion {
+                imm_unpacked: quote!{
+                    pub struct #mod_columns_struct_imm_unpacked<'imm> {
+                        pub phantom: std::marker::PhantomData<&'imm ()>
+                    }
+                }.into(),
+                unpacker:  quote!{
+                    pub fn #mod_columns_fn_imm_unpack<'imm>(_: &'imm #mod_columns_struct_imm) -> #mod_columns_struct_imm_unpacked<'imm> {
+                        #mod_columns_struct_imm_unpacked { phantom: std::marker::PhantomData }
+                    }
+                }.into()
+            }
+        } else {
+            let field_defs = imm_fields.iter().map(|Field { name, ty }| {
+                quote! {
+                    pub #name : &'imm #ty
+                }
+            });
+            let fields = imm_fields.iter().map(|Field { name, ty: _ }| name);
+            let unpack_fields = fields.clone();
 
-        ImmConversion {
-            imm_unpacked: quote!{
-                pub struct #mod_columns_struct_imm_unpacked<'imm> {
-                    #(#field_defs),*
-                }
-            }.into(),
-            unpacker:  quote!{
-                pub fn #mod_columns_fn_imm_unpack<'imm>(#mod_columns_struct_imm { #(#fields),* }: &'imm #mod_columns_struct_imm) -> #mod_columns_struct_imm_unpacked<'imm> {
-                    #mod_columns_struct_imm_unpacked { #(#unpack_fields),* }
-                }
-            }.into()
+            ImmConversion {
+                imm_unpacked: quote!{
+                    pub struct #mod_columns_struct_imm_unpacked<'imm> {
+                        #(#field_defs),*
+                    }
+                }.into(),
+                unpacker:  quote!{
+                    pub fn #mod_columns_fn_imm_unpack<'imm>(#mod_columns_struct_imm { #(#fields),* }: &'imm #mod_columns_struct_imm) -> #mod_columns_struct_imm_unpacked<'imm> {
+                        #mod_columns_struct_imm_unpacked { #(#unpack_fields),* }
+                    }
+                }.into()
+            }
         }
     }
 
@@ -65,5 +82,24 @@ impl ColKind for AssocBlocks {
         let ty = &field.ty;
         let lifetime = &namer.lifetime_imm;
         quote!(&#lifetime #ty).into()
+    }
+
+    fn check_column_application(
+        &self,
+        error_span: Span,
+        imm_fields: &[Field],
+        mut_fields: &[Field],
+        transactions: bool,
+        deletions: bool,
+    ) -> LinkedList<Diagnostic> {
+        if deletions {
+            LinkedList::from([Diagnostic::spanned(
+                error_span,
+                Level::Error,
+                String::from("AssocBlocks does not support deletions"),
+            )])
+        } else {
+            LinkedList::new()
+        }
     }
 }

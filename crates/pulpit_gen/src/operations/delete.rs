@@ -1,5 +1,4 @@
 use crate::{
-    columns::PrimaryKind,
     groups::{FieldIndex, Groups},
     namer::CodeNamer,
     operations::SingleOpFn,
@@ -10,10 +9,12 @@ use quote::quote;
 use quote_debug::Tokens;
 use syn::{ExprMatch, Ident};
 
-pub fn generate<Primary: PrimaryKind>(
+/// Should only be called when deletions are enabled for the table
+pub fn generate(
     namer: &CodeNamer,
-    groups: &Groups<Primary>,
+    groups: &Groups,
     uniques: &[Unique],
+    transactions: bool,
 ) -> SingleOpFn {
     let CodeNamer {
         type_key_error,
@@ -39,8 +40,6 @@ pub fn generate<Primary: PrimaryKind>(
     let key_ident = Ident::new("key", Span::call_site());
     let index_ident = Ident::new("index", Span::call_site());
     let brw_ident = Ident::new("brw_data", Span::call_site());
-
-    assert!(Primary::DELETIONS);
 
     let unique_deletions = uniques.iter().map(|Unique { alias: _, field }| {
         let field_index = groups.get_field_index(field).unwrap();
@@ -78,7 +77,7 @@ pub fn generate<Primary: PrimaryKind>(
             }
     }.into();
 
-    let op_impl = if Primary::TRANSACTIONS {
+    let op_impl = if transactions {
         let transactional = quote! {
             if !self.#table_member_transactions.#mod_transactions_struct_data_member_rollback {
                 self.#table_member_transactions.#mod_transactions_struct_data_member_log.push(#mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_delete(key));

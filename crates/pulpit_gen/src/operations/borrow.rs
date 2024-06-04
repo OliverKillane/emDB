@@ -1,14 +1,13 @@
 use super::SingleOp;
 use crate::{
-    columns::PrimaryKind,
     groups::{FieldIndex, Groups},
     namer::CodeNamer,
 };
 use proc_macro2::TokenStream;
 use quote::quote;
 
-fn generate_borrow_fields<'a, Primary: PrimaryKind>(
-    groups: &'a Groups<Primary>,
+fn generate_borrow_fields<'a>(
+    groups: &'a Groups,
     namer: &'a CodeNamer,
 ) -> impl Iterator<Item = TokenStream> + 'a {
     groups.idents.iter().map(|(field_name, field_index)| {
@@ -30,7 +29,7 @@ fn generate_borrow_fields<'a, Primary: PrimaryKind>(
     })
 }
 
-pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeNamer) -> SingleOp {
+pub fn generate(groups: &Groups, namer: &CodeNamer) -> SingleOp {
     let CodeNamer {
         type_key,
         struct_window,
@@ -44,11 +43,17 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
         ..
     } = namer;
 
-    let borrowed_fields = generate_borrow_fields(groups, namer);
-    let struct_fields = groups.idents.iter().map(|(field_name, field_index)| {
-        let field_ty = groups.get_type(field_index).unwrap();
-        quote!(pub #field_name: &'brw #field_ty)
-    });
+    
+    let (struct_fields_def, borrowed_fields) = if groups.idents.is_empty() {
+        (quote!(pub phantom: std::marker::PhantomData<&'brw ()>), quote!(phantom: std::marker::PhantomData))
+    } else {
+        let borrowed_fields = generate_borrow_fields(groups, namer);
+        let struct_fields = groups.idents.iter().map(|(field_name, field_index)| {
+            let field_ty = groups.get_type(field_index).unwrap();
+            quote!(pub #field_name: &'brw #field_ty)
+        });
+        (quote!{#(#struct_fields),*}, quote!(#(#borrowed_fields),*))
+    };
 
     let assoc_brws = (0..groups.assoc.len()).map(|ind| {
         let name = namer.name_assoc_column(ind);
@@ -58,7 +63,7 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
         op_mod: quote! {
             pub mod #mod_borrow {
                 pub struct #mod_borrow_struct_borrow<'brw> {
-                    #(#struct_fields),*
+                    #struct_fields_def
                 }
             }
         }
@@ -73,7 +78,7 @@ pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeName
                     #(#assoc_brws;)*
 
                     Ok(#mod_borrow::#mod_borrow_struct_borrow {
-                        #(#borrowed_fields,)*
+                        #borrowed_fields
                     })
                 }
             }

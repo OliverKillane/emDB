@@ -2,7 +2,7 @@ use quote::quote;
 use quote_debug::Tokens;
 use syn::{Ident, ItemImpl, ItemStruct};
 
-use super::{columns::PrimaryKind, groups::Groups, namer::CodeNamer};
+use super::{groups::Groups, namer::CodeNamer};
 
 pub struct Unique {
     pub alias: Ident,
@@ -14,9 +14,9 @@ pub struct UniqueDec {
     pub unique_impl: Tokens<ItemImpl>,
 }
 
-pub fn generate<Primary: PrimaryKind>(
+pub fn generate(
     uniques: &[Unique],
-    groups: &Groups<Primary>,
+    groups: &Groups,
     namer: &CodeNamer,
 ) -> UniqueDec {
     let CodeNamer {

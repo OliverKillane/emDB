@@ -2,7 +2,7 @@ use std::iter::once;
 
 use super::SingleOp;
 use crate::{
-    columns::{ColKind, PrimaryKind},
+    columns::ColKind,
     groups::{Field, Group, Groups},
     namer::CodeNamer,
     predicates::Predicate,
@@ -49,11 +49,13 @@ pub fn generate_column_assignments<Col: ColKind>(
     .into()
 }
 
-pub fn generate<Primary: PrimaryKind>(
-    groups: &Groups<Primary>,
+pub fn generate(
+    groups: &Groups,
     uniques: &[Unique],
     predicates: &[Predicate],
     namer: &CodeNamer,
+    deletions: bool,
+    transactions: bool,
 ) -> SingleOp {
     let CodeNamer {
         type_key,
@@ -144,7 +146,7 @@ pub fn generate<Primary: PrimaryKind>(
         }
     });
 
-    let (add_action, add_trans) = if Primary::DELETIONS {
+    let (add_action, add_trans) = if deletions {
         let places = assoc_grps.map(|grp| {
             quote! {
                 self.#table_member_columns.#grp.place(index, #grp);
@@ -164,7 +166,7 @@ pub fn generate<Primary: PrimaryKind>(
                     }
                 }
             },
-            if Primary::TRANSACTIONS {
+            if transactions {
                 quote! {
                     if !self.#table_member_transactions.#mod_transactions_struct_data_member_rollback {
                         self.#table_member_transactions.#mod_transactions_struct_data_member_log.push(#mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_insert(key));
@@ -180,7 +182,7 @@ pub fn generate<Primary: PrimaryKind>(
                 let #key_var = self.#table_member_columns.#name_primary_column.append(#name_primary_column);
                 #(#appends)*
             },
-            if Primary::TRANSACTIONS {
+            if transactions {
                 quote! {
                     if !self.#table_member_transactions.#mod_transactions_struct_data_member_rollback {
                         self.#table_member_transactions.#mod_transactions_struct_data_member_log.push(#mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_append);

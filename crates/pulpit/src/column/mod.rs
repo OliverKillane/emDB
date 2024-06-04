@@ -130,6 +130,46 @@
 //! separate inserts (required for an index that need to keep generations) is high.
 //! - Allows for other optimisations, such as in [`PrimaryRetain`]'s reuse of space for
 //!   data, and for the mutable data for generation & free slot storage.
+//! 
+//! Note that you can technically still use a separate index using 
+//! [`PrimaryAppendAdapter`] or [`PrimaryPullAdapter`]
+//!
+//! ## Potential for Improvement
+//! ### Using limit constraints on a table to determine the UnsafeIndex size.
+//! Requires adding this type of constraint.
+//! - The unsafeindex should be chosen based on the limit to the number of rows
+//!   e.g. < 256 elements means a u8 is all that is required.
+//! 
+//! ### Variadict Tuples
+//! A proposed feature for rust that could dramatically improve the code in 
+//! [`crate::gen`] by allowing fields to be represented here at the type level, 
+//! rather than being managed by macro.
+//! 
+//! ### References in Tables
+//! Allowing users to let the table borrow data for the lifetime of the Table efficiently.
+//! 
+//! Currently possible, but with the significant caveat that:
+//! 1. The references when 'gotten' live as long as the window, not their original lifetime.
+//! 2. When returning an `'imm` reference, we do not check if that type is already 
+//!    a reference type. By copying rather than re-referencing we can avoid a 
+//!    double dereference by the user on access, and allow the lifetime extension 
+//!    mentioned in (1.) 
+//! 
+//! ### A reference counted arena
+//! Need to store Rcs, and use them as the [`PrimaryWindow::ImmGet`] type.
+//! - Allows us to return Rcs, even for a [`PrimaryWindowPull`]
+//! - This should use our own allocator, rather than [`std::alloc`] (we know
+//!   type information [`std::alloc`] cannot use).
+//! 
+//! ### HashSet backed arena for large types
+//! To avoid duplicates - particularly with large strings.
+//! - As an associated column.
+//! 
+//! ### Optimisation Study
+//! We can further optimise the tables with:
+//! - careful use of [`std::hint::unreachable_unchecked`]
+//! - applying inlining where relevant
+//! - removing missed bounds checks in [`AssocWindow`] implementations
 
 use std::{hash::Hash, marker::PhantomData, mem::transmute};
 
@@ -139,19 +179,21 @@ mod assoc_vec;
 pub use assoc_vec::*;
 mod primary_gen_arena;
 pub use primary_gen_arena::*;
-mod primary_no_pull;
-pub use primary_no_pull::*;
-mod primary_pull;
-pub use primary_pull::*;
+mod primary_append_adapter;
+pub use primary_append_adapter::*;
+mod primary_pull_adapter;
+pub use primary_pull_adapter::*;
 mod primary_retain;
 pub use primary_retain::*;
 mod primary_thunderdome;
 pub use primary_thunderdome::*;
+mod primary_thunderdome_trans;
+pub use primary_thunderdome_trans::*;
 
 /// A single window type holding a mutable references through which windows for
 /// columns and primary indexes can be generated.
-pub struct Window<'imm, Data> {
-    inner: &'imm mut Data,
+pub struct Window<'imm, Table> {
+    inner: &'imm mut Table,
 }
 
 /// The trait for describing column construction and windowing.
@@ -392,6 +434,10 @@ mod utils {
                 count: 0,
                 data: Vec::with_capacity(size_hint / BLOCK_SIZE + 1),
             }
+        }
+
+        pub fn count(&self) -> usize {
+            self.count
         }
 
         pub fn append(&mut self, val: Value) -> *mut Value {
@@ -749,8 +795,7 @@ mod verif {
         test_pull_impl!(primary_retain => PrimaryRetain<usize, usize, 16>);
         test_pull_impl!(gen_arena => PrimaryGenerationalArena<usize, usize>);
         test_pull_impl!(thunderdome => PrimaryThunderDome<usize, usize>);
-
-        test_app_impl!(block => PrimaryAppend<AssocBlocks<usize, usize, 16>>);
+        test_pull_impl!(thunderdome_trans => PrimaryThunderDomeTrans<usize, usize>);
     }
 
     #[cfg(kani)]

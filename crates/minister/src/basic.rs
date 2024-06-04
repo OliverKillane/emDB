@@ -40,11 +40,11 @@ impl Physical for Basic {
     fn fold<InData, Acc>(
         stream: Self::Stream<InData>,
         initial: Acc,
-        fold_fn: impl Fn(&mut Acc, InData),
+        fold_fn: impl Fn(Acc, InData) -> Acc,
     ) -> Self::Single<Acc> {
         let mut acc = initial;
         for data in stream {
-            fold_fn(&mut acc, data);
+            acc = fold_fn(acc, data);
         }
         acc
     }
@@ -151,12 +151,10 @@ impl Physical for Basic {
         left
     }
 
-    fn fork<Data, const SPLIT: usize>(stream: Self::Stream<Data>) -> [Self::Stream<Data>; SPLIT]
+    fn fork<Data>(stream: &Self::Stream<Data>) -> Self::Stream<Data>
     where
-        Data: Clone,
-    {
-        let vals = [&stream; SPLIT];
-        vals.map(Clone::clone)
+        Data: Clone {
+        stream.clone()
     }
 
     fn split<LeftData, RightData>(

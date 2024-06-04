@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::SingleOp;
 use crate::{
-    columns::{ColKind, PrimaryKind},
+    columns::ColKind,
     groups::{Field, FieldIndex, FieldName, Group, Groups, MutImmut},
     namer::CodeNamer,
 };
@@ -11,8 +11,8 @@ use quote::quote;
 use quote_debug::Tokens;
 use syn::Type;
 
-fn generate_get_fields<'a, Primary: PrimaryKind>(
-    groups: &'a Groups<Primary>,
+fn generate_get_fields<'a>(
+    groups: &'a Groups,
     namer: &'a CodeNamer,
 ) -> impl Iterator<Item = TokenStream> + 'a {
     groups.idents.iter().map(|(field_name, field_index)| {
@@ -35,8 +35,8 @@ fn generate_get_fields<'a, Primary: PrimaryKind>(
 }
 
 /// Used to generate the field types for get operations on a table
-pub fn get_struct_fields<'a, Primary: PrimaryKind>(
-    groups: &'a Groups<Primary>,
+pub fn get_struct_fields<'a>(
+    groups: &'a Groups,
     namer: &'a CodeNamer,
 ) -> HashMap<FieldName, Tokens<Type>> {
     fn append<Col: ColKind>(
@@ -66,8 +66,8 @@ pub fn get_struct_fields<'a, Primary: PrimaryKind>(
     def_fields
 }
 
-pub fn generate_get_struct_fields<'a, Primary: PrimaryKind>(
-    groups: &'a Groups<Primary>,
+pub fn generate_get_struct_fields<'a>(
+    groups: &'a Groups,
     namer: &'a CodeNamer,
 ) -> Vec<TokenStream> {
     fn append<Col: ColKind>(
@@ -98,7 +98,7 @@ pub fn generate_get_struct_fields<'a, Primary: PrimaryKind>(
     def_fields
 }
 
-pub fn generate<Primary: PrimaryKind>(groups: &Groups<Primary>, namer: &CodeNamer) -> SingleOp {
+pub fn generate(groups: &Groups, namer: &CodeNamer) -> SingleOp {
     let CodeNamer {
         type_key_error,
         type_key,

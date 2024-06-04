@@ -221,7 +221,11 @@ fn generate_query<'imm>(
 
 pub struct QueriesInfo {
     pub query_mod: Tokens<ItemMod>,
-    pub query_impls: Tokens<ItemImpl>,
+
+    /// If there are no queries, we should not produce an impl block that does not 
+    /// use the [`SimpleNamer::db_lifetime`] as this will cause an error with span
+    /// [`proc_macro2::Span::call_site`]
+    pub query_impls: Option<Tokens<ItemImpl>>,
 }
 
 // TODO: determine error type
@@ -251,11 +255,17 @@ pub fn generate_queries<'imm>(
             }
         }
         .into(),
-        query_impls: quote! {
-            impl <#db_lifetime> #struct_database<#db_lifetime> {
-                #(#impls)*
-            }
-        }
-        .into(),
+        query_impls: if impls.is_empty() {
+            None
+        } else {
+            Some(
+                quote! {
+                    impl <#db_lifetime> #struct_database<#db_lifetime> {
+                        #(#impls)*
+                    }
+                }
+                .into(),
+            )
+        },
     }
 }

@@ -35,6 +35,11 @@ emql! {
             ~> map(z: i32 = c*c)
             ~> return;
     }
+
+    query remove_all() {
+        ref simple as simple_ref
+            |> delete(simple_ref);
+    }
 }
 
 fn main() {}

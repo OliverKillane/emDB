@@ -35,7 +35,7 @@ where
 
     unsafe fn get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, MutData> {
         unsafe {
-            let Data { imm_data, mut_data } = self.brw(ind);
+            let Data { imm_data, mut_data } = <Self as AssocWindow<'imm, ImmData, MutData>>::brw(self,ind);
             Data {
                 imm_data: transmute::<&ImmData, &'imm ImmData>(imm_data),
                 mut_data: mut_data.clone(),
@@ -63,6 +63,106 @@ where
 
     fn conv_get(get: Self::ImmGet) -> ImmData {
         get.clone()
+    }
+
+    unsafe fn unppend(&mut self) {
+        self.inner.blocks.unppend();
+    }
+}
+
+impl <'imm, ImmData, MutData, const BLOCK_SIZE: usize> Keyable for AssocBlocks<ImmData, MutData, BLOCK_SIZE> {
+    type Key = UnsafeIndex;
+} 
+
+impl <'imm, ImmData, MutData, const BLOCK_SIZE: usize> PrimaryWindow<'imm, ImmData, MutData>
+    for Window<'imm, AssocBlocks<ImmData, MutData, BLOCK_SIZE>>
+where
+    MutData: Clone,
+    ImmData: Clone,
+{
+    type ImmGet = &'imm ImmData;
+    type Col = AssocBlocks<ImmData, MutData, BLOCK_SIZE>;
+
+    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, MutData> {
+        if key <= self.inner.blocks.count() {
+            Ok(
+                Entry {
+                    index: key,
+                    data: unsafe {
+                        let Data { imm_data, mut_data } = self.inner.blocks.get(key);
+                        Data {
+                            imm_data: transmute::<&ImmData, &'imm ImmData>(imm_data),
+                            mut_data: mut_data.clone(),
+                        }
+                    },
+                }
+            )
+        } else {
+            Err(KeyError)
+        }
+    }
+
+    fn brw(&self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &MutData> {
+        if key <= self.inner.blocks.count() {
+            Ok(
+                Entry {
+                    index: key,
+                    data: unsafe {
+                        let Data { imm_data, mut_data } = self.inner.blocks.get(key);
+                        Data {
+                            imm_data,
+                            mut_data,
+                        }
+                    },
+                }
+            )
+        } else {
+            Err(KeyError)
+        }
+    }
+
+    fn brw_mut(&mut self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &mut MutData> {
+        if key <= self.inner.blocks.count() {
+            Ok(
+                Entry {
+                    index: key,
+                    data: unsafe {
+                        let Data { imm_data, mut_data } = self.inner.blocks.get_mut(key);
+                        Data {
+                            imm_data,
+                            mut_data,
+                        }
+                    },
+                }
+            )
+        } else {
+            Err(KeyError)
+        }
+    }
+
+    fn conv_get(get: Self::ImmGet) -> ImmData {
+        get.clone()
+    }
+
+    fn scan<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
+        0..self.inner.blocks.count()
+    }
+
+    fn count(&self) -> usize {
+        self.inner.blocks.count()
+    }
+} 
+
+impl <'imm, ImmData, MutData, const BLOCK_SIZE: usize> PrimaryWindowApp<'imm, ImmData, MutData>
+    for Window<'imm, AssocBlocks<ImmData, MutData, BLOCK_SIZE>>
+where
+    MutData: Clone,
+    ImmData: Clone,
+{
+    fn append(&mut self, val: Data<ImmData, MutData>) -> <Self::Col as Keyable>::Key {
+        let new_ind = self.inner.blocks.count();
+        self.inner.blocks.append(val);
+        new_ind
     }
 
     unsafe fn unppend(&mut self) {

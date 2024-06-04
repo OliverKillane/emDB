@@ -14,4 +14,19 @@ impl ColKind for PrimaryGenArena {
         let CodeNamer { pulpit_path, .. } = namer;
         quote! { #pulpit_path::column::PrimaryGenerationalArena }.into()
     }
+
+    fn check_column_application(
+        &self,
+        error_span: Span,
+        imm_fields: &[Field],
+        mut_fields: &[Field],
+        transactions: bool,
+        deletions: bool,
+    ) -> LinkedList<Diagnostic> {
+        if transactions {
+            LinkedList::from([Diagnostic::spanned(error_span, Level::Error, String::from("primaryGenArena does not support transactions"))])
+        } else {
+            LinkedList::new()
+        }
+    }
 }

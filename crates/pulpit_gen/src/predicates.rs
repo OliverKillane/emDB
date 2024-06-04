@@ -7,7 +7,6 @@ use syn::{Expr, ExprStruct, Ident, ItemFn, ItemMod};
 use crate::groups::Field;
 
 use super::{
-    columns::PrimaryKind,
     groups::{FieldName, Groups},
     namer::CodeNamer,
 };
@@ -19,9 +18,9 @@ pub struct Predicate {
 
 impl Predicate {
     /// Generates the predicate function to be stored in the predicate module.
-    pub fn generate_function<Primary: PrimaryKind>(
+    pub fn generate_function(
         &self,
-        groups: &Groups<Primary>,
+        groups: &Groups,
         namer: &CodeNamer,
     ) -> Tokens<ItemFn> {
         let CodeNamer {
@@ -42,9 +41,9 @@ impl Predicate {
 }
 
 /// Generate a module containing all predicates.
-pub fn generate<Primary: PrimaryKind>(
+pub fn generate(
     predicates: &[Predicate],
-    groups: &Groups<Primary>,
+    groups: &Groups,
     namer: &CodeNamer,
 ) -> Tokens<ItemMod> {
     let functions = predicates
@@ -64,8 +63,8 @@ pub fn generate<Primary: PrimaryKind>(
 /// but for fields in `new_fields` it uses the `update_value_name` struct instead.
 /// - Allows for the row to be checked by predicates before it is committed to
 ///   the table entry.
-pub fn generate_update_predicate_access<Primary: PrimaryKind>(
-    groups: &Groups<Primary>,
+pub fn generate_update_predicate_access(
+    groups: &Groups,
     new_fields: &[FieldName],
     update_value_name: &Ident,
     namer: &CodeNamer,

@@ -395,7 +395,9 @@ impl OperatorGen for plan::Update {
                 let results = #method_query_operator_alias::#map_kind(
                     #input_holding,
                     |#input_holding| {
-                        let (update_struct, continue_struct) = #closure_val(#input_holding);
+                        // need to clone to avoid borrow issues
+                        // TODO: determine how closure clonign affects cloning of internals 
+                        let (update_struct, continue_struct) = #closure_val.clone()(#input_holding);
 
                         match self.#table_name.#update_method(
                             #mod_tables::#table_name::#mod_update::#update_method::#mod_update_struct_update {
@@ -790,7 +792,7 @@ impl OperatorGen for plan::Fold {
                 let field_name = namer.transform_field_name(rf);
                 (
                     quote!(#field_name: #initial),
-                    quote!(*#field_name = { #update }),
+                    quote!(#field_name: { #update }),
                 )
             })
             .unzip();
@@ -804,8 +806,11 @@ impl OperatorGen for plan::Fold {
                     #(#init_fields,)*
                     #phantom_field: std::marker::PhantomData
                 },
-                |#acc_constructor { #(#acc_fields,)* } : &mut #acc_data_type, #input_data_constructor { #(#input_fields,)* }  | {
-                    #(#update_fields;)*
+                |#acc_constructor { #(#acc_fields,)* } : #acc_data_type, #input_data_constructor { #(#input_fields,)* }  | {
+                    #acc_constructor {
+                        #(#update_fields,)*
+                        #phantom_field: std::marker::PhantomData
+                    }
                 }
             )
         }
@@ -822,21 +827,29 @@ impl OperatorGen for plan::Fold {
         mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
         gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
-        let SimpleNamer { method_query_operator_alias, .. } = namer;
+        let SimpleNamer {
+            method_query_operator_alias,
+            ..
+        } = namer;
         let DataFlowNaming {
             holding_var: input_holding,
             ..
         } = dataflow_fields(lp, self.input, namer);
-        let DataFlowNaming { holding_var, dataflow_type, .. } = dataflow_fields(lp, self.output, namer);
-        
+        let DataFlowNaming {
+            holding_var,
+            dataflow_type,
+            ..
+        } = dataflow_fields(lp, self.output, namer);
+
         let closure_value = namer.operator_closure_value_name(self_key);
 
-        quote!{
+        quote! {
             let #holding_var: #dataflow_type = {
                 let (init, update) = #closure_value;
                 #method_query_operator_alias::fold(#input_holding, init, update)
             };
-        }.into()
+        }
+        .into()
     }
 }
 impl OperatorGen for plan::Filter {

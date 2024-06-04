@@ -89,6 +89,7 @@ impl EMDBBackend for SimpleSerialized {
 
         let tks = quote! {
             mod #impl_name {
+                #![allow(non_shorthand_field_patterns)] // current name field printing is `fielname: fieldname`
                 use emdb::dependencies::minister::Physical; //TODO: remove and use better operator selection
                 pub mod #mod_tables {
                     #(#table_defs)*

@@ -14,7 +14,7 @@ emql! {
         premium: bool,
         credits: i32,
     } @ [
-        pred(premium || credits > 0) as prem_credits
+        pred(*premium || *credits > 0) as prem_credits
     ]
 
     // Description:
@@ -74,7 +74,7 @@ emql! {
     query reward_premium(cred_bonus: f32) {
         ref users as users_ref
             |> deref(users_ref as it)
-            |> filter(it.premium)
+            |> filter(*it.premium)
             |> map(users_ref: ref users = users_ref, new_creds: i32 = ((it.credits as f32) * cred_bonus) as i32)
             |> update(users_ref use credits = new_creds)
             |> map(creds: i32 = new_creds)
@@ -89,7 +89,7 @@ emql! {
     //   the view
     query total_premium_credits() {
         use users
-            |> filter(premium)
+            |> filter(**premium)
             |> map(credits: i64 = credits as i64)
             |> fold(sum: i64 = 0 -> sum + credits)
             ~> return;

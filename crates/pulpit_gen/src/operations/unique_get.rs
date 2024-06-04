@@ -1,9 +1,9 @@
 use super::SingleOp;
-use crate::{columns::PrimaryKind, groups::Groups, namer::CodeNamer, uniques::Unique};
+use crate::{groups::Groups, namer::CodeNamer, uniques::Unique};
 use quote::quote;
 
-pub fn generate<Primary: PrimaryKind>(
-    groups: &Groups<Primary>,
+pub fn generate(
+    groups: &Groups,
     uniques: &[Unique],
     namer: &CodeNamer,
 ) -> SingleOp {

@@ -6,7 +6,7 @@ use quote_debug::Tokens;
 use syn::{Ident, ItemImpl, ItemMod, ItemStruct, ItemType, Type};
 
 use crate::{
-    columns::{ColKind, ImmConversion, PrimaryKind},
+    columns::{Associated, ColKind, ImmConversion, Primary},
     namer::CodeNamer,
 };
 
@@ -64,13 +64,13 @@ impl<Col: ColKind> Group<Col> {
     }
 }
 
-pub struct GroupConfig<Primary: PrimaryKind> {
+pub struct GroupConfig {
     pub primary: Group<Primary>,
-    pub assoc: Vec<Group<Primary::Assoc>>,
+    pub assoc: Vec<Group<Associated>>,
 }
 
-impl<Primary: PrimaryKind> From<GroupConfig<Primary>> for Groups<Primary> {
-    fn from(GroupConfig { primary, assoc }: GroupConfig<Primary>) -> Self {
+impl From<GroupConfig> for Groups {
+    fn from(GroupConfig { primary, assoc }: GroupConfig) -> Self {
         let mut idents = HashMap::new();
         primary.get_members(FieldIndex::Primary, &mut idents);
         for (ind, group) in assoc.iter().enumerate() {
@@ -91,13 +91,13 @@ impl<Primary: PrimaryKind> From<GroupConfig<Primary>> for Groups<Primary> {
     }
 }
 
-pub struct Groups<Primary: PrimaryKind> {
+pub struct Groups {
     pub idents: HashMap<Ident, FieldIndex>,
     pub primary: Group<Primary>,
-    pub assoc: Vec<Group<Primary::Assoc>>,
+    pub assoc: Vec<Group<Associated>>,
 }
 
-impl<Primary: PrimaryKind> Groups<Primary> {
+impl Groups {
     // get type from field
 
     pub fn get_field_index(&self, field: &FieldName) -> Option<&FieldIndex> {
@@ -196,7 +196,7 @@ impl<Col: ColKind> Group<Col> {
     }
 }
 
-impl<Primary: PrimaryKind> Groups<Primary> {
+impl Groups {
     pub fn column_types(&self, namer: &CodeNamer) -> Tokens<ItemMod> {
         let mod_columns = &namer.mod_columns;
 

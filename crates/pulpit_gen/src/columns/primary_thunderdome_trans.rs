@@ -1,9 +1,9 @@
 use super::*;
 
 /// A column that uses `thunderdome`
-pub struct PrimaryThunderdome;
+pub struct PrimaryThunderDomeTrans;
 
-impl ColKind for PrimaryThunderdome {
+impl ColKind for PrimaryThunderDomeTrans {
     fn derives(&self) -> MutImmut<Vec<Ident>> {
         MutImmut {
             imm_fields: vec![Ident::new("Clone", Span::call_site())],
@@ -18,16 +18,12 @@ impl ColKind for PrimaryThunderdome {
     
     fn check_column_application(
         &self,
-        error_span: Span,
-        imm_fields: &[Field],
-        mut_fields: &[Field],
-        transactions: bool,
-        deletions: bool,
+        _error_span: Span,
+        _imm_fields: &[Field],
+        _mut_fields: &[Field],
+        _transactions: bool,
+        _deletions: bool,
     ) -> LinkedList<Diagnostic> {
-        if transactions {
-            LinkedList::from([Diagnostic::spanned(error_span, Level::Error, String::from("PrimaryThunderdome does not support transactions"))])
-        } else {
-            LinkedList::new()
-        }
+        LinkedList::new()
     }
 }

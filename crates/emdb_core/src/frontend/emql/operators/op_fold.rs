@@ -58,7 +58,7 @@ impl EMQLOperator for Fold {
         if let Some(cont) = cont {
             linear_builder(lp,  op_ctx, cont, 
             |lp, mo, prev, next_edge| {
-                    let (raw_fields, mut errors) = extract_fields(fields, errors::query_operator_field_redefined);
+                    let (raw_fields, mut errors) = extract_fields_ordered(fields, errors::query_operator_field_redefined);
                     if !prev.data_type.stream {
                         errors.push_back(errors::query_stream_single_connection(call.span(), prev.last_span, true))
                     }

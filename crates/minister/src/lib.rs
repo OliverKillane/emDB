@@ -48,7 +48,7 @@ pub trait Physical {
     fn fold<InData, Acc>(
         stream: Self::Stream<InData>,
         initial: Acc,
-        fold_fn: impl Fn(&mut Acc, InData),
+        fold_fn: impl Fn(Acc, InData) -> Acc,
     ) -> Self::Single<Acc>;
 
     fn combine<Data>(
