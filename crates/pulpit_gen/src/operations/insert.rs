@@ -78,6 +78,7 @@ pub fn generate(
         mod_transactions_struct_data_member_rollback,
         mod_transactions_struct_data_member_log,
         struct_window_method_insert: method_insert,
+        name_phantom_member,
         ..
     } = namer;
 
@@ -89,15 +90,21 @@ pub fn generate(
         quote!(pub #field_name: #ty)
     });
 
-    let predicate_args = groups
+    let predicate_args_stream = groups
         .idents
         .keys()
         .map(|k| quote! {#k : &#insert_val.#k})
         .collect::<Vec<_>>();
 
+    let predicate_args = if predicate_args_stream.is_empty() {
+        quote!(#name_phantom_member: std::marker::PhantomData)
+    } else {
+        quote!(#(#predicate_args_stream),*)
+    };
+
     let predicate_checks = predicates.iter().map(|Predicate { alias, tokens: _ }| {
         quote! {
-            if !#mod_predicates::#alias(#mod_borrow::#mod_borrow_struct_borrow{#(#predicate_args),*}) {
+            if !#mod_predicates::#alias(#mod_borrow::#mod_borrow_struct_borrow{ #predicate_args }) {
                 return Err(#mod_insert::#mod_insert_enum_error::#alias);
             }
         }
@@ -142,14 +149,14 @@ pub fn generate(
     let assoc_grps = (0..groups.assoc.len()).map(|ind| namer.name_assoc_column(ind));
     let appends = assoc_grps.clone().map(|grp| {
         quote! {
-            self.#table_member_columns.#grp.append(#grp);
+            self.#table_member_columns.#grp.assoc_append(#grp);
         }
     });
 
     let (add_action, add_trans) = if deletions {
         let places = assoc_grps.map(|grp| {
             quote! {
-                self.#table_member_columns.#grp.place(index, #grp);
+                self.#table_member_columns.#grp.assoc_place(index, #grp);
             }
         });
         (

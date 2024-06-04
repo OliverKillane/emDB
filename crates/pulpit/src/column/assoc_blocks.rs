@@ -33,9 +33,9 @@ where
 {
     type ImmGet = &'imm ImmData;
 
-    unsafe fn get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, MutData> {
+    unsafe fn assoc_get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, MutData> {
         unsafe {
-            let Data { imm_data, mut_data } = <Self as AssocWindow<'imm, ImmData, MutData>>::brw(self,ind);
+            let Data { imm_data, mut_data } = <Self as AssocWindow<'imm, ImmData, MutData>>::assoc_brw(self,ind);
             Data {
                 imm_data: transmute::<&ImmData, &'imm ImmData>(imm_data),
                 mut_data: mut_data.clone(),
@@ -43,21 +43,21 @@ where
         }
     }
 
-    unsafe fn brw(&self, ind: UnsafeIndex) -> Data<&ImmData, &MutData> {
+    unsafe fn assoc_brw(&self, ind: UnsafeIndex) -> Data<&ImmData, &MutData> {
         unsafe {
             let Data { imm_data, mut_data } = self.inner.blocks.get(ind);
             Data { imm_data, mut_data }
         }
     }
 
-    unsafe fn brw_mut(&mut self, ind: UnsafeIndex) -> Data<&ImmData, &mut MutData> {
+    unsafe fn assoc_brw_mut(&mut self, ind: UnsafeIndex) -> Data<&ImmData, &mut MutData> {
         unsafe {
             let Data { imm_data, mut_data } = self.inner.blocks.get_mut(ind);
             Data { imm_data, mut_data }
         }
     }
 
-    fn append(&mut self, val: Data<ImmData, MutData>) {
+    fn assoc_append(&mut self, val: Data<ImmData, MutData>) {
         self.inner.blocks.append(val);
     }
 
@@ -65,7 +65,7 @@ where
         get.clone()
     }
 
-    unsafe fn unppend(&mut self) {
+    unsafe fn assoc_unppend(&mut self) {
         self.inner.blocks.unppend();
     }
 }

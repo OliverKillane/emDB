@@ -18,21 +18,24 @@ pub struct Predicate {
 
 impl Predicate {
     /// Generates the predicate function to be stored in the predicate module.
-    pub fn generate_function(
-        &self,
-        groups: &Groups,
-        namer: &CodeNamer,
-    ) -> Tokens<ItemFn> {
+    pub fn generate_function(&self, groups: &Groups, namer: &CodeNamer) -> Tokens<ItemFn> {
         let CodeNamer {
             mod_borrow,
             mod_borrow_struct_borrow,
             ..
         } = namer;
-        let args = groups.idents.keys();
+        let struct_args = if groups.idents.is_empty() {
+            quote!(..)
+        } else {
+            let args = groups.idents.keys();
+            quote!(#(#args),*)
+        };
+
+
         let name = &self.alias;
         let body = &self.tokens;
         quote! {
-            pub fn #name(super::#mod_borrow::#mod_borrow_struct_borrow {#(#args),*}: super::#mod_borrow::#mod_borrow_struct_borrow) -> bool {
+            pub fn #name(super::#mod_borrow::#mod_borrow_struct_borrow { #struct_args }: super::#mod_borrow::#mod_borrow_struct_borrow) -> bool {
                 #body
             }
         }
@@ -41,11 +44,7 @@ impl Predicate {
 }
 
 /// Generate a module containing all predicates.
-pub fn generate(
-    predicates: &[Predicate],
-    groups: &Groups,
-    namer: &CodeNamer,
-) -> Tokens<ItemMod> {
+pub fn generate(predicates: &[Predicate], groups: &Groups, namer: &CodeNamer) -> Tokens<ItemMod> {
     let functions = predicates
         .iter()
         .map(|pred| pred.generate_function(groups, namer));
@@ -72,6 +71,7 @@ pub fn generate_update_predicate_access(
     let CodeNamer {
         mod_borrow,
         mod_borrow_struct_borrow,
+        name_phantom_member,
         ..
     } = namer;
 
@@ -96,10 +96,18 @@ pub fn generate_update_predicate_access(
                         quote!(#name: &#var_name.#access.#name)
                     }
                 })
-        });
+        })
+        .collect::<Vec<_>>();
+
+    let access_fields = if accesses.is_empty() {
+        quote!(#name_phantom_member: std::marker::PhantomData)
+    } else {
+        quote!(#(#accesses),*)
+    };
+
     quote! {
         #mod_borrow::#mod_borrow_struct_borrow {
-            #(#accesses),*
+            #access_fields
         }
     }
     .into()

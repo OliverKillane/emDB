@@ -19,6 +19,7 @@ impl ColKind for AssocBlocks {
             mod_columns_struct_imm_unpacked,
             mod_columns_fn_imm_unpack,
             mod_columns_struct_imm,
+            name_phantom_member,
             ..
         } = namer;
 
@@ -26,12 +27,12 @@ impl ColKind for AssocBlocks {
             ImmConversion {
                 imm_unpacked: quote!{
                     pub struct #mod_columns_struct_imm_unpacked<'imm> {
-                        pub phantom: std::marker::PhantomData<&'imm ()>
+                        pub #name_phantom_member: std::marker::PhantomData<&'imm ()>
                     }
                 }.into(),
                 unpacker:  quote!{
                     pub fn #mod_columns_fn_imm_unpack<'imm>(_: &'imm #mod_columns_struct_imm) -> #mod_columns_struct_imm_unpacked<'imm> {
-                        #mod_columns_struct_imm_unpacked { phantom: std::marker::PhantomData }
+                        #mod_columns_struct_imm_unpacked { #name_phantom_member: std::marker::PhantomData }
                     }
                 }.into()
             }

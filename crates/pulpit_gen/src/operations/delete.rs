@@ -62,7 +62,7 @@ pub fn generate(
     let assoc_cols = (0..groups.assoc.len())
         .map(|ind| {
             let name = namer.name_assoc_column(ind);
-            quote!(let #name = unsafe { self.#table_member_columns.#name.pull(#index_ident) })
+            quote!(let #name = unsafe { self.#table_member_columns.#name.assoc_pull(#index_ident) })
         })
         .collect::<Vec<_>>();
 

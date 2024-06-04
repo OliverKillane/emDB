@@ -169,7 +169,7 @@ impl Update {
         // Generate the table access to primary, and all associated!
         let assoc_brw_muts = (0..groups.assoc.len()).map(|ind| {
             let name = namer.name_assoc_column(ind);
-            quote!(let #name = unsafe { self.#table_member_columns.#name.brw_mut(index) } )
+            quote!(let #name = unsafe { self.#table_member_columns.#name.assoc_brw_mut(index) } )
         });
         let table_access = quote! {
             let #pulpit_path::column::Entry { index, data: #name_primary_column } = match self.#table_member_columns.#name_primary_column.brw_mut(key) {

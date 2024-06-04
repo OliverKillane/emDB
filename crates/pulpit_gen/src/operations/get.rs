@@ -112,6 +112,7 @@ pub fn generate(groups: &Groups, namer: &CodeNamer) -> SingleOp {
         mod_get_struct_get,
         lifetime_imm,
         struct_window_method_get: method_get,
+        name_phantom_member,
         ..
     } = namer;
 
@@ -128,17 +129,29 @@ pub fn generate(groups: &Groups, namer: &CodeNamer) -> SingleOp {
 
     let get_struct_fields = generate_get_struct_fields(groups, namer);
 
+    let phantom_get = if include_lifetime && get_struct_fields.is_empty() {
+        quote!(pub #name_phantom_member: std::marker::PhantomData<&#lifetime_imm ()>)
+    } else {
+        quote!()
+    };
+
     let assoc_cols = (0..groups.assoc.len()).map(|ind| {
         let name = namer.name_assoc_column(ind);
-        quote!(let #name = unsafe { self.#table_member_columns.#name.get(index) }.convert_imm(#mod_columns::#name::#mod_columns_fn_imm_unpack))
+        quote!(let #name = unsafe { self.#table_member_columns.#name.assoc_get(index) }.convert_imm(#mod_columns::#name::#mod_columns_fn_imm_unpack))
     });
-    let get_fields = generate_get_fields(groups, namer);
+    let get_fields_stream = generate_get_fields(groups, namer).collect::<Vec<_>>();
+    let get_fields = if get_fields_stream.is_empty() {
+        quote!(#name_phantom_member: std::marker::PhantomData)
+    } else {
+        quote!(#(#get_fields_stream,)*)
+    };
 
     SingleOp {
         op_mod: quote! {
             pub mod #mod_get {
                 pub struct #mod_get_struct_get #lifetime {
                     #(#get_struct_fields,)*
+                    #phantom_get
                 }
             }
         }
@@ -154,7 +167,7 @@ pub fn generate(groups: &Groups, namer: &CodeNamer) -> SingleOp {
                     #(#assoc_cols;)*
 
                     Ok(#mod_get::#mod_get_struct_get {
-                        #(#get_fields,)*
+                        #get_fields
                     })
                 }
             }

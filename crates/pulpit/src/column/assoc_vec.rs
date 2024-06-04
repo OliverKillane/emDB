@@ -31,15 +31,15 @@ where
 {
     type ImmGet = ImmData;
 
-    unsafe fn get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, MutData> {
-        let Data { imm_data, mut_data } = self.brw(ind);
+    unsafe fn assoc_get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, MutData> {
+        let Data { imm_data, mut_data } = self.assoc_brw(ind);
         Data {
             imm_data: imm_data.clone(),
             mut_data: mut_data.clone(),
         }
     }
 
-    unsafe fn brw(&self, ind: UnsafeIndex) -> Data<&ImmData, &MutData> {
+    unsafe fn assoc_brw(&self, ind: UnsafeIndex) -> Data<&ImmData, &MutData> {
         if let Some(Data { imm_data, mut_data }) = self.inner.data.get_unchecked(ind) {
             Data { imm_data, mut_data }
         } else {
@@ -47,7 +47,7 @@ where
         }
     }
 
-    unsafe fn brw_mut(&mut self, ind: UnsafeIndex) -> Data<&ImmData, &mut MutData> {
+    unsafe fn assoc_brw_mut(&mut self, ind: UnsafeIndex) -> Data<&ImmData, &mut MutData> {
         if let Some(Data { imm_data, mut_data }) = self.inner.data.get_unchecked_mut(ind) {
             Data { imm_data, mut_data }
         } else {
@@ -55,7 +55,7 @@ where
         }
     }
 
-    fn append(&mut self, val: Data<ImmData, MutData>) {
+    fn assoc_append(&mut self, val: Data<ImmData, MutData>) {
         self.inner.data.push(Some(val))
     }
 
@@ -63,7 +63,7 @@ where
         get
     }
 
-    unsafe fn unppend(&mut self) {
+    unsafe fn assoc_unppend(&mut self) {
         self.inner.data.pop();
     }
 }
@@ -76,12 +76,12 @@ where
 {
     type ImmPull = ImmData;
 
-    unsafe fn pull(&mut self, ind: UnsafeIndex) -> Data<Self::ImmPull, MutData> {
+    unsafe fn assoc_pull(&mut self, ind: UnsafeIndex) -> Data<Self::ImmPull, MutData> {
         let val = self.inner.data.get_unchecked_mut(ind);
         val.take().unwrap()
     }
 
-    unsafe fn place(&mut self, ind: UnsafeIndex, val: Data<ImmData, MutData>) {
+    unsafe fn assoc_place(&mut self, ind: UnsafeIndex, val: Data<ImmData, MutData>) {
         *self.inner.data.get_unchecked_mut(ind) = Some(val);
     }
 

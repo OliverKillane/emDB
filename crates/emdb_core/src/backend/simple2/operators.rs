@@ -1045,7 +1045,7 @@ impl OperatorGen for plan::Join {
                     ..
                 } = dataflow_fields(lp, self.right.dataflow, namer);
                 quote! {
-                    |left: &#data_left, right: #data_right| -> bool {
+                    |left: &#data_left, right: &#data_right| -> bool {
                         #predicate
                     }
                 }
@@ -1157,9 +1157,7 @@ impl OperatorGen for plan::Fork {
             }).unzip();
 
             quote!{
-                {
-                    let (#(#other_outputs_names,)* #first_holding_out) = (#(#other_outputs_fork,)* #input_holding);
-                }
+                let (#(#other_outputs_names,)* #first_holding_out) = (#(#other_outputs_fork,)* #input_holding);
             }
         }.into()
     }

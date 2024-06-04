@@ -6,6 +6,7 @@ use syn::{Ident, Lifetime, Path};
 pub struct CodeNamer {
     pub lifetime_imm: Tokens<Lifetime>,
     pub name_primary_column: Ident,
+    pub name_phantom_member: Ident,
     pub pulpit_path: Tokens<Path>,
     pub struct_column_holder: Ident,
     pub type_key_error: Ident,
@@ -72,6 +73,7 @@ impl CodeNamer {
             lifetime_imm: quote! {'imm}.into(),
             mod_columns: new_id("column_types"),
             name_primary_column: new_id("primary"),
+            name_phantom_member: new_id("phantom"),
             mod_columns_struct_imm: new_id("Imm"),
             mod_columns_struct_mut: new_id("Mut"),
             mod_columns_struct_imm_unpacked: new_id("ImmUnpack"),

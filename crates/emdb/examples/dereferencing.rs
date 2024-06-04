@@ -44,7 +44,7 @@ emql! {
     query complex() {
         use cool
             |> map(x: usize = name.len())
-            |> filter(x > 10)
+            |> filter(*x > 10)
             |> let larger_than_10;
 
         use larger_than_10

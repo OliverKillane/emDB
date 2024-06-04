@@ -144,12 +144,21 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, namer: &SimpleNamer) -> Table
     let datastore_members_new = table_names
         .iter()
         .map(|name| quote!(#name: #mod_tables::#name::#struct_table::new(1024)));
-    let database_members = table_names
+
+    
+    let (database_members_window_stream, database_members_stream): (Vec<_>, Vec<_>) = table_names
         .iter()
-        .map(|name| quote!(#name: #mod_tables::#name::#struct_window<#db_lifetime>));
-    let database_members_window = table_names
+        .map(|name| (quote!(#name: self.#name.window()), quote!(#name: #mod_tables::#name::#struct_window<#db_lifetime>))).unzip();
+
+    let database_members_stream = table_names
         .iter()
-        .map(|name| quote!(#name: self.#name.window()));
+        .map(|name| quote!(#name: #mod_tables::#name::#struct_window<#db_lifetime>)).collect::<Vec<_>>();
+    
+    let (database_members_window, database_members) = if database_members_stream.is_empty() {
+        (quote!(phantom: std::marker::PhantomData), quote!(phantom: std::marker::PhantomData<&#db_lifetime ()>))
+    } else {
+        (quote!(#(#database_members_window_stream,)*),quote!(#(#database_members_stream,)*))
+    };
 
     TableWindow {
         table_defs,
@@ -169,7 +178,7 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, namer: &SimpleNamer) -> Table
 
                 pub fn db(&mut self) -> #struct_database<'_> {
                     #struct_database {
-                        #(#database_members_window,)*
+                        #database_members_window
                     }
                 }
             }
@@ -177,7 +186,7 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, namer: &SimpleNamer) -> Table
         .into(),
         database: quote! {
             pub struct #struct_database<#db_lifetime> {
-                #(#database_members,)*
+                #database_members
             }
         }
         .into(),

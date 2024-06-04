@@ -107,7 +107,7 @@ pub fn generate(
     } else {
         let assoc_cols = (0..groups.assoc.len()).map(|ind| {
             let name = namer.name_assoc_column(ind);
-            quote!(self.#table_member_columns.#name.unppend())
+            quote!(self.#table_member_columns.#name.assoc_unppend())
         });
 
         quote! {

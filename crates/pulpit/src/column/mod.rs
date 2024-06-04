@@ -332,7 +332,7 @@ pub trait AssocWindow<'imm, ImmData, MutData> {
     /// # Safety
     /// - No bounds checks applied
     /// - index assumed to be in valid state
-    unsafe fn get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, MutData>;
+    unsafe fn assoc_get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, MutData>;
 
     /// Borrow a value from an index in the column for a smaller lifetime
     /// - Zero cost, a normal reference.
@@ -340,24 +340,24 @@ pub trait AssocWindow<'imm, ImmData, MutData> {
     /// # Safety
     /// - No bounds checks applied
     /// - index assumed to be in valid state
-    unsafe fn brw(&self, ind: UnsafeIndex) -> Data<&ImmData, &MutData>;
+    unsafe fn assoc_brw(&self, ind: UnsafeIndex) -> Data<&ImmData, &MutData>;
 
     /// Mutably borrow the mutable part of an index in the column.
     ///
     /// # Safety
     /// - No bounds checks applied
     /// - index assumed to be in valid state
-    unsafe fn brw_mut(&mut self, ind: UnsafeIndex) -> Data<&ImmData, &mut MutData>;
+    unsafe fn assoc_brw_mut(&mut self, ind: UnsafeIndex) -> Data<&ImmData, &mut MutData>;
 
     /// Append a value to the column that is at the new largest [`UnsafeIndex`].
-    fn append(&mut self, val: Data<ImmData, MutData>);
+    fn assoc_append(&mut self, val: Data<ImmData, MutData>);
 
     /// To allow for transactions to remove data from the table
     ///
     /// # Safety
     /// - All [`AssocWindow::get`] values must not be accessed from this call,
     ///   to when they are dropped.
-    unsafe fn unppend(&mut self);
+    unsafe fn assoc_unppend(&mut self);
 
     /// For testing include a conversion for the immutable value
     fn conv_get(get: Self::ImmGet) -> ImmData;
@@ -371,13 +371,13 @@ pub trait AssocWindowPull<'imm, ImmData, MutData>: AssocWindow<'imm, ImmData, Mu
     ///
     /// # Safety
     /// - No bounds checks
-    unsafe fn pull(&mut self, ind: UnsafeIndex) -> Data<Self::ImmPull, MutData>;
+    unsafe fn assoc_pull(&mut self, ind: UnsafeIndex) -> Data<Self::ImmPull, MutData>;
 
     /// Place a value in an index that is in a `PULLED` state.
     ///
     /// # Safety
     /// - No bounds checks
-    unsafe fn place(&mut self, ind: UnsafeIndex, val: Data<ImmData, MutData>);
+    unsafe fn assoc_place(&mut self, ind: UnsafeIndex, val: Data<ImmData, MutData>);
 
     /// For testing include a conversion for the immutable value pulled
     fn conv_pull(pull: Self::ImmPull) -> ImmData;

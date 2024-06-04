@@ -184,6 +184,7 @@ pub fn generate_record_definitions<'imm>(
                 );
 
                 Some(quote!{
+                    #[derive(Clone)]
                     #pub_tks struct #name<#db_lifetime, #qy_lifetime> {
                         #(#members,)*
                         #phantom_field: std::marker::PhantomData<(&#db_lifetime (), &#qy_lifetime ())>,

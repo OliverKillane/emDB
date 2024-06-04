@@ -15,13 +15,13 @@ emql! {
         join(use person [
             inner pred {
                 if let Some(friend_name) = &left.friend {
-                    friend_name == &right.name
+                    friend_name == right.name
                 } else {
                     false
                 }
             }
         ] use friend)
-            |> map(peep: String = person.name, buddy: String = friend.name)
+            |> map(peep: &'db String = person.name, buddy: &'db String = friend.name)
             |> collect(friends as type friendship)
             ~> return;
     }
