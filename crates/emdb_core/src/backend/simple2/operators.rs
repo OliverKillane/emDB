@@ -6,6 +6,7 @@ use quote_debug::Tokens;
 use syn::{Expr, Ident, Path, Stmt, Type};
 
 use super::{
+    closures::{generate_context_closure, unwrap_context},
     namer::{
         boolean_predicate, dataflow_fields, expose_user_fields, new_error, new_id, transfer_fields,
         DataFlowNaming, SimpleNamer,
@@ -14,8 +15,8 @@ use super::{
     types::generate_record_name,
 };
 use crate::{
-    backend::simple::Simple,
-    plan::{self, operator_enum, FoldField},
+    backend::{simple::Simple, simple2::closures::generate_application},
+    plan::{self, operator_enum, DataFlow, FoldField},
     utils::misc::{PushMap, PushSet},
 };
 
@@ -44,14 +45,14 @@ pub trait OperatorGen {
     /// - Needs to update the set of mutated tables
     /// - Adds to the available errors
     #[allow(unused_variables, clippy::too_many_arguments)]
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         error_path: &Tokens<Path>,
-        errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         quote! { let _ = (); }.into()
@@ -63,14 +64,14 @@ impl OperatorGen for plan::Operator {}
 
 // table access
 impl OperatorGen for plan::UniqueRef {
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         error_path: &Tokens<Path>,
-        errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
@@ -149,14 +150,14 @@ impl OperatorGen for plan::UniqueRef {
 }
 
 impl OperatorGen for plan::ScanRefs {
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         _self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
@@ -198,14 +199,14 @@ impl OperatorGen for plan::ScanRefs {
     }
 }
 impl OperatorGen for plan::DeRef {
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         error_path: &Tokens<Path>,
-        errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
@@ -326,14 +327,14 @@ impl OperatorGen for plan::Update {
         .into()
     }
 
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         error_path: &Tokens<Path>,
-        errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let DataFlowNaming {
@@ -417,14 +418,14 @@ impl OperatorGen for plan::Update {
     }
 }
 impl OperatorGen for plan::Insert {
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         error_path: &Tokens<Path>,
-        errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
@@ -513,14 +514,14 @@ impl OperatorGen for plan::Insert {
     }
 }
 impl OperatorGen for plan::Delete {
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         error_path: &Tokens<Path>,
-        errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
@@ -592,14 +593,14 @@ impl OperatorGen for plan::Assert {
         (boolean_predicate(lp, &self.assert, self.input, namer).into_token_stream()).into()
     }
 
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         error_path: &Tokens<Path>,
-        errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
@@ -680,14 +681,14 @@ impl OperatorGen for plan::Map {
         .into()
     }
 
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
@@ -723,14 +724,14 @@ impl OperatorGen for plan::Map {
     }
 }
 impl OperatorGen for plan::Expand {
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         _self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
@@ -817,14 +818,14 @@ impl OperatorGen for plan::Fold {
         .into()
     }
 
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         error_path: &Tokens<Path>,
-        errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
@@ -862,14 +863,14 @@ impl OperatorGen for plan::Filter {
         (boolean_predicate(lp, &self.predicate, self.input, namer).into_token_stream()).into()
     }
 
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
@@ -893,14 +894,14 @@ impl OperatorGen for plan::Filter {
     }
 }
 impl OperatorGen for plan::Sort {
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         _self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
@@ -954,14 +955,14 @@ impl OperatorGen for plan::Take {
         let take_expr = &self.limit;
         quote! { {let limit: usize = #take_expr; limit} }.into()
     }
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
@@ -985,14 +986,14 @@ impl OperatorGen for plan::Take {
     }
 }
 impl OperatorGen for plan::Collect {
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         _self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
@@ -1054,14 +1055,14 @@ impl OperatorGen for plan::Join {
         }
     }
 
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
@@ -1125,14 +1126,14 @@ impl OperatorGen for plan::Join {
     }
 }
 impl OperatorGen for plan::Fork {
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         _self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
@@ -1163,14 +1164,14 @@ impl OperatorGen for plan::Fork {
     }
 }
 impl OperatorGen for plan::Union {
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         _self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
@@ -1228,14 +1229,14 @@ impl OperatorGen for plan::Row {
         .into()
     }
 
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
@@ -1258,14 +1259,14 @@ impl OperatorGen for plan::Row {
 }
 
 impl OperatorGen for plan::Return {
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let DataFlowNaming {
@@ -1278,14 +1279,14 @@ impl OperatorGen for plan::Return {
     }
 }
 impl OperatorGen for plan::Discard {
-    fn apply<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
         _self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let DataFlowNaming { holding_var, .. } = dataflow_fields(lp, self.input, namer);
@@ -1294,5 +1295,186 @@ impl OperatorGen for plan::Discard {
 }
 
 // contexts
-impl OperatorGen for plan::GroupBy {}
-impl OperatorGen for plan::ForEach {}
+impl OperatorGen for plan::GroupBy {
+    fn closure_data<'imm>(
+        &self,
+        lp: &'imm plan::Plan,
+        get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
+        namer: &SimpleNamer,
+    ) -> Tokens<Expr> {
+        generate_context_closure(lp, self.inner_ctx, get_types, namer)
+            .into_token_stream()
+            .into()
+    }
+
+    fn apply<'imm, 'brw>(
+        &self,
+        self_key: plan::Key<plan::Operator>,
+        lp: &'imm plan::Plan,
+        namer: &SimpleNamer,
+        error_path: &Tokens<Path>,
+        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        gen_info: &GeneratedInfo<'imm>,
+    ) -> Tokens<Stmt> {
+        // scoping out the mutable tables and errors to determine how to generate return and mapping.
+        let errors_cnt = errors.count();
+        let mutated_tables_cnt = mutated_tables.count();
+
+        let context = lp.get_context(self.inner_ctx);
+        let context_body = generate_application(
+            lp,
+            context,
+            error_path,
+            errors,
+            mutated_tables,
+            gen_info,
+            namer,
+        );
+
+        let grouping_field = namer.transform_field_name(&self.group_by);
+
+        let SimpleNamer {
+            method_query_operator_alias,
+            phantom_field,
+            ..
+        } = namer;
+        let DataFlowNaming {
+            holding_var: input_holding,
+            ..
+        } = dataflow_fields(lp, self.input, namer);
+        let DataFlowNaming {
+            holding_var,
+            dataflow_type,
+            ..
+        } = dataflow_fields(lp, self.output, namer);
+        let DataFlowNaming {
+            holding_var: inner_input_holding,
+            data_constructor: inner_data_constructor,
+            record_type: inner_record_type,
+            ..
+        } = dataflow_fields(lp, self.stream_in, namer);
+
+        let inner_fields = inner_record_type.fields.keys().map(|rf| {
+            let field_name = namer.transform_field_name(rf);
+            quote!(#field_name: input.#field_name)
+        });
+
+        let map_kind = if mutated_tables.count() > mutated_tables_cnt {
+            quote!(map_seq)
+        } else {
+            quote!(map)
+        };
+
+        let context_closure_values = unwrap_context(context, namer);
+        let context_closure_var = namer.operator_closure_value_name(self_key);
+
+        let final_result = if errors.count() > errors_cnt {
+            quote!(#method_query_operator_alias::error_stream(results)?)
+        } else {
+            quote!(results)
+        };
+
+        quote! {
+            let #holding_var: #dataflow_type = {
+                let split_vars = #method_query_operator_alias::map(
+                    #input_holding,
+                    |input| {
+                        (
+                            input.#grouping_field,
+                            #inner_data_constructor {
+                                #(#inner_fields,)*
+                                #phantom_field: std::marker::PhantomData
+                            }
+                        )
+                    }
+                );
+
+                let grouped = #method_query_operator_alias::group_by(split_vars);
+
+                let results = #method_query_operator_alias::#map_kind(
+                    grouped,
+                    |(grouping, #inner_input_holding)| {
+                        let #context_closure_values = (#context_closure_var)(grouping);
+                        #context_body
+                    }
+                );
+                #final_result
+            };
+        }
+        .into()
+    }
+}
+impl OperatorGen for plan::ForEach {
+    fn closure_data<'imm>(
+        &self,
+        lp: &'imm plan::Plan,
+        get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
+        namer: &SimpleNamer,
+    ) -> Tokens<Expr> {
+        generate_context_closure(lp, self.inner_ctx, get_types, namer)
+            .into_token_stream()
+            .into()
+    }
+
+    fn apply<'imm, 'brw>(
+        &self,
+        self_key: plan::Key<plan::Operator>,
+        lp: &'imm plan::Plan,
+        namer: &SimpleNamer,
+        error_path: &Tokens<Path>,
+        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        gen_info: &GeneratedInfo<'imm>,
+    ) -> Tokens<Stmt> {
+        let errors_cnt = errors.count();
+        let mutated_tables_cnt = mutated_tables.count();
+
+        let context = lp.get_context(self.inner_ctx);
+        let context_body = generate_application(
+            lp,
+            context,
+            error_path,
+            errors,
+            mutated_tables,
+            gen_info,
+            namer,
+        );
+        let SimpleNamer { method_query_operator_alias, ..} = namer;
+        let DataFlowNaming { holding_var: input_holding, .. } = dataflow_fields(lp, self.input, namer);
+        let DataFlowNaming { holding_var, dataflow_type, .. } = dataflow_fields(lp, self.output, namer);
+
+        let map_kind = if mutated_tables.count() > mutated_tables_cnt {
+            quote!(map_seq)
+        } else {
+            quote!(map)
+        };
+
+        let context_closure_values = unwrap_context(context, namer);
+        let context_closure_var = namer.operator_closure_value_name(self_key);
+
+        let final_result = if errors.count() > errors_cnt {
+            quote!(#method_query_operator_alias::error_stream(results)?)
+        } else {
+            quote!(results)
+        };
+
+        // NOTE: relies on the namer's mapping of operator names leaving user's 
+        //       field names the same.
+
+        let closure_args = context.params.iter().map(|(id, _)| quote!(lifted.#id));
+
+        quote!{
+            let #holding_var: #dataflow_type = {
+                let results = #method_query_operator_alias::#map_kind(
+                    #input_holding,
+                    |lifted| {
+                        let #context_closure_values = (#context_closure_var)(#(#closure_args),*);
+                        #context_body
+                    }
+                );
+                #final_result
+            };
+        }.into()
+    }
+}

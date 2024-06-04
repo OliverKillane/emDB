@@ -157,11 +157,11 @@ pub fn dataflow_fields<'plan>(
 
 /// Helper fn for generating the construction for an error, and add it to the query's map of
 /// error variants.
-pub fn new_error(
+pub fn new_error<'brw>(
     op_key: plan::Key<plan::Operator>,
     error_path: &Tokens<Path>,
     error_inner: Option<Tokens<Path>>,
-    errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
+    errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
     namer: &SimpleNamer,
 ) -> Tokens<Expr> {
     let variant_name = namer.operator_error_variant_name(op_key);

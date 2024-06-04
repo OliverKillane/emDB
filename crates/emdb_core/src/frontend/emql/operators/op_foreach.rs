@@ -38,12 +38,19 @@ impl EMQLOperator for ForEach {
         if let Some(Continue { data_type, prev_edge, last_span }) = cont {
             let mut errors = LinkedList::new();
             let next_edge = lp.dataflow.insert(plan::DataFlow::Null);
-            let stream_in_edge = lp.dataflow.insert(plan::DataFlow::Null);
-            let inner_ctx = lp.contexts.insert(plan::Context::from_params(Vec::new()));
+            let inner_ctx = lp.contexts.insert(plan::Context::from_params(lp.get_record_type_conc(data_type.fields).fields.iter().filter_map(|(field, ty)| {
+                // NOTE: Here we disallow the use of internal fields in a lift.
+                //       - We lift to provide values to the user's closures, as 
+                //         internals cannot be used in user's closures, there is 
+                //         no point in lifting.
+                match field {
+                    plan::RecordField::User(i) => Some((i.clone(), *ty)),
+                    plan::RecordField::Internal(_) => None,
+                }
+            }).collect()));
 
             let foreach_op = lp.operators.insert(plan::ForEach { 
-                input: prev_edge, 
-                stream_in: stream_in_edge, 
+                input: prev_edge,
                 inner_ctx, 
                 output: next_edge 
             }.into());
@@ -54,21 +61,11 @@ impl EMQLOperator for ForEach {
                 errors.push_back(errors::operator_requires_streams2(&call));
             }
 
-            let stream_in_data = plan::Data { fields: data_type.fields, stream: false };
-            *lp.get_mut_dataflow(stream_in_edge) = plan::DataFlow::Incomplete { from: foreach_op, with: stream_in_data.clone() };
-
-            let inner_cont = Continue {
-                data_type: stream_in_data,
-                prev_edge: stream_in_edge,
-                last_span: call.span(),
-            };
-
-            let mut variables = HashMap::from([
-                (in_name.clone(), VarState::Available { created: in_name.span(), state: inner_cont })
-            ]);
+            let mut variables = HashMap::new();
 
             add_streams_to_context(lp, tn, ts, &mut variables, inner_ctx, contents, &call, &mut errors);
             discard_ends(lp, inner_ctx, variables);
+
             lp.get_mut_context(op_ctx).add_operator(foreach_op);
 
             if let Some(out_stream) = lp.get_context(inner_ctx).returnflow {

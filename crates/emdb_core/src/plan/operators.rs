@@ -300,10 +300,7 @@ pub struct GroupBy {
 /// Run a sub-query for each row in an input stream
 pub struct ForEach {
     pub input: Key<DataFlow>,
-
-    pub stream_in: Key<DataFlow>,
     pub inner_ctx: Key<Context>,
-
     pub output: Key<DataFlow>,
 }
 

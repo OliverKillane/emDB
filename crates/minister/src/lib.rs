@@ -63,7 +63,7 @@ pub trait Physical {
 
     fn take<Data>(stream: Self::Stream<Data>, n: usize) -> Self::Stream<Data>;
 
-    fn groupby<Key, Rest>(
+    fn group_by<Key, Rest>(
         stream: Self::Stream<(Key, Rest)>,
     ) -> Self::Stream<(Key, Self::Stream<Rest>)>
     where

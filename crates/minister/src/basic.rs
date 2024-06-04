@@ -69,7 +69,7 @@ impl Physical for Basic {
         stream
     }
 
-    fn groupby<Key, Rest>(
+    fn group_by<Key, Rest>(
         stream: Self::Stream<(Key, Rest)>,
     ) -> Self::Stream<(Key, Self::Stream<Rest>)>
     where

@@ -72,17 +72,16 @@ pub fn generate_context<'imm>(
 /// };
 /// ```
 ///
-pub fn generate_application<'imm>(
+pub fn generate_application<'imm, 'brw>(
     lp: &'imm plan::Plan,
     ctx: &plan::Context,
     error_path: &Tokens<Path>,
-    errors: &mut PushMap<Ident, Option<Tokens<Path>>>,
-    mutated_tables: &mut PushSet<plan::ImmKey<'imm, plan::Table>>,
+    errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+    mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
     gen_info: &GeneratedInfo<'imm>,
     namer: &SimpleNamer,
 ) -> Tokens<ExprBlock> {
-    let num_errors_before = errors.len();
-
+    let error_cnt = errors.count();
     let tokens = ctx
         .ordering
         .iter()
@@ -98,11 +97,17 @@ pub fn generate_application<'imm>(
             )
         })
         .collect::<Vec<_>>();
-    let ret_val = if let Some(ret_op) = ctx.returnflow {
+    let result_val = if let Some(ret_op) = ctx.returnflow {
         let return_output = namer.operator_return_value_name(ret_op);
         quote! {#return_output}
     } else {
         quote! {()}
+    };
+
+    let ret_val = if errors.count() > error_cnt {
+        quote!(Ok(#result_val))
+    } else {
+        result_val
     };
 
     quote! {
@@ -113,3 +118,4 @@ pub fn generate_application<'imm>(
     }
     .into()
 }
+

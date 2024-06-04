@@ -9,7 +9,7 @@ emql! {
         surname: String,
         age: u8,
         bonus_points: i32,
-    } @ [ pred(age < 256) as sensible_ages ]
+    } @ [ pred(*age < 255) as sensible_ages ]
 
     table family_bonus {
         surname: String,
@@ -21,8 +21,7 @@ emql! {
             |> deref(ref_cust as person)
             |> update(ref_cust use bonus_points = person.bonus_points + 1)
             |> foreach(let customer in {
-                use customer
-                    ~> map(surname: String = person.surname)
+                row(surname: String = person.surname.clone())
                     ~> unique(surname for family_bonus.surname as ref family_ref)
                     ~> deref(family_ref as family)
                     ~> update(family_ref use bonus = family.bonus + 1);

@@ -7,7 +7,7 @@ use syn::{ExprBlock, Ident, ImplItemFn, ItemEnum, ItemImpl, ItemMod, Path};
 
 use crate::{
     plan,
-    utils::misc::{PushMap, PushSet},
+    utils::{misc::{PushSet, PushMap}},
 };
 
 use super::{
@@ -129,8 +129,8 @@ fn generate_query<'imm>(
     let top_context_data = generate_context(lp, context, &gen_info.get_types, namer);
     let unwrap_top_data = unwrap_context(context, namer);
 
-    let mut mutated_tables = HashSet::new();
     let mut errors = HashMap::new();
+    let mut mutated_tables = HashSet::new();
 
     let query_body = generate_application(
         lp,
@@ -186,7 +186,7 @@ fn generate_query<'imm>(
                 query_impl: quote!{
                     pub fn #name<#qy_lifetime>(&#qy_lifetime self, #(#params),* ) -> Result<#return_type, #mod_queries::#name::#mod_queries_mod_query_enum_error> {
                         let #unwrap_top_data = #top_context_data;
-                        Ok(#query_body)
+                        #query_body
                     }
                 }.into(),
             }
@@ -201,7 +201,7 @@ fn generate_query<'imm>(
                         // we catch `?` usage as that short circuits the lambda, not the query method
                         match (|| {
                             let #unwrap_top_data = #top_context_data;
-                            Ok(#query_body)
+                            #query_body
                         })() {
                             Ok(result) => {
                                 #commits
