@@ -14,11 +14,7 @@ pub struct UniqueDec {
     pub unique_impl: Tokens<ItemImpl>,
 }
 
-pub fn generate(
-    uniques: &[Unique],
-    groups: &Groups,
-    namer: &CodeNamer,
-) -> UniqueDec {
+pub fn generate(uniques: &[Unique], groups: &Groups, namer: &CodeNamer) -> UniqueDec {
     let CodeNamer {
         pulpit_path,
         struct_unique,

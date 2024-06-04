@@ -6,10 +6,10 @@ use crate::{
     table::Table,
 };
 
-/// Generates a table data structure using the provided updates to determine 
+/// Generates a table data structure using the provided updates to determine
 /// field mutability, and considering use of deletions and transactions.
-/// - Assumes the cost of accumulating unused immutable fields (from 
-///   [`PrimaryRetain`]) is negated by the cost of referencing on `get` 
+/// - Assumes the cost of accumulating unused immutable fields (from
+///   [`PrimaryRetain`]) is negated by the cost of referencing on `get`
 pub fn selector(
     SelectOperations {
         name,
@@ -29,7 +29,8 @@ pub fn selector(
                 fields: utils::determine_mutability(&updates, fields),
             },
             assoc: vec![],
-        }.into(),
+        }
+        .into(),
         uniques,
         predicates,
         updates,

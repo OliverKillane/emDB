@@ -31,7 +31,6 @@ impl Predicate {
             quote!(#(#args),*)
         };
 
-
         let name = &self.alias;
         let body = &self.tokens;
         quote! {

@@ -103,7 +103,6 @@ fn generate_query<'imm>(
     lp: &'imm plan::Plan,
     gen_info: &GeneratedInfo<'imm>,
     namer: &SimpleNamer,
-    key: plan::Key<plan::Query>,
     plan::Query { name, ctx }: &'imm plan::Query,
 ) -> QueryMod {
     let SimpleNamer {
@@ -245,7 +244,7 @@ pub fn generate_queries<'imm>(
     let (mods, impls): (Vec<Tokens<ItemMod>>, Vec<Tokens<ImplItemFn>>) = lp
         .queries
         .iter()
-        .map(move |(key, query)| generate_query(lp, gen_info, namer, key, query).extract())
+        .map(move |(_, query)| generate_query(lp, gen_info, namer, query).extract())
         .unzip();
 
     QueriesInfo {

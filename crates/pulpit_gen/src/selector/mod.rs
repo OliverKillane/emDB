@@ -1,12 +1,7 @@
 //! ## Table Implementation Selection
 //! Provides functions for determining the structure of the [`Table`] chosen.
 
-use crate::{
-    groups::Field,
-    operations::update::Update,
-    predicates::Predicate,
-    uniques::Unique,
-};
+use crate::{operations::update::Update, predicates::Predicate, uniques::Unique};
 use quote_debug::Tokens;
 use std::collections::HashMap;
 use syn::{Ident, Type};
@@ -31,16 +26,22 @@ mod utils {
     use quote_debug::Tokens;
     use syn::{Ident, Type};
 
-    use crate::{groups::{Field, MutImmut}, operations::update::Update};
+    use crate::{
+        groups::{Field, MutImmut},
+        operations::update::Update,
+    };
 
-    pub fn determine_mutability(updates: &[Update], mut fields: HashMap<Ident, Tokens<Type>>) -> MutImmut<Vec<Field>> {
+    pub fn determine_mutability(
+        updates: &[Update],
+        mut fields: HashMap<Ident, Tokens<Type>>,
+    ) -> MutImmut<Vec<Field>> {
         fn convert_fields(fields: HashMap<Ident, Tokens<Type>>) -> Vec<Field> {
             fields
                 .into_iter()
                 .map(|(name, ty)| Field { name, ty })
                 .collect()
         }
-    
+
         let mut mut_fields = HashMap::new();
         for Update {
             fields: update_fields,
@@ -58,5 +59,4 @@ mod utils {
             mut_fields: convert_fields(mut_fields),
         }
     }
-
 }

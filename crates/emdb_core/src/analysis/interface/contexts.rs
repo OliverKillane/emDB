@@ -243,8 +243,10 @@ impl OperatorClosures for plan::Join {
         lp: &plan::Plan,
     ) -> Option<ClosureValue> {
         if let plan::MatchKind::Pred(pred) = &self.match_kind {
-            let left_t = Namer::record_type(lp.get_dataflow(self.left.dataflow).get_conn().with.fields);
-            let right_t = Namer::record_type(lp.get_dataflow(self.right.dataflow).get_conn().with.fields);
+            let left_t =
+                Namer::record_type(lp.get_dataflow(self.left.dataflow).get_conn().with.fields);
+            let right_t =
+                Namer::record_type(lp.get_dataflow(self.right.dataflow).get_conn().with.fields);
             Some(ClosureValue {
                 expression: quote! {
                     move | left: &#left_t , right: &#right_t | {

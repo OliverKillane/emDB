@@ -44,16 +44,18 @@ pub fn generate(groups: &Groups, namer: &CodeNamer) -> SingleOp {
         ..
     } = namer;
 
-    
     let (struct_fields_def, borrowed_fields) = if groups.idents.is_empty() {
-        (quote!(pub #name_phantom_member: std::marker::PhantomData<&'brw ()>), quote!(#name_phantom_member: std::marker::PhantomData))
+        (
+            quote!(pub #name_phantom_member: std::marker::PhantomData<&'brw ()>),
+            quote!(#name_phantom_member: std::marker::PhantomData),
+        )
     } else {
         let borrowed_fields = generate_borrow_fields(groups, namer);
         let struct_fields = groups.idents.iter().map(|(field_name, field_index)| {
             let field_ty = groups.get_type(field_index).unwrap();
             quote!(pub #field_name: &'brw #field_ty)
         });
-        (quote!{#(#struct_fields),*}, quote!(#(#borrowed_fields),*))
+        (quote! {#(#struct_fields),*}, quote!(#(#borrowed_fields),*))
     };
 
     let assoc_brws = (0..groups.assoc.len()).map(|ind| {

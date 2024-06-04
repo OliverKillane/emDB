@@ -1,5 +1,5 @@
 //! ## Push only wrappers for [`HashSet`] and [`HashMap`]
-//! allows the tracking of if the structures are mutated in different scopes, 
+//! allows the tracking of if the structures are mutated in different scopes,
 //! while allowing all inserts to be sent to the same `&mut` data structure.  
 
 use std::{

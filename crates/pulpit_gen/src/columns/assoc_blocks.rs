@@ -88,9 +88,9 @@ impl ColKind for AssocBlocks {
     fn check_column_application(
         &self,
         error_span: Span,
-        imm_fields: &[Field],
-        mut_fields: &[Field],
-        transactions: bool,
+        _imm_fields: &[Field],
+        _mut_fields: &[Field],
+        _transactions: bool,
         deletions: bool,
     ) -> LinkedList<Diagnostic> {
         if deletions {

@@ -6,10 +6,10 @@ use crate::{
 
 use super::*;
 
-/// Generates a table data structure using the provided updates to determine 
+/// Generates a table data structure using the provided updates to determine
 /// field mutability, and considering use of deletions and transactions.
-/// - Assumes the cost of accumulating unused immutable fields (from 
-///   [`PrimaryRetain`]) is negated by the cost of referencing on `get` 
+/// - Assumes the cost of accumulating unused immutable fields (from
+///   [`PrimaryRetain`]) is negated by the cost of referencing on `get`
 pub fn selector(
     SelectOperations {
         name,
@@ -22,7 +22,6 @@ pub fn selector(
         public,
     }: SelectOperations,
 ) -> Table {
-
     let primary_fields = utils::determine_mutability(&updates, fields);
 
     let prim_col = if deletions {
@@ -46,7 +45,8 @@ pub fn selector(
                 fields: primary_fields,
             },
             assoc: vec![],
-        }.into(),
+        }
+        .into(),
         uniques,
         predicates,
         updates,

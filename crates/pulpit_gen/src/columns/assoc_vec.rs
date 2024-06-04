@@ -17,11 +17,11 @@ impl ColKind for AssocVec {
 
     fn check_column_application(
         &self,
-        error_span: Span,
-        imm_fields: &[Field],
-        mut_fields: &[Field],
-        transactions: bool,
-        deletions: bool,
+        _error_span: Span,
+        _imm_fields: &[Field],
+        _mut_fields: &[Field],
+        _transactions: bool,
+        _deletions: bool,
     ) -> LinkedList<Diagnostic> {
         LinkedList::new()
     }

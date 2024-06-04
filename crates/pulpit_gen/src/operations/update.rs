@@ -36,9 +36,9 @@ pub fn generate(
     let modules = updates
         .iter()
         .map(|update| update.generate_mod(groups, uniques, predicates, namer));
-    let impl_fns = updates
-        .iter()
-        .map(|update| update.generate_trait_impl_fn(namer, groups, uniques, predicates, transactions));
+    let impl_fns = updates.iter().map(|update| {
+        update.generate_trait_impl_fn(namer, groups, uniques, predicates, transactions)
+    });
 
     SingleOp {
         op_mod: quote! {

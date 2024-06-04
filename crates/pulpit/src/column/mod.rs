@@ -130,8 +130,8 @@
 //! separate inserts (required for an index that need to keep generations) is high.
 //! - Allows for other optimisations, such as in [`PrimaryRetain`]'s reuse of space for
 //!   data, and for the mutable data for generation & free slot storage.
-//! 
-//! Note that you can technically still use a separate index using 
+//!
+//! Note that you can technically still use a separate index using
 //! [`PrimaryAppendAdapter`] or [`PrimaryPullAdapter`]
 //!
 //! ## Potential for Improvement
@@ -139,32 +139,32 @@
 //! Requires adding this type of constraint.
 //! - The unsafeindex should be chosen based on the limit to the number of rows
 //!   e.g. < 256 elements means a u8 is all that is required.
-//! 
+//!
 //! ### Variadict Tuples
-//! A proposed feature for rust that could dramatically improve the code in 
-//! [`crate::gen`] by allowing fields to be represented here at the type level, 
+//! A proposed feature for rust that could dramatically improve the code in
+//! [`crate::gen`] by allowing fields to be represented here at the type level,
 //! rather than being managed by macro.
-//! 
+//!
 //! ### References in Tables
 //! Allowing users to let the table borrow data for the lifetime of the Table efficiently.
-//! 
+//!
 //! Currently possible, but with the significant caveat that:
 //! 1. The references when 'gotten' live as long as the window, not their original lifetime.
-//! 2. When returning an `'imm` reference, we do not check if that type is already 
-//!    a reference type. By copying rather than re-referencing we can avoid a 
-//!    double dereference by the user on access, and allow the lifetime extension 
-//!    mentioned in (1.) 
-//! 
+//! 2. When returning an `'imm` reference, we do not check if that type is already
+//!    a reference type. By copying rather than re-referencing we can avoid a
+//!    double dereference by the user on access, and allow the lifetime extension
+//!    mentioned in (1.)
+//!
 //! ### A reference counted arena
 //! Need to store Rcs, and use them as the [`PrimaryWindow::ImmGet`] type.
 //! - Allows us to return Rcs, even for a [`PrimaryWindowPull`]
 //! - This should use our own allocator, rather than [`std::alloc`] (we know
 //!   type information [`std::alloc`] cannot use).
-//! 
+//!
 //! ### HashSet backed arena for large types
 //! To avoid duplicates - particularly with large strings.
 //! - As an associated column.
-//! 
+//!
 //! ### Optimisation Study
 //! We can further optimise the tables with:
 //! - careful use of [`std::hint::unreachable_unchecked`]
@@ -492,15 +492,6 @@ mod verif {
         fn get_next_key(&self) -> Option<Key>;
     }
 
-    /// A very simple (and horribly inefficient) map, that is far faster to
-    /// verify than the (efficient) HashMap.
-    /// As verification of a [`primaryWindow`] requires tracking with a map,
-    /// we need to use this.
-    struct SimpleMap<Key, Value> {
-        data: Vec<Option<(Key, Value)>>,
-        count: usize,
-    }
-
     impl<Key: Eq + Clone, Value: Clone> ReferenceMap<Key, Value> for SimpleMap<Key, Value> {
         fn with_capacity(size_hint: usize) -> Self {
             Self {
@@ -796,13 +787,22 @@ mod verif {
         test_pull_impl!(gen_arena => PrimaryGenerationalArena<usize, usize>);
         test_pull_impl!(thunderdome => PrimaryThunderDome<usize, usize>);
         test_pull_impl!(thunderdome_trans => PrimaryThunderDomeTrans<usize, usize>);
-        
+
         test_app_impl!(assoc_blocks => AssocBlocks<usize, usize, 16>);
     }
 
     #[cfg(kani)]
     mod kani_verif {
         use super::*;
+
+        /// A very simple (and horribly inefficient) map, that is far faster to
+        /// verify than the (efficient) HashMap.
+        /// As verification of a [`primaryWindow`] requires tracking with a map,
+        /// we need to use this.
+        struct SimpleMap<Key, Value> {
+            data: Vec<Option<(Key, Value)>>,
+            count: usize,
+        }
 
         fn verif_pull<Col, const ITERS: usize>()
         where

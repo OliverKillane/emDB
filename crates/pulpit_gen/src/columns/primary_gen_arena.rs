@@ -18,13 +18,17 @@ impl ColKind for PrimaryGenArena {
     fn check_column_application(
         &self,
         error_span: Span,
-        imm_fields: &[Field],
-        mut_fields: &[Field],
+        _imm_fields: &[Field],
+        _mut_fields: &[Field],
         transactions: bool,
-        deletions: bool,
+        _deletions: bool,
     ) -> LinkedList<Diagnostic> {
         if transactions {
-            LinkedList::from([Diagnostic::spanned(error_span, Level::Error, String::from("primaryGenArena does not support transactions"))])
+            LinkedList::from([Diagnostic::spanned(
+                error_span,
+                Level::Error,
+                String::from("primaryGenArena does not support transactions"),
+            )])
         } else {
             LinkedList::new()
         }

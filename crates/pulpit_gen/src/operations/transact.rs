@@ -7,7 +7,7 @@ pub fn generate(
     updates: &[Update],
     namer: &CodeNamer,
     deletions: bool,
-    transactions: bool,
+    _transactions: bool,
 ) -> SingleOp {
     let CodeNamer {
         struct_window,

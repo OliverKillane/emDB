@@ -35,7 +35,8 @@ where
 
     unsafe fn assoc_get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, MutData> {
         unsafe {
-            let Data { imm_data, mut_data } = <Self as AssocWindow<'imm, ImmData, MutData>>::assoc_brw(self,ind);
+            let Data { imm_data, mut_data } =
+                <Self as AssocWindow<'imm, ImmData, MutData>>::assoc_brw(self, ind);
             Data {
                 imm_data: transmute::<&ImmData, &'imm ImmData>(imm_data),
                 mut_data: mut_data.clone(),
@@ -70,11 +71,13 @@ where
     }
 }
 
-impl <'imm, ImmData, MutData, const BLOCK_SIZE: usize> Keyable for AssocBlocks<ImmData, MutData, BLOCK_SIZE> {
+impl<ImmData, MutData, const BLOCK_SIZE: usize> Keyable
+    for AssocBlocks<ImmData, MutData, BLOCK_SIZE>
+{
     type Key = UnsafeIndex;
-} 
+}
 
-impl <'imm, ImmData, MutData, const BLOCK_SIZE: usize> PrimaryWindow<'imm, ImmData, MutData>
+impl<'imm, ImmData, MutData, const BLOCK_SIZE: usize> PrimaryWindow<'imm, ImmData, MutData>
     for Window<'imm, AssocBlocks<ImmData, MutData, BLOCK_SIZE>>
 where
     MutData: Clone,
@@ -85,18 +88,16 @@ where
 
     fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, MutData> {
         if key <= self.inner.blocks.count() {
-            Ok(
-                Entry {
-                    index: key,
-                    data: unsafe {
-                        let Data { imm_data, mut_data } = self.inner.blocks.get(key);
-                        Data {
-                            imm_data: transmute::<&ImmData, &'imm ImmData>(imm_data),
-                            mut_data: mut_data.clone(),
-                        }
-                    },
-                }
-            )
+            Ok(Entry {
+                index: key,
+                data: unsafe {
+                    let Data { imm_data, mut_data } = self.inner.blocks.get(key);
+                    Data {
+                        imm_data: transmute::<&ImmData, &'imm ImmData>(imm_data),
+                        mut_data: mut_data.clone(),
+                    }
+                },
+            })
         } else {
             Err(KeyError)
         }
@@ -104,18 +105,13 @@ where
 
     fn brw(&self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &MutData> {
         if key <= self.inner.blocks.count() {
-            Ok(
-                Entry {
-                    index: key,
-                    data: unsafe {
-                        let Data { imm_data, mut_data } = self.inner.blocks.get(key);
-                        Data {
-                            imm_data,
-                            mut_data,
-                        }
-                    },
-                }
-            )
+            Ok(Entry {
+                index: key,
+                data: unsafe {
+                    let Data { imm_data, mut_data } = self.inner.blocks.get(key);
+                    Data { imm_data, mut_data }
+                },
+            })
         } else {
             Err(KeyError)
         }
@@ -123,18 +119,13 @@ where
 
     fn brw_mut(&mut self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &mut MutData> {
         if key <= self.inner.blocks.count() {
-            Ok(
-                Entry {
-                    index: key,
-                    data: unsafe {
-                        let Data { imm_data, mut_data } = self.inner.blocks.get_mut(key);
-                        Data {
-                            imm_data,
-                            mut_data,
-                        }
-                    },
-                }
-            )
+            Ok(Entry {
+                index: key,
+                data: unsafe {
+                    let Data { imm_data, mut_data } = self.inner.blocks.get_mut(key);
+                    Data { imm_data, mut_data }
+                },
+            })
         } else {
             Err(KeyError)
         }
@@ -151,9 +142,9 @@ where
     fn count(&self) -> usize {
         self.inner.blocks.count()
     }
-} 
+}
 
-impl <'imm, ImmData, MutData, const BLOCK_SIZE: usize> PrimaryWindowApp<'imm, ImmData, MutData>
+impl<'imm, ImmData, MutData, const BLOCK_SIZE: usize> PrimaryWindowApp<'imm, ImmData, MutData>
     for Window<'imm, AssocBlocks<ImmData, MutData, BLOCK_SIZE>>
 where
     MutData: Clone,

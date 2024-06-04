@@ -3,9 +3,6 @@
 
 use proc_macro2::TokenStream;
 
-
-
-
 /// Provides raw access to generate table structures
 /// ```
 /// raw_interface!{
@@ -26,11 +23,4 @@ use proc_macro2::TokenStream;
 ///     transactions,
 /// }
 /// ```
-pub fn raw_interface(
-    tks: TokenStream,
-) {
-
-
-
-} 
-
+pub fn raw_interface(_: TokenStream) {}

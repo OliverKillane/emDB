@@ -248,7 +248,8 @@ fn add_query(
     let mut ts = HashMap::new();
 
     // Analyse the query parameters
-    let (raw_params, mut errors) = extract_fields_ordered(params, errors::query_parameter_redefined);
+    let (raw_params, mut errors) =
+        extract_fields_ordered(params, errors::query_parameter_redefined);
     let params =
         raw_params.into_iter().filter_map(|(name, data_type)| {
             match query_ast_typeto_scalar(
@@ -487,15 +488,18 @@ pub fn extract_fields_ordered<T>(
     let mut errors = LinkedList::new();
     let mut used_names = HashSet::with_capacity(fields.len());
 
-    let non_dup_fields = fields.into_iter().filter_map(|(id, content)| {
-        if let Some(other_id) = used_names.get(&id) {
-            errors.push_back(err_fn(&id, other_id));
-            None
-        } else {
-            used_names.insert(id.clone());
-            Some((id, content))
-        }
-    }).collect();
+    let non_dup_fields = fields
+        .into_iter()
+        .filter_map(|(id, content)| {
+            if let Some(other_id) = used_names.get(&id) {
+                errors.push_back(err_fn(&id, other_id));
+                None
+            } else {
+                used_names.insert(id.clone());
+                Some((id, content))
+            }
+        })
+        .collect();
 
     (non_dup_fields, errors)
 }

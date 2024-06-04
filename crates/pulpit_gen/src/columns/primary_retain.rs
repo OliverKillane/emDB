@@ -30,11 +30,10 @@ impl ColKind for PrimaryRetain {
                     pub #name : &'imm #ty
                 }
             });
-    
-    
+
             let fields = imm_fields.iter().map(|Field { name, ty: _ }| name);
             let unpack_fields = fields.clone();
-    
+
             ImmConversion {
                 imm_unpacked: quote!{
                     pub struct #mod_columns_struct_imm_unpacked<'imm> {
@@ -74,17 +73,20 @@ impl ColKind for PrimaryRetain {
         let lifetime = &namer.lifetime_imm;
         quote!(&#lifetime #ty).into()
     }
-    
+
     fn check_column_application(
         &self,
-        error_span: Span,
+        _error_span: Span,
         imm_fields: &[Field],
-        mut_fields: &[Field],
-        transactions: bool,
-        deletions: bool,
+        _mut_fields: &[Field],
+        _transactions: bool,
+        _deletions: bool,
     ) -> LinkedList<Diagnostic> {
         if imm_fields.is_empty() {
-            LinkedList::from([Diagnostic::new(Level::Error, String::from("PrimaryRetain requires at least one immutable field"))])
+            LinkedList::from([Diagnostic::new(
+                Level::Error,
+                String::from("PrimaryRetain requires at least one immutable field"),
+            )])
         } else {
             LinkedList::new()
         }

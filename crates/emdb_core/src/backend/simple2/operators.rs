@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use pulpit::column::Data;
 use quote::{quote, ToTokens};
 use quote_debug::Tokens;
 use syn::{Expr, Ident, Path, Stmt, Type};
@@ -15,8 +14,8 @@ use super::{
     types::generate_record_name,
 };
 use crate::{
-    backend::{simple::Simple, simple2::closures::generate_application},
-    plan::{self, operator_enum, DataFlow, FoldField},
+    backend::simple2::closures::generate_application,
+    plan::{self, operator_enum},
     utils::misc::{PushMap, PushSet},
 };
 
@@ -823,10 +822,10 @@ impl OperatorGen for plan::Fold {
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SimpleNamer,
-        error_path: &Tokens<Path>,
-        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
-        gen_info: &GeneratedInfo<'imm>,
+        _error_path: &Tokens<Path>,
+        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _gen_info: &GeneratedInfo<'imm>,
     ) -> Tokens<Stmt> {
         let SimpleNamer {
             method_query_operator_alias,
@@ -884,7 +883,7 @@ impl OperatorGen for plan::Filter {
         let DataFlowNaming {
             holding_var,
             dataflow_type,
-            stream,
+            
             ..
         } = dataflow_fields(lp, self.output, namer);
         let closure_value = namer.operator_closure_value_name(self_key);

@@ -1,11 +1,11 @@
 use super::*;
 
-/// An adapter used as a primary column when associated columns are all that 
+/// An adapter used as a primary column when associated columns are all that
 /// is needed.
 pub struct PrimaryAppendAdapter {
     max_key: usize,
-    /// Required as to fit the interface we need to be able to return `&mut ()`, 
-    /// however we cannot do the neat lifetime extension trick of `&()` with `&mut` 
+    /// Required as to fit the interface we need to be able to return `&mut ()`,
+    /// however we cannot do the neat lifetime extension trick of `&()` with `&mut`
     mut_val: (),
 }
 
@@ -17,9 +17,7 @@ impl Column for PrimaryAppendAdapter {
     type WindowKind<'imm> = Window<'imm, PrimaryAppendAdapter> where Self: 'imm;
 
     fn window(&mut self) -> Self::WindowKind<'_> {
-        Window {
-            inner: self,
-        }
+        Window { inner: self }
     }
 
     fn new(_: usize) -> Self {
@@ -30,8 +28,7 @@ impl Column for PrimaryAppendAdapter {
     }
 }
 
-impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryAppendAdapter>
-{
+impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryAppendAdapter> {
     type ImmGet = ();
     type Col = PrimaryAppendAdapter;
 
@@ -39,7 +36,10 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryAppendAdapter>
         if key < self.inner.max_key {
             Ok(Entry {
                 index: key,
-                data: Data{ imm_data: (), mut_data: () },
+                data: Data {
+                    imm_data: (),
+                    mut_data: (),
+                },
             })
         } else {
             Err(KeyError)
@@ -50,7 +50,10 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryAppendAdapter>
         if key < self.inner.max_key {
             Ok(Entry {
                 index: key,
-                data: Data { imm_data: &(), mut_data: &() },
+                data: Data {
+                    imm_data: &(),
+                    mut_data: &(),
+                },
             })
         } else {
             Err(KeyError)
@@ -61,16 +64,17 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryAppendAdapter>
         if key < self.inner.max_key {
             Ok(Entry {
                 index: key,
-                data: Data { imm_data: &(), mut_data: &mut self.inner.mut_val },
+                data: Data {
+                    imm_data: &(),
+                    mut_data: &mut self.inner.mut_val,
+                },
             })
         } else {
             Err(KeyError)
         }
     }
 
-    fn conv_get(_: Self::ImmGet) -> () {
-        ()
-    }
+    fn conv_get(_: Self::ImmGet) {}
 
     fn scan<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
         0..(self.inner.max_key)
@@ -81,9 +85,8 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryAppendAdapter>
     }
 }
 
-impl<'imm> PrimaryWindowApp<'imm, (), ()> for Window<'imm, PrimaryAppendAdapter>
-{
-    fn append(&mut self, val: Data<(), ()>) -> <Self::Col as Keyable>::Key {
+impl<'imm> PrimaryWindowApp<'imm, (), ()> for Window<'imm, PrimaryAppendAdapter> {
+    fn append(&mut self, _: Data<(), ()>) -> <Self::Col as Keyable>::Key {
         let key = self.inner.max_key;
         self.inner.max_key += 1;
         key

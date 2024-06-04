@@ -2,11 +2,7 @@ use super::SingleOp;
 use crate::{groups::Groups, namer::CodeNamer, uniques::Unique};
 use quote::quote;
 
-pub fn generate(
-    groups: &Groups,
-    uniques: &[Unique],
-    namer: &CodeNamer,
-) -> SingleOp {
+pub fn generate(groups: &Groups, uniques: &[Unique], namer: &CodeNamer) -> SingleOp {
     let CodeNamer {
         struct_window,
         struct_table_member_uniques,

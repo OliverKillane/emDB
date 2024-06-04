@@ -153,7 +153,8 @@ impl Physical for Basic {
 
     fn fork<Data>(stream: &Self::Stream<Data>) -> Self::Stream<Data>
     where
-        Data: Clone {
+        Data: Clone,
+    {
         stream.clone()
     }
 

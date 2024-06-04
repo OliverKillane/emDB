@@ -5,7 +5,7 @@ use quote_debug::Tokens;
 use syn::{Expr, ExprClosure, Ident, Lifetime, Path, Type};
 
 use crate::{
-    backend::simple::Simple, plan::{self, RecordConc}, utils::misc::PushMap
+    plan::{self, RecordConc}, utils::misc::PushMap
 };
 use quote::{quote, ToTokens};
 
@@ -157,11 +157,11 @@ pub fn dataflow_fields<'plan>(
 
 /// Helper fn for generating the construction for an error, and add it to the query's map of
 /// error variants.
-pub fn new_error<'brw>(
+pub fn new_error(
     op_key: plan::Key<plan::Operator>,
     error_path: &Tokens<Path>,
     error_inner: Option<Tokens<Path>>,
-    errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+    errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
     namer: &SimpleNamer,
 ) -> Tokens<Expr> {
     let variant_name = namer.operator_error_variant_name(op_key);

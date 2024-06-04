@@ -15,7 +15,7 @@ impl ColKind for PrimaryThunderDomeTrans {
         let CodeNamer { pulpit_path, .. } = namer;
         quote! { #pulpit_path::column::PrimaryThunderDome }.into()
     }
-    
+
     fn check_column_application(
         &self,
         _error_span: Span,

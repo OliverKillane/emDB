@@ -1,4 +1,7 @@
-use std::{collections::{HashMap, HashSet, LinkedList}, hash::Hash};
+use std::{
+    collections::{HashMap, HashSet, LinkedList},
+    hash::Hash,
+};
 
 pub(crate) fn singlelist<T>(item: T) -> LinkedList<T> {
     let mut list = LinkedList::new();
@@ -16,13 +19,12 @@ pub(crate) fn result_to_opt<O, E>(res: Result<O, E>, errs: &mut LinkedList<E>) -
     }
 }
 
-
 pub struct PushMap<'brw, K, V> {
     map: &'brw mut HashMap<K, V>,
     push_cnt: usize,
 }
 
-impl <'brw, K: Hash + Eq, V> PushMap<'brw, K, V> {
+impl<'brw, K: Hash + Eq, V> PushMap<'brw, K, V> {
     pub fn new(map: &'brw mut HashMap<K, V>) -> Self {
         Self { map, push_cnt: 0 }
     }
@@ -42,7 +44,7 @@ pub struct PushSet<'brw, K> {
     push_cnt: usize,
 }
 
-impl <'brw, K: Hash + Eq> PushSet<'brw, K> {
+impl<'brw, K: Hash + Eq> PushSet<'brw, K> {
     pub fn new(set: &'brw mut HashSet<K>) -> Self {
         Self { set, push_cnt: 0 }
     }
@@ -56,5 +58,3 @@ impl <'brw, K: Hash + Eq> PushSet<'brw, K> {
         self.push_cnt
     }
 }
-
-

@@ -127,12 +127,12 @@ impl GenInfo {
 }
 
 /// An adapter to allow for associated columns to be used with a primary.
-/// - Used as the primary column for a table, but with only generation data 
+/// - Used as the primary column for a table, but with only generation data
 ///   (no user data)
 pub struct PrimaryPullAdapter {
     gen: GenInfo,
-    /// Required as to fit the interface we need to be able to return `&mut ()`, 
-    /// however we cannot do the neat lifetime extension trick of `&()` with `&mut` 
+    /// Required as to fit the interface we need to be able to return `&mut ()`,
+    /// however we cannot do the neat lifetime extension trick of `&()` with `&mut`
     mut_val: (),
 }
 
@@ -156,14 +156,11 @@ impl Column for PrimaryPullAdapter {
     }
 
     fn window(&mut self) -> Self::WindowKind<'_> {
-        Window {
-            inner: self,
-        }
+        Window { inner: self }
     }
 }
 
-impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryPullAdapter>
-{
+impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> {
     type ImmGet = ();
     type Col = PrimaryPullAdapter;
 
@@ -171,7 +168,10 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryPullAdapter>
         let index = self.inner.gen.lookup_key(key)?;
         Ok(Entry {
             index,
-            data: Data { imm_data: (), mut_data: () },
+            data: Data {
+                imm_data: (),
+                mut_data: (),
+            },
         })
     }
 
@@ -179,7 +179,10 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryPullAdapter>
         let index = self.inner.gen.lookup_key(key)?;
         Ok(Entry {
             index,
-            data: Data{ imm_data: &(), mut_data: &() },
+            data: Data {
+                imm_data: &(),
+                mut_data: &(),
+            },
         })
     }
 
@@ -187,13 +190,14 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryPullAdapter>
         let index = self.inner.gen.lookup_key(key)?;
         Ok(Entry {
             index,
-            data: Data { imm_data: &(), mut_data: &mut self.inner.mut_val },
+            data: Data {
+                imm_data: &(),
+                mut_data: &mut self.inner.mut_val,
+            },
         })
     }
 
-    fn conv_get(_: Self::ImmGet) -> () {
-        ()
-    }
+    fn conv_get(_: Self::ImmGet) {}
 
     fn scan<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
         self.inner.gen.scan()
@@ -204,32 +208,28 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryPullAdapter>
     }
 }
 
-impl<'imm> PrimaryWindowPull<'imm, (), ()> for Window<'imm, PrimaryPullAdapter>
-{
+impl<'imm> PrimaryWindowPull<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> {
     type ImmPull = ();
 
     fn pull(&mut self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmPull, ()> {
         let index = self.inner.gen.pull_key(key)?;
         Ok(Entry {
             index,
-            data: Data { imm_data: (), mut_data: () },
+            data: Data {
+                imm_data: (),
+                mut_data: (),
+            },
         })
     }
 
-    fn insert(
-        &mut self,
-        _: Data<(), ()>,
-    ) -> (<Self::Col as Keyable>::Key, InsertAction) {
+    fn insert(&mut self, _: Data<(), ()>) -> (<Self::Col as Keyable>::Key, InsertAction) {
         self.inner.gen.insert()
     }
 
-    fn conv_pull(_: Self::ImmPull) -> () {
-        ()
-    }
+    fn conv_pull(_: Self::ImmPull) {}
 }
 
-impl<'imm> PrimaryWindowHide<'imm, (), ()> for Window<'imm, PrimaryPullAdapter>
-{
+impl<'imm> PrimaryWindowHide<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> {
     fn hide(&mut self, key: <Self::Col as Keyable>::Key) -> Result<(), KeyError> {
         self.inner.gen.hide_key(key)
     }

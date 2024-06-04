@@ -143,12 +143,32 @@ impl Table {
         let mut ops_mod_code = vec![
             operations::borrow::generate(groups, namer),
             operations::get::generate(groups, namer),
-            operations::update::generate(updates, groups, uniques, predicates, namer, *transactions),
-            operations::insert::generate(groups, uniques, predicates, namer, *deletions, *transactions),
+            operations::update::generate(
+                updates,
+                groups,
+                uniques,
+                predicates,
+                namer,
+                *transactions,
+            ),
+            operations::insert::generate(
+                groups,
+                uniques,
+                predicates,
+                namer,
+                *deletions,
+                *transactions,
+            ),
             operations::unique_get::generate(groups, uniques, namer),
         ];
         if *transactions {
-            ops_mod_code.push(operations::transact::generate(groups, updates, namer, *deletions, *transactions))
+            ops_mod_code.push(operations::transact::generate(
+                groups,
+                updates,
+                namer,
+                *deletions,
+                *transactions,
+            ))
         }
 
         let mut ops_fn_code = vec![
@@ -157,7 +177,12 @@ impl Table {
         ];
 
         if *deletions {
-            ops_fn_code.push(operations::delete::generate(namer, groups, uniques, *transactions))
+            ops_fn_code.push(operations::delete::generate(
+                namer,
+                groups,
+                uniques,
+                *transactions,
+            ))
         }
 
         let TableDec {
