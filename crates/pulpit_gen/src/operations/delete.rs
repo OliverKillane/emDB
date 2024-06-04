@@ -97,7 +97,7 @@ pub fn generate(
                 }
 
                 fn #struct_window_method_delete_hidden(&mut self, #key_ident: #type_key) {
-                    debug_assert!(self.#table_member_transactions.#mod_transactions_struct_data_member_rollback);
+                    debug_assert!(!self.#table_member_transactions.#mod_transactions_struct_data_member_rollback);
                     let #pulpit_path::column::Entry{ index: #index_ident, data } = self.#table_member_columns.#name_primary_column.pull(key).unwrap();
                     unsafe {
                         #(#assoc_cols;)*

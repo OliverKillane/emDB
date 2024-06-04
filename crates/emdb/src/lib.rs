@@ -1,4 +1,4 @@
-//! EmDB!
+#![doc = include_str!("../README.md")]
 
 pub use emdb_core as macros;
 

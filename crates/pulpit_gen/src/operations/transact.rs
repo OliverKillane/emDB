@@ -76,7 +76,7 @@ pub fn generate(
                     while let Some(entry) = self.#table_member_transactions.#mod_transactions_struct_data_member_log.pop() {
                         match entry {
                             #mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_delete(key) => {
-                                self.#struct_window_method_restore_hidden(key);
+                                self.#struct_window_method_delete_hidden(key);
                             },
                             _ => (),
                         }
@@ -91,7 +91,7 @@ pub fn generate(
                     while let Some(entry) = self.#table_member_transactions.#mod_transactions_struct_data_member_log.pop() {
                         match entry {
                             #mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_delete(key) => {
-                                self.#struct_window_method_delete_hidden(key);
+                                self.#struct_window_method_restore_hidden(key);
                             },
                             #mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_insert(key) => {
                                 self.#struct_window_method_reverse_insert(key);
