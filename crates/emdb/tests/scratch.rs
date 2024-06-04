@@ -15,7 +15,7 @@ enum RGB {
 }
 
 emql! {
-    impl my_db as SimpleSerialized{debug_file = "emdb/tests/debug/code.rs"};
+    impl my_db as Serialized{debug_file = "emdb/tests/debug/code.rs"};
     impl code_display as PlanViz{path = "emdb/tests/debug/code.dot", display_types = off, display_ctx_ops = on, display_control = on};
 
     table people {

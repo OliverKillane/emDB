@@ -139,7 +139,7 @@ pub enum TypeContext {
     ///
     /// The generated code needs to use type aliases like:
     /// ```
-    /// # type SomeRustTypeTokens = i32
+    /// # type SomeRustTypeTokens = i32;
     /// type TypeAlias<'db, 'qy> = SomeRustTypeTokens;
     /// ```
     Query,

@@ -14,7 +14,7 @@ use super::{
     types::generate_record_name,
 };
 use crate::{
-    backend::simple2::closures::generate_application,
+    backend::serialized::closures::generate_application,
     plan::{self, operator_enum},
     utils::misc::{PushMap, PushSet},
 };

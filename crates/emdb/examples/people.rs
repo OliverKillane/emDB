@@ -10,7 +10,7 @@ enum RGB {
 }
 
 emql! {
-    impl my_db as SimpleSerialized;
+    impl my_db as Serialized;
 
     table people {
         name: String,

@@ -492,72 +492,6 @@ mod verif {
         fn get_next_key(&self) -> Option<Key>;
     }
 
-    impl<Key: Eq + Clone, Value: Clone> ReferenceMap<Key, Value> for SimpleMap<Key, Value> {
-        fn with_capacity(size_hint: usize) -> Self {
-            Self {
-                data: Vec::with_capacity(size_hint),
-                count: 0,
-            }
-        }
-
-        fn get(&self, key: &Key) -> Option<&Value> {
-            self.data.iter().find_map(|entry| {
-                if let Some((k, v)) = entry {
-                    if k == key {
-                        Some(v)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-        }
-
-        fn insert(&mut self, key: Key, value: Value) -> Option<Value> {
-            if let Some(v) = self.get(&key) {
-                Some(v.clone())
-            } else {
-                self.data.push(Some((key, value)));
-                self.count += 1;
-                None
-            }
-        }
-
-        fn remove(&mut self, key: &Key) -> Option<Value> {
-            let val = self.data.iter_mut().find_map(|entry| {
-                if let Some((k, _)) = entry {
-                    if k == key {
-                        Some(entry)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })?;
-
-            val.take().map(|(_, v)| {
-                self.count -= 1;
-                v
-            })
-        }
-
-        fn len(&self) -> usize {
-            self.count
-        }
-
-        fn get_next_key(&self) -> Option<Key> {
-            self.data.iter().find_map(|entry| {
-                if let Some((k, _)) = entry {
-                    Some(k.clone())
-                } else {
-                    None
-                }
-            })
-        }
-    }
-
     impl<Key: Eq + Hash + Clone, Value> ReferenceMap<Key, Value> for HashMap<Key, Value> {
         fn with_capacity(size_hint: usize) -> Self {
             HashMap::with_capacity(size_hint)
@@ -802,6 +736,72 @@ mod verif {
         struct SimpleMap<Key, Value> {
             data: Vec<Option<(Key, Value)>>,
             count: usize,
+        }
+
+        impl<Key: Eq + Clone, Value: Clone> ReferenceMap<Key, Value> for SimpleMap<Key, Value> {
+            fn with_capacity(size_hint: usize) -> Self {
+                Self {
+                    data: Vec::with_capacity(size_hint),
+                    count: 0,
+                }
+            }
+
+            fn get(&self, key: &Key) -> Option<&Value> {
+                self.data.iter().find_map(|entry| {
+                    if let Some((k, v)) = entry {
+                        if k == key {
+                            Some(v)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+            }
+
+            fn insert(&mut self, key: Key, value: Value) -> Option<Value> {
+                if let Some(v) = self.get(&key) {
+                    Some(v.clone())
+                } else {
+                    self.data.push(Some((key, value)));
+                    self.count += 1;
+                    None
+                }
+            }
+
+            fn remove(&mut self, key: &Key) -> Option<Value> {
+                let val = self.data.iter_mut().find_map(|entry| {
+                    if let Some((k, _)) = entry {
+                        if k == key {
+                            Some(entry)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })?;
+
+                val.take().map(|(_, v)| {
+                    self.count -= 1;
+                    v
+                })
+            }
+
+            fn len(&self) -> usize {
+                self.count
+            }
+
+            fn get_next_key(&self) -> Option<Key> {
+                self.data.iter().find_map(|entry| {
+                    if let Some((k, _)) = entry {
+                        Some(k.clone())
+                    } else {
+                        None
+                    }
+                })
+            }
         }
 
         fn verif_pull<Col, const ITERS: usize>()

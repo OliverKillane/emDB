@@ -2,7 +2,7 @@
 use emdb::macros::emql;
 
 emql! {
-    impl my_db as SimpleSerialized;
+    impl my_db as Serialized;
 
     // Reasoning:
     //  - Constraint checking required, needs to fail immediately (hybrid IVM)

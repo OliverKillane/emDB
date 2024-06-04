@@ -1,28 +1,12 @@
-//! Forwards rust expressions from the plan in order to check their code, when no backend impl is needed.
-//! - Can be used for debugging.
-//! - less costly, can run with no optimisers.
-//! - useful for tests with no artifacts
+#![warn(dead_code)]
+#![warn(unused_variables)]
+//! # Simple Serializable Backend
+//! A basic backend producing code that uses [`pulpit`] generated tables.
+//! - Allows for basic immutability optimisations, and append only tables.
+//! - Generates a table object that uses parallelism internally, but only allows
+//!   queries to execute in parallel if they are read only (normal borrow checker
+//!   rules apply)
 
-use std::{collections::LinkedList, fs::File, io::Write, path::Path};
-
-use crate::{
-    analysis::interface::{
-        names::SimpleNamer,
-        types::{SimpleTypeImplementor, TypeImplementor},
-    },
-    utils::misc::singlelist,
-};
-
-use crate::{
-    analysis::interface::{
-        contexts::{trans_context, ClosureArgs},
-        names::ItemNamer,
-    },
-    plan,
-};
-use proc_macro2::TokenStream;
-
-use super::EMDBBackend;
 use combi::{
     core::{mapsuc, seq, setrepr},
     seqs,
@@ -34,16 +18,29 @@ use combi::{
     Combi,
 };
 use prettyplease::unparse;
+use proc_macro2::TokenStream;
 use proc_macro_error::{Diagnostic, Level};
+use queries::QueriesInfo;
 use quote::quote;
+use std::{collections::LinkedList, fs::File, io::Write, path::Path};
 use syn::{parse2, File as SynFile, LitStr};
 
-pub struct SemCheck {
+use super::EMDBBackend;
+use crate::utils::misc::singlelist;
+
+mod closures;
+mod namer;
+mod operators;
+mod queries;
+mod tables;
+mod types;
+
+pub struct Serialized {
     debug: Option<LitStr>,
 }
 
-impl EMDBBackend for SemCheck {
-    const NAME: &'static str = "SemCheck";
+impl EMDBBackend for Serialized {
+    const NAME: &'static str = "Serialized";
 
     fn parse_options(
         backend_name: &syn::Ident,
@@ -71,16 +68,38 @@ impl EMDBBackend for SemCheck {
         plan: &crate::plan::Plan,
     ) -> Result<proc_macro2::TokenStream, std::collections::LinkedList<proc_macro_error::Diagnostic>>
     {
-        let ty_impl = SimpleTypeImplementor::<SimpleNamer>::with_public_types(plan);
-        let types_preamble = ty_impl.translate_all_types(plan);
-        let queries = translate_all_queries(plan);
+        let namer = namer::SimpleNamer::new();
+        let tables::TableWindow {
+            table_defs,
+            datastore,
+            datastore_impl,
+            database,
+            table_generated_info,
+        } = tables::generate_tables(plan, &namer);
+
+        let record_defs =
+            types::generate_record_definitions(plan, &table_generated_info.get_types, &namer);
+
+        let QueriesInfo {
+            query_mod,
+            query_impls,
+        } = queries::generate_queries(plan, &table_generated_info, &namer);
+
+        let namer::SimpleNamer { mod_tables, .. } = &namer;
+
         let tks = quote! {
             mod #impl_name {
-                #![allow(unused_variables)]
-                #![allow(dead_code)]
-
-                #types_preamble
-                #queries
+                #![allow(non_shorthand_field_patterns)] // current name field printing is `fielname: fieldname`
+                use emdb::dependencies::minister::Physical; //TODO: remove and use better operator selection
+                pub mod #mod_tables {
+                    #(#table_defs)*
+                }
+                #query_mod
+                #(#record_defs)*
+                #datastore
+                #datastore_impl
+                #database
+                #query_impls
             }
         };
 
@@ -114,44 +133,5 @@ fn debug_output(debug_path: &LitStr, tks: TokenStream) -> Result<(), LinkedList<
             Level::Error,
             format!("Could not parse code as file: {e}"),
         ))),
-    }
-}
-
-fn translate_all_queries(lp: &plan::Plan) -> TokenStream {
-    lp.queries
-        .iter()
-        .map(|(key, query)| translate_query(lp, key, query))
-        .collect()
-}
-
-fn translate_query(
-    lp: &plan::Plan,
-    qk: plan::Key<plan::Query>,
-    query: &plan::Query,
-) -> TokenStream {
-    let ClosureArgs { params, value } = trans_context::<SimpleNamer>(lp, query.ctx);
-
-    let query_params = params.iter().map(|(id, ty)| {
-        quote! { #id: #ty }
-    });
-    let query_name = &query.name;
-    let query_closure_gen = value.expression;
-    let query_closure_type = value.datatype;
-
-    let return_type = if let Some(ret_op) = lp.get_context(query.ctx).returnflow {
-        let ret = lp.get_operator(ret_op).get_return();
-        let ret_type = SimpleNamer::record_type(lp.get_dataflow(ret.input).get_conn().with.fields);
-        quote! { -> #ret_type }
-    } else {
-        quote!()
-    };
-
-    quote! {
-        /// this is a function
-        pub fn #query_name(#(#query_params ,)*) #return_type {
-            let closures = #query_closure_gen ;
-
-            todo!()
-        }
     }
 }

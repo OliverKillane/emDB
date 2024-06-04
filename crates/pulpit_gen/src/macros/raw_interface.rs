@@ -4,7 +4,7 @@
 use proc_macro2::TokenStream;
 
 /// Provides raw access to generate table structures
-/// ```
+/// ```ignore
 /// raw_interface!{
 ///     primary: <column name> {
 ///         mut field: type,
