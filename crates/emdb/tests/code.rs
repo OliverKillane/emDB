@@ -2,338 +2,6 @@ mod my_db {
     #![allow(non_shorthand_field_patterns)]
     use emdb::dependencies::minister::Physical;
     pub mod tables {
-        pub mod customers {
-            #![allow(unused, non_camel_case_types)]
-            use emdb::dependencies::pulpit::column::{
-                PrimaryWindow, PrimaryWindowApp, PrimaryWindowPull, PrimaryWindowHide,
-                AssocWindow, AssocWindowPull, Column,
-            };
-            #[derive(Debug)]
-            pub struct KeyError;
-            mod column_types {
-                //! Column types to be used for storage in each column.
-                pub mod primary {
-                    #[derive(Clone)]
-                    pub struct Imm {
-                        pub age: u8,
-                        pub surname: String,
-                        pub forename: String,
-                    }
-                    #[derive(Clone)]
-                    pub struct Mut {
-                        pub bonus_points: i32,
-                    }
-                    pub struct ImmUnpack<'imm> {
-                        pub age: &'imm u8,
-                        pub surname: &'imm String,
-                        pub forename: &'imm String,
-                    }
-                    pub fn imm_unpack<'imm>(
-                        Imm { age, surname, forename }: &'imm Imm,
-                    ) -> ImmUnpack<'imm> {
-                        ImmUnpack {
-                            age,
-                            surname,
-                            forename,
-                        }
-                    }
-                }
-            }
-            pub mod borrows {
-                pub struct Borrows<'brw> {
-                    pub age: &'brw u8,
-                    pub bonus_points: &'brw i32,
-                    pub surname: &'brw String,
-                    pub forename: &'brw String,
-                }
-            }
-            impl<'imm> Window<'imm> {
-                pub fn borrow<'brw>(
-                    &'brw self,
-                    key: Key,
-                ) -> Result<borrows::Borrows<'brw>, KeyError> {
-                    let emdb::dependencies::pulpit::column::Entry {
-                        index,
-                        data: primary,
-                    } = match self.columns.primary.brw(key) {
-                        Ok(entry) => entry,
-                        Err(_) => return Err(KeyError),
-                    };
-                    Ok(borrows::Borrows {
-                        age: &primary.imm_data.age,
-                        bonus_points: &primary.mut_data.bonus_points,
-                        surname: &primary.imm_data.surname,
-                        forename: &primary.imm_data.forename,
-                    })
-                }
-            }
-            pub mod get {
-                pub struct Get<'db> {
-                    pub bonus_points: i32,
-                    pub age: &'db u8,
-                    pub surname: &'db String,
-                    pub forename: &'db String,
-                }
-            }
-            impl<'db> Window<'db> {
-                pub fn get(&self, key: Key) -> Result<get::Get<'db>, KeyError> {
-                    let emdb::dependencies::pulpit::column::Entry {
-                        index,
-                        data: primary,
-                    } = match self.columns.primary.get(key) {
-                        Ok(entry) => entry,
-                        Err(_) => return Err(KeyError),
-                    };
-                    let primary = primary.convert_imm(column_types::primary::imm_unpack);
-                    Ok(get::Get {
-                        age: primary.imm_data.age,
-                        bonus_points: primary.mut_data.bonus_points,
-                        surname: primary.imm_data.surname,
-                        forename: primary.imm_data.forename,
-                    })
-                }
-            }
-            pub mod updates {
-                pub mod pulpit_access_2 {
-                    #[derive(Debug)]
-                    pub enum UpdateError {
-                        KeyError,
-                        sensible_ages,
-                    }
-                    pub struct Update {
-                        pub bonus_points: i32,
-                    }
-                }
-            }
-            impl<'imm> Window<'imm> {
-                pub fn pulpit_access_2(
-                    &mut self,
-                    update: updates::pulpit_access_2::Update,
-                    key: Key,
-                ) -> Result<(), updates::pulpit_access_2::UpdateError> {
-                    let emdb::dependencies::pulpit::column::Entry {
-                        index,
-                        data: primary,
-                    } = match self.columns.primary.brw_mut(key) {
-                        Ok(entry) => entry,
-                        Err(_) => {
-                            return Err(updates::pulpit_access_2::UpdateError::KeyError);
-                        }
-                    };
-                    if !predicates::sensible_ages(borrows::Borrows {
-                        age: &primary.imm_data.age,
-                        surname: &primary.imm_data.surname,
-                        forename: &primary.imm_data.forename,
-                        bonus_points: &update.bonus_points,
-                    }) {
-                        return Err(updates::pulpit_access_2::UpdateError::sensible_ages);
-                    }
-                    let mut update = update;
-                    std::mem::swap(
-                        &mut primary.mut_data.bonus_points,
-                        &mut update.bonus_points,
-                    );
-                    if !self.transactions.rollback {
-                        self.transactions
-                            .log
-                            .push(
-                                transactions::LogItem::Update(
-                                    key,
-                                    transactions::Updates::pulpit_access_2(update),
-                                ),
-                            );
-                    }
-                    Ok(())
-                }
-            }
-            pub mod insert {
-                pub struct Insert {
-                    pub age: u8,
-                    pub bonus_points: i32,
-                    pub surname: String,
-                    pub forename: String,
-                }
-                #[derive(Debug)]
-                pub enum Error {
-                    sensible_ages,
-                }
-            }
-            impl<'imm> Window<'imm> {
-                pub fn insert(
-                    &mut self,
-                    insert_val: insert::Insert,
-                ) -> Result<Key, insert::Error> {
-                    if !predicates::sensible_ages(borrows::Borrows {
-                        age: &insert_val.age,
-                        bonus_points: &insert_val.bonus_points,
-                        surname: &insert_val.surname,
-                        forename: &insert_val.forename,
-                    }) {
-                        return Err(insert::Error::sensible_ages);
-                    }
-                    let primary = (emdb::dependencies::pulpit::column::Data {
-                        imm_data: column_types::primary::Imm {
-                            age: insert_val.age,
-                            surname: insert_val.surname,
-                            forename: insert_val.forename,
-                        },
-                        mut_data: column_types::primary::Mut {
-                            bonus_points: insert_val.bonus_points,
-                        },
-                    });
-                    let key = self.columns.primary.append(primary);
-                    if !self.transactions.rollback {
-                        self.transactions.log.push(transactions::LogItem::Append);
-                    }
-                    Ok(key)
-                }
-            }
-            pub mod unique {
-                #[derive(Debug)]
-                pub struct NotFound;
-            }
-            impl<'imm> Window<'imm> {}
-            mod transactions {
-                pub enum Updates {
-                    pulpit_access_2(super::updates::pulpit_access_2::Update),
-                }
-                pub enum LogItem {
-                    Update(super::Key, Updates),
-                    Append,
-                }
-                pub struct Data {
-                    pub log: Vec<LogItem>,
-                    pub rollback: bool,
-                }
-                impl Data {
-                    pub fn new() -> Self {
-                        Self {
-                            log: Vec::new(),
-                            rollback: false,
-                        }
-                    }
-                }
-            }
-            impl<'imm> Window<'imm> {
-                /// Commit all current changes
-                /// - Clears the rollback log
-                pub fn commit(&mut self) {
-                    debug_assert!(! self.transactions.rollback);
-                    self.transactions.log.clear()
-                }
-                /// Undo the transactions applied since the last commit
-                /// - Requires re-applying all updates, deleting inserts and undoing deletes
-                ///   (deletes' keys are actually just hidden until commit or abort)
-                pub fn abort(&mut self) {
-                    self.transactions.rollback = true;
-                    while let Some(entry) = self.transactions.log.pop() {
-                        match entry {
-                            transactions::LogItem::Append => {
-                                unsafe {
-                                    self.columns.primary.unppend();
-                                }
-                            }
-                            transactions::LogItem::Update(key, update) => {
-                                match update {
-                                    transactions::Updates::pulpit_access_2(update) => {
-                                        self.pulpit_access_2(update, key).unwrap();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    self.transactions.rollback = false;
-                }
-            }
-            impl<'imm> Window<'imm> {
-                pub fn count(&self) -> usize {
-                    self.columns.primary.count()
-                }
-            }
-            impl<'db> Window<'db> {
-                pub fn scan(&self) -> impl Iterator<Item = Key> + '_ {
-                    self.columns.primary.scan()
-                }
-            }
-            /// The key for accessing rows (delete, update, get)
-            pub type Key = <emdb::dependencies::pulpit::column::AssocBlocks<
-                column_types::primary::Imm,
-                column_types::primary::Mut,
-                1024usize,
-            > as emdb::dependencies::pulpit::column::Keyable>::Key;
-            mod predicates {
-                pub fn sensible_ages(
-                    super::borrows::Borrows {
-                        age,
-                        bonus_points,
-                        surname,
-                        forename,
-                    }: super::borrows::Borrows,
-                ) -> bool {
-                    *age < 255
-                }
-            }
-            struct Uniques {}
-            impl Uniques {
-                fn new(size_hint: usize) -> Self {
-                    Self {}
-                }
-            }
-            struct ColumnHolder {
-                primary: emdb::dependencies::pulpit::column::AssocBlocks<
-                    column_types::primary::Imm,
-                    column_types::primary::Mut,
-                    1024usize,
-                >,
-            }
-            impl ColumnHolder {
-                fn new(size_hint: usize) -> Self {
-                    Self {
-                        primary: emdb::dependencies::pulpit::column::AssocBlocks::new(
-                            size_hint,
-                        ),
-                    }
-                }
-                fn window(&mut self) -> WindowHolder<'_> {
-                    WindowHolder {
-                        primary: self.primary.window(),
-                    }
-                }
-            }
-            struct WindowHolder<'imm> {
-                primary: <emdb::dependencies::pulpit::column::AssocBlocks<
-                    column_types::primary::Imm,
-                    column_types::primary::Mut,
-                    1024usize,
-                > as emdb::dependencies::pulpit::column::Column>::WindowKind<'imm>,
-            }
-            pub struct Table {
-                columns: ColumnHolder,
-                uniques: Uniques,
-                transactions: transactions::Data,
-            }
-            impl Table {
-                pub fn new(size_hint: usize) -> Self {
-                    Self {
-                        columns: ColumnHolder::new(size_hint),
-                        uniques: Uniques::new(size_hint),
-                        transactions: transactions::Data::new(),
-                    }
-                }
-                pub fn window(&mut self) -> Window<'_> {
-                    Window {
-                        columns: self.columns.window(),
-                        uniques: &mut self.uniques,
-                        transactions: &mut self.transactions,
-                    }
-                }
-            }
-            pub struct Window<'imm> {
-                columns: WindowHolder<'imm>,
-                uniques: &'imm mut Uniques,
-                transactions: &'imm mut transactions::Data,
-            }
-        }
         pub mod family_bonus {
             #![allow(unused, non_camel_case_types)]
             use emdb::dependencies::pulpit::column::{
@@ -640,20 +308,352 @@ mod my_db {
                 transactions: &'imm mut transactions::Data,
             }
         }
+        pub mod customers {
+            #![allow(unused, non_camel_case_types)]
+            use emdb::dependencies::pulpit::column::{
+                PrimaryWindow, PrimaryWindowApp, PrimaryWindowPull, PrimaryWindowHide,
+                AssocWindow, AssocWindowPull, Column,
+            };
+            #[derive(Debug)]
+            pub struct KeyError;
+            mod column_types {
+                //! Column types to be used for storage in each column.
+                pub mod primary {
+                    #[derive(Clone)]
+                    pub struct Imm {
+                        pub forename: String,
+                        pub age: u8,
+                        pub surname: String,
+                    }
+                    #[derive(Clone)]
+                    pub struct Mut {
+                        pub bonus_points: i32,
+                    }
+                    pub struct ImmUnpack<'imm> {
+                        pub forename: &'imm String,
+                        pub age: &'imm u8,
+                        pub surname: &'imm String,
+                    }
+                    pub fn imm_unpack<'imm>(
+                        Imm { forename, age, surname }: &'imm Imm,
+                    ) -> ImmUnpack<'imm> {
+                        ImmUnpack {
+                            forename,
+                            age,
+                            surname,
+                        }
+                    }
+                }
+            }
+            pub mod borrows {
+                pub struct Borrows<'brw> {
+                    pub age: &'brw u8,
+                    pub surname: &'brw String,
+                    pub bonus_points: &'brw i32,
+                    pub forename: &'brw String,
+                }
+            }
+            impl<'imm> Window<'imm> {
+                pub fn borrow<'brw>(
+                    &'brw self,
+                    key: Key,
+                ) -> Result<borrows::Borrows<'brw>, KeyError> {
+                    let emdb::dependencies::pulpit::column::Entry {
+                        index,
+                        data: primary,
+                    } = match self.columns.primary.brw(key) {
+                        Ok(entry) => entry,
+                        Err(_) => return Err(KeyError),
+                    };
+                    Ok(borrows::Borrows {
+                        age: &primary.imm_data.age,
+                        surname: &primary.imm_data.surname,
+                        bonus_points: &primary.mut_data.bonus_points,
+                        forename: &primary.imm_data.forename,
+                    })
+                }
+            }
+            pub mod get {
+                pub struct Get<'db> {
+                    pub bonus_points: i32,
+                    pub forename: &'db String,
+                    pub age: &'db u8,
+                    pub surname: &'db String,
+                }
+            }
+            impl<'db> Window<'db> {
+                pub fn get(&self, key: Key) -> Result<get::Get<'db>, KeyError> {
+                    let emdb::dependencies::pulpit::column::Entry {
+                        index,
+                        data: primary,
+                    } = match self.columns.primary.get(key) {
+                        Ok(entry) => entry,
+                        Err(_) => return Err(KeyError),
+                    };
+                    let primary = primary.convert_imm(column_types::primary::imm_unpack);
+                    Ok(get::Get {
+                        age: primary.imm_data.age,
+                        surname: primary.imm_data.surname,
+                        bonus_points: primary.mut_data.bonus_points,
+                        forename: primary.imm_data.forename,
+                    })
+                }
+            }
+            pub mod updates {
+                pub mod pulpit_access_2 {
+                    #[derive(Debug)]
+                    pub enum UpdateError {
+                        KeyError,
+                        sensible_ages,
+                    }
+                    pub struct Update {
+                        pub bonus_points: i32,
+                    }
+                }
+            }
+            impl<'imm> Window<'imm> {
+                pub fn pulpit_access_2(
+                    &mut self,
+                    update: updates::pulpit_access_2::Update,
+                    key: Key,
+                ) -> Result<(), updates::pulpit_access_2::UpdateError> {
+                    let emdb::dependencies::pulpit::column::Entry {
+                        index,
+                        data: primary,
+                    } = match self.columns.primary.brw_mut(key) {
+                        Ok(entry) => entry,
+                        Err(_) => {
+                            return Err(updates::pulpit_access_2::UpdateError::KeyError);
+                        }
+                    };
+                    if !predicates::sensible_ages(borrows::Borrows {
+                        forename: &primary.imm_data.forename,
+                        age: &primary.imm_data.age,
+                        surname: &primary.imm_data.surname,
+                        bonus_points: &update.bonus_points,
+                    }) {
+                        return Err(updates::pulpit_access_2::UpdateError::sensible_ages);
+                    }
+                    let mut update = update;
+                    std::mem::swap(
+                        &mut primary.mut_data.bonus_points,
+                        &mut update.bonus_points,
+                    );
+                    if !self.transactions.rollback {
+                        self.transactions
+                            .log
+                            .push(
+                                transactions::LogItem::Update(
+                                    key,
+                                    transactions::Updates::pulpit_access_2(update),
+                                ),
+                            );
+                    }
+                    Ok(())
+                }
+            }
+            pub mod insert {
+                pub struct Insert {
+                    pub age: u8,
+                    pub surname: String,
+                    pub bonus_points: i32,
+                    pub forename: String,
+                }
+                #[derive(Debug)]
+                pub enum Error {
+                    sensible_ages,
+                }
+            }
+            impl<'imm> Window<'imm> {
+                pub fn insert(
+                    &mut self,
+                    insert_val: insert::Insert,
+                ) -> Result<Key, insert::Error> {
+                    if !predicates::sensible_ages(borrows::Borrows {
+                        age: &insert_val.age,
+                        surname: &insert_val.surname,
+                        bonus_points: &insert_val.bonus_points,
+                        forename: &insert_val.forename,
+                    }) {
+                        return Err(insert::Error::sensible_ages);
+                    }
+                    let primary = (emdb::dependencies::pulpit::column::Data {
+                        imm_data: column_types::primary::Imm {
+                            forename: insert_val.forename,
+                            age: insert_val.age,
+                            surname: insert_val.surname,
+                        },
+                        mut_data: column_types::primary::Mut {
+                            bonus_points: insert_val.bonus_points,
+                        },
+                    });
+                    let key = self.columns.primary.append(primary);
+                    if !self.transactions.rollback {
+                        self.transactions.log.push(transactions::LogItem::Append);
+                    }
+                    Ok(key)
+                }
+            }
+            pub mod unique {
+                #[derive(Debug)]
+                pub struct NotFound;
+            }
+            impl<'imm> Window<'imm> {}
+            mod transactions {
+                pub enum Updates {
+                    pulpit_access_2(super::updates::pulpit_access_2::Update),
+                }
+                pub enum LogItem {
+                    Update(super::Key, Updates),
+                    Append,
+                }
+                pub struct Data {
+                    pub log: Vec<LogItem>,
+                    pub rollback: bool,
+                }
+                impl Data {
+                    pub fn new() -> Self {
+                        Self {
+                            log: Vec::new(),
+                            rollback: false,
+                        }
+                    }
+                }
+            }
+            impl<'imm> Window<'imm> {
+                /// Commit all current changes
+                /// - Clears the rollback log
+                pub fn commit(&mut self) {
+                    debug_assert!(! self.transactions.rollback);
+                    self.transactions.log.clear()
+                }
+                /// Undo the transactions applied since the last commit
+                /// - Requires re-applying all updates, deleting inserts and undoing deletes
+                ///   (deletes' keys are actually just hidden until commit or abort)
+                pub fn abort(&mut self) {
+                    self.transactions.rollback = true;
+                    while let Some(entry) = self.transactions.log.pop() {
+                        match entry {
+                            transactions::LogItem::Append => {
+                                unsafe {
+                                    self.columns.primary.unppend();
+                                }
+                            }
+                            transactions::LogItem::Update(key, update) => {
+                                match update {
+                                    transactions::Updates::pulpit_access_2(update) => {
+                                        self.pulpit_access_2(update, key).unwrap();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    self.transactions.rollback = false;
+                }
+            }
+            impl<'imm> Window<'imm> {
+                pub fn count(&self) -> usize {
+                    self.columns.primary.count()
+                }
+            }
+            impl<'db> Window<'db> {
+                pub fn scan(&self) -> impl Iterator<Item = Key> + '_ {
+                    self.columns.primary.scan()
+                }
+            }
+            /// The key for accessing rows (delete, update, get)
+            pub type Key = <emdb::dependencies::pulpit::column::AssocBlocks<
+                column_types::primary::Imm,
+                column_types::primary::Mut,
+                1024usize,
+            > as emdb::dependencies::pulpit::column::Keyable>::Key;
+            mod predicates {
+                pub fn sensible_ages(
+                    super::borrows::Borrows {
+                        age,
+                        surname,
+                        bonus_points,
+                        forename,
+                    }: super::borrows::Borrows,
+                ) -> bool {
+                    *age < 255
+                }
+            }
+            struct Uniques {}
+            impl Uniques {
+                fn new(size_hint: usize) -> Self {
+                    Self {}
+                }
+            }
+            struct ColumnHolder {
+                primary: emdb::dependencies::pulpit::column::AssocBlocks<
+                    column_types::primary::Imm,
+                    column_types::primary::Mut,
+                    1024usize,
+                >,
+            }
+            impl ColumnHolder {
+                fn new(size_hint: usize) -> Self {
+                    Self {
+                        primary: emdb::dependencies::pulpit::column::AssocBlocks::new(
+                            size_hint,
+                        ),
+                    }
+                }
+                fn window(&mut self) -> WindowHolder<'_> {
+                    WindowHolder {
+                        primary: self.primary.window(),
+                    }
+                }
+            }
+            struct WindowHolder<'imm> {
+                primary: <emdb::dependencies::pulpit::column::AssocBlocks<
+                    column_types::primary::Imm,
+                    column_types::primary::Mut,
+                    1024usize,
+                > as emdb::dependencies::pulpit::column::Column>::WindowKind<'imm>,
+            }
+            pub struct Table {
+                columns: ColumnHolder,
+                uniques: Uniques,
+                transactions: transactions::Data,
+            }
+            impl Table {
+                pub fn new(size_hint: usize) -> Self {
+                    Self {
+                        columns: ColumnHolder::new(size_hint),
+                        uniques: Uniques::new(size_hint),
+                        transactions: transactions::Data::new(),
+                    }
+                }
+                pub fn window(&mut self) -> Window<'_> {
+                    Window {
+                        columns: self.columns.window(),
+                        uniques: &mut self.uniques,
+                        transactions: &mut self.transactions,
+                    }
+                }
+            }
+            pub struct Window<'imm> {
+                columns: WindowHolder<'imm>,
+                uniques: &'imm mut Uniques,
+                transactions: &'imm mut transactions::Data,
+            }
+        }
     }
     pub mod queries {
         pub mod customer_age_brackets {
             #[derive(Debug)]
             pub enum Error {
+                Error5(super::super::tables::family_bonus::unique::NotFound),
+                Error6,
                 Error2(
                     super::super::tables::customers::updates::pulpit_access_2::UpdateError,
                 ),
-                Error1,
-                Error5(super::super::tables::family_bonus::unique::NotFound),
-                Error6,
                 Error7(
                     super::super::tables::family_bonus::updates::pulpit_access_7::UpdateError,
                 ),
+                Error1,
             }
         }
     }
@@ -664,16 +664,16 @@ mod my_db {
     }
     #[derive(Clone)]
     struct RecordTypeAlias1<'db, 'qy> {
-        surname: &'db String,
-        age: &'db u8,
         forename: &'db String,
+        age: &'db u8,
+        surname: &'db String,
         bonus_points: i32,
         __internal_phantomdata: std::marker::PhantomData<(&'db (), &'qy ())>,
     }
     #[derive(Clone)]
     struct RecordTypeAlias2<'db, 'qy> {
-        person: RecordTypeAlias1<'db, 'qy>,
         ref_cust: tables::customers::Key,
+        person: RecordTypeAlias1<'db, 'qy>,
         __internal_phantomdata: std::marker::PhantomData<(&'db (), &'qy ())>,
     }
     #[derive(Clone)]
@@ -694,8 +694,8 @@ mod my_db {
     }
     #[derive(Clone)]
     struct RecordTypeAlias6<'db, 'qy> {
-        bonus: i32,
         surname: &'db String,
+        bonus: i32,
         __internal_phantomdata: std::marker::PhantomData<(&'db (), &'qy ())>,
     }
     #[derive(Clone)]
@@ -749,22 +749,22 @@ mod my_db {
                 ) = (
                     (),
                     (),
-                    |RecordTypeAlias2 { person, ref_cust, .. }| {
+                    |RecordTypeAlias2 { ref_cust, person, .. }| {
                         (
                             RecordTypeAlias3 {
                                 bonus_points: person.bonus_points + 1,
                                 __internal_phantomdata: std::marker::PhantomData,
                             },
                             RecordTypeAlias2 {
-                                person,
                                 ref_cust,
+                                person,
                                 __internal_phantomdata: std::marker::PhantomData,
                             },
                         )
                     },
                     |
-                        person: RecordTypeAlias1<'db, 'qy>,
-                        ref_cust: tables::customers::Key|
+                        ref_cust: tables::customers::Key,
+                        person: RecordTypeAlias1<'db, 'qy>|
                     {
                         (
                             RecordTypeAlias4 {
@@ -819,9 +819,9 @@ mod my_db {
                                     Ok(get_value) => {
                                         Ok(RecordTypeAlias2 {
                                             person: RecordTypeAlias1 {
-                                                surname: get_value.surname,
-                                                age: get_value.age,
                                                 forename: get_value.forename,
+                                                age: get_value.age,
+                                                surname: get_value.surname,
                                                 bonus_points: get_value.bonus_points,
                                                 __internal_phantomdata: std::marker::PhantomData,
                                             },
@@ -882,8 +882,8 @@ mod my_db {
                                     operator_closure_value_9,
                                     operator_closure_value_10,
                                 ) = (operator_closure_value_3)(
-                                    lifted.person,
                                     lifted.ref_cust,
+                                    lifted.person,
                                 );
                                 {
                                     let dataflow_value_4: <emdb::dependencies::minister::Basic as emdb::dependencies::minister::Physical>::Single<
@@ -928,8 +928,8 @@ mod my_db {
                                                     Ok(get_value) => {
                                                         Ok(RecordTypeAlias7 {
                                                             family: RecordTypeAlias6 {
-                                                                bonus: get_value.bonus,
                                                                 surname: get_value.surname,
+                                                                bonus: get_value.bonus,
                                                                 __internal_phantomdata: std::marker::PhantomData,
                                                             },
                                                             surname: dataflow_value_5.surname,
@@ -997,15 +997,15 @@ mod my_db {
             })() {
                 Ok(result) => {
                     {
-                        self.family_bonus.commit();
                         self.customers.commit();
+                        self.family_bonus.commit();
                     }
                     Ok(result)
                 }
                 Err(e) => {
                     {
-                        self.family_bonus.abort();
                         self.customers.abort();
+                        self.family_bonus.abort();
                     }
                     Err(e)
                 }

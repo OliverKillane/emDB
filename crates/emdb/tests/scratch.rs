@@ -8,6 +8,7 @@ use emdb::macros::emql;
 
 emql! {
     impl my_db as SimpleSerialized{debug_file = "emdb/tests/code.rs"};
+    impl code_display as PlanViz{path = "emdb/tests/debug/code.dot", display_types = off, display_ctx_ops = on, display_control = on};
 
     table customers {
         forename: String,
@@ -39,4 +40,6 @@ emql! {
 fn main() {
     let mut ds = my_db::Datastore::new();
     let mut db = ds.db();
+
+    let x = db.customer_age_brackets();
 }
