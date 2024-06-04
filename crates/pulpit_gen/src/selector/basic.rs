@@ -1,6 +1,6 @@
 use crate::{
-    columns::{AssocBlocks, PrimaryAppendAdapter, PrimaryRetain, PrimaryThunderDomeTrans},
-    groups::{Group, GroupConfig, MutImmut},
+    columns::{AssocBlocks, PrimaryRetain, PrimaryThunderDomeTrans, PrimaryThunderdome},
+    groups::{Group, GroupConfig},
     table::Table,
 };
 
@@ -25,44 +25,28 @@ pub fn selector(
 
     let primary_fields = utils::determine_mutability(&updates, fields);
 
-    // Here we assume a 
-    let groups = if deletions {
+    let prim_col = if deletions {
         if primary_fields.imm_fields.is_empty() {
-            GroupConfig {
-                primary: Group {
-                    col: PrimaryThunderDomeTrans.into(),
-                    fields: primary_fields,
-                },
-                assoc: vec![],
+            if transactions {
+                PrimaryThunderDomeTrans.into()
+            } else {
+                PrimaryThunderdome.into()
             }
         } else {
-            GroupConfig {
-                primary: Group {
-                    col: PrimaryRetain { block_size: 1024 }.into(),
-                    fields: primary_fields,
-                },
-                assoc: vec![],
-            }
+            PrimaryRetain { block_size: 1024 }.into()
         }
     } else {
-        GroupConfig {
-            primary: Group {
-                col: PrimaryAppendAdapter.into(),
-                fields: MutImmut {
-                    imm_fields: vec![],
-                    mut_fields: vec![],
-                },
-            },
-            assoc: vec![Group {
-                col: AssocBlocks { block_size: 1024 }.into(),
-                fields: primary_fields,
-            }],
-        }
-    }
-    .into();
+        AssocBlocks { block_size: 1024 }.into()
+    };
 
     Table {
-        groups,
+        groups: GroupConfig {
+            primary: Group {
+                col: prim_col,
+                fields: primary_fields,
+            },
+            assoc: vec![],
+        }.into(),
         uniques,
         predicates,
         updates,

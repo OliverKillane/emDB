@@ -13,16 +13,6 @@ mod my_db {
             mod column_types {
                 //! Column types to be used for storage in each column.
                 pub mod primary {
-                    #[derive()]
-                    pub struct Imm {}
-                    #[derive()]
-                    pub struct Mut {}
-                    pub struct ImmUnpack {}
-                    pub fn imm_unpack(Imm {}: Imm) -> ImmUnpack {
-                        ImmUnpack {}
-                    }
-                }
-                pub mod assoc_0 {
                     #[derive(Clone)]
                     pub struct Imm {}
                     #[derive(Clone)]
@@ -54,7 +44,6 @@ mod my_db {
                         Ok(entry) => entry,
                         Err(_) => return Err(KeyError),
                     };
-                    let assoc_0 = unsafe { self.columns.assoc_0.brw(index) };
                     Ok(borrows::Borrows {
                         phantom: std::marker::PhantomData,
                     })
@@ -73,8 +62,6 @@ mod my_db {
                         Err(_) => return Err(KeyError),
                     };
                     let primary = primary.convert_imm(column_types::primary::imm_unpack);
-                    let assoc_0 = unsafe { self.columns.assoc_0.get(index) }
-                        .convert_imm(column_types::assoc_0::imm_unpack);
                     Ok(get::Get {})
                 }
             }
@@ -99,12 +86,7 @@ mod my_db {
                         imm_data: column_types::primary::Imm {},
                         mut_data: column_types::primary::Mut {},
                     });
-                    let assoc_0 = (emdb::dependencies::pulpit::column::Data {
-                        imm_data: column_types::assoc_0::Imm {},
-                        mut_data: column_types::assoc_0::Mut {},
-                    });
                     let key = self.columns.primary.append(primary);
-                    self.columns.assoc_0.append(assoc_0);
                     if !self.transactions.rollback {
                         self.transactions.log.push(transactions::LogItem::Append);
                     }
@@ -152,7 +134,6 @@ mod my_db {
                             transactions::LogItem::Append => {
                                 unsafe {
                                     self.columns.primary.unppend();
-                                    self.columns.assoc_0.unppend();
                                 }
                             }
                             transactions::LogItem::Update(key, update) => match update {}
@@ -172,9 +153,10 @@ mod my_db {
                 }
             }
             /// The key for accessing rows (delete, update, get)
-            pub type Key = <emdb::dependencies::pulpit::column::PrimaryAppendAdapter<
+            pub type Key = <emdb::dependencies::pulpit::column::AssocBlocks<
                 column_types::primary::Imm,
                 column_types::primary::Mut,
+                1024usize,
             > as emdb::dependencies::pulpit::column::Keyable>::Key;
             mod predicates {
                 pub fn check2(
@@ -190,43 +172,31 @@ mod my_db {
                 }
             }
             struct ColumnHolder {
-                assoc_0: emdb::dependencies::pulpit::column::AssocBlocks<
-                    column_types::assoc_0::Imm,
-                    column_types::assoc_0::Mut,
-                    1024usize,
-                >,
-                primary: emdb::dependencies::pulpit::column::PrimaryAppendAdapter<
+                primary: emdb::dependencies::pulpit::column::AssocBlocks<
                     column_types::primary::Imm,
                     column_types::primary::Mut,
+                    1024usize,
                 >,
             }
             impl ColumnHolder {
                 fn new(size_hint: usize) -> Self {
                     Self {
-                        assoc_0: emdb::dependencies::pulpit::column::AssocBlocks::new(
-                            size_hint,
-                        ),
-                        primary: emdb::dependencies::pulpit::column::PrimaryAppendAdapter::new(
+                        primary: emdb::dependencies::pulpit::column::AssocBlocks::new(
                             size_hint,
                         ),
                     }
                 }
                 fn window(&mut self) -> WindowHolder<'_> {
                     WindowHolder {
-                        assoc_0: self.assoc_0.window(),
                         primary: self.primary.window(),
                     }
                 }
             }
             struct WindowHolder<'imm> {
-                assoc_0: <emdb::dependencies::pulpit::column::AssocBlocks<
-                    column_types::assoc_0::Imm,
-                    column_types::assoc_0::Mut,
-                    1024usize,
-                > as emdb::dependencies::pulpit::column::Column>::WindowKind<'imm>,
-                primary: <emdb::dependencies::pulpit::column::PrimaryAppendAdapter<
+                primary: <emdb::dependencies::pulpit::column::AssocBlocks<
                     column_types::primary::Imm,
                     column_types::primary::Mut,
+                    1024usize,
                 > as emdb::dependencies::pulpit::column::Column>::WindowKind<'imm>,
             }
             pub struct Table {
@@ -269,27 +239,27 @@ mod my_db {
                 pub mod primary {
                     #[derive(Clone)]
                     pub struct Imm {
-                        pub a: i32,
                         pub c: (u32, i32),
+                        pub a: i32,
                     }
                     #[derive(Clone)]
                     pub struct Mut {
                         pub b: String,
                     }
                     pub struct ImmUnpack<'imm> {
-                        pub a: &'imm i32,
                         pub c: &'imm (u32, i32),
+                        pub a: &'imm i32,
                     }
-                    pub fn imm_unpack<'imm>(Imm { a, c }: &'imm Imm) -> ImmUnpack<'imm> {
-                        ImmUnpack { a, c }
+                    pub fn imm_unpack<'imm>(Imm { c, a }: &'imm Imm) -> ImmUnpack<'imm> {
+                        ImmUnpack { c, a }
                     }
                 }
             }
             pub mod borrows {
                 pub struct Borrows<'brw> {
-                    pub a: &'brw i32,
-                    pub c: &'brw (u32, i32),
                     pub b: &'brw String,
+                    pub c: &'brw (u32, i32),
+                    pub a: &'brw i32,
                 }
             }
             impl<'imm> Window<'imm> {
@@ -305,17 +275,17 @@ mod my_db {
                         Err(_) => return Err(KeyError),
                     };
                     Ok(borrows::Borrows {
-                        a: &primary.imm_data.a,
-                        c: &primary.imm_data.c,
                         b: &primary.mut_data.b,
+                        c: &primary.imm_data.c,
+                        a: &primary.imm_data.a,
                     })
                 }
             }
             pub mod get {
                 pub struct Get<'db> {
                     pub b: String,
-                    pub a: &'db i32,
                     pub c: &'db (u32, i32),
+                    pub a: &'db i32,
                 }
             }
             impl<'db> Window<'db> {
@@ -329,9 +299,9 @@ mod my_db {
                     };
                     let primary = primary.convert_imm(column_types::primary::imm_unpack);
                     Ok(get::Get {
-                        a: primary.imm_data.a,
-                        c: primary.imm_data.c,
                         b: primary.mut_data.b,
+                        c: primary.imm_data.c,
+                        a: primary.imm_data.a,
                     })
                 }
             }
@@ -364,15 +334,15 @@ mod my_db {
                         }
                     };
                     if !predicates::c_predicate(borrows::Borrows {
-                        a: &primary.imm_data.a,
                         c: &primary.imm_data.c,
+                        a: &primary.imm_data.a,
                         b: &update.b,
                     }) {
                         return Err(updates::pulpit_access_4::UpdateError::c_predicate);
                     }
                     if !predicates::b_length(borrows::Borrows {
-                        a: &primary.imm_data.a,
                         c: &primary.imm_data.c,
+                        a: &primary.imm_data.a,
                         b: &update.b,
                     }) {
                         return Err(updates::pulpit_access_4::UpdateError::b_length);
@@ -394,9 +364,9 @@ mod my_db {
             }
             pub mod insert {
                 pub struct Insert {
-                    pub a: i32,
-                    pub c: (u32, i32),
                     pub b: String,
+                    pub c: (u32, i32),
+                    pub a: i32,
                 }
                 #[derive(Debug)]
                 pub enum Error {
@@ -411,16 +381,16 @@ mod my_db {
                     insert_val: insert::Insert,
                 ) -> Result<Key, insert::Error> {
                     if !predicates::c_predicate(borrows::Borrows {
-                        a: &insert_val.a,
-                        c: &insert_val.c,
                         b: &insert_val.b,
+                        c: &insert_val.c,
+                        a: &insert_val.a,
                     }) {
                         return Err(insert::Error::c_predicate);
                     }
                     if !predicates::b_length(borrows::Borrows {
-                        a: &insert_val.a,
-                        c: &insert_val.c,
                         b: &insert_val.b,
+                        c: &insert_val.c,
+                        a: &insert_val.a,
                     }) {
                         return Err(insert::Error::b_length);
                     }
@@ -430,8 +400,8 @@ mod my_db {
                     };
                     let primary = (emdb::dependencies::pulpit::column::Data {
                         imm_data: column_types::primary::Imm {
-                            a: insert_val.a,
                             c: insert_val.c,
+                            a: insert_val.a,
                         },
                         mut_data: column_types::primary::Mut {
                             b: insert_val.b,
@@ -587,12 +557,12 @@ mod my_db {
             > as emdb::dependencies::pulpit::column::Keyable>::Key;
             mod predicates {
                 pub fn c_predicate(
-                    super::borrows::Borrows { a, c, b }: super::borrows::Borrows,
+                    super::borrows::Borrows { b, c, a }: super::borrows::Borrows,
                 ) -> bool {
                     c.0 > c.1
                 }
                 pub fn b_length(
-                    super::borrows::Borrows { a, c, b }: super::borrows::Borrows,
+                    super::borrows::Borrows { b, c, a }: super::borrows::Borrows,
                 ) -> bool {
                     b.len() < 10
                 }
@@ -688,14 +658,14 @@ mod my_db {
     }
     struct RecordTypeAlias0<'db, 'qy> {
         c: (u32, i32),
-        a: i32,
         b: String,
+        a: i32,
         __internal_phantomdata: std::marker::PhantomData<(&'db (), &'qy ())>,
     }
     struct RecordTypeAlias1<'db, 'qy> {
         b: String,
-        a: i32,
         c: (u32, i32),
+        a: i32,
         __internal_phantomdata: std::marker::PhantomData<(&'db (), &'qy ())>,
     }
     pub struct RecordTypeAlias2<'db, 'qy> {
@@ -790,8 +760,8 @@ mod my_db {
                                         .simple
                                         .insert(tables::simple::insert::Insert {
                                             c: dataflow_value_0.c,
-                                            a: dataflow_value_0.a,
                                             b: dataflow_value_0.b,
+                                            a: dataflow_value_0.a,
                                         })?,
                                     __internal_phantomdata: std::marker::PhantomData,
                                 })

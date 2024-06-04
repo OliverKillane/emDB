@@ -3,9 +3,34 @@
 
 use proc_macro2::TokenStream;
 
+
+
+
+/// Provides raw access to generate table structures
+/// ```
+/// raw_interface!{
+///     primary: <column name> {
+///         mut field: type,
+///         field: type,
+///     }
+///     associated: [
+///         <column name> {
+///             mut field: type,
+///             field: type,
+///         }
+///     ],
+///     updates: [
+///         
+///     ],
+///     deletions,
+///     transactions,
+/// }
+/// ```
 pub fn raw_interface(
     tks: TokenStream,
 ) {
+
+
 
 } 
 

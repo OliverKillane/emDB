@@ -96,14 +96,10 @@ mod primary_retain;
 pub use primary_retain::*;
 mod assoc_vec;
 pub use assoc_vec::*;
-mod primary_pull_adapter;
-pub use primary_pull_adapter::*;
 mod primary_gen_arena;
 pub use primary_gen_arena::*;
 mod primary_thunderdome;
 pub use primary_thunderdome::*;
-mod primary_append_adapter;
-pub use primary_append_adapter::*;
 mod assoc_blocks;
 pub use assoc_blocks::*;
 mod primary_thunderdome_trans;
@@ -113,8 +109,7 @@ pub use primary_thunderdome_trans::*;
 #[enumtrait::quick_from]
 #[enumtrait::store(enum_primary)]
 pub enum Primary {
-    PrimaryAppendAdapter,
-    PrimaryPullAdapter,
+    AssocBlocks,
     PrimaryRetain,
     PrimaryThunderdome,
     PrimaryThunderDomeTrans,

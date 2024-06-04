@@ -796,6 +796,8 @@ mod verif {
         test_pull_impl!(gen_arena => PrimaryGenerationalArena<usize, usize>);
         test_pull_impl!(thunderdome => PrimaryThunderDome<usize, usize>);
         test_pull_impl!(thunderdome_trans => PrimaryThunderDomeTrans<usize, usize>);
+        
+        test_app_impl!(assoc_blocks => AssocBlocks<usize, usize, 16>);
     }
 
     #[cfg(kani)]
