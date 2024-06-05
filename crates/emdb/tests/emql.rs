@@ -27,15 +27,12 @@ macro_rules! valid_tests {
 }
 
 valid_tests!(
-    complex { 
+    complex {
         favourite_colours,
         dereferencing,
         userdetails
     },
-    context {
-        foreach,
-        groupby
-    },
+    context { foreach, groupby },
     extreme {
         empty_emql,
         empty_items,

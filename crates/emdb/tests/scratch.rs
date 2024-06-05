@@ -1,12 +1,11 @@
+#![allow(dead_code, unused_variables)]
 //! For manually debugging generated code.
 //!
 //! - Ensure that the proc macro is built. In vscode on the bottom bar you can
 //!   hover over `rust-analyzer` and click `Rebuild Proc Macros`
 //! - Saving this file should re-run the emql macro, to generate outputs.
-#![allow(unreachable_code)]
 use emdb::macros::emql;
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 enum RGB {
     Red,
@@ -15,7 +14,7 @@ enum RGB {
 }
 
 emql! {
-    impl my_db as Serialized{debug_file = "emdb/tests/code.rs"};
+    impl my_db as Serialized{debug_file = "emdb/tests/debug/code.rs"};
     impl code_display as PlanViz{path = "emdb/tests/debug/code.dot", display_types = off, display_ctx_ops = on, display_control = on};
 
     table data {
@@ -43,6 +42,6 @@ emql! {
 }
 
 fn main() {
-    let mut ds = my_db::Datastore::new();
-    let mut db = ds.db();
+    // let mut ds = my_db::Datastore::new();
+    // let mut db = ds.db();
 }

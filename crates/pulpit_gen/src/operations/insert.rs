@@ -2,7 +2,12 @@ use std::iter::once;
 
 use super::SingleOp;
 use crate::{
-    columns::ColKind, groups::{Field, Group, Groups}, limit::Limit, namer::CodeNamer, predicates::Predicate, uniques::Unique
+    columns::ColKind,
+    groups::{Field, Group, Groups},
+    limit::Limit,
+    namer::CodeNamer,
+    predicates::Predicate,
+    uniques::Unique,
 };
 use proc_macro2::Span;
 use quote::quote;
@@ -108,17 +113,21 @@ pub fn generate(
         }
     });
 
-    let mut errors = uniques.iter().map(|Unique { alias, .. }| alias).chain(
-        predicates
-            .iter()
-            .map(|Predicate { alias, tokens: _ }| alias),
-    ).collect::<Vec<_>>();
+    let mut errors = uniques
+        .iter()
+        .map(|Unique { alias, .. }| alias)
+        .chain(
+            predicates
+                .iter()
+                .map(|Predicate { alias, tokens: _ }| alias),
+        )
+        .collect::<Vec<_>>();
 
-   let limit_cons =  if let Some(limit) = limit {
+    let limit_cons = if let Some(limit) = limit {
         let alias = &limit.alias;
         errors.push(alias);
         let value = limit.generate_check();
-        quote!{
+        quote! {
             {
                 if self.#struct_window_method_count() >= #value {
                     return Err(#mod_insert::#mod_insert_enum_error::#alias);

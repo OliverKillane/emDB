@@ -1,3 +1,4 @@
+#![allow(dead_code, unused_variables)]
 //! ## Valid Tests for emql interface
 //! - Code is added in submodules from here, to be executed by the 
 //!   [emql.rs](./../emql.rs) integration test

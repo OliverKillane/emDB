@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use crate::{
-    groups::FieldName, limit::Limit, operations::{self, get::get_struct_fields, SingleOpFn}, uniques::UniqueDec
+    groups::FieldName,
+    limit::Limit,
+    operations::{self, get::get_struct_fields, SingleOpFn},
+    uniques::UniqueDec,
 };
 use quote::quote;
 use quote_debug::Tokens;

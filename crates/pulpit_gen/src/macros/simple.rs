@@ -8,8 +8,8 @@ use combi::{
     macros::{choices, seqs},
     tokens::{
         basic::{
-            collectuntil, getident, gettoken, matchident, matchpunct, peekident, peekpunct,
-            recovgroup, terminal,
+            collectuntil, getident, gettoken, isempty, matchident, matchpunct, peekident,
+            peekpunct, recovgroup, terminal,
         },
         derived::listseptrailing,
         error::{error, expectederr},
@@ -23,7 +23,11 @@ use proc_macro_error::{Diagnostic, Level};
 use syn::Ident;
 
 use crate::{
-    groups::Field, operations::update::Update, predicates::Predicate, selector::SelectOperations,
+    groups::Field,
+    limit::{Limit, LimitKind},
+    operations::update::Update,
+    predicates::Predicate,
+    selector::SelectOperations,
     uniques::Unique,
 };
 
@@ -125,6 +129,26 @@ fn parse_predicates() -> impl TokenParser<Vec<Predicate>> {
     )
 }
 
+fn parse_limit() -> impl TokenParser<Option<Limit>> {
+    named_parse(
+        "limit",
+        recovgroup(
+            proc_macro2::Delimiter::Brace,
+            choices! {
+                peekident("None") => mapsuc(matchident("None"), |_|None),
+                otherwise => mapsuc(
+                    seqs!(
+                        getident(),
+                        matchpunct(':'),
+                        collectuntil(isempty())
+                    ),
+                    |( alias, (_, tks))| Some(Limit { value: LimitKind::ConstVal(tks.into()), alias })
+                )
+            },
+        ),
+    )
+}
+
 fn named_parse<T>(name: &'static str, inner: impl TokenParser<T>) -> impl TokenParser<T> {
     mapsuc(seq(matchident(name), inner), |(_, data)| data)
 }
@@ -133,6 +157,7 @@ fn analyse(
     fields: Vec<ASTField>,
     updates: Vec<Update>,
     predicates: Vec<Predicate>,
+    limit: Option<Limit>,
     transactions: bool,
     deletions: bool,
     name: Ident,
@@ -154,6 +179,14 @@ fn analyse(
             add_duplicate(&pred.alias, prev_name)
         } else {
             seen_access_names.insert(pred.alias.clone());
+        }
+    }
+
+    if let Some(Limit { alias, .. }) = &limit {
+        if let Some(prev_name) = seen_access_names.get(alias) {
+            add_duplicate(alias, prev_name)
+        } else {
+            seen_access_names.insert(alias.clone());
         }
     }
 
@@ -187,7 +220,7 @@ fn analyse(
         predicates,
         updates,
         public: false,
-        limit: None,
+        limit,
     })
 }
 
@@ -196,6 +229,7 @@ pub fn simple(input: TokenStream) -> Result<SelectOperations, LinkedList<Diagnos
         comma_after(fields_parser()),
         comma_after(parse_updates()),
         comma_after(parse_predicates()),
+        comma_after(parse_limit()),
         comma_after(parse_on_off("transactions")),
         comma_after(parse_on_off("deletions")),
         mapsuc(
@@ -206,7 +240,15 @@ pub fn simple(input: TokenStream) -> Result<SelectOperations, LinkedList<Diagnos
 
     let (_, res) = mapsuc(seqdiff(parser, terminal), |(o, ())| o)
         .comp(TokenIter::from(input, Span::call_site()));
-    let (fields, (updates, (predicates, (transactions, (deletions, name))))) =
+    let (fields, (updates, (predicates, (limit, (transactions, (deletions, name)))))) =
         res.to_result().map_err(TokenDiagnostic::into_list)?;
-    analyse(fields, updates, predicates, transactions, deletions, name)
+    analyse(
+        fields,
+        updates,
+        predicates,
+        limit,
+        transactions,
+        deletions,
+        name,
+    )
 }
