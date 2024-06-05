@@ -3,7 +3,7 @@ use quote_debug::Tokens;
 use std::collections::HashMap;
 use syn::{Ident, ItemImpl, ItemMod, ItemStruct, Type};
 
-use super::namer::SimpleNamer;
+use super::namer::SerializedNamer;
 use crate::plan;
 
 pub struct GeneratedInfo<'imm> {
@@ -21,7 +21,7 @@ pub struct TableWindow<'imm> {
 
 /// Generate the tokens for the tables, and the struct to hold them (in [`TableWindow`]).
 /// - Generates the tokens for the [`plan::ScalarType`]s of table fields assuming they are just [`plan::ScalarTypeConc::Rust`] tyes
-pub fn generate_tables<'imm>(lp: &'imm plan::Plan, namer: &SimpleNamer) -> TableWindow<'imm> {
+pub fn generate_tables<'imm>(lp: &'imm plan::Plan, namer: &SerializedNamer) -> TableWindow<'imm> {
     // get the constraints and fields of each table
     let mut pulpit_configs = lp
         .tables
@@ -101,7 +101,7 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, namer: &SimpleNamer) -> Table
         }
     }
 
-    let SimpleNamer {
+    let SerializedNamer {
         pulpit:
             ref pulpit_namer @ pulpit::gen::namer::CodeNamer {
                 struct_table,

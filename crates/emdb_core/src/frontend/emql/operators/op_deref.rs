@@ -82,7 +82,8 @@ impl EMQLOperator for DeRef {
                                         data_out: new_type, 
                                         op: plan::DeRef { 
                                             input: prev_edge, reference: rec_reference, named: rec_named, table: table_id_copy, output: next_edge,
-                                            named_type: inner_record, }.into(), 
+                                            named_type: inner_record,
+                                            unchecked: false, }.into(), 
                                         call_span: call.span()
                                     }
                                 )

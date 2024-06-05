@@ -164,6 +164,9 @@ pub struct DeRef {
     /// The field input with the key
     pub reference: RecordField,
 
+    /// Specifies that the access should not be checked (e.g. panic on key not found)
+    pub unchecked: bool,
+
     /// The field to put the data in
     pub named: RecordField,
     pub named_type: Key<RecordType>,

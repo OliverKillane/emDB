@@ -23,7 +23,7 @@ use quote_debug::Tokens;
 use std::collections::{HashMap, HashSet};
 use syn::{Ident, ItemStruct, Type};
 
-use super::namer::SimpleNamer;
+use super::namer::SerializedNamer;
 use crate::plan;
 
 /// Gets all the record types that need to be declared public.
@@ -98,12 +98,12 @@ pub fn generate_scalar_type<'imm>(
     lp: &'imm plan::Plan,
     get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
     key: plan::Key<plan::ScalarType>,
-    namer: &SimpleNamer,
+    namer: &SerializedNamer,
 ) -> Tokens<Type> {
     match lp.get_scalar_type_conc(key) {
         plan::ScalarTypeConc::TableRef(tk) => {
             let table_name = &lp.get_table(*tk).name;
-            let SimpleNamer {
+            let SerializedNamer {
                 pulpit: pulpit::gen::namer::CodeNamer { type_key, .. },
                 mod_tables,
                 ..
@@ -138,7 +138,7 @@ pub fn generate_scalar_type<'imm>(
 pub fn generate_record_name(
     lp: &plan::Plan,
     key: plan::Key<plan::RecordType>,
-    namer: &SimpleNamer,
+    namer: &SerializedNamer,
 ) -> Tokens<Type> {
     let index = lp.get_record_conc_index(key);
     namer.record_name(*index)
@@ -153,11 +153,11 @@ pub fn generate_record_name(
 pub fn generate_record_definitions<'imm>(
     lp: &'imm plan::Plan,
     get_types: &'imm HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
-    namer: &'imm SimpleNamer,
+    namer: &'imm SerializedNamer,
 ) -> impl Iterator<Item = Tokens<ItemStruct>> + 'imm {
     let public_records = public_record_types(lp);
 
-    let SimpleNamer {
+    let SerializedNamer {
         qy_lifetime,
         db_lifetime,
         phantom_field,

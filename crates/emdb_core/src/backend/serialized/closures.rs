@@ -11,12 +11,12 @@ use quote::quote;
 use quote_debug::Tokens;
 use syn::{ExprBlock, ExprClosure, ExprTuple, Ident, Path, Type};
 
-use super::namer::SimpleNamer;
+use super::namer::SerializedNamer;
 use super::operators::OperatorGen;
 use super::tables::GeneratedInfo;
 use super::types::generate_scalar_type;
 
-pub fn unwrap_context(ctx: &plan::Context, namer: &SimpleNamer) -> Tokens<ExprTuple> {
+pub fn unwrap_context(ctx: &plan::Context, namer: &SerializedNamer) -> Tokens<ExprTuple> {
     let values = ctx
         .ordering
         .iter()
@@ -32,7 +32,7 @@ pub fn generate_context_closure<'imm>(
     lp: &'imm plan::Plan,
     ctx: plan::Key<plan::Context>,
     get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
-    namer: &SimpleNamer,
+    namer: &SerializedNamer,
 ) -> Tokens<ExprClosure> {
     let context = lp.get_context(ctx);
     let data = generate_context(lp, context, get_types, namer);
@@ -51,7 +51,7 @@ pub fn generate_context<'imm>(
     lp: &'imm plan::Plan,
     ctx: &plan::Context,
     get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
-    namer: &SimpleNamer,
+    namer: &SerializedNamer,
 ) -> Tokens<ExprTuple> {
     let data = ctx
         .ordering
@@ -79,7 +79,7 @@ pub fn generate_application<'imm, 'brw>(
     errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
     mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
     gen_info: &GeneratedInfo<'imm>,
-    namer: &SimpleNamer,
+    namer: &SerializedNamer,
 ) -> Tokens<ExprBlock> {
     let error_cnt = errors.count();
     let tokens = ctx

@@ -15,18 +15,18 @@ emql! {
     table people {
         name: String,
         age: u8,
-        fav: crate::RGB,
+        fav: crate::valid::complex::favourite_colours::RGB,
         score: i32,
     } @ [
         unique(name) as unique_names,
         pred(*age < 100 && *age > 10) as reasonable_ages
     ]
 
-    query add_new_person(name: String, age: u8, fav: crate::RGB) {
+    query add_new_person(name: String, age: u8, fav: super::RGB) {
         row(
             name: String = name,
             age: u8 = age,
-            fav: crate::RGB = fav,
+            fav: super::RGB = fav,
             score: i32 = 0
         )
             ~> insert(people as ref name)
@@ -63,8 +63,7 @@ emql! {
     }
 }
 
-#[test]
-fn basic_test() {
+pub fn test() {
     let mut ds = my_db::Datastore::new();
     let mut db = ds.db();
 
@@ -112,7 +111,6 @@ fn basic_test() {
 
         for user in db
             .get_top_scorers(3)
-            .expect("Note: the 'use' keyword is a 'ref -> deref' so can error")
             .p
             .into_iter()
         {

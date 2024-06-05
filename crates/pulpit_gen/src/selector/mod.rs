@@ -1,5 +1,5 @@
 //! ## Table Implementation Selection
-//! Provides functions for determining the structure of the [`Table`] chosen.
+//! Provides functions for determining the structure of the [`crate::table::Table`] chosen.
 
 use crate::{operations::update::Update, predicates::Predicate, uniques::Unique};
 use quote_debug::Tokens;

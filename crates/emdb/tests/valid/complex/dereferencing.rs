@@ -60,4 +60,17 @@ emql! {
     }
 }
 
-fn main() {}
+pub fn test() {
+    let mut ds = my_db::Datastore::new();
+    let mut db = ds.db();
+
+    for name in &["a", "b", "c"] {
+        let _: my_db::tables::cool::Key = db.new_cool(name.to_string()).expect("unique names").it;
+    }
+    
+    let top_10_value = db.collect_most_cool().expect("Correct dereferencing");
+    let (c_val, top_cools): (i32, Vec<my_db::tables::cool::Key>) = (top_10_value.c, top_10_value.blah.into_iter().map(|v| v.id).collect());
+
+    let _ = db.get_cool(top_cools[0]).expect("Correct dereferencing").score;
+    db.update_cool(top_cools[0]).expect("Correct key");
+}

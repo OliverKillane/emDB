@@ -355,7 +355,7 @@ pub trait AssocWindow<'imm, ImmData, MutData> {
     /// To allow for transactions to remove data from the table
     ///
     /// # Safety
-    /// - All [`AssocWindow::get`] values must not be accessed from this call,
+    /// - All [`AssocWindow::assoc_get`] values must not be accessed from this call,
     ///   to when they are dropped.
     unsafe fn assoc_unppend(&mut self);
 

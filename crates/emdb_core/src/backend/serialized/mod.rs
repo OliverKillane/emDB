@@ -68,7 +68,7 @@ impl EMDBBackend for Serialized {
         plan: &crate::plan::Plan,
     ) -> Result<proc_macro2::TokenStream, std::collections::LinkedList<proc_macro_error::Diagnostic>>
     {
-        let namer = namer::SimpleNamer::new();
+        let namer = namer::SerializedNamer::new();
         let tables::TableWindow {
             table_defs,
             datastore,
@@ -85,7 +85,7 @@ impl EMDBBackend for Serialized {
             query_impls,
         } = queries::generate_queries(plan, &table_generated_info, &namer);
 
-        let namer::SimpleNamer { mod_tables, .. } = &namer;
+        let namer::SerializedNamer { mod_tables, .. } = &namer;
 
         let tks = quote! {
             mod #impl_name {

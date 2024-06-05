@@ -11,7 +11,7 @@ use quote::{quote, ToTokens};
 
 const INTERNAL_FIELD_PREFIX: &str = "__internal_";
 
-pub struct SimpleNamer {
+pub struct SerializedNamer {
     pub pulpit: pulpit::gen::namer::CodeNamer,
     pub struct_datastore: Ident,
     pub struct_database: Ident,
@@ -30,7 +30,7 @@ pub fn new_id(id: &str) -> Ident {
     Ident::new(id, Span::call_site())
 }
 
-impl SimpleNamer {
+impl SerializedNamer {
     pub fn new() -> Self {
         let db_lifetime: Tokens<Lifetime> = quote!('db).into();
         Self {
@@ -67,13 +67,13 @@ impl SimpleNamer {
     }
 
     pub fn record_name(&self, key: plan::Key<plan::RecordType>) -> Tokens<Type> {
-        new_id(&format!("RecordTypeAlias{}", key.arr_idx()))
+        new_id(&format!("Record{}", key.arr_idx()))
             .into_token_stream()
             .into()
     }
 
     pub fn record_name_lifetimes(&self, key: plan::Key<plan::RecordType>) -> Tokens<Type> {
-        self.lifetime_type_alias(new_id(&format!("RecordTypeAlias{}", key.arr_idx())))
+        self.lifetime_type_alias(new_id(&format!("Record{}", key.arr_idx())))
     }
 
     fn lifetime_type_alias(&self, id: Ident) -> Tokens<Type> {
@@ -122,9 +122,9 @@ pub struct DataFlowNaming<'plan> {
 pub fn dataflow_fields<'plan>(
     lp: &'plan plan::Plan,
     key: plan::Key<plan::DataFlow>,
-    namer: &SimpleNamer,
+    namer: &SerializedNamer,
 ) -> DataFlowNaming<'plan> {
-    let SimpleNamer {
+    let SerializedNamer {
         db_lifetime,
         qy_lifetime,
         method_query_operator_alias,
@@ -162,7 +162,7 @@ pub fn new_error(
     error_path: &Tokens<Path>,
     error_inner: Option<Tokens<Path>>,
     errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
-    namer: &SimpleNamer,
+    namer: &SerializedNamer,
 ) -> Tokens<Expr> {
     let variant_name = namer.operator_error_variant_name(op_key);
     let construct_error = if error_inner.is_some() {
@@ -180,7 +180,7 @@ pub fn new_error(
 pub fn transfer_fields<'brw>(
     from: &'brw Ident,
     record: &'brw RecordConc,
-    namer: &'brw SimpleNamer,
+    namer: &'brw SerializedNamer,
 ) -> impl Iterator<Item = TokenStream> + 'brw {
     record
         .fields
@@ -195,7 +195,7 @@ pub fn transfer_fields<'brw>(
         }))
 }
 
-pub fn expose_user_fields<'brw>(record: &'brw plan::RecordConc, namer: &'brw SimpleNamer) -> impl Iterator<Item=TokenStream> + 'brw {
+pub fn expose_user_fields<'brw>(record: &'brw plan::RecordConc, namer: &'brw SerializedNamer) -> impl Iterator<Item=TokenStream> + 'brw {
     let phantomdata: &Ident = &namer.phantom_field;
     record.fields.keys().map(|rf| {
         let field_name = namer.transform_field_name(rf);
@@ -207,7 +207,7 @@ pub fn expose_user_fields<'brw>(record: &'brw plan::RecordConc, namer: &'brw Sim
     }).chain(once(quote! {#phantomdata: _}))
 }
 
-pub fn boolean_predicate(lp: &plan::Plan, predicate: &Expr, dataflow: plan::Key<plan::DataFlow>, namer: &SimpleNamer) -> Tokens<ExprClosure> {
+pub fn boolean_predicate(lp: &plan::Plan, predicate: &Expr, dataflow: plan::Key<plan::DataFlow>, namer: &SerializedNamer) -> Tokens<ExprClosure> {
     let DataFlowNaming {
         data_constructor,
         data_type,

@@ -2,7 +2,7 @@
 use super::*;
 
 /// An associated, append only [`Column`] storing data in a large vector for faster
-/// lookup than [`super::AssocBlocks`], but at the expense of needing copies for [`AssocWindow::get`].
+/// lookup than [`super::AssocBlocks`], but at the expense of needing copies for [`AssocWindow::assoc_get`].
 pub struct AssocVec<ImmData, MutData> {
     data: Vec<Option<Data<ImmData, MutData>>>,
 }

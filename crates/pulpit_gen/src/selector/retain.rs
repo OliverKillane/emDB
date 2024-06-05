@@ -9,7 +9,7 @@ use crate::{
 /// Generates a table data structure using the provided updates to determine
 /// field mutability, and considering use of deletions and transactions.
 /// - Assumes the cost of accumulating unused immutable fields (from
-///   [`PrimaryRetain`]) is negated by the cost of referencing on `get`
+///   [`crate::columns::PrimaryRetain`]) is negated by the cost of referencing on `get`
 pub fn selector(
     SelectOperations {
         name,

@@ -1,4 +1,3 @@
-#![allow(unused_variables)]
 use emdb::macros::emql;
 
 emql! {
@@ -23,8 +22,8 @@ emql! {
     //   - Needed for data insert, generation of id only occurs from here,
     //     hence we know the table alone determines id
     //   - Move semantics (taking ownership of data structure from outside the database)
-    query new_user(username: String, prem: bool) {
-        row(name: String = username, premium: bool = prem, credits: i32 = 0 )
+    query new_user(username: String, prem: bool, start_creds: Option<i32>) {
+        row(name: String = username, premium: bool = prem, credits: i32 = start_creds.unwrap_or(0) )
             ~> insert(users as ref user_id)
             ~> return;
     }
@@ -96,4 +95,49 @@ emql! {
     }
 }
 
-fn main() {}
+pub fn test() {
+    let mut ds = my_db::Datastore::new();
+    let mut db = ds.db();
+
+    let bob = db
+        .new_user(String::from("Bob"), false, Some(3))
+        .expect("empty database")
+        .user_id;
+
+    let alice = db
+        .new_user(String::from("Alice"), true, None)
+        .expect("empty database")
+        .user_id;
+
+    let bob_info = db.get_info(bob).unwrap();
+    let alice_info = db.get_info(alice).unwrap();
+
+    assert_eq!(bob_info.userdata.name, "Bob");
+    assert_eq!(bob_info.userdata.premium, &false);
+    assert_eq!(bob_info.userdata.credits, 3);
+
+    assert_eq!(alice_info.userdata.name, "Alice");
+    assert_eq!(alice_info.userdata.premium, &true);
+    assert_eq!(alice_info.userdata.credits, 0);
+
+    db.add_credits(bob, 10).unwrap();
+    db.add_credits(bob, 20).unwrap();
+    db.add_credits(bob, 30).unwrap();
+    db.add_credits(bob, 40).unwrap();
+    db.add_credits(bob, 50).unwrap();
+
+    let bob_info = db.get_info(bob).unwrap();
+    assert_eq!(bob_info.userdata.credits, 153);
+
+    assert_eq!(db.total_premium_credits().sum, 0);
+
+    db.add_credits(alice, 10).unwrap();
+    assert_eq!(db.total_premium_credits().sum, 10);
+
+    db.reward_premium(1.5).unwrap();
+    assert_eq!(db.total_premium_credits().sum, 15);
+
+    for entry in db.get_snapshot().it {
+        println!("{:5} {:9} has {:04} credits", entry.name, if *entry.premium { "(premium)" } else { ""}, entry.credits);
+    }
+}

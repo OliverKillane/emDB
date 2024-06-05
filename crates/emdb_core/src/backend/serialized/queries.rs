@@ -12,17 +12,17 @@ use crate::{
 
 use super::{
     closures::{generate_application, generate_context, unwrap_context},
-    namer::SimpleNamer,
+    namer::SerializedNamer,
     tables::GeneratedInfo,
     types::generate_scalar_type,
 };
 
 fn generate_errors(
     errors: HashMap<Ident, Option<Tokens<Path>>>,
-    SimpleNamer {
+    SerializedNamer {
         mod_queries_mod_query_enum_error,
         ..
-    }: &SimpleNamer,
+    }: &SerializedNamer,
 ) -> Option<Tokens<ItemEnum>> {
     if errors.is_empty() {
         None
@@ -54,7 +54,7 @@ struct CommitInfo {
 fn generate_commits<'imm>(
     lp: &'imm plan::Plan,
     mutated_tables: HashSet<plan::ImmKey<'imm, plan::Table>>,
-    SimpleNamer {
+    SerializedNamer {
         pulpit:
             CodeNamer {
                 struct_window_method_commit,
@@ -62,7 +62,7 @@ fn generate_commits<'imm>(
                 ..
             },
         ..
-    }: &SimpleNamer,
+    }: &SerializedNamer,
 ) -> Option<CommitInfo> {
     if mutated_tables.is_empty() {
         None
@@ -102,10 +102,10 @@ impl QueryMod {
 fn generate_query<'imm>(
     lp: &'imm plan::Plan,
     gen_info: &GeneratedInfo<'imm>,
-    namer: &SimpleNamer,
+    namer: &SerializedNamer,
     plan::Query { name, ctx }: &'imm plan::Query,
 ) -> QueryMod {
-    let SimpleNamer {
+    let SerializedNamer {
         qy_lifetime,
         mod_queries,
         mod_queries_mod_query_enum_error,
@@ -233,9 +233,9 @@ pub struct QueriesInfo {
 pub fn generate_queries<'imm>(
     lp: &'imm plan::Plan,
     gen_info: &GeneratedInfo<'imm>,
-    namer: &'imm SimpleNamer,
+    namer: &'imm SerializedNamer,
 ) -> QueriesInfo {
-    let SimpleNamer {
+    let SerializedNamer {
         db_lifetime,
         mod_queries,
         struct_database,

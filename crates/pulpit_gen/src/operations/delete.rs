@@ -56,6 +56,12 @@ pub fn generate(
         } else {
             quote!(mut_data)
         };
+
+        // POSSIBLE BUG: pulling values does not consider the transformations 
+        //               that may need to be applied to immutable values
+        //               (`ImmPull`), or autodereference might take care of 
+        //               this - not failing any tests for retain, would fail for 
+        //               other wrappings?
         quote!(self.#struct_table_member_uniques.#field.pull(&#data.#imm_access.#field).unwrap())
     });
 
