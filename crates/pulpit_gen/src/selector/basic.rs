@@ -20,6 +20,7 @@ pub fn selector(
         predicates,
         updates,
         public,
+        limit,
     }: SelectOperations,
 ) -> Table {
     let primary_fields = utils::determine_mutability(&updates, fields);
@@ -50,6 +51,7 @@ pub fn selector(
         uniques,
         predicates,
         updates,
+        limit,
         name,
         transactions,
         deletions,

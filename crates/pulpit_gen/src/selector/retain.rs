@@ -19,6 +19,7 @@ pub fn selector(
         uniques,
         predicates,
         updates,
+        limit,
         public,
     }: SelectOperations,
 ) -> Table {
@@ -35,6 +36,7 @@ pub fn selector(
         predicates,
         updates,
         name,
+        limit,
         transactions,
         deletions,
         public,

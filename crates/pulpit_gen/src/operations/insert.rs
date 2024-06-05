@@ -2,11 +2,7 @@ use std::iter::once;
 
 use super::SingleOp;
 use crate::{
-    columns::ColKind,
-    groups::{Field, Group, Groups},
-    namer::CodeNamer,
-    predicates::Predicate,
-    uniques::Unique,
+    columns::ColKind, groups::{Field, Group, Groups}, limit::Limit, namer::CodeNamer, predicates::Predicate, uniques::Unique
 };
 use proc_macro2::Span;
 use quote::quote;
@@ -54,6 +50,7 @@ pub fn generate(
     uniques: &[Unique],
     predicates: &[Predicate],
     namer: &CodeNamer,
+    limit: &Option<Limit>,
     deletions: bool,
     transactions: bool,
 ) -> SingleOp {
@@ -79,6 +76,7 @@ pub fn generate(
         mod_transactions_struct_data_member_log,
         struct_window_method_insert: method_insert,
         name_phantom_member,
+        struct_window_method_count,
         ..
     } = namer;
 
@@ -110,11 +108,26 @@ pub fn generate(
         }
     });
 
-    let errors = uniques.iter().map(|Unique { alias, .. }| alias).chain(
+    let mut errors = uniques.iter().map(|Unique { alias, .. }| alias).chain(
         predicates
             .iter()
             .map(|Predicate { alias, tokens: _ }| alias),
-    );
+    ).collect::<Vec<_>>();
+
+   let limit_cons =  if let Some(limit) = limit {
+        let alias = &limit.alias;
+        errors.push(alias);
+        let value = limit.generate_check();
+        quote!{
+            {
+                if self.#struct_window_method_count() >= #value {
+                    return Err(#mod_insert::#mod_insert_enum_error::#alias);
+                }
+            }
+        }
+    } else {
+        quote!()
+    };
 
     let unique_checks = uniques.iter().map(|Unique { alias, field }| {
         quote! {
@@ -201,7 +214,7 @@ pub fn generate(
         )
     };
 
-    if uniques.is_empty() && predicates.is_empty() {
+    if errors.is_empty() {
         SingleOp {
             op_mod: quote! {
                 pub mod #mod_insert {
@@ -240,6 +253,7 @@ pub fn generate(
             op_impl: quote! {
                 impl <'imm> #struct_window<'imm> {
                     pub fn #method_insert(&mut self, #insert_val: #mod_insert::#mod_insert_struct_insert) -> Result<#type_key, #mod_insert::#mod_insert_enum_error> {
+                        #limit_cons
                         #(#predicate_checks)*
                         #(#unique_checks)*
                         #(#splitting;)*

@@ -43,6 +43,7 @@ valid_tests!(
     },
     simple {
         no_errors,
-        basic_join
+        basic_join,
+        limited_table
     }
 );

@@ -1,7 +1,7 @@
 //! ## Table Implementation Selection
 //! Provides functions for determining the structure of the [`crate::table::Table`] chosen.
 
-use crate::{operations::update::Update, predicates::Predicate, uniques::Unique};
+use crate::{limit::Limit, operations::update::Update, predicates::Predicate, uniques::Unique};
 use quote_debug::Tokens;
 use std::collections::HashMap;
 use syn::{Ident, Type};
@@ -14,6 +14,7 @@ pub struct SelectOperations {
     pub uniques: Vec<Unique>,
     pub predicates: Vec<Predicate>,
     pub updates: Vec<Update>,
+    pub limit: Option<Limit>,
     pub public: bool,
 }
 

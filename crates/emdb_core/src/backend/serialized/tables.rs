@@ -69,6 +69,13 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, namer: &SerializedNamer) -> T
                         tokens: pred.cons.0.to_token_stream().into(),
                     })
                     .collect(),
+                limit: {
+                    if let Some(plan::Constraint { alias, cons: plan::Limit (expr)}) = &emdb_table.row_cons.limit {
+                        Some(pulpit::gen::limit::Limit { value: pulpit::gen::limit::LimitKind::ConstVal(expr.into_token_stream().into()), alias: alias.clone() })
+                    } else {
+                        None
+                    }
+                },
                 updates: Vec::new(),
                 public: true,
             };

@@ -15,28 +15,28 @@ mod my_db {
                 pub mod primary {
                     #[derive(Clone)]
                     pub struct Imm {
-                        pub bing: usize,
                         pub bar: (&'static str, bool),
                         pub foo: String,
+                        pub bing: usize,
                     }
                     #[derive(Clone)]
                     pub struct Mut {}
                     pub struct ImmUnpack<'imm> {
-                        pub bing: &'imm usize,
                         pub bar: &'imm (&'static str, bool),
                         pub foo: &'imm String,
+                        pub bing: &'imm usize,
                     }
                     pub fn imm_unpack<'imm>(
-                        Imm { bing, bar, foo }: &'imm Imm,
+                        Imm { bar, foo, bing }: &'imm Imm,
                     ) -> ImmUnpack<'imm> {
-                        ImmUnpack { bing, bar, foo }
+                        ImmUnpack { bar, foo, bing }
                     }
                 }
             }
             pub mod borrows {
                 pub struct Borrows<'brw> {
-                    pub foo: &'brw String,
                     pub bing: &'brw usize,
+                    pub foo: &'brw String,
                     pub bar: &'brw (&'static str, bool),
                 }
             }
@@ -53,17 +53,17 @@ mod my_db {
                         Err(_) => return Err(KeyError),
                     };
                     Ok(borrows::Borrows {
-                        foo: &primary.imm_data.foo,
                         bing: &primary.imm_data.bing,
+                        foo: &primary.imm_data.foo,
                         bar: &primary.imm_data.bar,
                     })
                 }
             }
             pub mod get {
                 pub struct Get<'db> {
-                    pub bing: &'db usize,
                     pub bar: &'db (&'static str, bool),
                     pub foo: &'db String,
+                    pub bing: &'db usize,
                 }
             }
             impl<'db> Window<'db> {
@@ -77,8 +77,8 @@ mod my_db {
                     };
                     let primary = primary.convert_imm(column_types::primary::imm_unpack);
                     Ok(get::Get {
-                        foo: primary.imm_data.foo,
                         bing: primary.imm_data.bing,
+                        foo: primary.imm_data.foo,
                         bar: primary.imm_data.bar,
                     })
                 }
@@ -87,8 +87,8 @@ mod my_db {
             impl<'imm> Window<'imm> {}
             pub mod insert {
                 pub struct Insert {
-                    pub foo: String,
                     pub bing: usize,
+                    pub foo: String,
                     pub bar: (&'static str, bool),
                 }
             }
@@ -96,9 +96,9 @@ mod my_db {
                 pub fn insert(&mut self, insert_val: insert::Insert) -> Key {
                     let primary = (emdb::dependencies::pulpit::column::Data {
                         imm_data: column_types::primary::Imm {
-                            bing: insert_val.bing,
                             bar: insert_val.bar,
                             foo: insert_val.foo,
+                            bing: insert_val.bing,
                         },
                         mut_data: column_types::primary::Mut {},
                     });
@@ -243,8 +243,8 @@ mod my_db {
     }
     #[derive(Clone)]
     struct Record0<'db, 'qy> {
-        bing: usize,
         foo: String,
+        bing: usize,
         bar: (&'static str, bool),
         __internal_phantomdata: std::marker::PhantomData<(&'db (), &'qy ())>,
     }
@@ -262,9 +262,9 @@ mod my_db {
     }
     #[derive(Clone)]
     struct Record3<'db, 'qy> {
-        foo: &'db String,
-        bing: &'db usize,
         bar: &'db (&'static str, bool),
+        bing: &'db usize,
+        foo: &'db String,
         __internal_phantomdata: std::marker::PhantomData<(&'db (), &'qy ())>,
     }
     #[derive(Clone)]
@@ -342,8 +342,8 @@ mod my_db {
                             new_key: self
                                 .data
                                 .insert(tables::data::insert::Insert {
-                                    bing: dataflow_value_0.bing,
                                     foo: dataflow_value_0.foo,
+                                    bing: dataflow_value_0.bing,
                                     bar: dataflow_value_0.bar,
                                 }),
                             __internal_phantomdata: std::marker::PhantomData,
@@ -372,7 +372,7 @@ mod my_db {
                 (),
                 (),
                 (),
-                |Record3 { foo: foo, bing: bing, bar: bar, __internal_phantomdata: _ }| {
+                |Record3 { bar: bar, bing: bing, foo: foo, __internal_phantomdata: _ }| {
                     Record6 {
                         bing_val: *bing,
                         __internal_phantomdata: std::marker::PhantomData,
@@ -406,9 +406,9 @@ mod my_db {
                                 Ok(get_value) => {
                                     Record5 {
                                         __internal_1: Record3 {
-                                            foo: get_value.foo,
-                                            bing: get_value.bing,
                                             bar: get_value.bar,
+                                            bing: get_value.bing,
+                                            foo: get_value.foo,
                                             __internal_phantomdata: std::marker::PhantomData,
                                         },
                                         __internal_0: dataflow_value_2.__internal_0,

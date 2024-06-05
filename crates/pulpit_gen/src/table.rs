@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    groups::FieldName,
-    operations::{self, get::get_struct_fields, SingleOpFn},
-    uniques::UniqueDec,
+    groups::FieldName, limit::Limit, operations::{self, get::get_struct_fields, SingleOpFn}, uniques::UniqueDec
 };
 use quote::quote;
 use quote_debug::Tokens;
@@ -23,6 +21,7 @@ pub struct Table {
     pub predicates: Vec<Predicate>,
     pub updates: Vec<Update>,
     pub name: Ident,
+    pub limit: Option<Limit>,
     pub transactions: bool,
     pub deletions: bool,
     pub public: bool,
@@ -105,7 +104,7 @@ impl Table {
         get_struct_fields(&self.groups, namer)
     }
     pub fn insert_can_error(&self) -> bool {
-        !self.predicates.is_empty() || !self.uniques.is_empty()
+        !self.predicates.is_empty() || !self.uniques.is_empty() || self.limit.is_some()
     }
     pub fn generate(&self, namer: &CodeNamer) -> Tokens<ItemMod> {
         let Self {
@@ -113,6 +112,7 @@ impl Table {
             uniques,
             predicates,
             updates,
+            limit,
             name,
             public,
             transactions,
@@ -156,6 +156,7 @@ impl Table {
                 uniques,
                 predicates,
                 namer,
+                limit,
                 *deletions,
                 *transactions,
             ),

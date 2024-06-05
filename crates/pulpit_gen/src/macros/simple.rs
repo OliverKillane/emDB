@@ -187,6 +187,7 @@ fn analyse(
         predicates,
         updates,
         public: false,
+        limit: None,
     })
 }
 
