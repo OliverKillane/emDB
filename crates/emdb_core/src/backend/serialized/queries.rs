@@ -6,8 +6,7 @@ use quote_debug::Tokens;
 use syn::{ExprBlock, Ident, ImplItemFn, ItemEnum, ItemImpl, ItemMod, Path};
 
 use crate::{
-    plan,
-    utils::{misc::{PushSet, PushMap}},
+    backend::interface::{namer::InterfaceNamer, InterfaceTrait}, plan, utils::misc::{PushMap, PushSet}
 };
 
 use super::{
@@ -149,7 +148,7 @@ fn generate_query<'imm>(
             QueryMod {
                 query_mod: quote! { mod #name {} }.into(),
                 query_impl: quote! {
-                    pub fn #name<#qy_lifetime>(&#qy_lifetime self, #(#params),* ) -> #return_type {
+                    fn #name<#qy_lifetime>(&#qy_lifetime self, #(#params),* ) -> #return_type {
                         let #unwrap_top_data = #top_context_data;
                         #query_body
                     }
@@ -167,7 +166,7 @@ fn generate_query<'imm>(
             QueryMod {
                 query_mod: quote! { mod #name {} }.into(),
                 query_impl: quote! {
-                    pub fn #name<#qy_lifetime>(&#qy_lifetime mut self, #(#params),* ) -> #return_type {
+                    fn #name<#qy_lifetime>(&#qy_lifetime mut self, #(#params),* ) -> #return_type {
                         let #unwrap_top_data = #top_context_data;
                         let result = #query_body;
                         #commits
@@ -183,7 +182,7 @@ fn generate_query<'imm>(
                     #error_enum
                 } }.into(),
                 query_impl: quote!{
-                    pub fn #name<#qy_lifetime>(&#qy_lifetime self, #(#params),* ) -> Result<#return_type, #mod_queries::#name::#mod_queries_mod_query_enum_error> {
+                    fn #name<#qy_lifetime>(&#qy_lifetime self, #(#params),* ) -> Result<#return_type, #mod_queries::#name::#mod_queries_mod_query_enum_error> {
                         let #unwrap_top_data = #top_context_data;
                         #query_body
                     }
@@ -196,7 +195,7 @@ fn generate_query<'imm>(
                     #error_enum
                 } }.into(),
                 query_impl: quote!{
-                    pub fn #name<#qy_lifetime>(&#qy_lifetime mut self, #(#params),* ) -> Result<#return_type, #mod_queries::#name::#mod_queries_mod_query_enum_error> {
+                    fn #name<#qy_lifetime>(&#qy_lifetime mut self, #(#params),* ) -> Result<#return_type, #mod_queries::#name::#mod_queries_mod_query_enum_error> {
                         // we catch `?` usage as that short circuits the lambda, not the query method
                         match (|| {
                             let #unwrap_top_data = #top_context_data;
@@ -233,12 +232,14 @@ pub struct QueriesInfo {
 pub fn generate_queries<'imm>(
     lp: &'imm plan::Plan,
     gen_info: &GeneratedInfo<'imm>,
+    interface_trait: &Option<InterfaceTrait>,
     namer: &'imm SerializedNamer,
 ) -> QueriesInfo {
     let SerializedNamer {
         db_lifetime,
         mod_queries,
         struct_database,
+        interface: InterfaceNamer { trait_database, ..},
         ..
     } = namer;
     let (mods, impls): (Vec<Tokens<ItemMod>>, Vec<Tokens<ImplItemFn>>) = lp
@@ -257,10 +258,15 @@ pub fn generate_queries<'imm>(
         query_impls: if impls.is_empty() {
             None
         } else {
+            let (impl_database, modifier) = if let Some(InterfaceTrait { name }) = interface_trait {
+                (quote! { super::#name::#trait_database<#db_lifetime> for }, quote!())
+            } else {
+                (quote! {}, quote!(pub))
+            };
             Some(
                 quote! {
-                    impl <#db_lifetime> #struct_database<#db_lifetime> {
-                        #(#impls)*
+                    impl <#db_lifetime> #impl_database #struct_database<#db_lifetime> {
+                        #(#modifier #impls)*
                     }
                 }
                 .into(),

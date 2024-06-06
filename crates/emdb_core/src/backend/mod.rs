@@ -69,7 +69,11 @@ macro_rules! create_backend {
     };
 }
 
-create_backend!(Backend as planviz::PlanViz, serialized::Serialized);
+create_backend!(
+    Backend as planviz::PlanViz,
+    serialized::Serialized,
+    interface::Interface
+);
 
 /// Wrapper for the targets to produce
 pub struct Targets {

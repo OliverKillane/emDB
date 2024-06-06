@@ -7,7 +7,7 @@ use syn::{Expr, Ident, Path, Stmt, Type};
 use super::{
     closures::{generate_context_closure, unwrap_context},
     namer::{
-        boolean_predicate, dataflow_fields, expose_user_fields, new_error, new_id, transfer_fields,
+        boolean_predicate, dataflow_fields, expose_user_fields, new_error, transfer_fields,
         DataFlowNaming, SerializedNamer,
     },
     tables::GeneratedInfo,
@@ -16,7 +16,7 @@ use super::{
 use crate::{
     backend::serialized::closures::generate_application,
     plan::{self, operator_enum},
-    utils::misc::{PushMap, PushSet},
+    utils::misc::{PushMap, PushSet, new_id},
 };
 
 fn no_closure_val() -> Tokens<Expr> {
@@ -43,6 +43,9 @@ pub trait OperatorGen {
     /// Generate the code for the operator
     /// - Needs to update the set of mutated tables
     /// - Adds to the available errors
+    ///   NOTE: the behaviour of 'mutates' needs to be the same as for 
+    ///       [`crate::analysis::mutability`] as that analysis is used for 
+    ///       generating traits that [`super::serialized`] can implement.
     #[allow(unused_variables, clippy::too_many_arguments)]
     fn apply<'imm, 'brw>(
         &self,

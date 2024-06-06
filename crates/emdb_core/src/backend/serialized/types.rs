@@ -94,6 +94,9 @@ fn public_record_types(lp: &plan::Plan) -> HashSet<plan::ImmKey<'_, plan::Record
 /// - Generates types with lifetimes ([`SimpleNamer::db_lifetime`] and
 ///   [`SimpleNamer::qy_lifetime`]) usable only in a [`plan::TypeContext::Query`]
 ///   context.
+/// 
+/// NOTE: In some circumstances the table types are not available (e.g in [`crate::backend::interface`])
+///       so an empty `get_types` map is passed.
 pub fn generate_scalar_type<'imm>(
     lp: &'imm plan::Plan,
     get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,

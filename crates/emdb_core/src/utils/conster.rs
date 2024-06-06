@@ -69,7 +69,7 @@ macro_rules! conster {
 }
 pub(crate) use conster;
 
-pub(crate) trait Const<T> {
+pub trait Const<T> {
     fn val() -> T;
 }
 

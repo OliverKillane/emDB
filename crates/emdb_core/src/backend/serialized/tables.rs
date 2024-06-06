@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use syn::{Ident, ItemImpl, ItemMod, ItemStruct, Type};
 
 use super::namer::SerializedNamer;
-use crate::plan;
+use crate::{backend::interface::{namer::InterfaceNamer, InterfaceTrait}, plan};
 
 pub struct GeneratedInfo<'imm> {
     pub get_types: HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
@@ -21,7 +21,7 @@ pub struct TableWindow<'imm> {
 
 /// Generate the tokens for the tables, and the struct to hold them (in [`TableWindow`]).
 /// - Generates the tokens for the [`plan::ScalarType`]s of table fields assuming they are just [`plan::ScalarTypeConc::Rust`] tyes
-pub fn generate_tables<'imm>(lp: &'imm plan::Plan, namer: &SerializedNamer) -> TableWindow<'imm> {
+pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<InterfaceTrait>, namer: &SerializedNamer) -> TableWindow<'imm> {
     // get the constraints and fields of each table
     let mut pulpit_configs = lp
         .tables
@@ -161,6 +161,19 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, namer: &SerializedNamer) -> T
         (quote!(#(#database_members_window_stream,)*),quote!(#(#database_members_stream,)*))
     };
 
+    let InterfaceNamer {
+        trait_datastore,
+        trait_datastore_method_db,
+        trait_datastore_method_new,
+        ..
+    } = &namer.interface;
+
+    let (impl_datastore, modifiers) = if let Some(InterfaceTrait { name }) = interface_trait {
+        (quote!{ super::#name::#trait_datastore for }, quote!())
+    } else {
+        (quote!(), quote!(pub))
+    };
+
     TableWindow {
         table_defs,
         datastore: quote! {
@@ -170,14 +183,14 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, namer: &SerializedNamer) -> T
         }
         .into(),
         datastore_impl: quote! {
-            impl #struct_datastore {
-                pub fn new() -> Self {
+            impl #impl_datastore #struct_datastore {
+                #modifiers fn #trait_datastore_method_new() -> Self {
                     Self {
                         #(#datastore_members_new,)*
                     }
                 }
 
-                pub fn db(&mut self) -> #struct_database<'_> {
+                #modifiers fn #trait_datastore_method_db(&mut self) -> #struct_database<'_> {
                     #struct_database {
                         #database_members_window
                     }

@@ -12,7 +12,7 @@
 
 use std::{fs::File, path::Path};
 
-use combi::{core::{choice, mapsuc, seq, setrepr}, macros::{choices, seqs}, tokens::{basic::{collectuntil, gettoken, matchident, matchpunct, peekident, peekpunct, syn}, error::{error, expectederr}, TokenDiagnostic, TokenIter, TokenParser}, Combi, Repr};
+use combi::{core::{choice, mapsuc, setrepr}, macros::choices, tokens::{basic::{collectuntil, gettoken, isempty, matchident, peekident, syn}, error::error, options::{OptEnd, OptField, OptParse}, TokenDiagnostic, TokenIter, TokenParser}, Combi, Repr};
 use syn::LitStr;
 use super::{EMDBBackend, Ident, LinkedList, TokenStream, plan};
 use proc_macro_error::{Diagnostic, Level};
@@ -43,32 +43,39 @@ impl EMDBBackend for PlanViz {
     const NAME: &'static str = "PlanViz";
 
     fn parse_options(backend_name: &Ident, options: Option<TokenStream>) -> Result<Self, LinkedList<Diagnostic>> {
-        fn on_off(name: &'static str) -> impl TokenParser<bool> {
-            mapsuc(seqs!(
-                matchpunct(','),
-                matchident(name),
-                matchpunct('='),
-                choices!(
-                    peekident("on") => mapsuc(matchident("on"), |_| true),
-                    peekident("off") => mapsuc(matchident("off"), |_| false),
-                    otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, "Expected `on` or `off`".to_owned()))
-                )
-            ), |(_, (_, (_, opt)))| opt)
+        fn on_off2() -> impl TokenParser<bool> {
+            choices!(
+                peekident("on") => mapsuc(matchident("on"), |_| true),
+                peekident("off") => mapsuc(matchident("off"), |_| false),
+                otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, "Expected `on` or `off`".to_owned()))
+            )
         }
-        let parser = expectederr(mapsuc(
-            expectederr(seqs!(
-                matchident("path"),
-                matchpunct('='),
-                setrepr(syn(collectuntil(peekpunct(','))), "<file path>"),
-                on_off("display_types"),
-                on_off("display_ctx_ops"),
-                on_off("display_control")
-            )),
-            |(_, (_, (out_location, (display_types, (display_ctx_ops, display_control))))): (_, (_, (LitStr, _)))| PlanViz{ out_location, config: DisplayConfig{display_types,display_ctx_ops, display_control} } 
-        ));
+        let parser = setrepr((
+            OptField::new("path", ||setrepr(syn(collectuntil(isempty())), "<file path>")),
+            (
+                OptField::new("types", on_off2),
+                (
+                    OptField::new("ctx", on_off2),
+                    (
+                        OptField::new("control", on_off2),
+                        OptEnd
+                    )
+                )
+            )
+        ).gen('='), "path = <path>, types = <on|off>, ctx = <on|off>, control = <on|off>");
         if let Some(opts) = options {
+
             let (_, res) = parser.comp(TokenIter::from(opts, backend_name.span()));
-            res.to_result().map_err(TokenDiagnostic::into_list)
+            let (path, (types, (ctx, (control, _)))) = res.to_result().map_err(TokenDiagnostic::into_list)?;
+
+            if let Some(out_location) = path {
+                Ok(
+                    PlanViz { out_location, config: DisplayConfig { display_types: types.unwrap_or(false), display_ctx_ops: ctx.unwrap_or(false), display_control: control.unwrap_or(false) } }
+                )
+            } else {
+                Err(singlelist(errors::expected_path(backend_name)))    
+            }
+
         } else {
             Err(singlelist(errors::expected_options(backend_name, &format!("{}", Repr(&parser)))))
         }

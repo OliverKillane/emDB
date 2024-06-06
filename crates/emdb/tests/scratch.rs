@@ -14,8 +14,17 @@ enum RGB {
 }
 
 emql! {
-    impl my_db as Serialized{debug_file = "emdb/tests/debug/code.rs"};
-    impl code_display as PlanViz{path = "emdb/tests/debug/code.dot", display_types = off, display_ctx_ops = on, display_control = on};
+    impl my_interface as Interface;
+    impl my_db as Serialized{
+        // debug_file = "emdb/tests/debug/code.rs",
+        interface = my_interface,
+    };
+    impl code_display as PlanViz{
+        path = "emdb/tests/debug/code.dot",
+        types = off,
+        ctx = on,
+        control = on,
+    };
 
     table data {
         foo: String,

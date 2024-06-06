@@ -8,11 +8,12 @@
 //!   rules apply)
 
 use combi::{
-    core::{mapsuc, seq, setrepr},
-    seqs,
+    core::mapsuc,
     tokens::{
-        basic::{collectuntil, isempty, matchident, matchpunct, syn},
-        error::expectederr,
+        basic::{
+            collectuntil, getident, isempty, syn,
+        },
+        options::{OptEnd, OptField, OptParse},
         TokenDiagnostic, TokenIter,
     },
     Combi,
@@ -25,11 +26,11 @@ use quote::quote;
 use std::{collections::LinkedList, fs::File, io::Write, path::Path};
 use syn::{parse2, File as SynFile, LitStr};
 
-use super::EMDBBackend;
+use super::{interface::InterfaceTrait, EMDBBackend};
 use crate::utils::misc::singlelist;
 
 mod closures;
-mod namer;
+pub mod namer;
 mod operators;
 mod queries;
 mod tables;
@@ -37,6 +38,7 @@ mod types;
 
 pub struct Serialized {
     debug: Option<LitStr>,
+    interface: Option<InterfaceTrait>,
 }
 
 impl EMDBBackend for Serialized {
@@ -47,18 +49,20 @@ impl EMDBBackend for Serialized {
         options: Option<proc_macro2::TokenStream>,
     ) -> Result<Self, std::collections::LinkedList<proc_macro_error::Diagnostic>> {
         if let Some(opts) = options {
-            let parser = expectederr(mapsuc(
-                seqs!(
-                    matchident("debug_file"),
-                    matchpunct('='),
-                    setrepr(syn(collectuntil(isempty())), "<file path>")
-                ),
-                |(_, (_, file))| Self { debug: Some(file) },
-            ));
+            let parser = (
+                OptField::new("debug_file", ||syn(collectuntil(isempty()))),
+                (OptField::new("interface", ||mapsuc(getident(), |name| InterfaceTrait{ name })), OptEnd),
+            )
+                .gen('=');
             let (_, res) = parser.comp(TokenIter::from(opts, backend_name.span()));
-            res.to_result().map_err(TokenDiagnostic::into_list)
+            res.to_result()
+                .map_err(TokenDiagnostic::into_list)
+                .map(|(debug, (interface, ()))| Serialized { debug, interface })
         } else {
-            Ok(Self { debug: None })
+            Ok(Self {
+                debug: None,
+                interface: None,
+            })
         }
     }
 
@@ -75,7 +79,7 @@ impl EMDBBackend for Serialized {
             datastore_impl,
             database,
             table_generated_info,
-        } = tables::generate_tables(plan, &namer);
+        } = tables::generate_tables(plan, &self.interface, &namer);
 
         let record_defs =
             types::generate_record_definitions(plan, &table_generated_info.get_types, &namer);
@@ -83,7 +87,7 @@ impl EMDBBackend for Serialized {
         let QueriesInfo {
             query_mod,
             query_impls,
-        } = queries::generate_queries(plan, &table_generated_info, &namer);
+        } = queries::generate_queries(plan, &table_generated_info, &self.interface, &namer);
 
         let namer::SerializedNamer { mod_tables, .. } = &namer;
 

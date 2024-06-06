@@ -3,6 +3,9 @@ use std::{
     hash::Hash,
 };
 
+use proc_macro2::Span;
+use syn::Ident;
+
 pub(crate) fn singlelist<T>(item: T) -> LinkedList<T> {
     let mut list = LinkedList::new();
     list.push_back(item);
@@ -57,4 +60,8 @@ impl<'brw, K: Hash + Eq> PushSet<'brw, K> {
     pub fn count(&self) -> usize {
         self.push_cnt
     }
+}
+
+pub fn new_id(id: &str) -> Ident {
+    Ident::new(id, Span::call_site())
 }

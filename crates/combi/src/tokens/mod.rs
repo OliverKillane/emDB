@@ -12,6 +12,7 @@ pub mod basic;
 pub mod derived;
 pub mod error;
 pub mod matcher;
+pub mod options;
 pub mod recovery;
 
 /// A wrapper for [TokenStream] that allows for 1-token lookahead, and records the current and last [Span]s.
@@ -96,6 +97,10 @@ impl TokenDiagnostic {
         let mut list = self.prev;
         list.push_back(self.main);
         list
+    }
+
+    pub fn from_list(mut list: LinkedList<Diagnostic>) -> Option<Self> {
+        list.pop_front().map(|main| Self { main, prev: list })
     }
 }
 

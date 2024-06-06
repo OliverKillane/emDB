@@ -4,7 +4,7 @@ error: No such backend `repeated_impl`
 4 |     impl nonexistent_backend as repeated_impl;
   |                                 ^^^^^^^^^^^^^
   |
-  = help: Available backends are: PlanViz, Serialized
+  = help: Available backends are: PlanViz, Serialized, Interface
 
 error: No such backend `repeated_impl`
  --> tests/invalid/simple_wrong_backend.rs:5:35
@@ -12,4 +12,4 @@ error: No such backend `repeated_impl`
 5 |     impl other_missing_backend as repeated_impl;
   |                                   ^^^^^^^^^^^^^
   |
-  = help: Available backends are: PlanViz, Serialized
+  = help: Available backends are: PlanViz, Serialized, Interface

@@ -146,4 +146,8 @@ For now we have struct generating macros like pulpit's and `tuple_impl_for(..)`.
 3. Adding a sorted index.
 4. Adding special associated columns for sets (repetitions of the same object), and indexes
 5. Fixing lack of macro provided errors for no fields, duplicate or nonexistent columns in updates
-6. Use the imm type for the pull type in pullable columns.
+6. Use the `ImmGet` type for the `ImmPull` in pullable columns.
+
+## Related Work
+Similar ideas for generating multi-index, in memory data structures.
+- [Boost Multi-index](https://www.boost.org/doc/libs/1_85_0/libs/multi_index/)

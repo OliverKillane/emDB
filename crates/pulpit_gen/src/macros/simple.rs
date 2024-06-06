@@ -1,5 +1,5 @@
 //! # A simple interface for generating tables.
-
+//! TODO: improve this using the new [`combi::tokens::options`] parser
 use std::collections::{HashMap, HashSet, LinkedList};
 
 use combi::{

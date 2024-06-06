@@ -5,7 +5,7 @@ use quote_debug::Tokens;
 use syn::{Expr, ExprClosure, Ident, Lifetime, Path, Type};
 
 use crate::{
-    plan::{self, RecordConc}, utils::misc::PushMap
+    backend::interface::namer::InterfaceNamer, plan::{self, RecordConc}, utils::misc::{new_id, PushMap}
 };
 use quote::{quote, ToTokens};
 
@@ -24,10 +24,7 @@ pub struct SerializedNamer {
     pub method_query_operator_alias: Tokens<Path>,
     pub method_query_operator_trait: Tokens<Path>,
     pub operator_error_parameter: Ident,
-}
-
-pub fn new_id(id: &str) -> Ident {
-    Ident::new(id, Span::call_site())
+    pub interface: InterfaceNamer,
 }
 
 impl SerializedNamer {
@@ -49,6 +46,7 @@ impl SerializedNamer {
             method_query_operator_alias: quote!(emdb::dependencies::minister::Basic).into(),
             method_query_operator_trait: quote!(emdb::dependencies::minister::Physical).into(),
             operator_error_parameter: new_id("err"),
+            interface: InterfaceNamer::new(),
         }
     }
 
