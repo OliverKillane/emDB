@@ -650,3 +650,23 @@ pub fn query_deref_cannot_deref_table_get(
     emql_error(53, reference.span(), format!("Cannot dereference a field directly taken from a table (this is `{name}.{field}`). Try mapping this into a table reference"))
     .note(format!("But what if `{name}.{field}` *is* a table reference? When dereferencing values from a table, the returned value is not the same type as the column, it can be optimised (for example it could be optimised into returning an Rc, a Cow, or a reference to the data). Rather than automatically copying out the value in these cases, it it left to the user to decide how they want to extract this."))
 }
+
+pub fn query_combine_extra_field(
+    lp: &plan::Plan,
+    call: &Ident,
+    field: &Ident,
+    data_type: &plan::Key<plan::RecordType>,
+) -> Diagnostic {
+    emql_error(54, field.span(), format!("Field `{field}` is not present in the type for `{call}` (same fields in input as output)"))
+    .span_note(field.span(), format!("The type is: `{}`", plan::With { plan: lp, extended: data_type }))
+}
+
+pub fn query_combine_missing_field(
+    lp: &plan::Plan,
+    call: &Ident,
+    field: &Ident,
+    data_type: &plan::Key<plan::RecordType>,
+) -> Diagnostic {
+    emql_error(54, field.span(), format!("Field `{field}` is required but not present in the type for `{call}` (same fields in input as output)"))
+    .span_note(field.span(), format!("The type is: `{}`", plan::With { plan: lp, extended: data_type }))
+}

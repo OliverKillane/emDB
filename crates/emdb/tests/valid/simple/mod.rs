@@ -4,3 +4,6 @@
 pub mod no_errors;
 pub mod basic_join;
 pub mod limited_table;
+pub mod sums;
+pub mod counts;
+pub mod filter;

@@ -16,16 +16,12 @@ use super::{
 use crate::{
     backend::serialized::closures::generate_application,
     plan::{self, operator_enum},
-    utils::misc::{PushMap, PushSet, new_id},
+    utils::misc::{new_id, PushMap, PushSet},
 };
 
 fn no_closure_val() -> Tokens<Expr> {
     quote! { () }.into()
 }
-
-// TODO: continue with operators
-//       - determine if an operator mutates a table?
-//         -> can use parallel access for contexts
 
 #[enumtrait::store(trait_operator_gen)]
 pub trait OperatorGen {
@@ -43,8 +39,8 @@ pub trait OperatorGen {
     /// Generate the code for the operator
     /// - Needs to update the set of mutated tables
     /// - Adds to the available errors
-    ///   NOTE: the behaviour of 'mutates' needs to be the same as for 
-    ///       [`crate::analysis::mutability`] as that analysis is used for 
+    ///   NOTE: the behaviour of 'mutates' needs to be the same as for
+    ///       [`crate::analysis::mutability`] as that analysis is used for
     ///       generating traits that [`super::serialized`] can implement.
     #[allow(unused_variables, clippy::too_many_arguments)]
     fn apply<'imm, 'brw>(
@@ -907,7 +903,6 @@ impl OperatorGen for plan::Filter {
         let DataFlowNaming {
             holding_var,
             dataflow_type,
-            
             ..
         } = dataflow_fields(lp, self.output, namer);
         let closure_value = namer.operator_closure_value_name(self_key);
@@ -916,6 +911,71 @@ impl OperatorGen for plan::Filter {
         }.into()
     }
 }
+
+impl OperatorGen for plan::Combine {
+    fn closure_data<'imm>(
+        &self,
+        lp: &'imm plan::Plan,
+        _get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
+        namer: &SerializedNamer,
+    ) -> Tokens<Expr> {
+        let SerializedNamer { phantom_field, .. } = namer;
+        let DataFlowNaming {
+            data_type,
+            data_constructor,
+            ..
+        } = dataflow_fields(lp, self.input, namer);
+        let Self {
+            left_name,
+            right_name,
+            ..
+        } = self;
+
+        let field_sets = self.update_fields.iter().map(|(field, expr)| {
+            let field_name = namer.transform_field_name(field);
+            quote!(#field_name: #expr)
+        });
+
+        quote! {
+            |#left_name: #data_type, #right_name: #data_type|
+                #data_constructor {
+                    #(#field_sets,)*
+                    #phantom_field: std::marker::PhantomData
+                }
+        }
+        .into()
+    }
+
+    fn apply<'imm, 'brw>(
+        &self,
+        self_key: plan::Key<plan::Operator>,
+        lp: &'imm plan::Plan,
+        namer: &SerializedNamer,
+        _error_path: &Tokens<Path>,
+        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _gen_info: &GeneratedInfo<'imm>,
+    ) -> Tokens<Stmt> {
+        let SerializedNamer {
+            method_query_operator_alias,
+            ..
+        } = namer;
+        let DataFlowNaming {
+            holding_var: input_holding,
+            ..
+        } = dataflow_fields(lp, self.input, namer);
+        let DataFlowNaming {
+            holding_var,
+            dataflow_type,
+            ..
+        } = dataflow_fields(lp, self.output, namer);
+        let closure_value = namer.operator_closure_value_name(self_key);
+        quote!{
+            let #holding_var: #dataflow_type = #method_query_operator_alias::combine(#input_holding, #closure_value);
+        }.into()
+    }
+}
+
 impl OperatorGen for plan::Sort {
     fn apply<'imm, 'brw>(
         &self,
@@ -1050,6 +1110,49 @@ impl OperatorGen for plan::Collect {
         }.into()
     }
 }
+
+impl OperatorGen for plan::Count {
+    fn apply<'imm, 'brw>(
+        &self,
+        _self_key: plan::Key<plan::Operator>,
+        lp: &'imm plan::Plan,
+        namer: &SerializedNamer,
+        _error_path: &Tokens<Path>,
+        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _gen_info: &GeneratedInfo<'imm>,
+    ) -> Tokens<Stmt> {
+        let SerializedNamer {
+            method_query_operator_alias,
+            phantom_field,
+            ..
+        } = namer;
+        let DataFlowNaming {
+            holding_var: input_holding,
+            ..
+        } = dataflow_fields(lp, self.input, namer);
+        let DataFlowNaming {
+            holding_var,
+            dataflow_type,
+            data_constructor,
+            ..
+        } = dataflow_fields(lp, self.output, namer);
+        let field = namer.transform_field_name(&self.out_field);
+
+        quote! {
+            let #holding_var: #dataflow_type = #method_query_operator_alias::map_single(
+                #method_query_operator_alias::count(#input_holding),
+                |count|
+                #data_constructor {
+                    #field: count,
+                    #phantom_field: std::marker::PhantomData
+                }
+            );
+        }
+        .into()
+    }
+}
+
 impl OperatorGen for plan::Join {
     fn closure_data<'imm>(
         &self,
@@ -1165,19 +1268,27 @@ impl OperatorGen for plan::Fork {
         } = namer;
         let DataFlowNaming {
             holding_var: input_holding,
+            stream,
             ..
         } = dataflow_fields(lp, self.input, namer);
 
         if self.outputs.is_empty() {
             unreachable!("Cannot generate fork to no outputs")
         } else {
+
+            let fork_op = if stream {
+                quote!(fork)
+            } else {
+                quote!(fork_single)
+            };
+
             let mut outputs = self.outputs.iter();
             let first_output = outputs.next().unwrap();
             let DataFlowNaming { holding_var: first_holding_out, .. } = dataflow_fields(lp, *first_output, namer);
 
             let (other_outputs_names, other_outputs_fork): (Vec<_>, Vec<_>) = outputs.map(|df_out| {
                 let DataFlowNaming { holding_var, .. } = dataflow_fields(lp, *df_out, namer);
-                (quote!(#holding_var), quote!(#method_query_operator_alias::fork(&#input_holding)))
+                (quote!(#holding_var), quote!(#method_query_operator_alias::#fork_op(&#input_holding)))
             }).unzip();
 
             quote!{
@@ -1428,7 +1539,7 @@ impl OperatorGen for plan::GroupBy {
         .into()
     }
 }
-impl OperatorGen for plan::ForEach {
+impl OperatorGen for plan::Lift {
     fn closure_data<'imm>(
         &self,
         lp: &'imm plan::Plan,
@@ -1463,41 +1574,58 @@ impl OperatorGen for plan::ForEach {
             gen_info,
             namer,
         );
-        let SerializedNamer { method_query_operator_alias, ..} = namer;
-        let DataFlowNaming { holding_var: input_holding, .. } = dataflow_fields(lp, self.input, namer);
-        let DataFlowNaming { holding_var, dataflow_type, .. } = dataflow_fields(lp, self.output, namer);
+        let SerializedNamer {
+            method_query_operator_alias,
+            ..
+        } = namer;
+        let DataFlowNaming {
+            holding_var: input_holding,
+            stream,
+            ..
+        } = dataflow_fields(lp, self.input, namer);
+        let DataFlowNaming {
+            holding_var,
+            dataflow_type,
+            ..
+        } = dataflow_fields(lp, self.output, namer);
 
-        let map_kind = if mutated_tables.count() > mutated_tables_cnt {
-            quote!(map_seq)
+        let map_kind = if stream {
+            if mutated_tables.count() > mutated_tables_cnt {
+                quote!(map_seq)
+            } else {
+                quote!(map)
+            }
         } else {
-            quote!(map)
+            quote!(map_single)
         };
 
         let context_closure_values = unwrap_context(context, namer);
         let context_closure_var = namer.operator_closure_value_name(self_key);
 
         let final_result = if errors.count() > errors_cnt {
-            quote!(#method_query_operator_alias::error_stream(results)?)
+            let error_map = if stream {quote!(error_stream)} else { quote!(error_single)};
+            quote!(#method_query_operator_alias::#error_map(results)?)
         } else {
             quote!(results)
         };
 
-        // NOTE: relies on the namer's mapping of operator names leaving user's 
+        // NOTE: relies on the namer's mapping of operator names leaving user's
         //       field names the same.
 
         let closure_args = context.params.iter().map(|(id, _)| quote!(lifted.#id));
 
-        quote!{
+        quote! {
             let #holding_var: #dataflow_type = {
                 let results = #method_query_operator_alias::#map_kind(
                     #input_holding,
                     |lifted| {
                         let #context_closure_values = (#context_closure_var)(#(#closure_args),*);
-                        #context_body
+                        #context_body // TODO: move into closure val
                     }
                 );
                 #final_result
             };
-        }.into()
+        }
+        .into()
     }
 }

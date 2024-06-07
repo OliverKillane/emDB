@@ -313,7 +313,7 @@ impl GetExtraNodeEdges for plan::DeRef {
     }
 }
 
-impl GetExtraNodeEdges for plan::ForEach {
+impl GetExtraNodeEdges for plan::Lift {
     fn get_extra_features(&self, self_key: plan::Key<plan::Operator>, edges: &mut Vec<PlanEdge>, config: &DisplayConfig) {
         edges.push(OperatorToContext{ context: self.inner_ctx, operator: self_key}.into());
     }
@@ -329,7 +329,9 @@ impl GetExtraNodeEdges for plan::Map {}
 impl GetExtraNodeEdges for plan::Expand {}
 impl GetExtraNodeEdges for plan::Fold {}
 impl GetExtraNodeEdges for plan::Filter {}
+impl GetExtraNodeEdges for plan::Combine {}
 impl GetExtraNodeEdges for plan::Sort {}
+impl GetExtraNodeEdges for plan::Count {}
 impl GetExtraNodeEdges for plan::Assert {}
 impl GetExtraNodeEdges for plan::Collect {}
 impl GetExtraNodeEdges for plan::Take {}

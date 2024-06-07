@@ -1,7 +1,7 @@
 use rusqlite::{params, Connection, OptionalExtension};
-use super::Database as _;
+use super::{Database as _, userdetails::Datastore as _ };
 
-pub struct Datastore {
+pub struct SQLite {
     conn: Connection,
 }
 
@@ -9,7 +9,12 @@ pub struct Database<'imm> {
     conn: &'imm mut Connection,
 }
 
-impl super::userdetails::Datastore for Datastore {
+fn mod_sqlite_int(inp: i64) -> i32 {
+    inp as i32
+}
+
+impl super::userdetails::Datastore for SQLite {
+    type DB<'imm> = Database<'imm>; 
     type users_key = usize;
     fn new() -> Self {
         let conn = Connection::open_in_memory().unwrap();
@@ -29,7 +34,7 @@ impl super::userdetails::Datastore for Datastore {
         Self { conn }
     }
 
-    fn db(&mut self) -> impl super::userdetails::Database<'_> + super::UserDetailsWrap<'_> {
+    fn db(&mut self) -> Self::DB<'_> {
         Database {
             conn: &mut self.conn,
         }
@@ -44,7 +49,7 @@ pub struct UserInfo {
 }
 
 impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
-    type Datastore = Datastore;
+    type Datastore = SQLite;
     fn new_user<'qy>(
         &'qy mut self,
         username: String,
@@ -56,7 +61,7 @@ impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
                 "INSERT INTO users (name, premium, credits) VALUES (?, ?, ?) RETURNING id",
             )
             .unwrap()
-            .query_row::<<Self::Datastore as super::userdetails::Datastore>::users_key, _, _>(params![username, prem, start_creds], |row| row.get(0))
+            .query_row::<<Self::Datastore as super::userdetails::Datastore>::users_key, _, _>(params![username, prem, start_creds.unwrap_or(0)], |row| row.get(0))
             .unwrap()
     }
 
@@ -69,7 +74,7 @@ impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
                     id: user_id,
                     name: row.get(0)?,
                     premium: row.get(1)?,
-                    credits: row.get(2)?,
+                    credits: mod_sqlite_int(row.get(2)?),
                 })
             })
             .optional()
@@ -86,7 +91,7 @@ impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
                     id: row.get(0)?,
                     name: row.get(1)?,
                     premium: row.get(2)?,
-                    credits: row.get(3)?,
+                    credits: mod_sqlite_int(row.get(3)?),
                 })
             })
             .unwrap()
@@ -122,7 +127,7 @@ impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
                 .unwrap_or(0);
 
             trans
-                .prepare_cached("UPDATE users SET credits = credits * ? WHERE premium = TRUE")
+                .prepare_cached("UPDATE users SET credits = ROUND(credits * ?, 0) WHERE premium = TRUE")
                 .unwrap()
                 .execute(params![cred_bonus])
                 .map_err(|_| ())?;
@@ -150,8 +155,8 @@ impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
     }
 }
 
-impl <'imm> super::UserDetailsWrap<'imm> for Database<'imm> {
-    fn new_user_wrap(&mut self, username: String, prem: bool, start_creds: Option<i32>) -> <Self::Datastore as super::userdetails::Datastore>::users_key {
-        self.new_user(username, prem, start_creds)
+impl super::GetNewUserKey for SQLite {
+    fn new_user_wrap<'imm>(db: &mut Self::DB<'imm>, username: String, prem: bool, start_creds: Option<i32>) -> <Self as super::userdetails::Datastore>::users_key {
+        db.new_user(username, prem, start_creds)
     }
 }

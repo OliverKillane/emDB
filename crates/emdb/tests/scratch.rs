@@ -18,9 +18,10 @@ emql! {
         traits_with_db = { },
     };
     impl my_db as Serialized{
-        // debug_file = "emdb/tests/debug/code.rs",
-        interface = my_interface,
-        pub = on,
+        // debug_file = "emdb/tests/code.rs",
+        // interface = my_interface,
+        // pub = on,
+        ds_name = EmDBDebug,
     };
     impl code_display as PlanViz{
         path = "emdb/tests/debug/code.dot",
@@ -30,30 +31,22 @@ emql! {
     };
 
     table data {
-        foo: String,
-        bing: usize,
-        bar: (&'static str, bool),
-    }
+        value: i32,
+    } @ [unique(value) as unique_values]
 
-    query new_data(foo: &str, bing: usize, bar_0: bool) {
-        row(
-            foo: String = String::from(foo),
-            bing: usize = bing,
-            bar: (&'static str, bool) = (if bar_0 { "bar" } else { "baz" }, bar_0)
-        )
-            ~> insert(data as ref new_key)
-            ~> return;
-    }
-
-    query all_bings() {
-        use data
-            |> map(bing_val: usize = *bing)
-            |> collect(values)
-            ~> return;
+    query filter_values(math: i32) {
+        row(other_math: i32 = 7)
+            ~> lift (
+                use data
+                    |> filter(**value > other_math)
+                    |> collect(filtered)
+                    ~> return;
+            );
     }
 }
 
 fn main() {
-    // let mut ds = my_db::Datastore::new();
-    // let mut db = ds.db();
+    use my_interface::Datastore;
+    let mut ds = my_db::EmDBDebug::new();
+    let db = ds.db();
 }

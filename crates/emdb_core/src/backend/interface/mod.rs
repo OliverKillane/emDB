@@ -76,6 +76,7 @@ impl super::EMDBBackend for Interface {
             trait_database,
             trait_database_type_datastore,
             trait_datastore,
+            trait_datastore_type_database,
             trait_datastore_method_new,
             trait_datastore_method_db,
             trait_any,
@@ -126,6 +127,7 @@ impl super::EMDBBackend for Interface {
 
         Ok(quote! {
             #public_tk mod #impl_name {
+                #![allow(non_camel_case_types)]
                 // NOTE: We want to allow methods to return any type, which would normally
                 //       require the trait to have an associated type, and to use this in the
                 //       return position of the method.
@@ -142,9 +144,11 @@ impl super::EMDBBackend for Interface {
                 }
 
                 pub trait #trait_datastore {
+                    // NOTE: the names of the datastore, and the database cannot conflict because the table names have `_key` appended.
+                    type #trait_datastore_type_database<'imm>: #trait_database<'imm, #trait_database_type_datastore=Self> #traits_with_db where Self: 'imm;
                     #(#key_types;)*
                     fn #trait_datastore_method_new() -> Self;
-                    fn #trait_datastore_method_db(&mut self) -> impl #trait_database<'_> #traits_with_db;
+                    fn #trait_datastore_method_db(&mut self) -> Self::#trait_datastore_type_database<'_>;
                 }
             }
         })

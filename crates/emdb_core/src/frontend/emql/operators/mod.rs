@@ -18,9 +18,10 @@ use crate::frontend::emql::parse::{
     fields_assign, fields_expr, functional_style, type_parser_to_punct, ContextRecurHandle,
 };
 use crate::frontend::emql::sem::{
-    add_streams_to_context, create_scanref, discard_ends, extract_fields_ordered, generate_access,
-    get_all_cols, get_user_fields, linear_builder, query_ast_typeto_scalar, update_incomplete,
-    valid_linear_builder, Continue, LinearBuilderState, ReturnVal, StreamContext, VarState,
+    add_streams_to_context, check_fields_type, create_scanref, discard_ends,
+    extract_fields_ordered, generate_access, get_all_cols, get_user_fields, linear_builder,
+    query_ast_typeto_scalar, update_incomplete, valid_linear_builder, Continue, FieldComparison,
+    LinearBuilderState, ReturnVal, StreamContext, VarState,
 };
 use crate::plan;
 use crate::utils::misc::{result_to_opt, singlelist};
@@ -139,7 +140,9 @@ create_operator!(
     op_take::Take,
     op_fork::Fork,
     op_union::Union,
-    op_foreach::ForEach,
+    op_lift::Lift,
     op_groupby::GroupBy,
-    op_join::Join
+    op_join::Join,
+    op_combine::Combine,
+    op_count::Count
 );

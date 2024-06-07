@@ -1,7 +1,7 @@
 use duckdb::{params, Connection, OptionalExt};
 use super::Database as _;
 
-pub struct Datastore {
+pub struct DuckDB {
     conn: Connection,
 }
 
@@ -9,7 +9,8 @@ pub struct Database<'imm> {
     conn: &'imm mut Connection,
 }
 
-impl super::userdetails::Datastore for Datastore {
+impl super::userdetails::Datastore for DuckDB {
+    type DB<'imm> = Database<'imm>; 
     type users_key = usize;
     fn new() -> Self {
         let conn = Connection::open_in_memory().unwrap();
@@ -30,7 +31,7 @@ impl super::userdetails::Datastore for Datastore {
         Self { conn }
     }
 
-    fn db(&mut self) -> impl super::userdetails::Database<'_> + super::UserDetailsWrap<'_> {
+    fn db(&mut self) -> Self::DB<'_> {
         Database {
             conn: &mut self.conn,
         }
@@ -46,7 +47,7 @@ pub struct UserInfo {
 
 
 impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
-    type Datastore = Datastore;
+    type Datastore = DuckDB;
     fn new_user<'qy>(
         &'qy mut self,
         username: String,
@@ -58,7 +59,7 @@ impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
                 "INSERT INTO users (name, premium, credits) VALUES (?, ?, ?) RETURNING id",
             )
             .unwrap()
-            .query_row::<<Self::Datastore as super::userdetails::Datastore>::users_key, _, _>(params![username, prem, start_creds], |row| row.get(0))
+            .query_row::<<Self::Datastore as super::userdetails::Datastore>::users_key, _, _>(params![username, prem, start_creds.unwrap_or(0)], |row| row.get(0))
             .unwrap()
     }
 
@@ -152,8 +153,8 @@ impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
     }
 }
 
-impl <'imm> super::UserDetailsWrap<'imm> for Database<'imm> {
-    fn new_user_wrap(&mut self, username: String, prem: bool, start_creds: Option<i32>) -> <Self::Datastore as super::userdetails::Datastore>::users_key {
-        self.new_user(username, prem, start_creds)
+impl super::GetNewUserKey for DuckDB {
+    fn new_user_wrap<'imm>(db: &mut Self::DB<'imm>, username: String, prem: bool, start_creds: Option<i32>) -> <Self as super::userdetails::Datastore>::users_key {
+        db.new_user(username, prem, start_creds)
     }
 }

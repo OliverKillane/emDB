@@ -337,6 +337,18 @@ impl OperatorDescription for plan::Fold {
     }
 }
 
+impl OperatorDescription for plan::Combine {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Combine")
+    }
+}
+
+impl OperatorDescription for plan::Count {
+    fn description(&self,plan: &plan::Plan) -> String {
+        format!("Count")
+    }
+}
+
 impl OperatorDescription for plan::Filter {
     fn description(&self,plan: &plan::Plan) -> String {
         format!("Filter")
@@ -379,7 +391,7 @@ impl OperatorDescription for plan::GroupBy {
     }
 }
 
-impl OperatorDescription for plan::ForEach {
+impl OperatorDescription for plan::Lift {
     fn description(&self,plan: &plan::Plan) -> String {
         format!("ForEach")
     }

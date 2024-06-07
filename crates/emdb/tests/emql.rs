@@ -1,6 +1,7 @@
 use glob::glob;
 use trybuild::TestCases;
 
+/// Test compilation failure, and the error messages produced match expected
 #[test]
 fn should_fail() {
     let t = TestCases::new();
@@ -9,7 +10,8 @@ fn should_fail() {
     }
 }
 
-/// Overcomplicated macro because importing each separately is boring + IDE picks it up nicely
+/// Overcomplicated macro because importing each separately is boring + IDE picks
+/// it up nicely
 macro_rules! valid_tests {
     ( $($section:ident { $($test:ident),+ } ),+ ) => {
         mod valid;
@@ -32,7 +34,11 @@ valid_tests!(
         dereferencing,
         userdetails
     },
-    context { foreach, groupby },
+    context {
+        lift_stream,
+        lift_single,
+        groupby
+    },
     extreme {
         empty_emql,
         empty_items,
@@ -41,6 +47,8 @@ valid_tests!(
     simple {
         no_errors,
         basic_join,
-        limited_table
+        limited_table,
+        sums,
+        counts
     }
 );

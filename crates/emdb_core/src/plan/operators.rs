@@ -23,10 +23,13 @@
 //! In the [super] documentation the shortcomings note provides some of a suggestion:
 //! - Could nest a context, but the operator type is restricted to ones that dont affect
 //!   cardinality of output.
+//! 
+//! Potential Improvement:
+//! - Strongly type single and stream dataflows. (Key<DataStream>, Key<DataSingle>)
 
 use super::{Context, Data, Key, Plan, RecordField, RecordType, Table};
 use std::collections::HashMap;
-use syn::Expr;
+use syn::{Expr, Ident};
 
 /// A complete data flow connection (only type allowed for valid, constructed plans)
 pub struct DataFlowConn {
@@ -259,6 +262,12 @@ pub struct Take {
     pub output: Key<DataFlow>,
 }
 
+pub struct Count {
+    pub input: Key<DataFlow>,
+    pub output: Key<DataFlow>,
+    pub out_field: RecordField,
+}
+
 pub enum MatchKind {
     Cross,
     Pred(Expr),
@@ -289,6 +298,18 @@ pub struct Join {
     pub output: Key<DataFlow>,
 }
 
+/// Combine a stream into a single element
+pub struct Combine {
+    pub input: Key<DataFlow>,
+
+    pub left_name: Ident,
+    pub right_name: Ident,
+
+    pub update_fields: Vec<(RecordField, Expr)>,
+
+    pub output: Key<DataFlow>,
+}
+
 /// Group by a field and aggregate the results
 pub struct GroupBy {
     pub input: Key<DataFlow>,
@@ -301,13 +322,14 @@ pub struct GroupBy {
 }
 
 /// Run a sub-query for each row in an input stream
-pub struct ForEach {
+pub struct Lift {
     pub input: Key<DataFlow>,
     pub inner_ctx: Key<Context>,
     pub output: Key<DataFlow>,
 }
 
 /// Given an operator output, multiply it into multiple outputs
+/// Can be either single or stream inputs!
 pub struct Fork {
     pub input: Key<DataFlow>,
     pub outputs: Vec<Key<DataFlow>>,
@@ -361,6 +383,8 @@ pub enum Operator {
     Filter,
     Sort,
     Assert,
+    Combine,
+    Count,
 
     // cardinality set
     Take,
@@ -368,7 +392,7 @@ pub enum Operator {
 
     // nested contexts
     GroupBy,
-    ForEach,
+    Lift,
 
     // stream join & split
     Join,

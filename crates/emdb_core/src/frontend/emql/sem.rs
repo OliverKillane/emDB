@@ -614,6 +614,49 @@ pub fn create_scanref(
     }
 }
 
+pub struct FieldComparison<'res> {
+    pub extra_fields: Vec<&'res Ident>,
+    pub missing_fields: Vec<&'res Ident>,
+}
+
+/// Check if the user defined fields present match a data type.
+/// INV: the data type has no [`plan::RecordField::Internal`] fields
+pub fn check_fields_type<'imm>(
+    lp: &'imm plan::Plan,
+    data_type: plan::Key<plan::RecordType>,
+    fields: impl Iterator<Item = &'imm Ident>,
+) -> FieldComparison<'imm> {
+    let mut keys = lp
+        .get_record_type_conc(data_type)
+        .fields
+        .keys()
+        .map(|rf| match rf {
+            plan::RecordField::User(i) => i,
+            plan::RecordField::Internal(_) => {
+                unreachable!("Cannot call this method with internal fields")
+            }
+        })
+        .collect::<HashSet<_>>();
+
+    let mut extra_fields = Vec::new();
+    let mut missing_fields = Vec::new();
+
+    for field in fields {
+        if !keys.remove(field) {
+            extra_fields.push(field);
+        }
+    }
+
+    for field in keys {
+        missing_fields.push(field);
+    }
+
+    FieldComparison {
+        extra_fields,
+        missing_fields,
+    }
+}
+
 pub fn get_all_cols(lp: &mut plan::Plan, table_id: plan::Key<plan::Table>) -> plan::RecordConc {
     // NOTE: cannot use lp.get_table as borrow checker does not know that does
     //       not borrow from lp.scalar_types which is mutated later

@@ -22,7 +22,7 @@ use proc_macro_error::{Diagnostic, Level};
 use queries::QueriesInfo;
 use quote::quote;
 use std::{collections::LinkedList, fs::File, io::Write, path::Path};
-use syn::{parse2, File as SynFile, LitStr};
+use syn::{parse2, File as SynFile, Ident, LitStr};
 
 use super::{interface::InterfaceTrait, EMDBBackend};
 use crate::utils::{misc::singlelist, on_off::on_off};
@@ -38,6 +38,7 @@ pub struct Serialized {
     debug: Option<LitStr>,
     interface: Option<InterfaceTrait>,
     public: bool,
+    ds_name: Option<Ident>,
 }
 
 impl EMDBBackend for Serialized {
@@ -56,7 +57,10 @@ impl EMDBBackend for Serialized {
                     }),
                     (
                         OptField::new("pub", on_off),
-                        OptEnd
+                        (
+                            OptField::new("ds_name", getident),
+                            OptEnd
+                        )
                     ),
                 ),
             )
@@ -64,12 +68,13 @@ impl EMDBBackend for Serialized {
             let (_, res) = parser.comp(TokenIter::from(opts, backend_name.span()));
             res.to_result()
                 .map_err(TokenDiagnostic::into_list)
-                .map(|(debug, (interface, (public, ())))| Serialized { debug, interface, public: public.unwrap_or(false) })
+                .map(|(debug, (interface, (public, (ds_name, ()))))| Serialized { debug, interface, public: public.unwrap_or(false), ds_name })
         } else {
             Ok(Self {
                 debug: None,
                 interface: None,
-                public: false
+                public: false,
+                ds_name: None,
             })
         }
     }
@@ -80,7 +85,11 @@ impl EMDBBackend for Serialized {
         plan: &crate::plan::Plan,
     ) -> Result<proc_macro2::TokenStream, std::collections::LinkedList<proc_macro_error::Diagnostic>>
     {
-        let namer = namer::SerializedNamer::new();
+        let mut namer = namer::SerializedNamer::new();
+        if let Some(name) = self.ds_name {
+            namer.struct_datastore = name;
+        }
+
         let tables::TableWindow {
             table_defs,
             datastore,

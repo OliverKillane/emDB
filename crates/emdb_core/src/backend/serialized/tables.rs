@@ -166,16 +166,17 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
         trait_datastore,
         trait_datastore_method_db,
         trait_datastore_method_new,
+        trait_datastore_type_database,
         ..
     } = &namer.interface;
 
-    let (impl_datastore, modifiers, key_defs) = if let Some(InterfaceTrait { name }) = interface_trait {
+    let (impl_datastore, modifiers, key_defs, ds_assoc_db) = if let Some(InterfaceTrait { name }) = interface_trait {
         (quote!{ super::#name::#trait_datastore for }, quote!(), lp.tables.iter().map(|(_, plan::Table { name, ..})| {
             let key_name = namer.interface.key_name(name);
             quote! { type #key_name = #mod_tables::#name::#type_key }
-        }).collect::<Vec<_>>())
+        }).collect::<Vec<_>>(), quote!(type #trait_datastore_type_database<#db_lifetime> = #struct_database<#db_lifetime>;))
     } else {
-        (quote!(), quote!(pub), Vec::new())
+        (quote!(), quote!(pub), Vec::new(), quote!())
     };
 
 
@@ -189,6 +190,7 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
         .into(),
         datastore_impl: quote! {
             impl #impl_datastore #struct_datastore {
+                #ds_assoc_db
                 #(#key_defs;)*
                 
                 #modifiers fn #trait_datastore_method_new() -> Self {

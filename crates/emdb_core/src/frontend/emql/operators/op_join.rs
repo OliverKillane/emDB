@@ -130,7 +130,7 @@ impl EMQLOperator for Join {
                 let op_matcher = match matcher {
                     MatchKind::Equi { left_field, right_field } => {
                         check_field(lp, &call, &left_field, left_rec_conc, &mut errors);
-                        check_field(lp, &call, &right_field, left_rec_conc, &mut errors);
+                        check_field(lp, &call, &right_field, right_rec_conc, &mut errors);
 
                         plan::MatchKind::Equi { left_field: left_field.into(), right_field: right_field.into() }
                     },

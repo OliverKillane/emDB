@@ -1,12 +1,12 @@
-#![allow(unused_macros)]
-#![allow(unused_imports)]
-
+#[macro_export]
 macro_rules! total {
     ($($e:literal => $r:expr,)*) => {
         0 $( + $e)*
     }
 }
+pub use total;
 
+#[macro_export]
 macro_rules! choose_internal {
     ($rng:ident $total:expr => $e:literal => $r:expr,) => {
         $r
@@ -19,14 +19,13 @@ macro_rules! choose_internal {
         }
     };
 }
+pub use choose_internal;
 
+#[macro_export]
 macro_rules! choose {
     ($rng:ident $($inp:tt)*) => {
         {choose_internal!{$rng (total!{$($inp)*}) => $($inp)*}}
     }
 
 }
-
-pub(crate) use choose;
-pub(crate) use choose_internal;
-pub(crate) use total;
+pub use choose;

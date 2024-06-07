@@ -89,8 +89,15 @@ pub fn generate(
                 self.#table_member_transactions.#mod_transactions_struct_data_member_log.push(#mod_transactions::#mod_transactions_enum_logitem::#mod_transactions_enum_logitem_variant_delete(key));
             }
         };
-        let restore_unique_from_borrow = uniques.iter().map(|Unique { alias:_, field }| {
-            quote!(self.#struct_table_member_uniques.#field.insert(#brw_ident.#field.clone(), #key_ident).unwrap())
+        // We cannot insert into the table while holding the borrow of the row.
+        // - while borrow does not impact the unique indices, the `self.borrow` 
+        //   borrows all members of `self`
+        // - Hence we clone, then place, rather than just `self.uniques.insert(brw.field.clone())` 
+        let get_clone_of_uniques = uniques.iter().map(|Unique { alias, field }| {
+            quote!(let #alias = #brw_ident.#field.clone())
+        });
+        let restore_unique_from_borrow = uniques.iter().map(|Unique { alias, field }| {
+            quote!(self.#struct_table_member_uniques.#field.insert(#alias, #key_ident).unwrap())
         });
 
         quote! {
@@ -114,6 +121,7 @@ pub fn generate(
                     debug_assert!(self.#table_member_transactions.#mod_transactions_struct_data_member_rollback);
                     self.#table_member_columns.#name_primary_column.reveal(#key_ident).unwrap();
                     let #brw_ident = self.#struct_window_method_borrow(#key_ident).unwrap();
+                    #(#get_clone_of_uniques;)*
                     #(#restore_unique_from_borrow;)*
                 }
 

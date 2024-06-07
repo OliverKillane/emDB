@@ -1,26 +1,19 @@
 use super::*;
 
 #[derive(Debug)]
-pub struct ForEach {
+pub struct Lift {
     call: Ident,
-    in_name: Ident,
     contents: Vec<StreamExpr>
 }
 
-impl EMQLOperator for ForEach {
-    const NAME: &'static str = "foreach";
+impl EMQLOperator for Lift {
+    const NAME: &'static str = "lift";
 
     fn build_parser(ctx_recur: ContextRecurHandle) -> impl TokenParser<Self> {
         mapsuc(functional_style(Self::NAME, 
-            seqs!(
-                matchident("let"),
-                setrepr(getident(),"<variable to use in context>"),
-                matchident("in"),
-                recovgroup(Delimiter::Brace, setrepr(ctx_recur, "<context>"))
-            )
-        ),|(call, (_, (in_name, (_,  contents))))| ForEach {
+            ctx_recur
+        ),|(call, contents)| Lift {
             call,
-            in_name,
             contents,
         })
     }
@@ -34,7 +27,7 @@ impl EMQLOperator for ForEach {
         op_ctx: plan::Key<plan::Context>,
         cont: Option<Continue>,
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
-        let Self { call, in_name, contents } = self;
+        let Self { call, contents } = self;
         if let Some(Continue { data_type, prev_edge, last_span }) = cont {
             let mut errors = LinkedList::new();
             let next_edge = lp.dataflow.insert(plan::DataFlow::Null);
@@ -49,17 +42,13 @@ impl EMQLOperator for ForEach {
                 }
             }).collect()));
 
-            let foreach_op = lp.operators.insert(plan::ForEach { 
+            let foreach_op = lp.operators.insert(plan::Lift { 
                 input: prev_edge,
                 inner_ctx, 
                 output: next_edge 
             }.into());
 
             update_incomplete(lp.get_mut_dataflow(prev_edge), foreach_op);
-
-            if !data_type.stream {
-                errors.push_back(errors::operator_requires_streams2(&call));
-            }
 
             let mut variables = HashMap::new();
 
@@ -73,7 +62,7 @@ impl EMQLOperator for ForEach {
                     if let plan::Operator::Return(plan::Return{ input }) = lp.get_operator(out_stream) {
                         let old_data = lp.get_dataflow(*input).get_conn().with.clone();
                         assert!(!old_data.stream, "return always takes single");
-                        let new_data = plan::Data { fields: old_data.fields, stream: true };
+                        let new_data = plan::Data { fields: old_data.fields, stream: data_type.stream };
                         *lp.get_mut_dataflow(next_edge) = plan::DataFlow::Incomplete { from: foreach_op, with: new_data.clone() };
 
                         Ok( StreamContext::Continue(Continue { data_type: new_data, prev_edge: next_edge, last_span: call.span() }))

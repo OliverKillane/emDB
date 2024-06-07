@@ -1,10 +1,10 @@
-use divan::{black_box, Bencher};
-use experiments2::userdetails::{emdb_impl::Datastore as EmDB, duckdb_impl::Datastore as DuckDB, sqlite_impl::Datastore as SQLite, UserDetailsWrap, userdetails::{Datastore, Database}};
+use divan::{black_box, black_box_drop, Bencher};
+use experiments2::{utils::{choose, choose_internal, total}, userdetails::{duckdb_impl::DuckDB, emdb_impl::EmDB, sqlite_impl::SQLite, userdetails::{Database, Datastore}, GetNewUserKey}};
 
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 
 // const TABLE_SIZES: [usize; 9] = [1, 8, 64, 128, 512, 4096, 16384, 65536, 262144];
-const TABLE_SIZES: [usize; 3] = [1, 8, 16];
+const TABLE_SIZES: [usize; 4] = [1, 8, 16, 512];
 
 fn main() {
     divan::main();
@@ -55,24 +55,29 @@ where
         })
 }
 
-fn random_table<'a, const SIZE: usize, DS: Datastore>() -> (Vec<DS::users_key>, T) {
+fn random_table<'a, const SIZE: usize, DS: Datastore + GetNewUserKey>() -> (Vec<DS::users_key>, DS) {
     let mut ds = DS::new();
-    let mut db = ds.db();
-    let mut rng = rand::thread_rng();
-
-    let mut ids = (0..SIZE)
-        .map(|i| {
-            let (user, prem, init) = random_user(&mut rng, i);
-            db.new_user_wrap(user, prem, init)
-        })
-        .collect::<Vec<DS::users_key>>();
-    ids.shuffle(&mut rng);
-
-    for id in ids.iter() {
-        db.add_credits(*id, rng.gen_range(2..100));
+    let mut ids;
+    {
+        let mut db = ds.db();
+        let mut rng = rand::thread_rng();
+    
+        ids = (0..SIZE)
+            .map(|i| {
+                let (user, prem, init) = random_user(&mut rng, i);
+                DS::new_user_wrap(&mut db, user, prem, init)
+    
+            })
+            .collect::<Vec<DS::users_key>>();
+        ids.shuffle(&mut rng);
+    
+        for id in ids.iter() {
+            db.add_credits(*id, rng.gen_range(2..100));
+        }
+        db.reward_premium(2f32);
     }
-    db.reward_premium(2f32);
-    black_box((ids, db))
+
+    black_box((ids, ds))
 }
 
 /// Time taken to get ids in random order
@@ -83,13 +88,14 @@ fn random_table<'a, const SIZE: usize, DS: Datastore>() -> (Vec<DS::users_key>, 
 )]
 fn gets<T, const N: usize>(bencher: Bencher)
 where
-    T: Datastore,
+    T: Datastore + GetNewUserKey,
 {
     bencher
         .with_inputs(random_table::<N, T>)
-        .bench_local_refs(|(ids, db)| {
+        .bench_local_refs(|(ids, ds)| {
+            let db = ds.db();
             for id in ids {
-                black_box(db.get_info(*id)).unwrap();
+                black_box_drop(db.get_info(*id));
             }
         })
 }
@@ -102,11 +108,14 @@ where
 )]
 fn snapshot<T, const N: usize>(bencher: Bencher)
 where
-    T: Datastore,
+    T: Datastore + GetNewUserKey,
 {
     bencher
         .with_inputs(random_table::<N, T>)
-        .bench_local_refs(|(_, db)| black_box(db.get_snapshot()))
+        .bench_local_refs(|(_, ds)| {
+            let db = ds.db();
+            black_box_drop(db.get_snapshot())
+        })
 }
 
 /// Time taken to get the total credits of premium users
@@ -118,11 +127,15 @@ where
 )]
 fn premium_credits<'a, T, const N: usize>(bencher: Bencher)
 where
-    T: Datastore,
+    T: Datastore + GetNewUserKey,
 {
     bencher
         .with_inputs(random_table::<N, T>)
-        .bench_local_refs(|(_, db)| black_box(db.total_premium_credits()))
+        .bench_local_refs(|(_, ds)| {
+            let db = ds.db();
+            black_box_drop(db.total_premium_credits())
+        }
+    )
 }
 
 /// Time taken to reward premium users
@@ -134,35 +147,41 @@ where
 )]
 fn reward_premium<T, const N: usize>(bencher: Bencher)
 where
-    T: Datastore,
+    T: Datastore + GetNewUserKey,
 {
     bencher
         .with_inputs(random_table::<N, T>)
-        .bench_local_refs(|(_, db)| black_box(db.reward_premium(2f32)))
+        .bench_local_refs(|(_, ds)| {
+            let mut db = ds.db();
+            black_box_drop(db.reward_premium(2f32))
+        }
+    )
 }
 
 /// Random workload of N actions
 #[divan::bench(
     name = "random_workloads",
-    types = [EmDB, DuckDB, SQLite],,
-    consts = [1024, 2048, 4096]
+    types = [EmDB, DuckDB, SQLite],
+    consts = [1024, 2048, 4096],
+    max_time = 100
 )]
-fn mixed_workload<T, const N: usize>(bencher: Bencher)
+fn mixed_workload<DS, const N: usize>(bencher: Bencher)
 where
-    T: Datastore,
+    DS: Datastore + GetNewUserKey,
 {
     bencher.bench_local(|| {
-        let mut db = T::new();
+        let mut ds = DS::new();
+        let mut db = ds.db();
         let mut rng = rand::thread_rng();
 
         // avoid reallocations
         let mut ids = Vec::with_capacity(N);
-        ids.push(db.new_user(String::from("bob"), true));
+        ids.push(DS::new_user_wrap(&mut db, String::from("bob"), true, Some(3)));
 
         for _ in 0..N {
             choose! { rng
-                10 => { ids.push(db.new_user(String::from("bob"), true)); },
-                20 => { black_box(db.get_info(ids[rng.gen_range(0..ids.len())])).unwrap(); },
+                10 => { ids.push(DS::new_user_wrap(&mut db, String::from("bob"), true, Some(3))); },
+                20 => { black_box(db.get_info(ids[rng.gen_range(0..ids.len())])); },
                 1 => { black_box(db.get_snapshot()); },
                 2 => { black_box(db.total_premium_credits()); },
                 1 => { let _ = black_box(db.reward_premium(1.2f32)); },

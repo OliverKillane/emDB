@@ -49,7 +49,7 @@ impl GetMuts for plan::GroupBy {
         lp.get_context(self.inner_ctx).mutates(lp)
     }
 }
-impl GetMuts for plan::ForEach {
+impl GetMuts for plan::Lift {
     fn mutates(&self, lp: &plan::Plan) -> bool {
         lp.get_context(self.inner_ctx).mutates(lp)
     }
@@ -62,10 +62,12 @@ impl GetMuts for plan::Map {}
 impl GetMuts for plan::Expand {}
 impl GetMuts for plan::Fold {}
 impl GetMuts for plan::Filter {}
+impl GetMuts for plan::Combine {}
 impl GetMuts for plan::Sort {}
 impl GetMuts for plan::Assert {}
 impl GetMuts for plan::Take {}
 impl GetMuts for plan::Collect {}
+impl GetMuts for plan::Count {}
 impl GetMuts for plan::Join {}
 impl GetMuts for plan::Fork {}
 impl GetMuts for plan::Union {}

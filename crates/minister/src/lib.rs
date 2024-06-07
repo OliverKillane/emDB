@@ -45,6 +45,8 @@ pub trait Physical {
         predicate: impl Fn(&Data) -> bool,
     ) -> Self::Stream<Data>;
 
+    fn count<Data>(stream: Self::Stream<Data>) -> Self::Single<usize>;
+
     fn fold<InData, Acc>(
         stream: Self::Stream<InData>,
         initial: Acc,
@@ -102,6 +104,10 @@ pub trait Physical {
     fn fork<Data>(stream: &Self::Stream<Data>) -> Self::Stream<Data>
     where
         Data: Clone;
+    
+    fn fork_single<Data>(single: &Self::Single<Data>) -> Self::Single<Data>
+        where
+            Data: Clone;
 
     fn split<LeftData, RightData>(
         stream: Self::Stream<(LeftData, RightData)>,

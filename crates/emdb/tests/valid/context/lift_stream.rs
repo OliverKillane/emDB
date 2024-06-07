@@ -19,14 +19,14 @@ emql! {
         ref customers as ref_cust
             |> deref(ref_cust as person)
             |> update(ref_cust use bonus_points = person.bonus_points + 1)
-            |> foreach(let customer in {
+            |> lift(
                 row(surname: String = person.surname.clone())
                     ~> unique(surname for family_bonus.surname as ref family_ref)
                     ~> deref(family_ref as family)
                     ~> update(family_ref use bonus = family.bonus + 1);
 
                 row() ~> return; // void return
-            });
+            );
     }
 
     query add_customer(forename: String, surname: String, age: u8) {

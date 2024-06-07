@@ -189,4 +189,14 @@ impl Physical for Basic {
     ) -> Self::Single<OutData> {
         (mapping)(single)
     }
+
+    fn count<Data>(stream: Self::Stream<Data>) -> Self::Single<usize> {
+        stream.len()
+    }
+    
+    fn fork_single<Data>(single: &Self::Single<Data>) -> Self::Single<Data>
+        where
+            Data: Clone {
+        single.clone()
+    }
 }
