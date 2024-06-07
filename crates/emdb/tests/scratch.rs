@@ -14,10 +14,13 @@ enum RGB {
 }
 
 emql! {
-    impl my_interface as Interface;
+    impl my_interface as Interface{
+        traits_with_db = { },
+    };
     impl my_db as Serialized{
         // debug_file = "emdb/tests/debug/code.rs",
         interface = my_interface,
+        pub = on,
     };
     impl code_display as PlanViz{
         path = "emdb/tests/debug/code.dot",

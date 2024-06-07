@@ -239,7 +239,8 @@ pub fn generate_queries<'imm>(
         db_lifetime,
         mod_queries,
         struct_database,
-        interface: InterfaceNamer { trait_database, ..},
+        struct_datastore,
+        interface: InterfaceNamer { trait_database, trait_database_type_datastore, ..},
         ..
     } = namer;
     let (mods, impls): (Vec<Tokens<ItemMod>>, Vec<Tokens<ImplItemFn>>) = lp
@@ -258,14 +259,15 @@ pub fn generate_queries<'imm>(
         query_impls: if impls.is_empty() {
             None
         } else {
-            let (impl_database, modifier) = if let Some(InterfaceTrait { name }) = interface_trait {
-                (quote! { super::#name::#trait_database<#db_lifetime> for }, quote!())
+            let (impl_database, modifier, type_ds) = if let Some(InterfaceTrait { name }) = interface_trait {
+                (quote! { super::#name::#trait_database<#db_lifetime> for }, quote!(), quote!(type #trait_database_type_datastore = #struct_datastore;))
             } else {
-                (quote! {}, quote!(pub))
+                (quote! {}, quote!(pub), quote!())
             };
             Some(
                 quote! {
                     impl <#db_lifetime> #impl_database #struct_database<#db_lifetime> {
+                        #type_ds
                         #(#modifier #impls)*
                     }
                 }

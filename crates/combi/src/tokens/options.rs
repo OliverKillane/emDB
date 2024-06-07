@@ -49,7 +49,9 @@ pub trait OptParse: Sized {
                 }),
             ),
             move |(value, others)| {
-                let errors = others.into_keys().map(|k| {
+                let errors = others
+                    .into_keys()
+                    .map(|k| {
                         Diagnostic::spanned(
                             k.span(),
                             Level::Error,
@@ -60,7 +62,11 @@ pub trait OptParse: Sized {
                 if errors.is_empty() {
                     CombiResult::Suc(value)
                 } else {
-                    CombiResult::Err(TokenDiagnostic::from_list(errors).expect("Non-empty, so at least one element, so we must have a diagnostic"))
+                    CombiResult::Err(
+                        TokenDiagnostic::from_list(errors).expect(
+                            "Non-empty, so at least one element, so we must have a diagnostic",
+                        ),
+                    )
                 }
             },
         )
@@ -99,7 +105,10 @@ impl OptParse for OptEnd {
             if errors.is_empty() {
                 CombiResult::Suc(((), uniques))
             } else {
-                CombiResult::Err(TokenDiagnostic::from_list(errors).expect("Non-empty, so at least one element, so we must have a diagnostic"))
+                CombiResult::Err(
+                    TokenDiagnostic::from_list(errors)
+                        .expect("Non-empty, so at least one element, so we must have a diagnostic"),
+                )
             }
         })
     }
@@ -158,7 +167,9 @@ impl<O, P: TokenParser<O>, R: OptParse, F: Fn() -> P> OptParse for (OptField<O, 
                 if let Some((key, _)) = uniques.get_key_value(&Ident::new(name, Span::call_site()))
                 {
                     let key = key.clone();
-                    let val = uniques.remove(&key).expect("Key was use for access already taken from the map");
+                    let val = uniques
+                        .remove(&key)
+                        .expect("Key was use for access already taken from the map");
 
                     match (seqdiff(parser(), terminal)).comp(TokenIter::from(val, key.span())) {
                         (DiffRes::First(_), CombiResult::Suc(_)) => {

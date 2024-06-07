@@ -10,9 +10,7 @@
 use combi::{
     core::mapsuc,
     tokens::{
-        basic::{
-            collectuntil, getident, isempty, syn,
-        },
+        basic::{collectuntil, getident, isempty, syn},
         options::{OptEnd, OptField, OptParse},
         TokenDiagnostic, TokenIter,
     },
@@ -27,7 +25,7 @@ use std::{collections::LinkedList, fs::File, io::Write, path::Path};
 use syn::{parse2, File as SynFile, LitStr};
 
 use super::{interface::InterfaceTrait, EMDBBackend};
-use crate::utils::misc::singlelist;
+use crate::utils::{misc::singlelist, on_off::on_off};
 
 mod closures;
 pub mod namer;
@@ -39,6 +37,7 @@ mod types;
 pub struct Serialized {
     debug: Option<LitStr>,
     interface: Option<InterfaceTrait>,
+    public: bool,
 }
 
 impl EMDBBackend for Serialized {
@@ -50,18 +49,27 @@ impl EMDBBackend for Serialized {
     ) -> Result<Self, std::collections::LinkedList<proc_macro_error::Diagnostic>> {
         if let Some(opts) = options {
             let parser = (
-                OptField::new("debug_file", ||syn(collectuntil(isempty()))),
-                (OptField::new("interface", ||mapsuc(getident(), |name| InterfaceTrait{ name })), OptEnd),
+                OptField::new("debug_file", || syn(collectuntil(isempty()))),
+                (
+                    OptField::new("interface", || {
+                        mapsuc(getident(), |name| InterfaceTrait { name })
+                    }),
+                    (
+                        OptField::new("pub", on_off),
+                        OptEnd
+                    ),
+                ),
             )
                 .gen('=');
             let (_, res) = parser.comp(TokenIter::from(opts, backend_name.span()));
             res.to_result()
                 .map_err(TokenDiagnostic::into_list)
-                .map(|(debug, (interface, ()))| Serialized { debug, interface })
+                .map(|(debug, (interface, (public, ())))| Serialized { debug, interface, public: public.unwrap_or(false) })
         } else {
             Ok(Self {
                 debug: None,
                 interface: None,
+                public: false
             })
         }
     }
@@ -91,8 +99,14 @@ impl EMDBBackend for Serialized {
 
         let namer::SerializedNamer { mod_tables, .. } = &namer;
 
+        let public_tk = if self.public {
+            quote!(pub)
+        } else {
+            quote!()
+        };  
+
         let tks = quote! {
-            mod #impl_name {
+            #public_tk mod #impl_name {
                 #![allow(non_shorthand_field_patterns)] // current name field printing is `fielname: fieldname`
                 use emdb::dependencies::minister::Physical; //TODO: remove and use better operator selection
                 pub mod #mod_tables {

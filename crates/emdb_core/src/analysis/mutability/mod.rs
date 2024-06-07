@@ -5,19 +5,19 @@ use crate::plan;
 #[enumtrait::store(trait_get_muts)]
 pub trait GetMuts {
     /// Update the set with the mutated tables
-    fn mutates(&self, lp: & plan::Plan) -> bool {
+    fn mutates(&self, lp: &plan::Plan) -> bool {
         false
     }
 }
 
 impl GetMuts for plan::Query {
-    fn mutates(&self, lp: & plan::Plan) -> bool {
+    fn mutates(&self, lp: &plan::Plan) -> bool {
         lp.get_context(self.ctx).mutates(lp)
     }
 }
 
 impl GetMuts for plan::Context {
-    fn mutates(&self, lp: & plan::Plan) -> bool {
+    fn mutates(&self, lp: &plan::Plan) -> bool {
         self.ordering
             .iter()
             .map(|k| lp.get_operator(*k).mutates(lp))
@@ -29,28 +29,28 @@ impl GetMuts for plan::Context {
 impl GetMuts for plan::Operator {}
 
 impl GetMuts for plan::Insert {
-    fn mutates(&self, lp: & plan::Plan) -> bool {
+    fn mutates(&self, lp: &plan::Plan) -> bool {
         true
     }
 }
 impl GetMuts for plan::Update {
-    fn mutates(&self, lp: & plan::Plan) -> bool {
+    fn mutates(&self, lp: &plan::Plan) -> bool {
         true
     }
 }
 impl GetMuts for plan::Delete {
-    fn mutates(&self, lp: & plan::Plan) -> bool {
+    fn mutates(&self, lp: &plan::Plan) -> bool {
         true
     }
 }
 
 impl GetMuts for plan::GroupBy {
-    fn mutates(&self, lp: & plan::Plan) -> bool {
+    fn mutates(&self, lp: &plan::Plan) -> bool {
         lp.get_context(self.inner_ctx).mutates(lp)
     }
 }
 impl GetMuts for plan::ForEach {
-    fn mutates(&self, lp: & plan::Plan) -> bool {
+    fn mutates(&self, lp: &plan::Plan) -> bool {
         lp.get_context(self.inner_ctx).mutates(lp)
     }
 }

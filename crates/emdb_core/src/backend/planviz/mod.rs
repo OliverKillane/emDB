@@ -1,99 +1,127 @@
 //! # Logical Plan Vizualisation
 //! The debugging plan graph view for emDB.
-//! 
-//! Given the complexity of the [`plan::Plan`], [`crate::analysis`] and 
+//!
+//! Given the complexity of the [`plan::Plan`], [`crate::analysis`] and
 //! [`crate::optimise`] it is necessary to explore plans graphically.
-//! 
+//!
 //! ## Live Debugging
 //! It is recommended to work in a scratch file, with Planviz implemented.
 //! - If using vscode, the [graphviz interactive preview extension](vscode:extension/tintinweb.graphviz-interactive-preview)
-//!   is recommended (open dots file, save in scratch rust file and watch preview 
+//!   is recommended (open dots file, save in scratch rust file and watch preview
 //!   automatically update live).
 
 use std::{fs::File, path::Path};
 
-use combi::{core::{choice, mapsuc, setrepr}, macros::choices, tokens::{basic::{collectuntil, gettoken, isempty, matchident, peekident, syn}, error::error, options::{OptEnd, OptField, OptParse}, TokenDiagnostic, TokenIter, TokenParser}, Combi, Repr};
-use syn::LitStr;
-use super::{EMDBBackend, Ident, LinkedList, TokenStream, plan};
-use proc_macro_error::{Diagnostic, Level};
-use crate::utils::misc::singlelist;
-use quote::quote;
-use typed_generational_arena::StandardArena as GenArena;
+use super::{plan, EMDBBackend, Ident, LinkedList, TokenStream};
+use crate::utils::{misc::singlelist, on_off::on_off};
+use combi::{
+    core::setrepr,
+    tokens::{
+        basic::{collectuntil, isempty, syn},
+        options::{OptEnd, OptField, OptParse},
+        TokenDiagnostic, TokenIter,
+    },
+    Combi, Repr,
+};
 use dot;
+use proc_macro_error::Diagnostic;
+use quote::quote;
+use syn::LitStr;
+use typed_generational_arena::StandardArena as GenArena;
 
-mod errors;
 mod edges;
+mod errors;
 mod nodes;
 
-use edges::{PlanEdge, EdgeStyle, get_edges};
-use nodes::{PlanNode, StyleableNode, node_call, get_nodes};
+use edges::{get_edges, EdgeStyle, PlanEdge};
+use nodes::{get_nodes, node_call, PlanNode, StyleableNode};
 
 pub struct PlanViz {
     out_location: LitStr,
-    config: DisplayConfig
+    config: DisplayConfig,
 }
 
 struct DisplayConfig {
     display_types: bool,
     display_ctx_ops: bool,
-    display_control: bool
+    display_control: bool,
 }
 
 impl EMDBBackend for PlanViz {
     const NAME: &'static str = "PlanViz";
 
-    fn parse_options(backend_name: &Ident, options: Option<TokenStream>) -> Result<Self, LinkedList<Diagnostic>> {
-        fn on_off2() -> impl TokenParser<bool> {
-            choices!(
-                peekident("on") => mapsuc(matchident("on"), |_| true),
-                peekident("off") => mapsuc(matchident("off"), |_| false),
-                otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, "Expected `on` or `off`".to_owned()))
-            )
-        }
-        let parser = setrepr((
-            OptField::new("path", ||setrepr(syn(collectuntil(isempty())), "<file path>")),
+    fn parse_options(
+        backend_name: &Ident,
+        options: Option<TokenStream>,
+    ) -> Result<Self, LinkedList<Diagnostic>> {
+        let parser = setrepr(
             (
-                OptField::new("types", on_off2),
+                OptField::new("path", || {
+                    setrepr(syn(collectuntil(isempty())), "<file path>")
+                }),
                 (
-                    OptField::new("ctx", on_off2),
+                    OptField::new("types", on_off),
                     (
-                        OptField::new("control", on_off2),
-                        OptEnd
-                    )
-                )
+                        OptField::new("ctx", on_off),
+                        (OptField::new("control", on_off), OptEnd),
+                    ),
+                ),
             )
-        ).gen('='), "path = <path>, types = <on|off>, ctx = <on|off>, control = <on|off>");
+                .gen('='),
+            "path = <path>, types = <on|off>, ctx = <on|off>, control = <on|off>",
+        );
         if let Some(opts) = options {
-
             let (_, res) = parser.comp(TokenIter::from(opts, backend_name.span()));
-            let (path, (types, (ctx, (control, _)))) = res.to_result().map_err(TokenDiagnostic::into_list)?;
+            let (path, (types, (ctx, (control, _)))) =
+                res.to_result().map_err(TokenDiagnostic::into_list)?;
 
             if let Some(out_location) = path {
-                Ok(
-                    PlanViz { out_location, config: DisplayConfig { display_types: types.unwrap_or(false), display_ctx_ops: ctx.unwrap_or(false), display_control: control.unwrap_or(false) } }
-                )
+                Ok(PlanViz {
+                    out_location,
+                    config: DisplayConfig {
+                        display_types: types.unwrap_or(false),
+                        display_ctx_ops: ctx.unwrap_or(false),
+                        display_control: control.unwrap_or(false),
+                    },
+                })
             } else {
-                Err(singlelist(errors::expected_path(backend_name)))    
+                Err(singlelist(errors::expected_path(backend_name)))
             }
-
         } else {
-            Err(singlelist(errors::expected_options(backend_name, &format!("{}", Repr(&parser)))))
+            Err(singlelist(errors::expected_options(
+                backend_name,
+                &format!("{}", Repr(&parser)),
+            )))
         }
     }
 
-    fn generate_code(self, impl_name: Ident, plan: &plan::Plan) -> Result<TokenStream, LinkedList<Diagnostic>> {
+    fn generate_code(
+        self,
+        impl_name: Ident,
+        plan: &plan::Plan,
+    ) -> Result<TokenStream, LinkedList<Diagnostic>> {
         let out_path_str = self.out_location.value();
         match File::create(Path::new(&out_path_str)) {
             Ok(mut open_file) => {
-                match dot::render(&plan::With { plan, extended: (impl_name.clone(), self.config) }, &mut open_file) {
-                    Ok(()) => { Ok(quote! {
-mod #impl_name {
-    pub const OUT_DIRECTORY: &str = #out_path_str;
-}
-                    }) }
-                    Err(e) => Err(singlelist(errors::io_error(&impl_name, self.out_location.span(), &e)))
+                match dot::render(
+                    &plan::With {
+                        plan,
+                        extended: (impl_name.clone(), self.config),
+                    },
+                    &mut open_file,
+                ) {
+                    Ok(()) => Ok(quote! {
+                    mod #impl_name {
+                        pub const OUT_DIRECTORY: &str = #out_path_str;
+                    }
+                                        }),
+                    Err(e) => Err(singlelist(errors::io_error(
+                        &impl_name,
+                        self.out_location.span(),
+                        &e,
+                    ))),
                 }
-            },
+            }
             Err(e) => {
                 let span = self.out_location.span();
                 Err(singlelist(errors::io_error(&impl_name, span, &e)))

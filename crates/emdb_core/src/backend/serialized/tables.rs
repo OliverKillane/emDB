@@ -113,6 +113,7 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
             ref pulpit_namer @ pulpit::gen::namer::CodeNamer {
                 struct_table,
                 struct_window,
+                type_key,
                 ..
             },
         struct_datastore,
@@ -168,11 +169,15 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
         ..
     } = &namer.interface;
 
-    let (impl_datastore, modifiers) = if let Some(InterfaceTrait { name }) = interface_trait {
-        (quote!{ super::#name::#trait_datastore for }, quote!())
+    let (impl_datastore, modifiers, key_defs) = if let Some(InterfaceTrait { name }) = interface_trait {
+        (quote!{ super::#name::#trait_datastore for }, quote!(), lp.tables.iter().map(|(_, plan::Table { name, ..})| {
+            let key_name = namer.interface.key_name(name);
+            quote! { type #key_name = #mod_tables::#name::#type_key }
+        }).collect::<Vec<_>>())
     } else {
-        (quote!(), quote!(pub))
+        (quote!(), quote!(pub), Vec::new())
     };
+
 
     TableWindow {
         table_defs,
@@ -184,6 +189,8 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
         .into(),
         datastore_impl: quote! {
             impl #impl_datastore #struct_datastore {
+                #(#key_defs;)*
+                
                 #modifiers fn #trait_datastore_method_new() -> Self {
                     Self {
                         #(#datastore_members_new,)*
