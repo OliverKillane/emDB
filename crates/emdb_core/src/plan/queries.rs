@@ -1,4 +1,4 @@
-use super::{Key, Operator, Plan, RecordType, ScalarType};
+use super::{DataFlow, Key, Operator, Plan, RecordType, ScalarType};
 use proc_macro2::Ident;
 
 pub struct Query {
@@ -14,6 +14,8 @@ pub struct Context {
     pub ordering: Vec<Key<Operator>>,
     /// The parameters for the context
     pub params: Vec<(Ident, Key<ScalarType>)>,
+    /// Any streams that are passed into the context
+    pub inflows: Vec<Key<DataFlow>>,
     /// if the context returns a value, then the return value operator
     /// INV is a [super::Return]
     pub returnflow: Option<Key<Operator>>,
@@ -21,10 +23,11 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn from_params(params: Vec<(Ident, Key<ScalarType>)>) -> Self {
+    pub fn from_params(params: Vec<(Ident, Key<ScalarType>)>, inflows: Vec<Key<DataFlow>>) -> Self {
         Context {
             ordering: Vec::new(),
             params,
+            inflows,
             returnflow: None,
             discards: Vec::new(),
         }

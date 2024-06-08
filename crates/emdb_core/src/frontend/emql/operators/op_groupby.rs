@@ -55,7 +55,7 @@ impl EMQLOperator for GroupBy {
                 let inner_rec = lp.record_types.insert(plan::ConcRef::Conc(in_fields));
                 let next_edge = lp.dataflow.insert(plan::DataFlow::Null);
                 let stream_in_edge = lp.dataflow.insert(plan::DataFlow::Null);
-                let inner_ctx = lp.contexts.insert(plan::Context::from_params(vec![(by, grouping_type)]));
+                let inner_ctx = lp.contexts.insert(plan::Context::from_params(vec![(by, grouping_type)], vec![stream_in_edge]));
 
                      
                 let groupby_op = lp.operators.insert(plan::GroupBy {

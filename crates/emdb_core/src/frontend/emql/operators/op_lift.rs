@@ -40,7 +40,7 @@ impl EMQLOperator for Lift {
                     plan::RecordField::User(i) => Some((i.clone(), *ty)),
                     plan::RecordField::Internal(_) => None,
                 }
-            }).collect()));
+            }).collect(), Vec::new()));
 
             let foreach_op = lp.operators.insert(plan::Lift { 
                 input: prev_edge,

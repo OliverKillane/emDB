@@ -104,10 +104,10 @@ pub trait Physical {
     fn fork<Data>(stream: &Self::Stream<Data>) -> Self::Stream<Data>
     where
         Data: Clone;
-    
+
     fn fork_single<Data>(single: &Self::Single<Data>) -> Self::Single<Data>
-        where
-            Data: Clone;
+    where
+        Data: Clone;
 
     fn split<LeftData, RightData>(
         stream: Self::Stream<(LeftData, RightData)>,

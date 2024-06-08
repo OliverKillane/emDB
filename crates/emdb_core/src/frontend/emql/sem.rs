@@ -270,7 +270,7 @@ fn add_query(
     // Create and populate the query context
     let op_ctx = lp
         .contexts
-        .insert(plan::Context::from_params(params.collect()));
+        .insert(plan::Context::from_params(params.collect(), Vec::new()));
     lp.queries.insert(plan::Query {
         name: name.clone(),
         ctx: op_ctx,

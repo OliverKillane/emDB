@@ -65,3 +65,23 @@ impl<'brw, K: Hash + Eq> PushSet<'brw, K> {
 pub fn new_id(id: &str) -> Ident {
     Ident::new(id, Span::call_site())
 }
+
+pub struct PushVec<'brw, T> {
+    vec: &'brw mut Vec<T>,
+    push_cnt: usize,
+}
+
+impl<'brw, T> PushVec<'brw, T> {
+    pub fn new(vec: &'brw mut Vec<T>) -> Self {
+        Self { vec, push_cnt: 0 }
+    }
+
+    pub fn push(&mut self, item: T) {
+        self.push_cnt += 1;
+        self.vec.push(item)
+    }
+
+    pub fn count(&self) -> usize {
+        self.push_cnt
+    }
+}

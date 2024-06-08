@@ -1,11 +1,10 @@
-use std::collections::HashMap;
 
 use quote::{quote, ToTokens};
 use quote_debug::Tokens;
-use syn::{Expr, Ident, Path, Stmt, Type};
+use syn::{Expr, Ident, Path, Stmt};
 
 use super::{
-    closures::{generate_context_closure, unwrap_context},
+    closures::ContextGen,
     namer::{
         boolean_predicate, dataflow_fields, expose_user_fields, new_error, transfer_fields,
         DataFlowNaming, SerializedNamer,
@@ -19,29 +18,15 @@ use crate::{
     utils::misc::{new_id, PushMap, PushSet},
 };
 
-fn no_closure_val() -> Tokens<Expr> {
-    quote! { () }.into()
-}
-
 #[enumtrait::store(trait_operator_gen)]
 pub trait OperatorGen {
-    /// Generate the data needed that captures from query parameters
-    #[allow(unused_variables)]
-    fn closure_data<'imm>(
-        &self,
-        lp: &'imm plan::Plan,
-        get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
-        namer: &SerializedNamer,
-    ) -> Tokens<Expr> {
-        no_closure_val()
-    }
-
     /// Generate the code for the operator
     /// - Needs to update the set of mutated tables
     /// - Adds to the available errors
     ///   NOTE: the behaviour of 'mutates' needs to be the same as for
     ///       [`crate::analysis::mutability`] as that analysis is used for
     ///       generating traits that [`super::serialized`] can implement.
+    /// - Adds to the values required for the context.
     #[allow(unused_variables, clippy::too_many_arguments)]
     fn apply<'imm, 'brw>(
         &self,
@@ -52,9 +37,8 @@ pub trait OperatorGen {
         errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         gen_info: &GeneratedInfo<'imm>,
-    ) -> Tokens<Stmt> {
-        quote! { let _ = (); }.into()
-    }
+        context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
+    ) -> Tokens<Stmt>;
 }
 
 #[enumtrait::impl_trait(trait_operator_gen for operator_enum)]
@@ -71,11 +55,13 @@ impl OperatorGen for plan::UniqueRef {
         errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             method_query_operator_alias,
             operator_error_parameter,
             mod_tables,
+            self_alias,
             pulpit:
                 pulpit::gen::namer::CodeNamer {
                     mod_unique,
@@ -116,7 +102,7 @@ impl OperatorGen for plan::UniqueRef {
         let transfer_fields = transfer_fields(&input_holding_var, input_record_type, namer);
 
         let action = quote! {
-            let data = self.#table_name.#unique_field_access(&#input_holding_var.#unique_reference)?;
+            let data = #self_alias.#table_name.#unique_field_access(&#input_holding_var.#unique_reference)?;
             Ok(#data_constructor {
                 #new_field: data,
                 #(#transfer_fields,)*
@@ -157,10 +143,12 @@ impl OperatorGen for plan::ScanRefs {
         _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             method_query_operator_alias,
             phantom_field,
+            self_alias,
             pulpit:
                 pulpit::gen::namer::CodeNamer {
                     struct_window_method_scan,
@@ -179,7 +167,7 @@ impl OperatorGen for plan::ScanRefs {
         quote! {
             let #holding_var: #dataflow_type = {
                 let stream_values = #method_query_operator_alias::consume_stream(
-                    self.#table_name
+                    #self_alias.#table_name
                         .#struct_window_method_scan()
                         .collect::<Vec<_>>()
                         .into_iter()
@@ -206,10 +194,12 @@ impl OperatorGen for plan::DeRef {
         errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             method_query_operator_alias,
             operator_error_parameter,
+            self_alias,
             pulpit:
                 pulpit::gen::namer::CodeNamer {
                     struct_window_method_get,
@@ -257,7 +247,7 @@ impl OperatorGen for plan::DeRef {
                     #method_query_operator_alias::#map_kind(
                         #input_holding,
                         |#input_holding| {
-                            match self.#table_name.#struct_window_method_get(#input_holding.#deref_field) {
+                            match #self_alias.#table_name.#struct_window_method_get(#input_holding.#deref_field) {
                                 Ok(#get_value_id) => #data_type {
                                     #new_field: #inner_type {
                                         #(#transfer_fields_get_struct,)*
@@ -277,7 +267,7 @@ impl OperatorGen for plan::DeRef {
                     let result = #method_query_operator_alias::#map_kind(
                         #input_holding,
                         |#input_holding| {
-                            match self.#table_name.#struct_window_method_get(#input_holding.#deref_field) {
+                            match #self_alias.#table_name.#struct_window_method_get(#input_holding.#deref_field) {
                                 Ok(#get_value_id) => Ok(#data_type {
                                     #new_field: #inner_type {
                                         #(#transfer_fields_get_struct,)*
@@ -306,46 +296,6 @@ impl OperatorGen for plan::Update {
     //          and hope the rust compiler removes redundant clones (e.g. value
     //          cloned for insert, but is never used after this)
     // For simplicity of implementation, I have chosen (2.)
-
-    fn closure_data<'imm>(
-        &self,
-        lp: &'imm plan::Plan,
-        _get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
-        namer: &SerializedNamer,
-    ) -> Tokens<Expr> {
-        let SerializedNamer { phantom_field, .. } = namer;
-        let DataFlowNaming {
-            data_constructor,
-            record_type,
-            ..
-        } = dataflow_fields(lp, self.input, namer);
-
-        // the update type name
-        let update_type = generate_record_name(lp, self.update_type, namer);
-        let update_exprs = self.mapping.iter().map(|(name, expr)| {
-            let field_name = namer.transform_field_name(name);
-            quote!(#field_name: #expr)
-        });
-        let args_names = record_type
-            .fields
-            .keys()
-            .map(|k| {
-                let field_name = namer.transform_field_name(k);
-                quote!(#field_name)
-            })
-            .collect::<Vec<_>>();
-
-        quote! {
-            |#data_constructor { #(#args_names,)* .. } | {
-                (
-                    #update_type { #(#update_exprs,)* #phantom_field: std::marker::PhantomData },
-                    #data_constructor { #(#args_names,)* #phantom_field: std::marker::PhantomData }
-                )
-            }
-        }
-        .into()
-    }
-
     fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
@@ -355,8 +305,27 @@ impl OperatorGen for plan::Update {
         errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
+        let closure_val = namer.operator_closure_value_name(self_key);
+        let SerializedNamer {
+            mod_tables,
+            operator_error_parameter,
+            method_query_operator_alias,
+            phantom_field,
+            self_alias,
+            pulpit:
+                pulpit::gen::namer::CodeNamer {
+                    mod_update,
+                    mod_update_struct_update,
+                    mod_update_enum_error,
+                    ..
+                },
+            ..
+        } = namer;
         let DataFlowNaming {
+            data_constructor: input_data_constructor,
+            record_type: input_record_type,
             holding_var: input_holding,
             ..
         } = dataflow_fields(lp, self.input, namer);
@@ -367,19 +336,32 @@ impl OperatorGen for plan::Update {
             ..
         } = dataflow_fields(lp, self.output, namer);
 
-        let SerializedNamer {
-            mod_tables,
-            operator_error_parameter,
-            method_query_operator_alias,
-            pulpit:
-                pulpit::gen::namer::CodeNamer {
-                    mod_update,
-                    mod_update_struct_update,
-                    mod_update_enum_error,
-                    ..
-                },
-            ..
-        } = namer;
+        {
+            // the update expression closure
+            let update_type = generate_record_name(lp, self.update_type, namer);
+            let update_exprs = self.mapping.iter().map(|(name, expr)| {
+                let field_name = namer.transform_field_name(name);
+                quote!(#field_name: #expr)
+            });
+            let args_names = input_record_type
+                .fields
+                .keys()
+                .map(|k| {
+                    let field_name = namer.transform_field_name(k);
+                    quote!(#field_name)
+                })
+                .collect::<Vec<_>>();
+
+            context_vals.push((closure_val.clone(), quote! {
+                |#input_data_constructor { #(#args_names,)* .. } | {
+                    (
+                        #update_type { #(#update_exprs,)* #phantom_field: std::marker::PhantomData },
+                        #input_data_constructor { #(#args_names,)* #phantom_field: std::marker::PhantomData }
+                    )
+                }
+            }
+            .into()));
+        }
 
         let update_method = namer.pulpit_table_interaction(self_key);
         let table_name = &lp.get_table(self.table).name;
@@ -402,8 +384,6 @@ impl OperatorGen for plan::Update {
 
         mutated_tables.push(plan::ImmKey::new(self.table, lp));
 
-        let closure_val = namer.operator_closure_value_name(self_key);
-
         let (map_kind, error_kind) = if stream {
             (quote!(map_seq), quote!(error_stream))
         } else {
@@ -419,7 +399,7 @@ impl OperatorGen for plan::Update {
                         // TODO: determine how closure clonign affects cloning of internals 
                         let (update_struct, continue_struct) = #closure_val.clone()(#input_holding);
 
-                        match self.#table_name.#update_method(
+                        match #self_alias.#table_name.#update_method(
                             #mod_tables::#table_name::#mod_update::#update_method::#mod_update_struct_update {
                                 #(#transfer_update_struct,)*
                             },
@@ -446,12 +426,14 @@ impl OperatorGen for plan::Insert {
         errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         gen_info: &GeneratedInfo<'imm>,
+        _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             mod_tables,
             operator_error_parameter,
             method_query_operator_alias,
             phantom_field,
+            self_alias,
             pulpit:
                 pulpit::gen::namer::CodeNamer {
                     mod_insert,
@@ -497,7 +479,7 @@ impl OperatorGen for plan::Insert {
                         #input_holding,
                         |#input_holding| {
                             Ok(#data_constructor {
-                                    #ref_name: self.#table_name.insert(#mod_tables::#table_name::#mod_insert::#mod_insert_struct_insert {
+                                    #ref_name: #self_alias.#table_name.insert(#mod_tables::#table_name::#mod_insert::#mod_insert_struct_insert {
                                     #(#insert_fields,)*
                                 })?,
                                 #phantom_field: std::marker::PhantomData
@@ -516,7 +498,7 @@ impl OperatorGen for plan::Insert {
                     #input_holding,
                     |#input_holding| {
                         #data_constructor {
-                            #ref_name: self.#table_name.insert(#mod_tables::#table_name::#mod_insert::#mod_insert_struct_insert {
+                            #ref_name: #self_alias.#table_name.insert(#mod_tables::#table_name::#mod_insert::#mod_insert_struct_insert {
                                 #(#insert_fields,)*
                             }),
                             #phantom_field: std::marker::PhantomData
@@ -542,11 +524,13 @@ impl OperatorGen for plan::Delete {
         errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             mod_tables,
             operator_error_parameter,
             method_query_operator_alias,
+            self_alias,
             pulpit:
                 pulpit::gen::namer::CodeNamer {
                     type_key_error,
@@ -589,7 +573,7 @@ impl OperatorGen for plan::Delete {
                 let result = #method_query_operator_alias::#map_kind(
                     #input_holding,
                     |#input_holding| {
-                        match self.#table_name.#struct_window_method_delete(#input_holding.#key_member) {
+                        match #self_alias.#table_name.#struct_window_method_delete(#input_holding.#key_member) {
                             Ok(()) => Ok(#input_holding),
                             Err(#operator_error_parameter) => #error_construct,
                         }
@@ -603,15 +587,6 @@ impl OperatorGen for plan::Delete {
 
 // Errors
 impl OperatorGen for plan::Assert {
-    fn closure_data<'imm>(
-        &self,
-        lp: &'imm plan::Plan,
-        _get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
-        namer: &SerializedNamer,
-    ) -> Tokens<Expr> {
-        (boolean_predicate(lp, &self.assert, self.input, namer).into_token_stream()).into()
-    }
-
     fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
@@ -621,6 +596,7 @@ impl OperatorGen for plan::Assert {
         errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             method_query_operator_alias,
@@ -638,6 +614,11 @@ impl OperatorGen for plan::Assert {
         } = dataflow_fields(lp, self.output, namer);
 
         let closure_data = namer.operator_closure_value_name(self_key);
+
+        context_vals.push((
+            closure_data.clone(),
+            (boolean_predicate(lp, &self.assert, self.input, namer).into_token_stream()).into(),
+        ));
 
         let error_construct = new_error(self_key, error_path, None, errors, namer);
 
@@ -667,39 +648,6 @@ impl OperatorGen for plan::Assert {
 }
 
 impl OperatorGen for plan::Map {
-    fn closure_data<'imm>(
-        &self,
-        lp: &'imm plan::Plan,
-        _get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
-        namer: &SerializedNamer,
-    ) -> Tokens<Expr> {
-        let SerializedNamer { phantom_field, .. } = namer;
-        let DataFlowNaming {
-            data_constructor: input_constructor,
-            record_type,
-            ..
-        } = dataflow_fields(lp, self.input, namer);
-        let DataFlowNaming {
-            data_constructor, ..
-        } = dataflow_fields(lp, self.output, namer);
-        let input_fields = expose_user_fields(record_type, namer);
-
-        let mapping_fields = self.mapping.iter().map(|(rf, e)| {
-            let field_name = namer.transform_field_name(rf);
-            quote! {#field_name: #e}
-        });
-
-        quote! {
-            |#input_constructor { #(#input_fields,)* }| {
-                #data_constructor {
-                    #(#mapping_fields,)*
-                    #phantom_field: std::marker::PhantomData
-                }
-            }
-        }
-        .into()
-    }
-
     fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
@@ -709,23 +657,48 @@ impl OperatorGen for plan::Map {
         _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             method_query_operator_alias,
+            phantom_field,
             ..
         } = namer;
         let DataFlowNaming {
             holding_var: input_holding,
+            data_constructor: input_constructor,
+            record_type: input_record_type,
             ..
         } = dataflow_fields(lp, self.input, namer);
         let DataFlowNaming {
             holding_var,
             dataflow_type,
+            data_constructor,
             stream,
             ..
         } = dataflow_fields(lp, self.output, namer);
 
         let closure_data = namer.operator_closure_value_name(self_key);
+
+        let input_fields = expose_user_fields(input_record_type, namer);
+
+        let mapping_fields = self.mapping.iter().map(|(rf, e)| {
+            let field_name = namer.transform_field_name(rf);
+            quote! {#field_name: #e}
+        });
+
+        context_vals.push((
+            closure_data.clone(),
+            quote! {
+                |#input_constructor { #(#input_fields,)* }| {
+                    #data_constructor {
+                        #(#mapping_fields,)*
+                        #phantom_field: std::marker::PhantomData
+                    }
+                }
+            }
+            .into(),
+        ));
 
         let map_fn = if stream {
             quote!(map)
@@ -752,6 +725,7 @@ impl OperatorGen for plan::Expand {
         _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             method_query_operator_alias,
@@ -786,24 +760,37 @@ impl OperatorGen for plan::Expand {
     }
 }
 impl OperatorGen for plan::Fold {
-    fn closure_data<'imm>(
+    fn apply<'imm, 'brw>(
         &self,
+        self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
-        _get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
         namer: &SerializedNamer,
-    ) -> Tokens<Expr> {
-        let SerializedNamer { phantom_field, .. } = namer;
+        _error_path: &Tokens<Path>,
+        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
+        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _gen_info: &GeneratedInfo<'imm>,
+        context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
+    ) -> Tokens<Stmt> {
+        let SerializedNamer {
+            method_query_operator_alias,
+            phantom_field,
+            ..
+        } = namer;
         let DataFlowNaming {
             data_constructor: input_data_constructor,
             record_type: input_record_type,
+            holding_var: input_holding,
             ..
         } = dataflow_fields(lp, self.input, namer);
         let DataFlowNaming {
+            holding_var,
+            dataflow_type,
             data_constructor: acc_constructor,
             data_type: acc_data_type,
             record_type: acc_record_type,
             ..
         } = dataflow_fields(lp, self.output, namer);
+        let closure_value = namer.operator_closure_value_name(self_key);
 
         let (init_fields, update_fields): (Vec<_>, Vec<_>) = self
             .fold_fields
@@ -820,7 +807,7 @@ impl OperatorGen for plan::Fold {
         let acc_fields = expose_user_fields(acc_record_type, namer);
         let input_fields = expose_user_fields(input_record_type, namer);
 
-        quote! {
+        context_vals.push((closure_value.clone(), quote! {
             (
                 #acc_constructor {
                     #(#init_fields,)*
@@ -834,34 +821,7 @@ impl OperatorGen for plan::Fold {
                 }
             )
         }
-        .into()
-    }
-
-    fn apply<'imm, 'brw>(
-        &self,
-        self_key: plan::Key<plan::Operator>,
-        lp: &'imm plan::Plan,
-        namer: &SerializedNamer,
-        _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
-        _gen_info: &GeneratedInfo<'imm>,
-    ) -> Tokens<Stmt> {
-        let SerializedNamer {
-            method_query_operator_alias,
-            ..
-        } = namer;
-        let DataFlowNaming {
-            holding_var: input_holding,
-            ..
-        } = dataflow_fields(lp, self.input, namer);
-        let DataFlowNaming {
-            holding_var,
-            dataflow_type,
-            ..
-        } = dataflow_fields(lp, self.output, namer);
-
-        let closure_value = namer.operator_closure_value_name(self_key);
+        .into()));
 
         quote! {
             let #holding_var: #dataflow_type = {
@@ -873,15 +833,6 @@ impl OperatorGen for plan::Fold {
     }
 }
 impl OperatorGen for plan::Filter {
-    fn closure_data<'imm>(
-        &self,
-        lp: &'imm plan::Plan,
-        _get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
-        namer: &SerializedNamer,
-    ) -> Tokens<Expr> {
-        (boolean_predicate(lp, &self.predicate, self.input, namer).into_token_stream()).into()
-    }
-
     fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
@@ -891,6 +842,7 @@ impl OperatorGen for plan::Filter {
         _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             method_query_operator_alias,
@@ -906,6 +858,12 @@ impl OperatorGen for plan::Filter {
             ..
         } = dataflow_fields(lp, self.output, namer);
         let closure_value = namer.operator_closure_value_name(self_key);
+
+        context_vals.push((
+            closure_value.clone(),
+            (boolean_predicate(lp, &self.predicate, self.input, namer).into_token_stream()).into(),
+        ));
+
         quote!{
             let #holding_var: #dataflow_type = #method_query_operator_alias::filter(#input_holding, #closure_value);
         }.into()
@@ -913,39 +871,6 @@ impl OperatorGen for plan::Filter {
 }
 
 impl OperatorGen for plan::Combine {
-    fn closure_data<'imm>(
-        &self,
-        lp: &'imm plan::Plan,
-        _get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
-        namer: &SerializedNamer,
-    ) -> Tokens<Expr> {
-        let SerializedNamer { phantom_field, .. } = namer;
-        let DataFlowNaming {
-            data_type,
-            data_constructor,
-            ..
-        } = dataflow_fields(lp, self.input, namer);
-        let Self {
-            left_name,
-            right_name,
-            ..
-        } = self;
-
-        let field_sets = self.update_fields.iter().map(|(field, expr)| {
-            let field_name = namer.transform_field_name(field);
-            quote!(#field_name: #expr)
-        });
-
-        quote! {
-            |#left_name: #data_type, #right_name: #data_type|
-                #data_constructor {
-                    #(#field_sets,)*
-                    #phantom_field: std::marker::PhantomData
-                }
-        }
-        .into()
-    }
-
     fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
@@ -955,13 +880,17 @@ impl OperatorGen for plan::Combine {
         _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             method_query_operator_alias,
+            phantom_field,
             ..
         } = namer;
         let DataFlowNaming {
             holding_var: input_holding,
+            data_type,
+            data_constructor,
             ..
         } = dataflow_fields(lp, self.input, namer);
         let DataFlowNaming {
@@ -969,7 +898,30 @@ impl OperatorGen for plan::Combine {
             dataflow_type,
             ..
         } = dataflow_fields(lp, self.output, namer);
+        let Self {
+            left_name,
+            right_name,
+            ..
+        } = self;
         let closure_value = namer.operator_closure_value_name(self_key);
+
+        let field_sets = self.update_fields.iter().map(|(field, expr)| {
+            let field_name = namer.transform_field_name(field);
+            quote!(#field_name: #expr)
+        });
+
+        context_vals.push((
+            closure_value.clone(),
+            quote! {
+                |#left_name: #data_type, #right_name: #data_type|
+                    #data_constructor {
+                        #(#field_sets,)*
+                        #phantom_field: std::marker::PhantomData
+                    }
+            }
+            .into(),
+        ));
+
         quote!{
             let #holding_var: #dataflow_type = #method_query_operator_alias::combine(#input_holding, #closure_value);
         }.into()
@@ -986,6 +938,7 @@ impl OperatorGen for plan::Sort {
         _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             method_query_operator_alias,
@@ -1029,15 +982,6 @@ impl OperatorGen for plan::Sort {
     }
 }
 impl OperatorGen for plan::Take {
-    fn closure_data<'imm>(
-        &self,
-        _lp: &'imm plan::Plan,
-        _get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
-        _namer: &SerializedNamer,
-    ) -> Tokens<Expr> {
-        let take_expr = &self.limit;
-        quote! { {let limit: usize = #take_expr; limit} }.into()
-    }
     fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
@@ -1047,6 +991,7 @@ impl OperatorGen for plan::Take {
         _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             method_query_operator_alias,
@@ -1063,6 +1008,14 @@ impl OperatorGen for plan::Take {
         } = dataflow_fields(lp, self.output, namer);
 
         let closure_value = namer.operator_closure_value_name(self_key);
+
+        let take_expr = &self.limit;
+
+        context_vals.push((
+            closure_value.clone(),
+            quote! { {let limit: usize = #take_expr; limit} }.into(),
+        ));
+
         quote!{
             let #holding_var: #dataflow_type = #method_query_operator_alias::take(#input_holding, #closure_value);
         }.into()
@@ -1078,6 +1031,7 @@ impl OperatorGen for plan::Collect {
         _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             method_query_operator_alias,
@@ -1121,6 +1075,7 @@ impl OperatorGen for plan::Count {
         _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             method_query_operator_alias,
@@ -1154,33 +1109,6 @@ impl OperatorGen for plan::Count {
 }
 
 impl OperatorGen for plan::Join {
-    fn closure_data<'imm>(
-        &self,
-        lp: &'imm plan::Plan,
-        _get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
-        namer: &SerializedNamer,
-    ) -> Tokens<Expr> {
-        match &self.match_kind {
-            plan::MatchKind::Cross | plan::MatchKind::Equi { .. } => no_closure_val(),
-            plan::MatchKind::Pred(predicate) => {
-                let DataFlowNaming {
-                    data_type: data_left,
-                    ..
-                } = dataflow_fields(lp, self.left.dataflow, namer);
-                let DataFlowNaming {
-                    data_type: data_right,
-                    ..
-                } = dataflow_fields(lp, self.right.dataflow, namer);
-                quote! {
-                    |left: &#data_left, right: &#data_right| -> bool {
-                        #predicate
-                    }
-                }
-                .into()
-            }
-        }
-    }
-
     fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
@@ -1190,6 +1118,7 @@ impl OperatorGen for plan::Join {
         _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             method_query_operator_alias,
@@ -1221,8 +1150,19 @@ impl OperatorGen for plan::Join {
                 plan::MatchKind::Cross => {
                     quote! {#method_query_operator_alias::join_cross(#left_hold_var, #right_hold_var)}
                 }
-                plan::MatchKind::Pred(_) => {
+                plan::MatchKind::Pred(predicate) => {
                     let join_pred = namer.operator_closure_value_name(self_key);
+
+                    context_vals.push((
+                        join_pred.clone(),
+                        quote! {
+                            |left: &#data_left, right: &#data_right| -> bool {
+                                #predicate
+                            }
+                        }
+                        .into(),
+                    ));
+
                     quote! {#method_query_operator_alias::predicate_join(#left_hold_var, #right_hold_var, #join_pred)}
                 }
                 plan::MatchKind::Equi {
@@ -1261,6 +1201,7 @@ impl OperatorGen for plan::Fork {
         _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             method_query_operator_alias,
@@ -1307,6 +1248,7 @@ impl OperatorGen for plan::Union {
         _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             method_query_operator_alias,
@@ -1338,31 +1280,6 @@ impl OperatorGen for plan::Union {
     }
 }
 impl OperatorGen for plan::Row {
-    fn closure_data<'imm>(
-        &self,
-        lp: &'imm plan::Plan,
-        _get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
-        namer: &SerializedNamer,
-    ) -> Tokens<Expr> {
-        let SerializedNamer { phantom_field, .. } = namer;
-
-        let DataFlowNaming {
-            data_constructor, ..
-        } = dataflow_fields(lp, self.output, namer);
-
-        let data_fields = self.fields.iter().map(|(rf, e)| {
-            let member_name = namer.transform_field_name(rf);
-            quote!(#member_name: #e)
-        });
-        quote! {
-            #data_constructor {
-                #(#data_fields,)*
-                #phantom_field: std::marker::PhantomData
-            }
-        }
-        .into()
-    }
-
     fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
@@ -1372,18 +1289,37 @@ impl OperatorGen for plan::Row {
         _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             method_query_operator_alias,
+            phantom_field,
             ..
         } = namer;
         let DataFlowNaming {
             holding_var,
             dataflow_type,
+            data_constructor,
             ..
         } = dataflow_fields(lp, self.output, namer);
 
         let data_name = namer.operator_closure_value_name(self_key);
+
+        let data_fields = self.fields.iter().map(|(rf, e)| {
+            let member_name = namer.transform_field_name(rf);
+            quote!(#member_name: #e)
+        });
+
+        context_vals.push((
+            data_name.clone(),
+            quote! {
+                #data_constructor {
+                    #(#data_fields,)*
+                    #phantom_field: std::marker::PhantomData
+                }
+            }
+            .into(),
+        ));
 
         quote! {
             let #holding_var: #dataflow_type = #method_query_operator_alias::consume_single(#data_name);
@@ -1402,6 +1338,7 @@ impl OperatorGen for plan::Return {
         _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let DataFlowNaming {
             holding_var,
@@ -1422,6 +1359,7 @@ impl OperatorGen for plan::Discard {
         _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
+        _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         let DataFlowNaming { holding_var, .. } = dataflow_fields(lp, self.input, namer);
         quote! { let _ = #holding_var; }.into()
@@ -1430,17 +1368,6 @@ impl OperatorGen for plan::Discard {
 
 // contexts
 impl OperatorGen for plan::GroupBy {
-    fn closure_data<'imm>(
-        &self,
-        lp: &'imm plan::Plan,
-        get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
-        namer: &SerializedNamer,
-    ) -> Tokens<Expr> {
-        generate_context_closure(lp, self.inner_ctx, get_types, namer)
-            .into_token_stream()
-            .into()
-    }
-
     fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
@@ -1450,15 +1377,18 @@ impl OperatorGen for plan::GroupBy {
         errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         gen_info: &GeneratedInfo<'imm>,
+        context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
         // scoping out the mutable tables and errors to determine how to generate return and mapping.
-        let errors_cnt = errors.count();
-        let mutated_tables_cnt = mutated_tables.count();
+        let context_closure_var = namer.operator_closure_value_name(self_key);
 
-        let context = lp.get_context(self.inner_ctx);
-        let context_body = generate_application(
+        let ContextGen {
+            code,
+            can_error,
+            mutates,
+        } = generate_application(
             lp,
-            context,
+            self.inner_ctx,
             error_path,
             errors,
             mutated_tables,
@@ -1466,11 +1396,14 @@ impl OperatorGen for plan::GroupBy {
             namer,
         );
 
+        context_vals.push((context_closure_var.clone(), code.into_token_stream().into()));
+
         let grouping_field = namer.transform_field_name(&self.group_by);
 
         let SerializedNamer {
             method_query_operator_alias,
             phantom_field,
+            self_alias,
             ..
         } = namer;
         let DataFlowNaming {
@@ -1483,7 +1416,6 @@ impl OperatorGen for plan::GroupBy {
             ..
         } = dataflow_fields(lp, self.output, namer);
         let DataFlowNaming {
-            holding_var: inner_input_holding,
             data_constructor: inner_data_constructor,
             record_type: inner_record_type,
             ..
@@ -1494,16 +1426,13 @@ impl OperatorGen for plan::GroupBy {
             quote!(#field_name: input.#field_name)
         });
 
-        let map_kind = if mutated_tables.count() > mutated_tables_cnt {
+        let map_kind = if mutates {
             quote!(map_seq)
         } else {
             quote!(map)
         };
 
-        let context_closure_values = unwrap_context(context, namer);
-        let context_closure_var = namer.operator_closure_value_name(self_key);
-
-        let final_result = if errors.count() > errors_cnt {
+        let final_result = if can_error {
             quote!(#method_query_operator_alias::error_stream(results)?)
         } else {
             quote!(results)
@@ -1523,14 +1452,11 @@ impl OperatorGen for plan::GroupBy {
                         )
                     }
                 );
-
                 let grouped = #method_query_operator_alias::group_by(split_vars);
-
                 let results = #method_query_operator_alias::#map_kind(
                     grouped,
-                    |(grouping, #inner_input_holding)| {
-                        let #context_closure_values = (#context_closure_var)(grouping);
-                        #context_body
+                    |(grouping, inner_stream)| {
+                        (#context_closure_var)(#self_alias, grouping, inner_stream)
                     }
                 );
                 #final_result
@@ -1539,18 +1465,8 @@ impl OperatorGen for plan::GroupBy {
         .into()
     }
 }
-impl OperatorGen for plan::Lift {
-    fn closure_data<'imm>(
-        &self,
-        lp: &'imm plan::Plan,
-        get_types: &HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
-        namer: &SerializedNamer,
-    ) -> Tokens<Expr> {
-        generate_context_closure(lp, self.inner_ctx, get_types, namer)
-            .into_token_stream()
-            .into()
-    }
 
+impl OperatorGen for plan::Lift {
     fn apply<'imm, 'brw>(
         &self,
         self_key: plan::Key<plan::Operator>,
@@ -1560,22 +1476,27 @@ impl OperatorGen for plan::Lift {
         errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
         mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
         gen_info: &GeneratedInfo<'imm>,
+        context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
     ) -> Tokens<Stmt> {
-        let errors_cnt = errors.count();
-        let mutated_tables_cnt = mutated_tables.count();
-
-        let context = lp.get_context(self.inner_ctx);
-        let context_body = generate_application(
+        let context_closure_var = namer.operator_closure_value_name(self_key);
+        let ContextGen {
+            code,
+            can_error,
+            mutates,
+        } = generate_application(
             lp,
-            context,
+            self.inner_ctx,
             error_path,
             errors,
             mutated_tables,
             gen_info,
             namer,
         );
+        context_vals.push((context_closure_var.clone(), code.into_token_stream().into()));
+
         let SerializedNamer {
             method_query_operator_alias,
+            self_alias,
             ..
         } = namer;
         let DataFlowNaming {
@@ -1590,7 +1511,7 @@ impl OperatorGen for plan::Lift {
         } = dataflow_fields(lp, self.output, namer);
 
         let map_kind = if stream {
-            if mutated_tables.count() > mutated_tables_cnt {
+            if mutates {
                 quote!(map_seq)
             } else {
                 quote!(map)
@@ -1599,11 +1520,12 @@ impl OperatorGen for plan::Lift {
             quote!(map_single)
         };
 
-        let context_closure_values = unwrap_context(context, namer);
-        let context_closure_var = namer.operator_closure_value_name(self_key);
-
-        let final_result = if errors.count() > errors_cnt {
-            let error_map = if stream {quote!(error_stream)} else { quote!(error_single)};
+        let final_result = if can_error {
+            let error_map = if stream {
+                quote!(error_stream)
+            } else {
+                quote!(error_single)
+            };
             quote!(#method_query_operator_alias::#error_map(results)?)
         } else {
             quote!(results)
@@ -1612,15 +1534,18 @@ impl OperatorGen for plan::Lift {
         // NOTE: relies on the namer's mapping of operator names leaving user's
         //       field names the same.
 
-        let closure_args = context.params.iter().map(|(id, _)| quote!(lifted.#id));
+        let closure_args = lp
+            .get_context(self.inner_ctx)
+            .params
+            .iter()
+            .map(|(id, _)| quote!(lifted.#id));
 
         quote! {
             let #holding_var: #dataflow_type = {
                 let results = #method_query_operator_alias::#map_kind(
                     #input_holding,
                     |lifted| {
-                        let #context_closure_values = (#context_closure_var)(#(#closure_args),*);
-                        #context_body // TODO: move into closure val
+                        (#context_closure_var)(#self_alias, #(#closure_args),*)
                     }
                 );
                 #final_result

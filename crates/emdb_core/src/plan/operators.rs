@@ -23,7 +23,7 @@
 //! In the [super] documentation the shortcomings note provides some of a suggestion:
 //! - Could nest a context, but the operator type is restricted to ones that dont affect
 //!   cardinality of output.
-//! 
+//!
 //! Potential Improvement:
 //! - Strongly type single and stream dataflows. (Key<DataStream>, Key<DataSingle>)
 

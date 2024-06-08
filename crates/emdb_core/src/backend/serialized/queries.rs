@@ -10,7 +10,7 @@ use crate::{
 };
 
 use super::{
-    closures::{generate_application, generate_context, unwrap_context},
+    closures::{generate_application, ContextGen},
     namer::SerializedNamer,
     tables::GeneratedInfo,
     types::generate_scalar_type,
@@ -108,6 +108,7 @@ fn generate_query<'imm>(
         qy_lifetime,
         mod_queries,
         mod_queries_mod_query_enum_error,
+        method_query_operator_alias,
         ..
     } = namer;
 
@@ -119,26 +120,25 @@ fn generate_query<'imm>(
         quote!(())
     };
 
-    let params = context.params.iter().map(|(name, ty_key)| {
+    let (params_use, params): (Vec<_>, Vec<_>) = context.params.iter().map(|(name, ty_key)| {
         let ty = generate_scalar_type(lp, &gen_info.get_types, *ty_key, namer);
-        quote!(#name: #ty)
-    });
-
-    let top_context_data = generate_context(lp, context, &gen_info.get_types, namer);
-    let unwrap_top_data = unwrap_context(context, namer);
+        (name, quote!(#name: #ty))
+    }).unzip();
 
     let mut errors = HashMap::new();
     let mut mutated_tables = HashSet::new();
 
-    let query_body = generate_application(
+    let ContextGen { code, .. } = generate_application(
         lp,
-        context,
+        *ctx,
         &quote!(#mod_queries::#name::#mod_queries_mod_query_enum_error).into(),
         &mut PushMap::new(&mut errors),
         &mut PushSet::new(&mut mutated_tables),
         gen_info,
         namer,
     );
+
+    let run_query = quote!((#code)(self, #(#params_use),* ));
 
     match (
         generate_errors(errors, namer),
@@ -149,8 +149,7 @@ fn generate_query<'imm>(
                 query_mod: quote! { mod #name {} }.into(),
                 query_impl: quote! {
                     fn #name<#qy_lifetime>(&#qy_lifetime self, #(#params),* ) -> #return_type {
-                        let #unwrap_top_data = #top_context_data;
-                        #query_body
+                        #run_query
                     }
                 }
                 .into(),
@@ -167,8 +166,7 @@ fn generate_query<'imm>(
                 query_mod: quote! { mod #name {} }.into(),
                 query_impl: quote! {
                     fn #name<#qy_lifetime>(&#qy_lifetime mut self, #(#params),* ) -> #return_type {
-                        let #unwrap_top_data = #top_context_data;
-                        let result = #query_body;
+                        let result = #run_query;
                         #commits
                         result
                     }
@@ -183,8 +181,7 @@ fn generate_query<'imm>(
                 } }.into(),
                 query_impl: quote!{
                     fn #name<#qy_lifetime>(&#qy_lifetime self, #(#params),* ) -> Result<#return_type, #mod_queries::#name::#mod_queries_mod_query_enum_error> {
-                        let #unwrap_top_data = #top_context_data;
-                        #query_body
+                        #run_query.map(#method_query_operator_alias::export_single)
                     }
                 }.into(),
             }
@@ -196,14 +193,10 @@ fn generate_query<'imm>(
                 } }.into(),
                 query_impl: quote!{
                     fn #name<#qy_lifetime>(&#qy_lifetime mut self, #(#params),* ) -> Result<#return_type, #mod_queries::#name::#mod_queries_mod_query_enum_error> {
-                        // we catch `?` usage as that short circuits the lambda, not the query method
-                        match (|| {
-                            let #unwrap_top_data = #top_context_data;
-                            #query_body
-                        })() {
+                        match #run_query {
                             Ok(result) => {
                                 #commits
-                                Ok(result)
+                                Ok(#method_query_operator_alias::export_single(result))
                             },
                             Err(e) => {
                                 #aborts

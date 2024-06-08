@@ -3,7 +3,7 @@
 
 use emdb::macros::emql;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProductCategory {
     Electronics,
     Clothing,
@@ -152,7 +152,6 @@ emql!{
             ~> unique(cust_ref for current_customers.reference as ref customer_ref)
             ~> deref(customer_ref as customer)
             ~> lift(
-
                 use purchases
                     |> filter(**customer_reference == cust_ref)
                     |> let customer_purchases;
@@ -183,21 +182,58 @@ emql!{
                         money_spent: left.result.money_spent + right.result.money_spent,
                     })
                     ~> return;
-            );
+            ) ~> return;
     }
 
     // Description:
     //   For a given product get for each purchasing customer:
     //     - customer reference
     //     - total spent by the customer on the product
-    //     - a list of references to each purchase 
     // Reasoning:
     //   To demonstrate complex aggregations, and returning data structures
-    query product_customers() {}
+    query product_customers(serial: usize, btc_rate: f64, usd_rate: f64) {
+        row(serial: usize = serial)
+            ~> unique(serial for products.serial as ref product_ref)
+            ~> deref(product_ref as product)
+            ~> lift(
+                use purchases 
+                    |> filter(**product_serial == serial)
+                    |> groupby(customer_reference for let purchases in {
+                        use purchases 
+                            |> map(sum: u64 = crate::analytical::exchange(btc_rate, usd_rate, *price, *currency))
+                            |> combine(use left + right in sum = left.sum + right.sum)
+                            ~> map(customer: &'db[u8; 4] = customer_reference, product_serial: usize = serial, total: u64 = sum)
+                            ~> return;
+                    }) 
+                    |> collect(customers)
+                    ~> return ;
+            )
+            ~> return;
+    }
 
     // Description:
     //   Get the total sales per category, in the different currencies
     // Reasoning:
     //   Demonstrating aggregation over a large table
-    query category_sales() {}
+    query category_sales(btc_rate: f64, usd_rate: f64) {
+        
+        use purchases |> let purchase_data;
+        use products |> let product_data;
+
+        join(use purchase_data [inner equi(product_serial = serial)] use product_data)
+            |> map(
+                category: crate::analytical::ProductCategory = *product_data.category, 
+                money: u64 = crate::analytical::exchange(
+                    btc_rate, usd_rate, *purchase_data.price, *purchase_data.currency
+                )
+            )
+            |> groupby(category for let category_purchase_data in {
+                use category_purchase_data
+                    |> combine(use left + right in money = left.money + right.money)
+                    ~> map(category: crate::analytical::ProductCategory = category, total: u64 = money)
+                    ~> return;
+            }) 
+            |> collect(category_totals) 
+            ~> return;
+    }
 }

@@ -90,12 +90,12 @@ pub fn generate(
             }
         };
         // We cannot insert into the table while holding the borrow of the row.
-        // - while borrow does not impact the unique indices, the `self.borrow` 
+        // - while borrow does not impact the unique indices, the `self.borrow`
         //   borrows all members of `self`
-        // - Hence we clone, then place, rather than just `self.uniques.insert(brw.field.clone())` 
-        let get_clone_of_uniques = uniques.iter().map(|Unique { alias, field }| {
-            quote!(let #alias = #brw_ident.#field.clone())
-        });
+        // - Hence we clone, then place, rather than just `self.uniques.insert(brw.field.clone())`
+        let get_clone_of_uniques = uniques
+            .iter()
+            .map(|Unique { alias, field }| quote!(let #alias = #brw_ident.#field.clone()));
         let restore_unique_from_borrow = uniques.iter().map(|Unique { alias, field }| {
             quote!(self.#struct_table_member_uniques.#field.insert(#alias, #key_ident).unwrap())
         });

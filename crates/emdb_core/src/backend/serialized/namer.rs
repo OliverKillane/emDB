@@ -25,6 +25,7 @@ pub struct SerializedNamer {
     pub method_query_operator_trait: Tokens<Path>,
     pub operator_error_parameter: Ident,
     pub interface: InterfaceNamer,
+    pub self_alias: Ident,
 }
 
 impl SerializedNamer {
@@ -47,6 +48,7 @@ impl SerializedNamer {
             method_query_operator_trait: quote!(emdb::dependencies::minister::Physical).into(),
             operator_error_parameter: new_id("err"),
             interface: InterfaceNamer::new(),
+            self_alias: new_id(&format!("{INTERNAL_FIELD_PREFIX}self")),
         }
     }
 
