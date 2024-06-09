@@ -104,8 +104,9 @@ impl super::EMDBBackend for Interface {
                 }
             });
 
-        let key_types = plan.tables.iter().map(|(key, plan::Table { name, .. })| {
-            let key_name = interface_namer.key_name(name);
+        let exposed_table_keys = public::exposed_keys(plan);
+        let key_types = exposed_table_keys.into_iter().map(|tablekey| {
+            let key_name = interface_namer.key_name(&plan.get_table(*tablekey).name);
             quote! { type #key_name: Clone + Copy + Eq }
         });
 
@@ -156,6 +157,7 @@ impl super::EMDBBackend for Interface {
 }
 
 pub mod namer;
+pub mod public; 
 
 fn generate_parameter_type(
     lp: &plan::Plan,

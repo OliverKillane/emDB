@@ -12,11 +12,19 @@ categories = ["experiment"]
 duckdb = { version = "0.10.2", features = ["bundled"] }
 rusqlite = { version = "0.31.0", features = ["bundled"] }
 emdb = { path = "../../../crates/emdb" }
+rand = "0.8"
 
 [dev-dependencies]
 divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }
-rand = "0.8"
 
 [[bench]]
 name = "userdetails"
+harness = false
+
+[[bench]]
+name = "sales_analytics"
+harness = false
+
+[[bench]]
+name = "data_logs"
 harness = false

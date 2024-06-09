@@ -4,3 +4,5 @@
 pub mod favourite_colours;
 pub mod dereferencing;
 pub mod userdetails;
+pub mod sales_analytics;
+pub mod data_logs;

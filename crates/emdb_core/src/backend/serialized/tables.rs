@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use syn::{Ident, ItemImpl, ItemMod, ItemStruct, Type};
 
 use super::namer::SerializedNamer;
-use crate::{backend::interface::{namer::InterfaceNamer, InterfaceTrait}, plan};
+use crate::{backend::interface::{namer::InterfaceNamer, InterfaceTrait, public::exposed_keys}, plan};
 
 pub struct GeneratedInfo<'imm> {
     pub get_types: HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
@@ -171,7 +171,9 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
     } = &namer.interface;
 
     let (impl_datastore, modifiers, key_defs, ds_assoc_db) = if let Some(InterfaceTrait { name }) = interface_trait {
-        (quote!{ super::#name::#trait_datastore for }, quote!(), lp.tables.iter().map(|(_, plan::Table { name, ..})| {
+        let exposed_table_keys = exposed_keys(&lp);
+        (quote!{ super::#name::#trait_datastore for }, quote!(), exposed_table_keys.into_iter().map(|tablekey| {
+            let name = &lp.get_table(*tablekey).name;
             let key_name = namer.interface.key_name(name);
             quote! { type #key_name = #mod_tables::#name::#type_key }
         }).collect::<Vec<_>>(), quote!(type #trait_datastore_type_database<#db_lifetime> = #struct_database<#db_lifetime>;))

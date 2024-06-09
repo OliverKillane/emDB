@@ -51,9 +51,10 @@ impl Physical for Basic {
 
     fn combine<Data>(
         stream: Self::Stream<Data>,
+        alternative: Data,
         combiner: impl Fn(Data, Data) -> Data,
     ) -> Self::Single<Data> {
-        stream.into_iter().reduce(combiner).unwrap()
+        stream.into_iter().reduce(combiner).unwrap_or(alternative)
     }
 
     fn sort<Data>(

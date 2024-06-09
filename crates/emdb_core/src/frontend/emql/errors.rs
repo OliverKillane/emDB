@@ -519,6 +519,18 @@ pub fn query_let_variable_already_assigned(
     }
 }
 
+pub fn query_let_variable_shadows_table(
+    assign: &Ident,
+    table: &Ident,
+) -> Diagnostic {
+    emql_error(
+        55,
+        assign.span(),
+        format!("variables created by let cannot shadow tables, but `{assign}` does"),
+    )
+    .span_note(table.span(), "Table defined here".to_string())
+}
+
 pub fn query_deref_cannot_deref_bag_type(
     lp: &Plan,
     reference: &Ident,

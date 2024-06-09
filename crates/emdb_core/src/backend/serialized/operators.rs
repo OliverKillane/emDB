@@ -14,7 +14,7 @@ use super::{
 };
 use crate::{
     backend::serialized::closures::generate_application,
-    plan::{self, operator_enum},
+    plan::{self, operator_enum, FoldField},
     utils::misc::{new_id, PushMap, PushSet},
 };
 
@@ -905,25 +905,34 @@ impl OperatorGen for plan::Combine {
         } = self;
         let closure_value = namer.operator_closure_value_name(self_key);
 
-        let field_sets = self.update_fields.iter().map(|(field, expr)| {
+        let (field_defaults, field_sets): (Vec<_>, Vec<_>) = self.update_fields.iter().map(|(field, FoldField { initial, update })| {
             let field_name = namer.transform_field_name(field);
-            quote!(#field_name: #expr)
-        });
+            (quote!(#field_name: #initial), quote!(#field_name: #update))
+        }).unzip();
 
         context_vals.push((
             closure_value.clone(),
             quote! {
-                |#left_name: #data_type, #right_name: #data_type|
+                (
                     #data_constructor {
-                        #(#field_sets,)*
+                        #(#field_defaults,)*
                         #phantom_field: std::marker::PhantomData
+                    },
+                    |#left_name: #data_type, #right_name: #data_type|
+                        #data_constructor {
+                            #(#field_sets,)*
+                            #phantom_field: std::marker::PhantomData
                     }
+                )
             }
             .into(),
         ));
 
         quote!{
-            let #holding_var: #dataflow_type = #method_query_operator_alias::combine(#input_holding, #closure_value);
+            let #holding_var: #dataflow_type = {
+                let (alternative, update) = #closure_value;
+                #method_query_operator_alias::combine(#input_holding, alternative, update)   
+            };
         }.into()
     }
 }

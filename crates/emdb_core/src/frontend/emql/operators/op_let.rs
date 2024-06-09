@@ -27,28 +27,11 @@ impl EMQLOperator for Let {
     ) -> Result<StreamContext, LinkedList<Diagnostic>> {
         let Self { call, var_name } = self;
         if let Some(prev_state) = cont {
-            if let Some(varstate) = vs.get(&var_name) {
-                Err(singlelist(match varstate {
-                    VarState::Used { created, used } => {
-                        errors::query_let_variable_already_assigned(
-                            &var_name,
-                            *created,
-                            Some(*used),
-                        )
-                    }
-                    VarState::Available { created, state } => {
-                        errors::query_let_variable_already_assigned(&var_name, *created, None)
-                    }
-                }))
+            let mut errors = LinkedList::new();
+            assign_new_var(var_name, prev_state, vs, tn, &mut errors);
+            if !errors.is_empty() {
+                Err(errors)
             } else {
-                let var_span = var_name.span();
-                vs.insert(
-                    var_name,
-                    VarState::Available {
-                        created: var_span,
-                        state: prev_state,
-                    },
-                );
                 Ok(StreamContext::Nothing {
                     last_span: call.span(),
                 })

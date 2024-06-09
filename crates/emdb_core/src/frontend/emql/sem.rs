@@ -898,3 +898,35 @@ pub fn valid_linear_builder(
         last_span: result.call_span,
     }
 }
+
+pub fn assign_new_var(
+    var_name: Ident,
+    state: Continue,
+    vs: &mut HashMap<Ident, VarState>,
+    tn: &HashMap<Ident, plan::Key<plan::Table>>,
+    errors: &mut LinkedList<Diagnostic>,
+) -> bool {
+    if let Some((table_name, _)) = tn.get_key_value(&var_name) {
+        errors.push_back(errors::query_let_variable_shadows_table(
+            &var_name, table_name,
+        ));
+        false
+    } else if let Some(varstate) = vs.get(&var_name) {
+        errors.push_back(match varstate {
+            VarState::Used { created, used } => {
+                errors::query_let_variable_already_assigned(&var_name, *created, Some(*used))
+            }
+            VarState::Available { created, state } => {
+                errors::query_let_variable_already_assigned(&var_name, *created, None)
+            }
+        });
+        false
+    } else {
+        let var_span = var_name.span();
+        vs.insert(var_name, VarState::Available {
+            created: var_span,
+            state: state
+        });
+        true
+    }
+}

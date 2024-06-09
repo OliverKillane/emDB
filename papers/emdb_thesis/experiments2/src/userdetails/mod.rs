@@ -1,5 +1,6 @@
 //! ## The motivating example for [`emdb`]
-//! Supporting a basic OLTP workload
+//! Supporting a complex OLTP workload.
+//! - Just above the abstraction for a key-value store due to aggregations.
 
 use emdb::macros::emql;
 use userdetails::Database;

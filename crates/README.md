@@ -50,6 +50,9 @@ verify correct code).
 
 Furthermore coverage of proofs is important, `kani` only analyses proofs.
 
+### [`cargo pgo`](https://github.com/Kobzol/cargo-pgo)
+Profile guided optimisation addon for cargo.
+
 ## Develop
 ### Workspace
 All crates part of this project are contained in a single [cargo workspace](https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html).

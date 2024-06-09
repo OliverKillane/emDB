@@ -305,7 +305,7 @@ pub struct Combine {
     pub left_name: Ident,
     pub right_name: Ident,
 
-    pub update_fields: Vec<(RecordField, Expr)>,
+    pub update_fields: Vec<(RecordField, FoldField)>,
 
     pub output: Key<DataFlow>,
 }

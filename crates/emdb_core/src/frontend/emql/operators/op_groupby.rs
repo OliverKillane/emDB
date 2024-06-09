@@ -77,10 +77,9 @@ impl EMQLOperator for GroupBy {
                     last_span: call.span(),
                 };
 
-                let mut variables = HashMap::from([
-                    (in_name.clone(), VarState::Available { created: in_name.span(), state: inner_cont })
-                ]);
-                
+                let mut variables = HashMap::new();
+                assign_new_var(in_name.clone(), inner_cont, &mut variables, tn , &mut errors);
+
                 add_streams_to_context(lp, tn, ts, &mut variables, inner_ctx, contents, &call, &mut errors);
                 discard_ends(lp, inner_ctx, variables);
                 lp.get_mut_context(op_ctx).add_operator(groupby_op);

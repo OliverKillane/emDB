@@ -18,7 +18,7 @@ use crate::frontend::emql::parse::{
     fields_assign, fields_expr, functional_style, type_parser_to_punct, ContextRecurHandle,
 };
 use crate::frontend::emql::sem::{
-    add_streams_to_context, check_fields_type, create_scanref, discard_ends,
+    add_streams_to_context, check_fields_type, create_scanref, discard_ends, assign_new_var,
     extract_fields_ordered, generate_access, get_all_cols, get_user_fields, linear_builder,
     query_ast_typeto_scalar, update_incomplete, valid_linear_builder, Continue, FieldComparison,
     LinearBuilderState, ReturnVal, StreamContext, VarState,
@@ -49,10 +49,12 @@ use syn::Expr;
 trait EMQLOperator: Sized + Debug {
     const NAME: &'static str;
 
+    /// Parse the operator's tokens (taken directly from the stream, after peeking for [`EMQLOperator::NAME`])
     fn build_parser(ctx_recur: ContextRecurHandle) -> impl TokenParser<Self>;
 
     /// Convert the operator to a logical plan node
-    /// - `tn` represents the identifier to table mapping
+    /// - Needs to ensure a valid plan is left even on logical errors (to allow 
+    ///   other streams, inner contexts to be analysed).
     #[allow(clippy::too_many_arguments)]
     fn build_logical(
         self,

@@ -13,12 +13,19 @@ enum RGB {
     Green,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LogLevel {
+    Error,
+    Warning,
+    Info,
+}
+
 emql! {
     impl my_interface as Interface{
         traits_with_db = { },
     };
     impl my_db as Serialized{
-        debug_file = "emdb/tests/debug/code.rs",
+        // debug_file = "emdb/tests/code.rs",
         // interface = my_interface,
         // pub = on,
         ds_name = EmDBDebug,
@@ -30,57 +37,60 @@ emql! {
         control = on,
     };
 
-    table customers {
-        forename: String,
-        surname: String,
-        age: u8,
-        bonus_points: i32,
-    } @ [ pred(*age < 255) as sensible_ages ]
-
-    table family_bonus {
-        surname: String,
-        bonus: i32
-    } @ [ unique(surname) as unique_surnames_cons ]
-
-    query customer_age_brackets() {
-        ref customers as ref_cust
-            |> deref(ref_cust as person)
-            |> update(ref_cust use bonus_points = person.bonus_points + 1)
-            |> lift(
-                row(surname: String = person.surname.clone())
-                    ~> unique(surname for family_bonus.surname as ref family_ref)
-                    ~> deref(family_ref as family)
-                    ~> update(family_ref use bonus = family.bonus + 1);
-
-                row() ~> return; // void return
-            );
+    table logs {
+        timestamp: u64,
+        comment: Option<String>,
+        level: crate::LogLevel,
     }
 
-    query add_customer(forename: String, surname: String, age: u8) {
+    query add_event(
+        timestamp: u64,
+        comment: Option<String>,
+        log_level: crate::LogLevel,
+    ) {
         row(
-            forename: String = forename,
-            surname: String = surname,
-            age: u8 = age,
-            bonus_points: i32 = 0
-        )
-            ~> insert(customers as ref name)
+            timestamp: u64 = timestamp,
+            comment: Option<String> = comment,
+            level: crate::LogLevel = log_level,
+        ) ~> insert(logs as ref log_id);
+    }
+
+    query get_errors_per_minute() {
+        use logs
+            |> filter(*level == crate::LogLevel::Error)
+            |> map(min: u64 = timestamp % 60)
+            |> groupby(min for let errors in {
+                use errors
+                    |> count(num_logs)
+                    ~> map(min: u64 = min, errors: usize = num_logs)
+                    ~> return;
+            })
+            |> collect(errors)
             ~> return;
     }
 
-    query add_family(surname: String) {
-        row(surname: String = surname, bonus: i32 = 0)
-            ~> insert(family_bonus as ref name)
+    query get_comment_summaries(time_start: u64, time_end: u64) {
+        use logs
+            |> filter(**timestamp >= time_start && **timestamp <= time_end && comment.is_some())
+            |> map(
+                comment: &'db str = &comment.as_ref().unwrap()[..100], 
+                length: usize = comment.as_ref().unwrap().len()
+            )
+            |> collect(comments)
             ~> return;
     }
 
-    query get_family(family: ref family_bonus) {
-        row(family: ref family_bonus = family)
-            ~> deref(family as family_val)
-            ~> return;
+    query demote_error_logs() {
+        ref logs as log_ref
+            |> deref(log_ref as log_data)
+            |> update(log_ref use level = (
+                if crate::LogLevel::Error == log_data.level { crate::LogLevel::Warning } else { log_data.level.clone() }
+            ));
     }
 }
 
 fn main() {
+    use my_interface::Datastore;
     let mut ds = my_db::EmDBDebug::new();
     let db = ds.db();
 }

@@ -13,10 +13,16 @@ emql! {
             ~> return;
     }
 
-    query sum_data() {
+    query sum_data_combine() {
         use values
             |> map(sum: i32 = *value)
-            |> combine(use left + right in sum = left.sum + right.sum)
+            |> combine(use left + right in sum[0] = [left.sum + right.sum])
+            ~> return;
+    }
+
+    query sum_data_fold() {
+        use values
+            |> fold(sum: i32 = 0 -> sum + *value)
             ~> return;
     }
 }
@@ -29,6 +35,6 @@ pub fn test() {
         let _: my_db::tables::values::Key = db.add_data(i).new_key;
     }
 
-    let sum = db.sum_data().sum;
+    let sum = db.sum_data_fold().sum;
     assert_eq!(sum, 4950);
 }

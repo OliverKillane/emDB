@@ -55,6 +55,7 @@ pub trait Physical {
 
     fn combine<Data>(
         stream: Self::Stream<Data>,
+        alternative: Data,
         combiner: impl Fn(Data, Data) -> Data,
     ) -> Self::Single<Data>;
 

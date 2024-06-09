@@ -1,3 +1,5 @@
+use combi::logical::or;
+
 use super::*;
 
 #[derive(Debug)]
@@ -5,13 +7,16 @@ pub struct Combine {
     call: Ident,
     left_name: Ident,
     right_name: Ident,
-    fields: Vec<(Ident, Expr)>,
+    fields: Vec<(Ident, (Expr, Expr))>,
 }
 
 impl EMQLOperator for Combine {
     const NAME: &'static str = "combine";
 
     fn build_parser(ctx_recur: ContextRecurHandle) -> impl TokenParser<Self> {
+        // NOTE: I dont like this syntax, but for some reason using the 'fold' syntax 
+        //       here (separated with arrow), results in `rustc 1.80.0-nightly (032af18af 2024-06-02)` 
+        //       SIGSEGV. I dont have time to debug that. 
         mapsuc(
             functional_style(
                 Self::NAME,
@@ -21,20 +26,21 @@ impl EMQLOperator for Combine {
                     matchpunct('+'),
                     setrepr(getident(), "<right input>"),
                     matchident("in"),
-                    listseptrailing(
+                    setrepr(listseptrailing(
                         ',',
                         mapsuc(
                             seqs!(
-                                setrepr(getident(), "<field o combine to>"),
+                                setrepr(getident(), "<field to combine to>"),
+                                recovgroup(Delimiter::Bracket, setrepr(syn(collectuntil(isempty())), "<default value (if stream empty)>")),
                                 matchpunct('='),
-                                setrepr(syntopunct(peekpunct(',')), "<combined value>")
+                                recovgroup(Delimiter::Bracket, setrepr(syn(collectuntil(isempty())), "<default value (if stream empty)>"))
                             ),
-                            |(field, (_, expr))| (field, expr)
+                            | (field, (default, (_, combine))) | (field, (default, combine))
                         )
-                    )
+                    ), "bob")
                 ),
             ),
-            |(call, (_, (left_name, (_, (right_name, (_, fields))))))| Combine {
+            | (call, (_, (left_name, (_, (right_name, (_, fields))))))| Combine {
                 call,
                 left_name,
                 right_name,
@@ -111,7 +117,7 @@ impl EMQLOperator for Combine {
                             right_name,
                             update_fields: raw_fields
                                 .into_iter()
-                                .map(|(id, expr)| (id.into(), expr))
+                                .map(|(id, (initial, update))| (id.into(), plan::FoldField { initial, update}))
                                 .collect(),
                             output: next_edge,
                         }

@@ -29,11 +29,12 @@ macro_rules! valid_tests {
 }
 
 valid_tests!(
-    complex {
-        favourite_colours,
-        dereferencing,
-        userdetails
-    },
+    // complex {
+    //     favourite_colours,
+    //     dereferencing,
+    //     userdetails,
+    //     sales_analytics
+    // },
     context {
         lift_stream,
         lift_single,

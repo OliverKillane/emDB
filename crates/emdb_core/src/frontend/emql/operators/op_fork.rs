@@ -13,13 +13,14 @@ impl EMQLOperator for Fork {
 
     fn build_parser(ctx_recur: ContextRecurHandle) -> impl TokenParser<Self> {
         mapsuc(
-            functional_style(Self::NAME, 
+            functional_style(
+                Self::NAME,
                 seq(
                     matchident("let"),
-                    listsep(',', setrepr(getident(), "<variable>"))
-                )
+                    listsep(',', setrepr(getident(), "<variable>")),
+                ),
             ),
-            |(call, (_, vars))| Fork {call, vars}
+            |(call, (_, vars))| Fork { call, vars },
         )
     }
 
@@ -35,49 +36,68 @@ impl EMQLOperator for Fork {
         let Self { call, vars } = self;
         if let Some(cont) = cont {
             let mut errors = LinkedList::new();
-            for var in vars.iter() {
-                if let Some(varstate) = vs.get(var) {
-                    errors.push_back(match varstate {
-                        VarState::Used { created, used } => {
-                            errors::query_let_variable_already_assigned(
-                                var,
-                                *created,
-                                Some(*used),
-                            )
-                        }
-                        VarState::Available { created, state } => {
-                            errors::query_let_variable_already_assigned(var, *created, None)
-                        }
-                    })
-                }
-            }
+
+
+            let (var_edges, vars_added): (Vec<plan::Key<plan::DataFlow>>, Vec<Ident>) = vars
+                .into_iter()
+                .filter_map(|var| {
+                    let out_edge = lp.dataflow.insert(plan::DataFlow::Null);
+                    if assign_new_var(
+                        var.clone(),
+                        Continue {
+                            data_type: cont.data_type.clone(),
+                            prev_edge: out_edge,
+                            last_span: call.span(),
+                        },
+                        vs,
+                        tn,
+                        &mut errors,
+                    ) {
+                        Some((out_edge, var))
+                    } else {
+                        lp.dataflow.remove(out_edge);
+                        None
+                    }
+                })
+                .unzip();
 
             if errors.is_empty() {
-                let var_edges: Vec<plan::Key<plan::DataFlow>> = vars.into_iter().map(
-                    |var| {
-                        let out_edge = lp.dataflow.insert(plan::DataFlow::Null);
-                        vs.insert(var.clone(), VarState::Available {
-                            created: var.span(),
-                            state: Continue { data_type: cont.data_type.clone(), prev_edge: out_edge, last_span: call.span() }
-                        });
-                        out_edge
-                    }
-                ).collect();
-
                 let fork_op = lp.operators.insert(
-                    plan::Fork { input: cont.prev_edge, outputs: var_edges.clone() }.into(),
+                    plan::Fork {
+                        input: cont.prev_edge,
+                        outputs: var_edges.clone(),
+                    }
+                    .into(),
                 );
 
                 for edge in var_edges {
-                    *lp.get_mut_dataflow(edge) = plan::DataFlow::Incomplete { from: fork_op, with: cont.data_type.clone() }
+                    *lp.get_mut_dataflow(edge) = plan::DataFlow::Incomplete {
+                        from: fork_op,
+                        with: cont.data_type.clone(),
+                    }
                 }
 
                 update_incomplete(lp.get_mut_dataflow(cont.prev_edge), fork_op);
                 lp.get_mut_context(op_ctx).add_operator(fork_op);
 
-                Ok(StreamContext::Nothing { last_span: call.span() }) 
-
+                Ok(StreamContext::Nothing {
+                    last_span: call.span(),
+                })
             } else {
+                // NOTE: given we were unable to add all the edge, we need to repair the 
+                //       logical plan so that further semantic analysis can continue with 
+                //       a valid plan.
+                //       I previously implemented by checking names first, but:
+                //       - fork can duplicate names
+                //       - easier to change with one `assign_new_var` function to do all 
+                //         variable assignment
+                for var in vars_added {
+                    vs.remove(&var);
+                }
+                for edge in var_edges {
+                    lp.dataflow.remove(edge);
+                }
+
                 Err(errors)
             }
         } else {
