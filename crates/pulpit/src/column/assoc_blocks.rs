@@ -146,14 +146,21 @@ where
     }
 
     #[inline(always)]
-    fn scan<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
+    fn scan_brw<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
+        self.scan_get()
+    }
+
+    #[inline(always)]
+    fn scan_get(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
         0..self.inner.blocks.count()
     }
+    
 
     #[inline(always)]
     fn count(&self) -> usize {
         self.inner.blocks.count()
     }
+    
 }
 
 impl<'imm, ImmData, MutData, const BLOCK_SIZE: usize> PrimaryWindowApp<'imm, ImmData, MutData>

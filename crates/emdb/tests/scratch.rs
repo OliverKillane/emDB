@@ -91,7 +91,7 @@ emql! {
 }
 
 fn main() {
-    use my_interface::Datastore;
-    let mut ds = my_db::EmDBDebug::new();
-    let db = ds.db();
+    // use my_interface::Datastore;
+    // let mut ds = my_db::EmDBDebug::new();
+    // let db = ds.db();
 }

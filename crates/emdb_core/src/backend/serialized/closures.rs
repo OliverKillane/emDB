@@ -10,7 +10,7 @@ use quote::quote;
 use quote_debug::Tokens;
 use syn::{ExprClosure, Ident, Path};
 
-use super::namer::{dataflow_fields, DataFlowNaming, SerializedNamer};
+use super::{namer::{dataflow_fields, DataFlowNaming, SerializedNamer}, operators::OperatorImpl};
 use super::operators::OperatorGen;
 use super::tables::GeneratedInfo;
 use super::types::generate_scalar_type;
@@ -24,6 +24,7 @@ pub struct ContextGen {
 /// Generate the code for a given context.
 /// - Includes a parameter for aliasing `self` (rather than the closure
 ///   borrowing `self`)
+#[allow(clippy::too_many_arguments)]
 pub fn generate_application<'imm, 'brw>(
     lp: &'imm plan::Plan,
     ctx: plan::Key<plan::Context>,
@@ -32,6 +33,7 @@ pub fn generate_application<'imm, 'brw>(
     mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
     gen_info: &GeneratedInfo<'imm>,
     namer: &SerializedNamer,
+    operator_impl: &OperatorImpl,
 ) -> ContextGen {
     let context = lp.get_context(ctx);
     let SerializedNamer { self_alias, .. } = namer;
@@ -53,6 +55,7 @@ pub fn generate_application<'imm, 'brw>(
                 mutated_tables,
                 gen_info,
                 &mut context_vals,
+                operator_impl,
             )
         })
         .collect::<Vec<_>>();
@@ -69,8 +72,8 @@ pub fn generate_application<'imm, 'brw>(
     });
 
     let inflows = context.inflows.iter().map(|df| {
-        let DataFlowNaming { holding_var, dataflow_type, .. } = dataflow_fields(lp, *df, namer);
-        quote!(#holding_var: #dataflow_type)
+        let DataFlowNaming { holding_var, .. } = dataflow_fields(lp, *df, namer);
+        quote!(#holding_var)
     });
 
     let ret_val = if let Some(ret_op) = context.returnflow {

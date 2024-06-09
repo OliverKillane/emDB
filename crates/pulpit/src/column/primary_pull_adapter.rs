@@ -212,14 +212,20 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> {
     fn conv_get(_: Self::ImmGet) {}
 
     #[inline(always)]
-    fn scan<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
+    fn scan_brw<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
         self.inner.gen.scan()
+    }
+
+    #[inline(always)]
+    fn scan_get(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
+        self.inner.gen.scan().collect::<Vec<_>>().into_iter()
     }
 
     #[inline(always)]
     fn count(&self) -> usize {
         self.inner.gen.count()
     }
+    
 }
 
 impl<'imm> PrimaryWindowPull<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> {

@@ -99,8 +99,14 @@ where
         get
     }
 
-    fn scan<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
+    #[inline(always)]
+    fn scan_brw<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
         self.inner.arena.iter().map(|(i, _)| i)
+    }
+
+    #[inline(always)]
+    fn scan_get(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
+        self.scan_brw().collect::<Vec<_>>().into_iter()
     }
 
     fn count(&self) -> usize {

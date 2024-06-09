@@ -7,7 +7,8 @@ use super::SingleOpFn;
 
 pub fn generate(namer: &CodeNamer, op_attrs: &TokenStream) -> SingleOpFn {
     let CodeNamer {
-        struct_window_method_scan: method_scan,
+        struct_window_method_scan_brw,
+        struct_window_method_scan_get,
         type_key,
         struct_window,
         name_primary_column,
@@ -20,8 +21,13 @@ pub fn generate(namer: &CodeNamer, op_attrs: &TokenStream) -> SingleOpFn {
         op_impl: quote! {
             impl <#lifetime_imm> #struct_window<#lifetime_imm> {
                 #op_attrs
-                pub fn #method_scan(&self) -> impl Iterator<Item = #type_key> + '_ {
-                    self.#table_member_columns.#name_primary_column.scan()
+                pub fn #struct_window_method_scan_brw(&self) -> impl Iterator<Item = #type_key> + '_ {
+                    self.#table_member_columns.#name_primary_column.scan_brw()
+                }
+
+                #op_attrs
+                pub fn #struct_window_method_scan_get(&self) -> impl Iterator<Item = #type_key> + '_ {
+                    self.#table_member_columns.#name_primary_column.scan_get()
                 }
             }
         }

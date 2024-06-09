@@ -21,8 +21,6 @@ pub struct SerializedNamer {
     pub phantom_field: Ident,
     pub mod_queries: Ident,
     pub mod_queries_mod_query_enum_error: Ident,
-    pub method_query_operator_alias: Tokens<Path>,
-    pub method_query_operator_trait: Tokens<Path>,
     pub operator_error_parameter: Ident,
     pub interface: InterfaceNamer,
     pub self_alias: Ident,
@@ -44,8 +42,6 @@ impl SerializedNamer {
             phantom_field: new_id(&format!("{INTERNAL_FIELD_PREFIX}phantomdata")),
             mod_queries: new_id("queries"),
             mod_queries_mod_query_enum_error: new_id("Error"),
-            method_query_operator_alias: quote!(emdb::dependencies::minister::Basic).into(),
-            method_query_operator_trait: quote!(emdb::dependencies::minister::Physical).into(),
             operator_error_parameter: new_id("err"),
             interface: InterfaceNamer::new(),
             self_alias: new_id(&format!("{INTERNAL_FIELD_PREFIX}self")),
@@ -114,7 +110,6 @@ pub struct DataFlowNaming<'plan> {
     pub stream: bool,
     pub data_constructor: Tokens<Type>,
     pub data_type: Tokens<Type>,
-    pub dataflow_type: Tokens<Type>,
     pub record_type: &'plan plan::RecordConc,
 }
 
@@ -124,11 +119,11 @@ pub fn dataflow_fields<'plan>(
     key: plan::Key<plan::DataFlow>,
     namer: &SerializedNamer,
 ) -> DataFlowNaming<'plan> {
+    // NOTE: Previously we included the type of the stream/single, however this 
+    //       prevented using streams of types that are `impl Trait`.
     let SerializedNamer {
         db_lifetime,
         qy_lifetime,
-        method_query_operator_alias,
-        method_query_operator_trait,
         ..
     } = namer;
     let df_conn = lp.get_dataflow(key).get_conn();
@@ -139,18 +134,11 @@ pub fn dataflow_fields<'plan>(
         plan::ConcRef::Ref(_) => unreachable!("Index is from lp.get_record_conc_index"),
     };
 
-    let flow_kind = if df_conn.with.stream {
-        quote!(Stream)
-    } else {
-        quote!(Single)
-    };
-
     DataFlowNaming {
         holding_var: namer.dataflow_value_name(key),
         stream: df_conn.with.stream,
         data_constructor: record_name.clone(),
         data_type: quote!(#record_name<#db_lifetime, #qy_lifetime>).into(),
-        dataflow_type: quote!{<#method_query_operator_alias as #method_query_operator_trait>::#flow_kind<#record_name<#db_lifetime, #qy_lifetime>>}.into(),
         record_type
     }
 }

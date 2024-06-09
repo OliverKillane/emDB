@@ -10,10 +10,7 @@ use crate::{
 };
 
 use super::{
-    closures::{generate_application, ContextGen},
-    namer::SerializedNamer,
-    tables::GeneratedInfo,
-    types::generate_scalar_type,
+    closures::{generate_application, ContextGen}, namer::SerializedNamer, operators::OperatorImpl, tables::GeneratedInfo, types::generate_scalar_type
 };
 
 fn generate_errors(
@@ -103,12 +100,13 @@ fn generate_query<'imm>(
     gen_info: &GeneratedInfo<'imm>,
     namer: &SerializedNamer,
     plan::Query { name, ctx }: &'imm plan::Query,
+    operator_impl: &OperatorImpl,
 ) -> QueryMod {
+    let OperatorImpl { impl_alias, .. } = operator_impl;
     let SerializedNamer {
         qy_lifetime,
         mod_queries,
         mod_queries_mod_query_enum_error,
-        method_query_operator_alias,
         ..
     } = namer;
 
@@ -136,6 +134,7 @@ fn generate_query<'imm>(
         &mut PushSet::new(&mut mutated_tables),
         gen_info,
         namer,
+        operator_impl
     );
 
     let run_query = quote!((#code)(self, #(#params_use),* ));
@@ -181,7 +180,7 @@ fn generate_query<'imm>(
                 } }.into(),
                 query_impl: quote!{
                     fn #name<#qy_lifetime>(&#qy_lifetime self, #(#params),* ) -> Result<#return_type, #mod_queries::#name::#mod_queries_mod_query_enum_error> {
-                        #run_query.map(#method_query_operator_alias::export_single)
+                        #run_query.map(#impl_alias::export_single)
                     }
                 }.into(),
             }
@@ -196,7 +195,7 @@ fn generate_query<'imm>(
                         match #run_query {
                             Ok(result) => {
                                 #commits
-                                Ok(#method_query_operator_alias::export_single(result))
+                                Ok(#impl_alias::export_single(result))
                             },
                             Err(e) => {
                                 #aborts
@@ -227,6 +226,7 @@ pub fn generate_queries<'imm>(
     gen_info: &GeneratedInfo<'imm>,
     interface_trait: &Option<InterfaceTrait>,
     namer: &'imm SerializedNamer,
+    operator_impl: &OperatorImpl,
     inline_queries: bool,
 ) -> QueriesInfo {
     let SerializedNamer {
@@ -240,7 +240,7 @@ pub fn generate_queries<'imm>(
     let (mods, impls): (Vec<Tokens<ItemMod>>, Vec<Tokens<ImplItemFn>>) = lp
         .queries
         .iter()
-        .map(move |(_, query)| generate_query(lp, gen_info, namer, query).extract())
+        .map(move |(_, query)| generate_query(lp, gen_info, namer, query, operator_impl).extract())
         .unzip();
 
     QueriesInfo {

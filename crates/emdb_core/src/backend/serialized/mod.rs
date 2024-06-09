@@ -16,6 +16,7 @@ use combi::{
     },
     Combi,
 };
+use operators::OperatorImpls;
 use prettyplease::unparse;
 use proc_macro2::TokenStream;
 use proc_macro_error::{Diagnostic, Level};
@@ -106,10 +107,12 @@ impl EMDBBackend for Serialized {
         let record_defs =
             types::generate_record_definitions(plan, &table_generated_info.get_types, &namer);
 
+        let operator_impl = OperatorImpls::Basic.get_paths();
+        
         let QueriesInfo {
             query_mod,
             query_impls,
-        } = queries::generate_queries(plan, &table_generated_info, &self.interface, &namer, self.aggressive_inlining);
+        } = queries::generate_queries(plan, &table_generated_info, &self.interface, &namer, &operator_impl, self.aggressive_inlining);
 
         let namer::SerializedNamer { mod_tables, .. } = &namer;
 
@@ -117,7 +120,9 @@ impl EMDBBackend for Serialized {
             quote!(pub)
         } else {
             quote!()
-        };  
+        };
+
+        let minister_trait = operator_impl.trait_path;  
 
         let tks = quote! {
             #public_tk mod #impl_name {
@@ -126,7 +131,7 @@ impl EMDBBackend for Serialized {
                 #![allow(unused_variables)]
                 #![allow(dead_code)]
                 
-                use emdb::dependencies::minister::Physical; //TODO: remove and use better operator selection
+                use #minister_trait; //TODO: remove and use better operator selection
                 pub mod #mod_tables {
                     #(#table_defs)*
                 }

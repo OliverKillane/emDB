@@ -267,7 +267,16 @@ pub trait PrimaryWindow<'imm, ImmData, MutData> {
     /// For testing include a conversion for the immutable value
     fn conv_get(get: Self::ImmGet) -> ImmData;
 
-    fn scan<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw;
+    /// Get an iterator over the current indices, guarenteed to be valid for `'brw`
+    /// - For [`PrimaryWindowPull`] this prevents the table being modified
+    /// - For [`PrimaryWindowApp`] the implementation can be optimised, given no deletions can occur.
+    fn scan_brw<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw;
+
+    /// Get an iterator over the current indices, that does not keep a borrow of the window.
+    /// - Typically collects indices from [`PrimaryWindow::scan_brw`].
+    /// - Can return other kinds of iterators (e.g. compressed values, for append only tables - ranges)
+    fn scan_get(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key>;
+
     fn count(&self) -> usize;
 }
 
