@@ -50,6 +50,7 @@ pub fn generate_column_assignments<Col: ColKind>(
     .into()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn generate(
     groups: &Groups,
     uniques: &[Unique],

@@ -161,7 +161,7 @@ impl Column for PrimaryPullAdapter {
             },
             mut_val: (),
         }
-    }  
+    }
 
     fn window(&mut self) -> Self::WindowKind<'_> {
         Window { inner: self }

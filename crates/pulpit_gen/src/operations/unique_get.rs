@@ -3,7 +3,12 @@ use crate::{groups::Groups, namer::CodeNamer, uniques::Unique};
 use proc_macro2::TokenStream;
 use quote::quote;
 
-pub fn generate(groups: &Groups, uniques: &[Unique], namer: &CodeNamer, op_attrs: &TokenStream) -> SingleOp {
+pub fn generate(
+    groups: &Groups,
+    uniques: &[Unique],
+    namer: &CodeNamer,
+    op_attrs: &TokenStream,
+) -> SingleOp {
     let CodeNamer {
         struct_window,
         struct_table_member_uniques,

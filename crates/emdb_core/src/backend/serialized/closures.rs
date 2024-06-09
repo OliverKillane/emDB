@@ -59,6 +59,10 @@ pub fn generate_application<'imm, 'brw>(
 
     let (ids, vals): (Vec<_>, Vec<_>) = context_vals.into_iter().unzip();
 
+    let can_error = errors.count() > error_cnt;
+    let mutates = mutated_tables.count() > mut_cnt;
+    
+
     let params = context.params.iter().map(|(id, ty)| {
         let ty = generate_scalar_type(lp, &gen_info.get_types, *ty, namer);
         quote! { #id: #ty }
@@ -69,20 +73,17 @@ pub fn generate_application<'imm, 'brw>(
         quote!(#holding_var: #dataflow_type)
     });
 
-    let result_val = if let Some(ret_op) = context.returnflow {
+    let ret_val = if let Some(ret_op) = context.returnflow {
         let return_output = namer.operator_return_value_name(ret_op);
-        quote! {#return_output}
+        if can_error {
+            quote!(Ok(#return_output))
+        } else {
+            quote!(#return_output)
+        }
+    } else if can_error {
+        quote! (Ok(()))
     } else {
-        quote! {()}
-    };
-
-    let can_error = errors.count() > error_cnt;
-    let mutates = mutated_tables.count() > mut_cnt;
-
-    let ret_val = if can_error {
-        quote!(Ok(#result_val))
-    } else {
-        result_val
+        quote!()
     };
 
     let self_mut = if mutates {

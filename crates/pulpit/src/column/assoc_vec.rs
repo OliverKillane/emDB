@@ -13,7 +13,7 @@ impl<ImmData, MutData> Column for AssocVec<ImmData, MutData> {
     type WindowKind<'imm> = Window<'imm, AssocVec<ImmData, MutData>>
     where
         Self: 'imm;
-    
+
     fn new(size_hint: usize) -> Self {
         AssocVec {
             data: Vec::with_capacity(size_hint),

@@ -28,7 +28,7 @@ impl Datastore for DuckDB {
         DuckDB { conn }
     }
 
-    fn db<'imm>(&'imm mut self) -> Self::DB<'imm> {
+    fn db(&mut self) -> Self::DB<'_> {
         DuckDBDatabase { conn: &self.conn }
     }
 }
@@ -36,8 +36,8 @@ impl Datastore for DuckDB {
 impl<'imm> Database<'imm> for DuckDBDatabase<'imm> {
     type Datastore = DuckDB;
 
-    fn add_event<'qy>(
-        &'qy mut self,
+    fn add_event(
+        &mut self,
         timestamp: usize,
         comment: Option<String>,
         log_level: crate::data_logs::LogLevel,
@@ -57,7 +57,7 @@ impl<'imm> Database<'imm> for DuckDBDatabase<'imm> {
             .unwrap();
     }
 
-    fn get_errors_per_minute<'qy>(&'qy self) -> Vec<(usize, usize)> {
+    fn get_errors_per_minute(&self) -> Vec<(usize, usize)> {
         self.conn
             .prepare_cached(
                 "
@@ -100,8 +100,8 @@ impl<'imm> Database<'imm> for DuckDBDatabase<'imm> {
             .unwrap()
     }
 
-    fn get_comment_summaries<'qy>(
-        &'qy self,
+    fn get_comment_summaries(
+        &self,
         time_start: usize,
         time_end: usize,
     ) -> Vec<(String, usize)> {
@@ -127,7 +127,7 @@ impl<'imm> Database<'imm> for DuckDBDatabase<'imm> {
             .unwrap()
     }
 
-    fn demote_error_logs<'qy>(&'qy mut self) {
+    fn demote_error_logs(&mut self) {
         self.conn
             .prepare_cached(
                 "

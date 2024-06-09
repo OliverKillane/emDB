@@ -40,8 +40,8 @@ impl super::userdetails::Datastore for DuckDB {
 
 impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
     type Datastore = DuckDB;
-    fn new_user<'qy>(
-        &'qy mut self,
+    fn new_user(
+        &mut self,
         username: String,
         prem: bool,
         start_creds: Option<i32>,
@@ -58,8 +58,8 @@ impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
             .unwrap()
     }
 
-    fn get_info<'qy>(
-        &'qy self,
+    fn get_info(
+        &self,
         user_id: <Self::Datastore as super::userdetails::Datastore>::users_key,
     ) -> Result<(usize, String, bool, i32), ()> {
         self.conn
@@ -69,11 +69,10 @@ impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
                 Ok((user_id, row.get(0)?, row.get(1)?, row.get(2)?))
             })
             .optional()
-            .unwrap()
-            .map_or(Err(()), Ok)
+            .unwrap().ok_or(())
     }
 
-    fn get_snapshot<'qy>(&'qy self) -> Vec<(usize, String, bool, i32)> {
+    fn get_snapshot(&self) -> Vec<(usize, String, bool, i32)> {
         self.conn
             .prepare_cached("SELECT id, name, premium, credits FROM users")
             .unwrap()
@@ -85,8 +84,8 @@ impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
             .collect()
     }
 
-    fn add_credits<'qy>(
-        &'qy mut self,
+    fn add_credits(
+        &mut self,
         user: <Self::Datastore as super::userdetails::Datastore>::users_key,
         creds: i32,
     ) -> Result<(), ()> {
@@ -103,7 +102,7 @@ impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
         }
     }
 
-    fn reward_premium<'qy>(&'qy mut self, cred_bonus: f32) -> Result<i64, ()> {
+    fn reward_premium(&mut self, cred_bonus: f32) -> Result<i64, ()> {
         let trans = self.conn.transaction().unwrap();
 
         let diff = {
@@ -135,7 +134,7 @@ impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
         Ok(diff)
     }
 
-    fn total_premium_credits<'qy>(&'qy self) -> i64 {
+    fn total_premium_credits(&self) -> i64 {
         self.conn
             .prepare_cached("SELECT SUM(credits) FROM users WHERE premium = TRUE")
             .unwrap()
@@ -146,8 +145,8 @@ impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
 }
 
 impl super::GetNewUserKey for DuckDB {
-    fn new_user_wrap<'imm>(
-        db: &mut Self::DB<'imm>,
+    fn new_user_wrap(
+        db: &mut Self::DB<'_>,
         username: String,
         prem: bool,
         start_creds: Option<i32>,

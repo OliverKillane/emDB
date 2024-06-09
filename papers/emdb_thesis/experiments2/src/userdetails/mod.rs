@@ -116,8 +116,8 @@ emql! {
 
 // Required to get new user keys for other queries
 pub trait GetNewUserKey: userdetails::Datastore {
-    fn new_user_wrap<'imm>(
-        db: &mut Self::DB<'imm>,
+    fn new_user_wrap(
+        db: &mut Self::DB<'_>,
         username: String,
         prem: bool,
         start_creds: Option<i32>,
@@ -125,8 +125,8 @@ pub trait GetNewUserKey: userdetails::Datastore {
 }
 
 impl GetNewUserKey for emdb_impl::EmDB {
-    fn new_user_wrap<'imm>(
-        db: &mut Self::DB<'imm>,
+    fn new_user_wrap(
+        db: &mut Self::DB<'_>,
         username: String,
         prem: bool,
         start_creds: Option<i32>,
@@ -136,8 +136,8 @@ impl GetNewUserKey for emdb_impl::EmDB {
 }
 
 impl GetNewUserKey for emdb_inlined_impl::EmDBInlined {
-    fn new_user_wrap<'imm>(
-        db: &mut Self::DB<'imm>,
+    fn new_user_wrap(
+        db: &mut Self::DB<'_>,
         username: String,
         prem: bool,
         start_creds: Option<i32>,
@@ -166,7 +166,7 @@ pub fn random_user(rng: &mut ThreadRng, id: usize) -> (String, bool, Option<i32>
     )
 }
 
-pub fn random_table<'a, const SIZE: usize, DS: userdetails::Datastore + GetNewUserKey>(
+pub fn random_table<const SIZE: usize, DS: userdetails::Datastore + GetNewUserKey>(
 ) -> (Vec<DS::users_key>, DS) {
     let mut ds = DS::new();
     let mut ids;

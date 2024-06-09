@@ -87,7 +87,7 @@ impl Datastore for SQLite {
 impl<'imm> Database<'imm> for SQLiteDatabase<'imm> {
     type Datastore = SQLite;
 
-    fn new_customer<'qy>(&'qy mut self, reference: usize, name: String, address: String) {
+    fn new_customer(&mut self, reference: usize, name: String, address: String) {
         self.conn
             .prepare_cached("INSERT INTO customers (reference, name, address) VALUES (?, ?, ?)")
             .unwrap()
@@ -95,8 +95,8 @@ impl<'imm> Database<'imm> for SQLiteDatabase<'imm> {
             .unwrap();
     }
 
-    fn new_sale<'qy>(
-        &'qy mut self,
+    fn new_sale(
+        &mut self,
         customer_reference: usize,
         product_serial: usize,
         quantity: u8,
@@ -119,7 +119,7 @@ impl<'imm> Database<'imm> for SQLiteDatabase<'imm> {
             ]).unwrap();
     }
 
-    fn customer_leaving<'qy>(&'qy mut self, reference: usize) {
+    fn customer_leaving(&mut self, reference: usize) {
         let trans = self.conn.transaction().unwrap();
         trans
             .prepare_cached("DELETE FROM customers WHERE reference = ?")
@@ -134,8 +134,8 @@ impl<'imm> Database<'imm> for SQLiteDatabase<'imm> {
         trans.commit().unwrap();
     }
 
-    fn new_product<'qy>(
-        &'qy mut self,
+    fn new_product(
+        &mut self,
         serial: usize,
         name: String,
         category: crate::sales_analytics::ProductCategory,
@@ -155,8 +155,8 @@ impl<'imm> Database<'imm> for SQLiteDatabase<'imm> {
             .unwrap();
     }
 
-    fn customer_value<'qy>(
-        &'qy self,
+    fn customer_value(
+        &self,
         btc_rate: f64,
         usd_rate: f64,
         cust_ref_outer: usize,
@@ -236,7 +236,6 @@ impl<'imm> Database<'imm> for SQLiteDatabase<'imm> {
                 ))
             })
             .unwrap()
-            .into_iter()
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
         if res.is_empty() {
@@ -246,8 +245,8 @@ impl<'imm> Database<'imm> for SQLiteDatabase<'imm> {
         }
     }
 
-    fn product_customers<'qy>(
-        &'qy self,
+    fn product_customers(
+        &self,
         serial: usize,
         btc_rate: f64,
         usd_rate: f64,
@@ -304,7 +303,7 @@ impl<'imm> Database<'imm> for SQLiteDatabase<'imm> {
             .unwrap()
     }
 
-    fn category_sales<'qy>(&'qy self, btc_rate: f64, usd_rate: f64) -> Vec<(u8, f64)> {
+    fn category_sales(&self, btc_rate: f64, usd_rate: f64) -> Vec<(u8, f64)> {
         self.conn
             .prepare_cached(
                 "

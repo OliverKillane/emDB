@@ -21,12 +21,12 @@ use super::{
 
 pub enum AttrKinds {
     Inline,
-    Custom(TokenStream)
+    Custom(TokenStream),
 }
 
 /// Attributes to apply to the publicly accessible operation of the table
 /// - Inlining for example
-/// 
+///
 /// TODO: In future add statistics (logging methods calls)
 impl AttrKinds {
     pub fn to_tokens(&self) -> TokenStream {
@@ -141,7 +141,10 @@ impl Table {
             deletions,
         } = self;
 
-        let op_attrs = attrs.iter().map(AttrKinds::to_tokens).collect::<TokenStream>();
+        let op_attrs = attrs
+            .iter()
+            .map(AttrKinds::to_tokens)
+            .collect::<TokenStream>();
 
         let CodeNamer {
             pulpit_path,
@@ -174,7 +177,7 @@ impl Table {
                 predicates,
                 namer,
                 *transactions,
-                &op_attrs
+                &op_attrs,
             ),
             operations::insert::generate(
                 groups,
@@ -184,7 +187,7 @@ impl Table {
                 limit,
                 *deletions,
                 *transactions,
-                &op_attrs
+                &op_attrs,
             ),
             operations::unique_get::generate(groups, uniques, namer, &op_attrs),
         ];
@@ -195,7 +198,7 @@ impl Table {
                 namer,
                 *deletions,
                 *transactions,
-                &op_attrs
+                &op_attrs,
             ))
         }
 

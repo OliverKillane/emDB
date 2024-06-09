@@ -125,7 +125,7 @@ pub fn generate(
                     #(#get_clone_of_uniques;)*
                     #(#restore_unique_from_borrow;)*
                 }
-                
+
                 #op_attrs
                 pub fn #method_delete(&mut self, #key_ident: #type_key) -> Result<(), #type_key_error> {
                     match self.#table_member_columns.#name_primary_column.hide(#key_ident) {

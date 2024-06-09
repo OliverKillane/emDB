@@ -71,7 +71,7 @@ emql! {
     query get_comment_summaries(time_start: usize, time_end: usize) {
         use logs
             |> filter(**timestamp >= time_start && **timestamp <= time_end && comment.is_some())
-            |> map(slice: &'db str = &comment.as_ref().unwrap())
+            |> map(slice: &'db str = comment.as_ref().unwrap())
             |> map(
                 comment: &'db str = &slice[..(std::cmp::min(30, slice.len()))],
                 length: usize = slice.len()
