@@ -3,7 +3,7 @@ use std::collections::HashSet;
 
 use crate::plan;
 fn get_exposed_keys_record<'imm>(lp: &'imm plan::Plan, key: plan::Key<plan::RecordType>, tableset: &mut HashSet<plan::ImmKey<'imm, plan::Table>>) {
-    for (_, k) in &lp.get_record_type_conc(key).fields {
+    for k in lp.get_record_type_conc(key).fields.values() {
         get_exposed_keys_scalar(lp, *k, tableset)
     }
 }
@@ -15,7 +15,7 @@ fn get_exposed_keys_scalar<'imm>(lp: &'imm plan::Plan, key: plan::Key<plan::Scal
     }
 }
 
-pub fn exposed_keys<'imm>(lp: &'imm plan::Plan) -> HashSet<plan::ImmKey<'imm, plan::Table>> {
+pub fn exposed_keys(lp: &plan::Plan) -> HashSet<plan::ImmKey<'_, plan::Table>> {
     let mut tableset = HashSet::new();
     for (_, plan::Query{ctx, ..}) in &lp.queries {
         let context = lp.get_context(*ctx);

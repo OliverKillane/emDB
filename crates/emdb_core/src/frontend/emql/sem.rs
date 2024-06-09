@@ -923,10 +923,13 @@ pub fn assign_new_var(
         false
     } else {
         let var_span = var_name.span();
-        vs.insert(var_name, VarState::Available {
-            created: var_span,
-            state: state
-        });
+        vs.insert(
+            var_name,
+            VarState::Available {
+                created: var_span,
+                state,
+            },
+        );
         true
     }
 }

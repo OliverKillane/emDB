@@ -3,12 +3,10 @@
 //! - Embeds buisness logic in database (advantageous for [`emdb`])
 //! - Complex aggregations
 
+use crate::utils::{choose, choose_internal, total};
 use emdb::macros::emql;
-use emdb_impl::EmDB;
 use rand::{rngs::ThreadRng, Rng};
 use sales_analytics::{Database, Datastore};
-
-use crate::{utils::{choose, total, choose_internal}};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum ProductCategory {
@@ -36,13 +34,13 @@ fn validate_price(price: &u64, currency: &Currency) -> bool {
     }
 }
 
-fn exchange(btc_rate: f64, usd_rate: f64,price: u64, currency: Currency) -> u64 {
+fn exchange(btc_rate: f64, usd_rate: f64, price: u64, currency: Currency) -> u64 {
     match currency {
         Currency::GBP => price,
         Currency::USD => (price as f64 * usd_rate) as u64,
         Currency::BTC => (price as f64 * btc_rate) as u64,
     }
-} 
+}
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 struct Aggregate {
@@ -63,7 +61,7 @@ impl Default for Aggregate {
     }
 }
 
-emql!{
+emql! {
     impl sales_analytics as Interface{
         pub = on,
     };
@@ -93,9 +91,9 @@ emql!{
         name: String,
         address: String,
     } @ [
-        unique(reference) as unique_customer_reference, 
+        unique(reference) as unique_customer_reference,
         unique(address) as unique_customer_address,
-        pred(name.len() > 2) as sensible_name, 
+        pred(name.len() > 2) as sensible_name,
         pred(address.len() > 0) as non_empty_address,
     ]
 
@@ -103,8 +101,8 @@ emql!{
     table old_customers {
         reference: usize,
     }
-    
-    // Basic queries for data population ======================================= 
+
+    // Basic queries for data population =======================================
     query new_customer(
         reference: usize,
         name: String,
@@ -136,7 +134,7 @@ emql!{
     ) {
         row(
             reference: usize = reference,
-        ) 
+        )
             ~> unique(reference for current_customers.reference as ref customer_ref)
             ~> delete(customer_ref)
             ~> map(reference: usize = reference)
@@ -156,12 +154,12 @@ emql!{
     }
 
     // Anaysis queries =========================================================
-    
+
     // Description:
-    //   Get the total value of a customer's purchases, using the current 
+    //   Get the total value of a customer's purchases, using the current
     //   exchange rates, but only if they are a current customer.
-    //   
-    //   Additionally get the sum of all products they have purchased in each product 
+    //
+    //   Additionally get the sum of all products they have purchased in each product
     //   category.
     // Reasoning:
     //   Allows us to demonstrate embedding of business logic into the database.
@@ -173,7 +171,7 @@ emql!{
                 use purchases
                     |> filter(**customer_reference == cust_ref_outer)
                     |> let customer_purchases;
-                
+
                 use products |> let all_prods;
 
                 join(use all_prods [inner equi(serial = product_serial)] use customer_purchases)
@@ -213,7 +211,7 @@ emql!{
             ~> unique(serial for products.serial as ref product_ref)
             ~> deref(product_ref as product)
             ~> lift(
-                use purchases 
+                use purchases
                     |> filter(**product_serial == serial)
                     |> groupby(customer_reference for let filtered_purchases in {
                         use filtered_purchases
@@ -221,8 +219,8 @@ emql!{
                             |> combine(use left + right in sum[0] = [left.sum + right.sum])
                             ~> map(customer: &'db usize = customer_reference, total: u64 = sum)
                             ~> return;
-                    }) 
-                    |> collect(customers as type customers_for_prod) 
+                    })
+                    |> collect(customers as type customers_for_prod)
                     ~> map(product_serial: usize = serial, customers: type customers_for_prod = customers)
                     ~> return ;
             )
@@ -239,7 +237,7 @@ emql!{
 
         join(use purchase_data [inner equi(product_serial = serial)] use product_data)
             |> map(
-                category: crate::sales_analytics::ProductCategory = *product_data.category, 
+                category: crate::sales_analytics::ProductCategory = *product_data.category,
                 money: u64 = (*purchase_data.quantity as u64) * crate::sales_analytics::exchange(
                     btc_rate, usd_rate, *purchase_data.price, *purchase_data.currency
                 )
@@ -249,15 +247,14 @@ emql!{
                     |> combine(use left + right in money[0] = [left.money + right.money])
                     ~> map(category: crate::sales_analytics::ProductCategory = category, total: u64 = money)
                     ~> return;
-            }) 
-            |> collect(category_totals) 
+            })
+            |> collect(category_totals)
             ~> return;
     }
 }
 
-pub mod sqlite_impl;
 pub mod duckdb_impl;
-
+pub mod sqlite_impl;
 
 pub struct TableConfig {
     pub customers: usize,
@@ -274,12 +271,19 @@ impl TableConfig {
         }
     }
 
-    pub fn populate_database<DS: Datastore>(Self { customers, sales, products }: &Self, rng: &mut ThreadRng) -> DS {
+    pub fn populate_database<DS: Datastore>(
+        Self {
+            customers,
+            sales,
+            products,
+        }: &Self,
+        rng: &mut ThreadRng,
+    ) -> DS {
         let mut ds = DS::new();
 
         {
             let mut db = ds.db();
-    
+
             for i in 0..*customers {
                 db.new_customer(
                     i,
@@ -287,7 +291,7 @@ impl TableConfig {
                     format!("Address for person {i}"),
                 );
             }
-    
+
             for i in 0..*products {
                 db.new_product(
                     i,
@@ -305,13 +309,13 @@ impl TableConfig {
                     1 => Currency::USD,
                     1 => Currency::BTC,
                 };
-    
+
                 let price = match currency {
                     Currency::GBP => rng.gen_range(0..100000),
                     Currency::USD => rng.gen_range(0..=10000),
                     Currency::BTC => rng.gen_range(0..20),
                 };
-    
+
                 db.new_sale(
                     rng.gen_range(0..*customers),
                     rng.gen_range(0..*products),
@@ -323,14 +327,4 @@ impl TableConfig {
         }
         ds
     }
-}
-
-
-fn test_db<DS: Datastore>() {
-    let tcfg = TableConfig::from_size(1024); 
-    let mut ds = TableConfig::populate_database::<DS>(&tcfg, &mut rand::thread_rng());
-    let db = ds.db();
-    db.category_sales(0.2, 2.3);
-    db.product_customers(0, 0.9, 1.2);
-    db.customer_value(1.5, 8.8, 0);
 }

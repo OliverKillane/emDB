@@ -116,7 +116,11 @@ impl EMDBBackend for Serialized {
 
         let tks = quote! {
             #public_tk mod #impl_name {
+                // lints (generated code not idiomatic, and can propagate confusing/incorrect lints to user code)
                 #![allow(non_shorthand_field_patterns)] // current name field printing is `fielname: fieldname`
+                #![allow(unused_variables)]
+                #![allow(dead_code)]
+                
                 use emdb::dependencies::minister::Physical; //TODO: remove and use better operator selection
                 pub mod #mod_tables {
                     #(#table_defs)*

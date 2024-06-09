@@ -12,8 +12,8 @@ pub struct SQLiteDatabase<'imm> {
 impl Datastore for SQLite {
     type DB<'imm> = SQLiteDatabase<'imm>;
 
-    /// IMPORTANT NOTE: This implementation is less constrained than the emdb one, 
-    ///                 as it ommits the `sensible_prices` predicate on the `purchases` 
+    /// IMPORTANT NOTE: This implementation is less constrained than the emdb one,
+    ///                 as it ommits the `sensible_prices` predicate on the `purchases`
     ///                 table.
     ///
     /// The schema should include:
@@ -33,8 +33,8 @@ impl Datastore for SQLite {
     /// ```
     /// However due to a bug in duckdb, on insert the database will crash.
     /// - This bug has an issue [here](https://github.com/duckdb/duckdb-rs/issues/334)
-    /// 
-    /// Hence we are forgiving, and do not enforce this constraint (to duckdb's 
+    ///
+    /// Hence we are forgiving, and do not enforce this constraint (to duckdb's
     /// performance advantage).
     fn new() -> Self {
         let conn = Connection::open_in_memory().unwrap();
@@ -78,7 +78,9 @@ impl Datastore for SQLite {
     }
 
     fn db(&mut self) -> Self::DB<'_> {
-        SQLiteDatabase { conn: &mut self.conn }
+        SQLiteDatabase {
+            conn: &mut self.conn,
+        }
     }
 }
 
@@ -104,14 +106,16 @@ impl<'imm> Database<'imm> for SQLiteDatabase<'imm> {
         self.conn
             .prepare_cached(" INSERT INTO purchases (customer_reference, product_serial, quantity, price, currency) VALUES (?, ?, ?, ?, ?)")
             .unwrap()
-            .execute(params![customer_reference, product_serial, quantity, price, 
-            
-            match currency {
-                super::Currency::GBP => 0,
-                super::Currency::USD => 1,
-                super::Currency::BTC => 2,
-            }
-            
+            .execute(params![
+                customer_reference,
+                product_serial,
+                quantity,
+                price,
+                match currency {
+                    super::Currency::GBP => 0,
+                    super::Currency::USD => 1,
+                    super::Currency::BTC => 2,
+                }
             ]).unwrap();
     }
 
@@ -139,17 +143,15 @@ impl<'imm> Database<'imm> for SQLiteDatabase<'imm> {
         self.conn
             .prepare_cached(" INSERT INTO products (serial, name, category) VALUES (?, ?, ?)")
             .unwrap()
-            .execute(
-                params![
-                    serial,
-                    name,
-                    match category {
-                        super::ProductCategory::Electronics => 0,
-                        super::ProductCategory::Clothing => 1,
-                        super::ProductCategory::Food => 2,
-                    }
-                ],
-            )
+            .execute(params![
+                serial,
+                name,
+                match category {
+                    super::ProductCategory::Electronics => 0,
+                    super::ProductCategory::Clothing => 1,
+                    super::ProductCategory::Food => 2,
+                }
+            ])
             .unwrap();
     }
 
@@ -159,7 +161,8 @@ impl<'imm> Database<'imm> for SQLiteDatabase<'imm> {
         usd_rate: f64,
         cust_ref_outer: usize,
     ) -> (usize, f64, usize, usize, usize) {
-        let res = self.conn
+        let res = self
+            .conn
             .prepare_cached(
                 "
         WITH customer_purchases AS (
@@ -231,15 +234,16 @@ impl<'imm> Database<'imm> for SQLiteDatabase<'imm> {
                     row.get(3)?,
                     row.get(4)?,
                 ))
-            }).unwrap()
+            })
+            .unwrap()
             .into_iter()
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
-    if res.is_empty() {
-        (0, 0.0, 0, 0, 0)
-    } else {
-        res[0]
-    }
+        if res.is_empty() {
+            (0, 0.0, 0, 0, 0)
+        } else {
+            res[0]
+        }
     }
 
     fn product_customers<'qy>(
@@ -302,7 +306,8 @@ impl<'imm> Database<'imm> for SQLiteDatabase<'imm> {
 
     fn category_sales<'qy>(&'qy self, btc_rate: f64, usd_rate: f64) -> Vec<(u8, f64)> {
         self.conn
-            .prepare_cached("
+            .prepare_cached(
+                "
             WITH joined_data AS (
                 SELECT
                     pr.category,
@@ -333,7 +338,8 @@ impl<'imm> Database<'imm> for SQLiteDatabase<'imm> {
                 total
             FROM
                 aggregated_data;
-        ",)
+        ",
+            )
             .unwrap()
             .query_map(params![usd_rate, btc_rate], |row| {
                 Ok((row.get(0)?, row.get(1)?))
@@ -342,9 +348,4 @@ impl<'imm> Database<'imm> for SQLiteDatabase<'imm> {
             .collect::<Result<Vec<_>, _>>()
             .unwrap()
     }
-}
-
-#[test]
-fn check() {
-    super::test_db::<SQLite>()
 }

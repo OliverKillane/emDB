@@ -1,7 +1,7 @@
+use crate::utils::{choose, choose_internal, total};
 use data_logs::Database;
 use emdb::macros::emql;
 use rand::{rngs::ThreadRng, Rng};
-use crate::{utils::{choose, total, choose_internal}};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LogLevel {
@@ -41,7 +41,7 @@ emql! {
     // Description:
     //   Get the number of errors per minute counter
     // Reasoning:
-    //   Requires a large mapping (accellerated by parallelism), and a groupby 
+    //   Requires a large mapping (accellerated by parallelism), and a groupby
     //   aggregation. For demonstrating OLAP performance.
     query get_errors_per_minute() {
         use logs
@@ -58,16 +58,17 @@ emql! {
     }
 
     // Description:
-    //   Get the first 30 characters of each comment, and the length of the 
+    //   Get the first 30 characters of each comment, and the length of the
     //   comment.
     // Reasoning:
     //   Requires a fast map over a large stream of values, a common OLAP workload.
     query get_comment_summaries(time_start: usize, time_end: usize) {
         use logs
             |> filter(**timestamp >= time_start && **timestamp <= time_end && comment.is_some())
+            |> map(slice: &'db str = &comment.as_ref().unwrap())
             |> map(
-                comment: &'db str = &comment.as_ref().unwrap()[..30], 
-                length: usize = comment.as_ref().unwrap().len()
+                comment: &'db str = &slice[..(std::cmp::min(30, slice.len()))],
+                length: usize = slice.len()
             )
             |> collect(comments)
             ~> return;
@@ -82,8 +83,8 @@ emql! {
             |> deref(log_ref as log_data)
             |> update(log_ref use level = (
                 if crate::data_logs::LogLevel::Error == log_data.level {
-                    crate::data_logs::LogLevel::Warning 
-                } else { 
+                    crate::data_logs::LogLevel::Warning
+                } else {
                     log_data.level
                 }
             ));
@@ -95,16 +96,23 @@ pub fn populate_table<DS: data_logs::Datastore>(rng: &mut ThreadRng, size: usize
     {
         let mut db = ds.db();
         for t in 0..size {
-            db.add_event(t, choose!{ rng
-                3 => None,
-                2 => Some(String::from("This is a short string")), // 22 chars
-                1 => Some(String::from("This is a very very very very very very very very long string")), // 61 chars
-              }, choose!{ rng
-                1 => LogLevel::Error,
-                2 => LogLevel::Warning,
-                3 => LogLevel::Info,
-              });
+            db.add_event(
+                t,
+                choose! { rng
+                  3 => None,
+                  2 => Some(String::from("This is a short string")), // 22 chars
+                  1 => Some(String::from("This is a very very very very very very very very long string")), // 61 chars
+                },
+                choose! { rng
+                  1 => LogLevel::Error,
+                  2 => LogLevel::Warning,
+                  3 => LogLevel::Info,
+                },
+            );
         }
     }
     ds
 }
+
+pub mod duckdb_impl;
+pub mod sqlite_impl;

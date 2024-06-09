@@ -519,10 +519,7 @@ pub fn query_let_variable_already_assigned(
     }
 }
 
-pub fn query_let_variable_shadows_table(
-    assign: &Ident,
-    table: &Ident,
-) -> Diagnostic {
+pub fn query_let_variable_shadows_table(assign: &Ident, table: &Ident) -> Diagnostic {
     emql_error(
         55,
         assign.span(),

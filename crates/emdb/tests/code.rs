@@ -12,8 +12,8 @@ mod my_db {
         pub mod logs {
             #![allow(unused, non_camel_case_types)]
             use emdb::dependencies::pulpit::column::{
-                PrimaryWindow, PrimaryWindowApp, PrimaryWindowPull, PrimaryWindowHide,
-                AssocWindow, AssocWindowPull, Column,
+                AssocWindow, AssocWindowPull, Column, PrimaryWindow, PrimaryWindowApp,
+                PrimaryWindowHide, PrimaryWindowPull,
             };
             #[derive(Debug)]
             pub struct KeyError;
@@ -119,14 +119,10 @@ mod my_db {
                     let mut update = update;
                     std::mem::swap(&mut primary.mut_data.level, &mut update.level);
                     if !self.transactions.rollback {
-                        self.transactions
-                            .log
-                            .push(
-                                transactions::LogItem::Update(
-                                    key,
-                                    transactions::Updates::pulpit_access_23(update),
-                                ),
-                            );
+                        self.transactions.log.push(transactions::LogItem::Update(
+                            key,
+                            transactions::Updates::pulpit_access_23(update),
+                        ));
                     }
                     Ok(())
                 }
@@ -186,7 +182,7 @@ mod my_db {
                 /// Commit all current changes
                 /// - Clears the rollback log
                 pub fn commit(&mut self) {
-                    debug_assert!(! self.transactions.rollback);
+                    debug_assert!(!self.transactions.rollback);
                     self.transactions.log.clear()
                 }
                 /// Undo the transactions applied since the last commit
@@ -196,18 +192,14 @@ mod my_db {
                     self.transactions.rollback = true;
                     while let Some(entry) = self.transactions.log.pop() {
                         match entry {
-                            transactions::LogItem::Append => {
-                                unsafe {
-                                    self.columns.primary.unppend();
+                            transactions::LogItem::Append => unsafe {
+                                self.columns.primary.unppend();
+                            },
+                            transactions::LogItem::Update(key, update) => match update {
+                                transactions::Updates::pulpit_access_23(update) => {
+                                    self.pulpit_access_23(update, key).unwrap();
                                 }
-                            }
-                            transactions::LogItem::Update(key, update) => {
-                                match update {
-                                    transactions::Updates::pulpit_access_23(update) => {
-                                        self.pulpit_access_23(update, key).unwrap();
-                                    }
-                                }
-                            }
+                            },
                         }
                     }
                     self.transactions.rollback = false;
@@ -246,9 +238,7 @@ mod my_db {
             impl ColumnHolder {
                 fn new(size_hint: usize) -> Self {
                     Self {
-                        primary: emdb::dependencies::pulpit::column::AssocBlocks::new(
-                            size_hint,
-                        ),
+                        primary: emdb::dependencies::pulpit::column::AssocBlocks::new(size_hint),
                     }
                 }
                 fn window(&mut self) -> WindowHolder<'_> {
@@ -300,9 +290,7 @@ mod my_db {
             #[derive(Debug)]
             pub enum Error {
                 Error22,
-                Error23(
-                    super::super::tables::logs::updates::pulpit_access_23::UpdateError,
-                ),
+                Error23(super::super::tables::logs::updates::pulpit_access_23::UpdateError),
             }
         }
     }
@@ -445,12 +433,10 @@ mod my_db {
             comment: Option<String>,
             log_level: crate::LogLevel,
         ) -> () {
-            let result = (|
-                __internal_self: &mut Self,
-                timestamp: u64,
-                comment: Option<String>,
-                log_level: crate::LogLevel|
-            {
+            let result = (|__internal_self: &mut Self,
+                           timestamp: u64,
+                           comment: Option<String>,
+                           log_level: crate::LogLevel| {
                 let (operator_closure_value_0) = (Record0 {
                     timestamp: timestamp,
                     comment: comment,
@@ -656,32 +642,24 @@ mod my_db {
                 return_value_13
             })(self)
         }
-        pub fn get_comment_summaries<'qy>(
-            &'qy self,
-            time_start: u64,
-            time_end: u64,
-        ) -> Record15 {
+        pub fn get_comment_summaries<'qy>(&'qy self, time_start: u64, time_end: u64) -> Record15 {
             (|__internal_self: &Self, time_start: u64, time_end: u64| {
                 let (operator_closure_value_17, operator_closure_value_18) = (
-                    |
-                        Record11 {
-                            timestamp: timestamp,
-                            comment: comment,
-                            level: level,
-                            __internal_phantomdata: _,
-                        }: &Record11<'db, 'qy>,
-                    | -> bool {
-                        **timestamp >= time_start && **timestamp <= time_end
-                            && comment.is_some()
+                    |Record11 {
+                         timestamp: timestamp,
+                         comment: comment,
+                         level: level,
+                         __internal_phantomdata: _,
+                     }: &Record11<'db, 'qy>|
+                     -> bool {
+                        **timestamp >= time_start && **timestamp <= time_end && comment.is_some()
                     },
-                    |
-                        Record11 {
-                            timestamp: timestamp,
-                            comment: comment,
-                            level: level,
-                            __internal_phantomdata: _,
-                        }|
-                    {
+                    |Record11 {
+                         timestamp: timestamp,
+                         comment: comment,
+                         level: level,
+                         __internal_phantomdata: _,
+                     }| {
                         Record14 {
                             comment: &comment.as_ref().unwrap()[..100],
                             length: comment.as_ref().unwrap().len(),
@@ -771,23 +749,26 @@ mod my_db {
             &'qy mut self,
         ) -> Result<(), queries::demote_error_logs::Error> {
             match (|__internal_self: &mut Self| {
-                let (operator_closure_value_23) = (|Record18 { log_ref, log_data, .. }| {
-                    (
-                        Record19 {
-                            level: (if crate::LogLevel::Error == log_data.level {
-                                crate::LogLevel::Warning
-                            } else {
-                                log_data.level.clone()
-                            }),
-                            __internal_phantomdata: std::marker::PhantomData,
-                        },
-                        Record18 {
-                            log_ref,
-                            log_data,
-                            __internal_phantomdata: std::marker::PhantomData,
-                        },
-                    )
-                });
+                let (operator_closure_value_23) =
+                    (|Record18 {
+                          log_ref, log_data, ..
+                      }| {
+                        (
+                            Record19 {
+                                level: (if crate::LogLevel::Error == log_data.level {
+                                    crate::LogLevel::Warning
+                                } else {
+                                    log_data.level.clone()
+                                }),
+                                __internal_phantomdata: std::marker::PhantomData,
+                            },
+                            Record18 {
+                                log_ref,
+                                log_data,
+                                __internal_phantomdata: std::marker::PhantomData,
+                            },
+                        )
+                    });
                 let dataflow_value_18: <emdb::dependencies::minister::Basic as emdb::dependencies::minister::Physical>::Stream<
                     Record16<'db, 'qy>,
                 > = {
@@ -861,7 +842,8 @@ mod my_db {
                     emdb::dependencies::minister::Basic::error_stream(results)?
                 };
                 Ok(())
-            })(self) {
+            })(self)
+            {
                 Ok(result) => {
                     {
                         self.logs.commit();

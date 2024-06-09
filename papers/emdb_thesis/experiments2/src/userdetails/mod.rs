@@ -108,12 +108,22 @@ emql! {
 }
 
 // Required to get new user keys for other queries
-pub trait GetNewUserKey: userdetails::Datastore  {
-    fn new_user_wrap<'imm>(db: &mut Self::DB<'imm>, username: String, prem: bool, start_creds: Option<i32>) -> <Self as userdetails::Datastore>::users_key;
+pub trait GetNewUserKey: userdetails::Datastore {
+    fn new_user_wrap<'imm>(
+        db: &mut Self::DB<'imm>,
+        username: String,
+        prem: bool,
+        start_creds: Option<i32>,
+    ) -> <Self as userdetails::Datastore>::users_key;
 }
 
 impl GetNewUserKey for emdb_impl::EmDB {
-    fn new_user_wrap<'imm>(db: &mut Self::DB<'imm>, username: String, prem: bool, start_creds: Option<i32>) -> <Self as userdetails::Datastore>::users_key {
+    fn new_user_wrap<'imm>(
+        db: &mut Self::DB<'imm>,
+        username: String,
+        prem: bool,
+        start_creds: Option<i32>,
+    ) -> <Self as userdetails::Datastore>::users_key {
         db.new_user(username, prem, start_creds).unwrap().user_id
     }
 }

@@ -1,6 +1,5 @@
-use super::{sales_analytics::{Database, Datastore}, TableConfig};
-use duckdb::{params, Connection, Error, OptionalExt, Row};
-use rand::rngs::ThreadRng;
+use super::sales_analytics::{Database, Datastore};
+use duckdb::{params, Connection};
 
 pub struct DuckDB {
     conn: Connection,
@@ -62,7 +61,9 @@ impl Datastore for DuckDB {
     }
 
     fn db(&mut self) -> Self::DB<'_> {
-        DuckDBDatabase { conn: &mut self.conn }
+        DuckDBDatabase {
+            conn: &mut self.conn,
+        }
     }
 }
 
@@ -88,14 +89,16 @@ impl<'imm> Database<'imm> for DuckDBDatabase<'imm> {
         self.conn
             .prepare_cached(" INSERT INTO purchases (customer_reference, product_serial, quantity, price, currency) VALUES (?, ?, ?, ?, ?)")
             .unwrap()
-            .query_row(params![customer_reference, product_serial, quantity, price, 
-            
-            match currency {
-                super::Currency::GBP => 0,
-                super::Currency::USD => 1,
-                super::Currency::BTC => 2,
-            }
-            
+            .query_row(params![
+                customer_reference,
+                product_serial,
+                quantity,
+                price,
+                match currency {
+                    super::Currency::GBP => 0,
+                    super::Currency::USD => 1,
+                    super::Currency::BTC => 2,
+                }
             ], |_| Ok(())).unwrap()
     }
 
@@ -144,7 +147,8 @@ impl<'imm> Database<'imm> for DuckDBDatabase<'imm> {
         usd_rate: f64,
         cust_ref_outer: usize,
     ) -> (usize, u64, usize, usize, usize) {
-        let res = self.conn
+        let res = self
+            .conn
             .prepare_cached(
                 "
         WITH customer_purchases AS (
@@ -216,16 +220,16 @@ impl<'imm> Database<'imm> for DuckDBDatabase<'imm> {
                     row.get(3)?,
                     row.get(4)?,
                 ))
-            }).unwrap()
+            })
+            .unwrap()
             .into_iter()
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
-    if res.is_empty() {
-        (0, 0, 0, 0, 0)
-    } else {
-        res[0]
-    }
-
+        if res.is_empty() {
+            (0, 0, 0, 0, 0)
+        } else {
+            res[0]
+        }
     }
 
     fn product_customers<'qy>(
@@ -288,7 +292,8 @@ impl<'imm> Database<'imm> for DuckDBDatabase<'imm> {
 
     fn category_sales<'qy>(&'qy self, btc_rate: f64, usd_rate: f64) -> Vec<(u8, u64)> {
         self.conn
-            .prepare_cached("
+            .prepare_cached(
+                "
             WITH joined_data AS (
                 SELECT
                     pr.category,
@@ -319,7 +324,8 @@ impl<'imm> Database<'imm> for DuckDBDatabase<'imm> {
                 total
             FROM
                 aggregated_data;
-        ",)
+        ",
+            )
             .unwrap()
             .query_map(params![usd_rate, btc_rate], |row| {
                 Ok((row.get(0)?, row.get(1)?))
@@ -328,10 +334,4 @@ impl<'imm> Database<'imm> for DuckDBDatabase<'imm> {
             .collect::<Result<Vec<_>, _>>()
             .unwrap()
     }
-}
-
-
-#[test]
-fn check() {
-    super::test_db::<DuckDB>();
 }

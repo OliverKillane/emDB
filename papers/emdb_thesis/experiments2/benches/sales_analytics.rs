@@ -5,8 +5,7 @@ use experiments2::{
         emdb_impl::EmDB,
         sales_analytics::{Database, Datastore},
         sqlite_impl::SQLite,
-        Currency, ProductCategory,
-        TableConfig,
+        Currency, ProductCategory, TableConfig,
     },
     utils::{choose, choose_internal, total},
 };

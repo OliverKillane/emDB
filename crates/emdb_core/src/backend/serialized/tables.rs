@@ -171,7 +171,7 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
     } = &namer.interface;
 
     let (impl_datastore, modifiers, key_defs, ds_assoc_db) = if let Some(InterfaceTrait { name }) = interface_trait {
-        let exposed_table_keys = exposed_keys(&lp);
+        let exposed_table_keys = exposed_keys(lp);
         (quote!{ super::#name::#trait_datastore for }, quote!(), exposed_table_keys.into_iter().map(|tablekey| {
             let name = &lp.get_table(*tablekey).name;
             let key_name = namer.interface.key_name(name);

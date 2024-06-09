@@ -1,5 +1,14 @@
 use divan::{black_box, black_box_drop, Bencher};
-use experiments2::{utils::{choose, choose_internal, total}, userdetails::{duckdb_impl::DuckDB, emdb_impl::EmDB, sqlite_impl::SQLite, userdetails::{Database, Datastore}, GetNewUserKey}};
+use experiments2::{
+    userdetails::{
+        duckdb_impl::DuckDB,
+        emdb_impl::EmDB,
+        sqlite_impl::SQLite,
+        userdetails::{Database, Datastore},
+        GetNewUserKey,
+    },
+    utils::{choose, choose_internal, total},
+};
 
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 
@@ -12,15 +21,19 @@ fn main() {
 
 fn random_user(rng: &mut ThreadRng, id: usize) -> (String, bool, Option<i32>) {
     let prem = rng.gen_bool(0.5);
-    (format!("User{id}"), prem, if prem {
-        if rng.gen_bool(0.5) {
-            Some(rng.gen_range(2..100))
+    (
+        format!("User{id}"),
+        prem,
+        if prem {
+            if rng.gen_bool(0.5) {
+                Some(rng.gen_range(2..100))
+            } else {
+                None
+            }
         } else {
-            None
-        }
-    } else {
-        Some(rng.gen_range(2..100))
-    } )
+            Some(rng.gen_range(2..100))
+        },
+    )
 }
 
 /// Time taken for a number of inserts of random premium/non-premium
@@ -39,11 +52,7 @@ where
             let mut rng = rand::thread_rng();
 
             (
-                (0..N)
-                    .map(|i| {
-                        random_user(&mut rng, i)
-                    })
-                    .collect::<Vec<_>>(),
+                (0..N).map(|i| random_user(&mut rng, i)).collect::<Vec<_>>(),
                 db,
             )
         })
@@ -55,22 +64,22 @@ where
         })
 }
 
-fn random_table<'a, const SIZE: usize, DS: Datastore + GetNewUserKey>() -> (Vec<DS::users_key>, DS) {
+fn random_table<'a, const SIZE: usize, DS: Datastore + GetNewUserKey>() -> (Vec<DS::users_key>, DS)
+{
     let mut ds = DS::new();
     let mut ids;
     {
         let mut db = ds.db();
         let mut rng = rand::thread_rng();
-    
+
         ids = (0..SIZE)
             .map(|i| {
                 let (user, prem, init) = random_user(&mut rng, i);
                 DS::new_user_wrap(&mut db, user, prem, init)
-    
             })
             .collect::<Vec<DS::users_key>>();
         ids.shuffle(&mut rng);
-    
+
         for id in ids.iter() {
             db.add_credits(*id, rng.gen_range(2..100));
         }
@@ -134,8 +143,7 @@ where
         .bench_local_refs(|(_, ds)| {
             let db = ds.db();
             black_box_drop(db.total_premium_credits())
-        }
-    )
+        })
 }
 
 /// Time taken to reward premium users
@@ -154,8 +162,7 @@ where
         .bench_local_refs(|(_, ds)| {
             let mut db = ds.db();
             black_box_drop(db.reward_premium(2f32))
-        }
-    )
+        })
 }
 
 /// Random workload of N actions
