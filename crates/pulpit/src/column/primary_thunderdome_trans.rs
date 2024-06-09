@@ -17,6 +17,7 @@ impl<ImmData, MutData> Column for PrimaryThunderDomeTrans<ImmData, MutData> {
     where
         Self: 'imm;
 
+    #[inline(always)]
     fn new(size_hint: usize) -> Self {
         Self {
             arena: ThunderArena::with_capacity(size_hint),
@@ -24,6 +25,7 @@ impl<ImmData, MutData> Column for PrimaryThunderDomeTrans<ImmData, MutData> {
         }
     }
 
+    #[inline(always)]
     fn window(&mut self) -> Self::WindowKind<'_> {
         Window { inner: self }
     }
@@ -42,6 +44,7 @@ where
     type ImmGet = ImmData;
     type Col = PrimaryThunderDomeTrans<ImmData, MutData>;
 
+    #[inline(always)]
     fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, MutData> {
         let Entry {
             data: Data { imm_data, mut_data },
@@ -56,6 +59,7 @@ where
         })
     }
 
+    #[inline(always)]
     fn brw(&self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &MutData> {
         match self.inner.arena.get(key) {
             Some(Data {
@@ -73,6 +77,7 @@ where
         }
     }
 
+    #[inline(always)]
     fn brw_mut(&mut self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &mut MutData> {
         match self.inner.arena.get_mut(key) {
             Some(Data {
@@ -111,6 +116,7 @@ where
 {
     type ImmPull = ImmData;
 
+    #[inline(always)]
     fn insert(
         &mut self,
         Data { imm_data, mut_data }: Data<ImmData, MutData>,
@@ -135,6 +141,7 @@ where
         )
     }
 
+    #[inline(always)]
     fn pull(&mut self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmPull, MutData> {
         match self.inner.arena.remove(key) {
             Some(Data {
@@ -166,6 +173,7 @@ where
     ImmData: Clone,
     MutData: Clone,
 {
+    #[inline(always)]
     fn hide(&mut self, key: <Self::Col as Keyable>::Key) -> Result<(), KeyError> {
         match self.inner.arena.get_mut(key) {
             Some(Data {
@@ -184,6 +192,7 @@ where
         }
     }
 
+    #[inline(always)]
     fn reveal(&mut self, key: <Self::Col as Keyable>::Key) -> Result<(), KeyError> {
         match self.inner.arena.get_mut(key) {
             Some(Data {

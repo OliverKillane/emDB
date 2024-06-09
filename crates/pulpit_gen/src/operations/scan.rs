@@ -1,10 +1,11 @@
+use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::namer::CodeNamer;
 
 use super::SingleOpFn;
 
-pub fn generate(namer: &CodeNamer) -> SingleOpFn {
+pub fn generate(namer: &CodeNamer, op_attrs: &TokenStream) -> SingleOpFn {
     let CodeNamer {
         struct_window_method_scan: method_scan,
         type_key,
@@ -18,6 +19,7 @@ pub fn generate(namer: &CodeNamer) -> SingleOpFn {
     SingleOpFn {
         op_impl: quote! {
             impl <#lifetime_imm> #struct_window<#lifetime_imm> {
+                #op_attrs
                 pub fn #method_scan(&self) -> impl Iterator<Item = #type_key> + '_ {
                     self.#table_member_columns.#name_primary_column.scan()
                 }

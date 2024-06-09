@@ -3,14 +3,15 @@ use experiments2::{
     userdetails::{
         duckdb_impl::DuckDB,
         emdb_impl::EmDB,
+        emdb_inlined_impl::EmDBInlined,
+        random_table, random_user,
         sqlite_impl::SQLite,
         userdetails::{Database, Datastore},
         GetNewUserKey,
     },
     utils::{choose, choose_internal, total},
 };
-
-use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
+use rand::Rng;
 
 // const TABLE_SIZES: [usize; 9] = [1, 8, 64, 128, 512, 4096, 16384, 65536, 262144];
 const TABLE_SIZES: [usize; 4] = [1, 8, 16, 512];
@@ -19,27 +20,10 @@ fn main() {
     divan::main();
 }
 
-fn random_user(rng: &mut ThreadRng, id: usize) -> (String, bool, Option<i32>) {
-    let prem = rng.gen_bool(0.5);
-    (
-        format!("User{id}"),
-        prem,
-        if prem {
-            if rng.gen_bool(0.5) {
-                Some(rng.gen_range(2..100))
-            } else {
-                None
-            }
-        } else {
-            Some(rng.gen_range(2..100))
-        },
-    )
-}
-
 /// Time taken for a number of inserts of random premium/non-premium
 #[divan::bench(
     name = "random_inserts",
-    types = [EmDB, DuckDB, SQLite],
+    types = [SQLite, EmDB, EmDBInlined, DuckDB],
     consts = TABLE_SIZES
 )]
 fn inserts<T, const N: usize>(bencher: Bencher)
@@ -59,40 +43,15 @@ where
         .bench_local_values(|(users, mut ds)| {
             let mut db = ds.db();
             for (name, prem, initial) in users {
-                black_box(db.new_user(name, prem, initial));
+                black_box_drop(db.new_user(name, prem, initial));
             }
         })
-}
-
-fn random_table<'a, const SIZE: usize, DS: Datastore + GetNewUserKey>() -> (Vec<DS::users_key>, DS)
-{
-    let mut ds = DS::new();
-    let mut ids;
-    {
-        let mut db = ds.db();
-        let mut rng = rand::thread_rng();
-
-        ids = (0..SIZE)
-            .map(|i| {
-                let (user, prem, init) = random_user(&mut rng, i);
-                DS::new_user_wrap(&mut db, user, prem, init)
-            })
-            .collect::<Vec<DS::users_key>>();
-        ids.shuffle(&mut rng);
-
-        for id in ids.iter() {
-            db.add_credits(*id, rng.gen_range(2..100));
-        }
-        db.reward_premium(2f32);
-    }
-
-    black_box((ids, ds))
 }
 
 /// Time taken to get ids in random order
 #[divan::bench(
     name = "random_get_ids",
-    types = [EmDB, DuckDB, SQLite],
+    types = [SQLite, EmDB, EmDBInlined, DuckDB],
     consts = TABLE_SIZES
 )]
 fn gets<T, const N: usize>(bencher: Bencher)
@@ -112,7 +71,7 @@ where
 /// Time taken to get a snapshot
 #[divan::bench(
     name = "snapshot",
-    types = [EmDB, DuckDB, SQLite],
+    types = [SQLite, EmDB, EmDBInlined, DuckDB],
     consts = TABLE_SIZES
 )]
 fn snapshot<T, const N: usize>(bencher: Bencher)
@@ -130,7 +89,7 @@ where
 /// Time taken to get the total credits of premium users
 #[divan::bench(
     name = "get_total_prem_credits",
-    types = [EmDB, DuckDB, SQLite],
+    types = [SQLite, EmDB, EmDBInlined, DuckDB],
     consts = TABLE_SIZES,
     max_time = 1
 )]
@@ -149,7 +108,7 @@ where
 /// Time taken to reward premium users
 #[divan::bench(
     name = "reward_premium_users",
-    types = [EmDB, DuckDB, SQLite],
+    types = [SQLite, EmDB, EmDBInlined, DuckDB],
     consts = TABLE_SIZES,
     max_time = 1
 )]
@@ -168,7 +127,7 @@ where
 /// Random workload of N actions
 #[divan::bench(
     name = "random_workloads",
-    types = [EmDB, DuckDB, SQLite],
+    types = [SQLite, EmDB, EmDBInlined, DuckDB],
     consts = [1024, 2048, 4096],
     max_time = 100
 )]

@@ -3,7 +3,6 @@
 
 pub mod access;
 pub mod column;
-pub mod traits;
 pub mod value;
 
 pub mod gen {

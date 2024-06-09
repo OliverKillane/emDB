@@ -21,7 +21,7 @@ pub struct TableWindow<'imm> {
 
 /// Generate the tokens for the tables, and the struct to hold them (in [`TableWindow`]).
 /// - Generates the tokens for the [`plan::ScalarType`]s of table fields assuming they are just [`plan::ScalarTypeConc::Rust`] tyes
-pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<InterfaceTrait>, namer: &SerializedNamer) -> TableWindow<'imm> {
+pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<InterfaceTrait>, namer: &SerializedNamer, inlining: bool) -> TableWindow<'imm> {
     // get the constraints and fields of each table
     let mut pulpit_configs = lp
         .tables
@@ -131,7 +131,7 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
                 (key, table_impl.op_get_types(pulpit_namer)),
                 (
                     (key, table_impl.insert_can_error()),
-                    table_impl.generate(pulpit_namer),
+                    table_impl.generate(pulpit_namer, if inlining { vec![pulpit::gen::table::AttrKinds::Inline] } else { vec![] }),
                 ),
             )
         })

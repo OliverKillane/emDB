@@ -70,6 +70,12 @@ emql! {
         pub = on,
         ds_name = EmDB,
     };
+    impl emdb_inlined_impl as Serialized{
+        interface = sales_analytics,
+        pub = on,
+        ds_name = EmDBInlined,
+        aggressive_inlining = on,
+    };
 
     table products {
         serial: usize,

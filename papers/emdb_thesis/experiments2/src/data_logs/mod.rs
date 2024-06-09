@@ -19,6 +19,12 @@ emql! {
         pub = on,
         ds_name = EmDB,
     };
+    impl emdb_inlined_impl as Serialized{
+        interface = data_logs,
+        pub = on,
+        ds_name = EmDBInlined,
+        aggressive_inlining = on,
+    };
 
     table logs {
         timestamp: usize,

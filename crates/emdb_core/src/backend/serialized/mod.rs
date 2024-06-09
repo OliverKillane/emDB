@@ -39,6 +39,7 @@ pub struct Serialized {
     interface: Option<InterfaceTrait>,
     public: bool,
     ds_name: Option<Ident>,
+    aggressive_inlining: bool,
 }
 
 impl EMDBBackend for Serialized {
@@ -59,7 +60,10 @@ impl EMDBBackend for Serialized {
                         OptField::new("pub", on_off),
                         (
                             OptField::new("ds_name", getident),
-                            OptEnd
+                            (
+                                OptField::new("aggressive_inlining", on_off),
+                                OptEnd
+                            )
                         )
                     ),
                 ),
@@ -68,13 +72,14 @@ impl EMDBBackend for Serialized {
             let (_, res) = parser.comp(TokenIter::from(opts, backend_name.span()));
             res.to_result()
                 .map_err(TokenDiagnostic::into_list)
-                .map(|(debug, (interface, (public, (ds_name, ()))))| Serialized { debug, interface, public: public.unwrap_or(false), ds_name })
+                .map(|(debug, (interface, (public, (ds_name, (inline_queries, ())))))| Serialized { debug, interface, public: public.unwrap_or(false), ds_name, aggressive_inlining: inline_queries.unwrap_or(false) })
         } else {
             Ok(Self {
                 debug: None,
                 interface: None,
                 public: false,
                 ds_name: None,
+                aggressive_inlining: false,
             })
         }
     }
@@ -96,7 +101,7 @@ impl EMDBBackend for Serialized {
             datastore_impl,
             database,
             table_generated_info,
-        } = tables::generate_tables(plan, &self.interface, &namer);
+        } = tables::generate_tables(plan, &self.interface, &namer, self.aggressive_inlining);
 
         let record_defs =
             types::generate_record_definitions(plan, &table_generated_info.get_types, &namer);
@@ -104,7 +109,7 @@ impl EMDBBackend for Serialized {
         let QueriesInfo {
             query_mod,
             query_impls,
-        } = queries::generate_queries(plan, &table_generated_info, &self.interface, &namer);
+        } = queries::generate_queries(plan, &table_generated_info, &self.interface, &namer, self.aggressive_inlining);
 
         let namer::SerializedNamer { mod_tables, .. } = &namer;
 

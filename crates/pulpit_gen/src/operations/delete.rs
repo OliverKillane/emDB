@@ -4,7 +4,7 @@ use crate::{
     operations::SingleOpFn,
     uniques::Unique,
 };
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use quote_debug::Tokens;
 use syn::{ExprMatch, Ident};
@@ -15,6 +15,7 @@ pub fn generate(
     groups: &Groups,
     uniques: &[Unique],
     transactions: bool,
+    op_attrs: &TokenStream,
 ) -> SingleOpFn {
     let CodeNamer {
         type_key_error,
@@ -124,7 +125,8 @@ pub fn generate(
                     #(#get_clone_of_uniques;)*
                     #(#restore_unique_from_borrow;)*
                 }
-
+                
+                #op_attrs
                 pub fn #method_delete(&mut self, #key_ident: #type_key) -> Result<(), #type_key_error> {
                     match self.#table_member_columns.#name_primary_column.hide(#key_ident) {
                         Ok(()) => (),
@@ -139,6 +141,7 @@ pub fn generate(
     } else {
         quote!{
             impl <'imm> #struct_window<'imm> {
+                #op_attrs
                 pub fn #method_delete(&mut self, #key_ident: #type_key) -> Result<(), #type_key_error> {
                     #delete_hard
                 }

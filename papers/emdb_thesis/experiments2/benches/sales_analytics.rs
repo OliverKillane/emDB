@@ -3,9 +3,10 @@ use experiments2::{
     sales_analytics::{
         duckdb_impl::DuckDB,
         emdb_impl::EmDB,
+        emdb_inlined_impl::EmDBInlined,
         sales_analytics::{Database, Datastore},
         sqlite_impl::SQLite,
-        Currency, ProductCategory, TableConfig,
+        TableConfig,
     },
     utils::{choose, choose_internal, total},
 };
@@ -13,7 +14,7 @@ use rand::{rngs::ThreadRng, Rng};
 
 #[divan::bench(
     name = "random_workloads",
-    types = [EmDB, SQLite, DuckDB],
+    types = [SQLite, EmDB, EmDBInlined, DuckDB],
     consts = [1024, 8192, 16384],
     max_time = 10
 )]

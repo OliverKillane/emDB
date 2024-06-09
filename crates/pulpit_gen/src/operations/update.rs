@@ -1,4 +1,4 @@
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use quote_debug::Tokens;
 use syn::{ExprLet, ExprMethodCall, Ident, ImplItemFn, ItemMod, Variant};
@@ -26,6 +26,7 @@ pub fn generate(
     predicates: &[Predicate],
     namer: &CodeNamer,
     transactions: bool,
+    op_attrs: &TokenStream,
 ) -> SingleOp {
     let CodeNamer {
         mod_update,
@@ -37,7 +38,7 @@ pub fn generate(
         .iter()
         .map(|update| update.generate_mod(groups, uniques, predicates, namer));
     let impl_fns = updates.iter().map(|update| {
-        update.generate_trait_impl_fn(namer, groups, uniques, predicates, transactions)
+        update.generate_trait_impl_fn(namer, groups, uniques, predicates, transactions, op_attrs)
     });
 
     SingleOp {
@@ -141,6 +142,7 @@ impl Update {
         uniques: &[Unique],
         predicates: &[Predicate],
         transactions: bool,
+        op_attrs: &TokenStream,
     ) -> Tokens<ImplItemFn> {
         let CodeNamer {
             mod_update,
@@ -264,6 +266,7 @@ impl Update {
         };
 
         quote! {
+            #op_attrs
             pub fn #update_name(&mut self, #update_var: #mod_update::#update_name::#mod_update_struct_update, key: #type_key) -> Result<(), #mod_update::#update_name::#mod_update_enum_error> {
                 #table_access
                 #(#predicate_checks)*

@@ -3,6 +3,7 @@ use experiments2::data_logs::{
     data_logs::{Database, Datastore},
     duckdb_impl::DuckDB,
     emdb_impl::EmDB,
+    emdb_inlined_impl::EmDBInlined,
     populate_table,
     sqlite_impl::SQLite,
 };
@@ -11,7 +12,7 @@ const TABLE_SIZES: [usize; 1] = [2048]; //[1048576, 2097152, 4194304, 8388608, 1
 
 #[divan::bench(
     name = "demote_errors_data_cleaning",
-    types = [SQLite, EmDB, DuckDB],
+    types = [SQLite, EmDB, EmDBInlined, DuckDB],
     consts = TABLE_SIZES,
 )]
 fn demote_errors_data_cleaning<DS: Datastore, const SIZE: usize>(bencher: Bencher) {
@@ -25,7 +26,7 @@ fn demote_errors_data_cleaning<DS: Datastore, const SIZE: usize>(bencher: Benche
 
 #[divan::bench(
     name = "get_errors_per_minute",
-    types = [SQLite, EmDB, DuckDB],
+    types = [SQLite, EmDB, EmDBInlined, DuckDB],
     consts = TABLE_SIZES,
 )]
 fn get_errors_per_minute<DS: Datastore, const SIZE: usize>(bencher: Bencher) {
@@ -39,7 +40,7 @@ fn get_errors_per_minute<DS: Datastore, const SIZE: usize>(bencher: Bencher) {
 
 #[divan::bench(
     name = "get_comment_summaries",
-    types = [SQLite, EmDB, DuckDB],
+    types = [SQLite, EmDB, EmDBInlined, DuckDB],
     consts = TABLE_SIZES,
 )]
 fn get_comment_summaries<DS: Datastore, const SIZE: usize>(bencher: Bencher) {

@@ -1,8 +1,9 @@
 use super::SingleOp;
 use crate::{groups::Groups, namer::CodeNamer, uniques::Unique};
+use proc_macro2::TokenStream;
 use quote::quote;
 
-pub fn generate(groups: &Groups, uniques: &[Unique], namer: &CodeNamer) -> SingleOp {
+pub fn generate(groups: &Groups, uniques: &[Unique], namer: &CodeNamer, op_attrs: &TokenStream) -> SingleOp {
     let CodeNamer {
         struct_window,
         struct_table_member_uniques,
@@ -15,6 +16,7 @@ pub fn generate(groups: &Groups, uniques: &[Unique], namer: &CodeNamer) -> Singl
     let unique_methods = uniques.iter().map(|Unique { alias, field }| {
         let ty = groups.get_typefield(field).unwrap();
         quote!{
+            #op_attrs
             pub fn #alias(&self, value: &#ty) -> Result<#type_key, #mod_unique::#mod_unique_struct_notfound> {
                 match self.#struct_table_member_uniques.#field.lookup(value) {
                     Ok(k) => Ok(k),

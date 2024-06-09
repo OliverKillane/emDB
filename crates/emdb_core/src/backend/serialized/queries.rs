@@ -227,6 +227,7 @@ pub fn generate_queries<'imm>(
     gen_info: &GeneratedInfo<'imm>,
     interface_trait: &Option<InterfaceTrait>,
     namer: &'imm SerializedNamer,
+    inline_queries: bool,
 ) -> QueriesInfo {
     let SerializedNamer {
         db_lifetime,
@@ -257,11 +258,18 @@ pub fn generate_queries<'imm>(
             } else {
                 (quote! {}, quote!(pub), quote!())
             };
+
+            let inline_tks = if inline_queries {
+                quote!(#[inline(always)])
+            } else {
+                quote!()
+            };
+
             Some(
                 quote! {
                     impl <#db_lifetime> #impl_database #struct_database<#db_lifetime> {
                         #type_ds
-                        #(#modifier #impls)*
+                        #(#inline_tks #modifier #impls)*
                     }
                 }
                 .into(),

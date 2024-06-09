@@ -29,6 +29,7 @@ emql! {
         // interface = my_interface,
         // pub = on,
         ds_name = EmDBDebug,
+        aggressive_inlining = on,
     };
     impl code_display as PlanViz{
         path = "emdb/tests/debug/code.dot",
@@ -73,7 +74,7 @@ emql! {
         use logs
             |> filter(**timestamp >= time_start && **timestamp <= time_end && comment.is_some())
             |> map(
-                comment: &'db str = &comment.as_ref().unwrap()[..100],
+                comment: &'db str = &comment.as_ref().unwrap()[..100], 
                 length: usize = comment.as_ref().unwrap().len()
             )
             |> collect(comments)

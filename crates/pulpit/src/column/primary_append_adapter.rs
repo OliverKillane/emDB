@@ -32,6 +32,7 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryAppendAdapter> {
     type ImmGet = ();
     type Col = PrimaryAppendAdapter;
 
+    #[inline(always)]
     fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, ()> {
         if key < self.inner.max_key {
             Ok(Entry {
@@ -46,6 +47,7 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryAppendAdapter> {
         }
     }
 
+    #[inline(always)]
     fn brw(&self, key: <Self::Col as Keyable>::Key) -> Access<&(), &()> {
         if key < self.inner.max_key {
             Ok(Entry {
@@ -60,6 +62,7 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryAppendAdapter> {
         }
     }
 
+    #[inline(always)]
     fn brw_mut(&mut self, key: <Self::Col as Keyable>::Key) -> Access<&(), &mut ()> {
         if key < self.inner.max_key {
             Ok(Entry {
@@ -74,24 +77,28 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryAppendAdapter> {
         }
     }
 
+    #[inline(always)]
     fn conv_get(_: Self::ImmGet) {}
 
+    #[inline(always)]
     fn scan<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
         0..(self.inner.max_key)
     }
 
+    #[inline(always)]
     fn count(&self) -> usize {
         self.inner.max_key
     }
 }
 
 impl<'imm> PrimaryWindowApp<'imm, (), ()> for Window<'imm, PrimaryAppendAdapter> {
+    #[inline(always)]
     fn append(&mut self, _: Data<(), ()>) -> <Self::Col as Keyable>::Key {
         let key = self.inner.max_key;
         self.inner.max_key += 1;
         key
     }
-
+    #[inline(always)]
     unsafe fn unppend(&mut self) {
         self.inner.max_key -= 1;
     }

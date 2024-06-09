@@ -1,3 +1,5 @@
+use assume::assume;
+
 use super::*;
 
 use std::{
@@ -12,15 +14,17 @@ struct NextFree(Option<usize>);
 type EncodedNextFree = usize;
 
 impl NextFree {
+    #[inline(always)]
     fn encode(&self) -> usize {
         if let Some(index) = self.0 {
-            debug_assert!(index != EncodedNextFree::MAX);
+            assume!(unsafe: index != EncodedNextFree::MAX, "index is invalid" );
             index
         } else {
             EncodedNextFree::MAX
         }
     }
 
+    #[inline(always)]
     fn decode(val: EncodedNextFree) -> Self {
         NextFree(if val == EncodedNextFree::MAX {
             None
@@ -134,6 +138,7 @@ where
     type ImmGet = &'imm ImmData;
     type Col = PrimaryRetain<ImmData, MutData, BLOCK_SIZE>;
 
+    #[inline(always)]
     fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, MutData> {
         let Entry {
             index,
@@ -148,6 +153,7 @@ where
         })
     }
 
+    #[inline(always)]
     fn brw(&self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &MutData> {
         if let Some(MutEntry { imm_ptr, mut_data }) = self.inner.mut_data.get(key.index) {
             unsafe {
@@ -172,6 +178,7 @@ where
         }
     }
 
+    #[inline(always)]
     fn brw_mut(&mut self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &mut MutData> {
         if let Some(MutEntry { imm_ptr, mut_data }) = self.inner.mut_data.get_mut(key.index) {
             unsafe {
@@ -196,10 +203,12 @@ where
         }
     }
 
+    #[inline(always)]
     fn conv_get(get: Self::ImmGet) -> ImmData {
         get.clone()
     }
 
+    #[inline(always)]
     fn scan<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
         self.inner
             .mut_data
@@ -218,6 +227,7 @@ where
             })
     }
 
+    #[inline(always)]
     fn count(&self) -> usize {
         self.inner.visible_count
     }
@@ -231,6 +241,7 @@ where
 {
     type ImmPull = &'imm ImmData;
 
+    #[inline(always)]
     fn insert(
         &mut self,
         Data { imm_data, mut_data }: Data<ImmData, MutData>,
@@ -292,6 +303,7 @@ where
         }
     }
 
+    #[inline(always)]
     fn pull(&mut self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmPull, MutData> {
         if let Some(mut_entry) = self.inner.mut_data.get_mut(key.index) {
             unsafe {
@@ -339,6 +351,7 @@ where
     MutData: Clone,
     ImmData: Clone,
 {
+    #[inline(always)]
     fn hide(&mut self, key: <Self::Col as Keyable>::Key) -> Result<(), KeyError> {
         if let Some(MutEntry { imm_ptr, mut_data }) = self.inner.mut_data.get_mut(key.index) {
             unsafe {
@@ -355,6 +368,7 @@ where
         }
     }
 
+    #[inline(always)]
     fn reveal(&mut self, key: <Self::Col as Keyable>::Key) -> Result<(), KeyError> {
         if let Some(MutEntry { imm_ptr, mut_data }) = self.inner.mut_data.get_mut(key.index) {
             unsafe {

@@ -3,6 +3,7 @@
 //! - Just above the abstraction for a key-value store due to aggregations.
 
 use emdb::macros::emql;
+use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use userdetails::Database;
 
 emql! {
@@ -13,6 +14,12 @@ emql! {
         interface = userdetails,
         pub = on,
         ds_name = EmDB,
+    };
+    impl emdb_inlined_impl as Serialized{
+        interface = userdetails,
+        pub = on,
+        ds_name = EmDBInlined,
+        aggressive_inlining = on,
     };
 
     // Reasoning:
@@ -128,5 +135,57 @@ impl GetNewUserKey for emdb_impl::EmDB {
     }
 }
 
+impl GetNewUserKey for emdb_inlined_impl::EmDBInlined {
+    fn new_user_wrap<'imm>(
+        db: &mut Self::DB<'imm>,
+        username: String,
+        prem: bool,
+        start_creds: Option<i32>,
+    ) -> <Self as userdetails::Datastore>::users_key {
+        db.new_user(username, prem, start_creds).unwrap().user_id
+    }
+}
+
 pub mod duckdb_impl;
 pub mod sqlite_impl;
+
+pub fn random_user(rng: &mut ThreadRng, id: usize) -> (String, bool, Option<i32>) {
+    let prem = rng.gen_bool(0.5);
+    (
+        format!("User{id}"),
+        prem,
+        if prem {
+            if rng.gen_bool(0.5) {
+                Some(rng.gen_range(2..100))
+            } else {
+                None
+            }
+        } else {
+            Some(rng.gen_range(2..100))
+        },
+    )
+}
+
+pub fn random_table<'a, const SIZE: usize, DS: userdetails::Datastore + GetNewUserKey>(
+) -> (Vec<DS::users_key>, DS) {
+    let mut ds = DS::new();
+    let mut ids;
+    {
+        let mut db = ds.db();
+        let mut rng = rand::thread_rng();
+
+        ids = (0..SIZE)
+            .map(|i| {
+                let (user, prem, init) = random_user(&mut rng, i);
+                DS::new_user_wrap(&mut db, user, prem, init)
+            })
+            .collect::<Vec<DS::users_key>>();
+        ids.shuffle(&mut rng);
+
+        for id in ids.iter() {
+            db.add_credits(*id, rng.gen_range(2..100));
+        }
+        db.reward_premium(2f32);
+    }
+    (ids, ds)
+}

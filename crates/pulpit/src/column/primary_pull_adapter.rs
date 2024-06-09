@@ -1,5 +1,7 @@
 use std::marker::PhantomData;
 
+use assume::assume;
+
 use super::*;
 
 #[derive(Clone, Copy)]
@@ -17,6 +19,7 @@ struct GenInfo {
 }
 
 impl GenInfo {
+    #[inline(always)]
     fn lookup_key<Store>(&self, key: GenKey<Store, usize>) -> Result<UnsafeIndex, KeyError> {
         match self.generations.get(key.index) {
             Some(GenEntry::Generation(g)) if key.generation == *g => Ok(key.index),
@@ -24,6 +27,7 @@ impl GenInfo {
         }
     }
 
+    #[inline(always)]
     fn pull_key<Store>(&mut self, key: GenKey<Store, usize>) -> Result<UnsafeIndex, KeyError> {
         if let Some(entry) = self.generations.get_mut(key.index) {
             if let GenEntry::Generation(_) = entry {
@@ -43,6 +47,7 @@ impl GenInfo {
         }
     }
 
+    #[inline(always)]
     fn hide_key<Store>(&mut self, key: GenKey<Store, usize>) -> Result<(), KeyError> {
         if let Some(entry) = self.generations.get_mut(key.index) {
             match *entry {
@@ -58,6 +63,7 @@ impl GenInfo {
         }
     }
 
+    #[inline(always)]
     fn reveal_key<Store>(&mut self, key: GenKey<Store, usize>) -> Result<(), KeyError> {
         if let Some(entry) = self.generations.get_mut(key.index) {
             match *entry {
@@ -73,6 +79,7 @@ impl GenInfo {
         }
     }
 
+    #[inline(always)]
     fn scan<Store>(&self) -> impl Iterator<Item = GenKey<Store, usize>> + '_ {
         self.generations
             .iter()
@@ -87,6 +94,7 @@ impl GenInfo {
             })
     }
 
+    #[inline(always)]
     fn insert<Store>(&mut self) -> (GenKey<Store, usize>, InsertAction) {
         if let Some(k) = self.next_free {
             // TODO: could use unchecked here
@@ -104,7 +112,7 @@ impl GenInfo {
                         InsertAction::Place(k),
                     )
                 }
-                _ => unreachable!(),
+                _ => assume!(unsafe: @unreachable),
             }
         } else {
             let index = self.generations.len();
@@ -153,7 +161,7 @@ impl Column for PrimaryPullAdapter {
             },
             mut_val: (),
         }
-    }
+    }  
 
     fn window(&mut self) -> Self::WindowKind<'_> {
         Window { inner: self }
@@ -164,6 +172,7 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> {
     type ImmGet = ();
     type Col = PrimaryPullAdapter;
 
+    #[inline(always)]
     fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, ()> {
         let index = self.inner.gen.lookup_key(key)?;
         Ok(Entry {
@@ -175,6 +184,7 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> {
         })
     }
 
+    #[inline(always)]
     fn brw(&self, key: <Self::Col as Keyable>::Key) -> Access<&(), &()> {
         let index = self.inner.gen.lookup_key(key)?;
         Ok(Entry {
@@ -186,6 +196,7 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> {
         })
     }
 
+    #[inline(always)]
     fn brw_mut(&mut self, key: <Self::Col as Keyable>::Key) -> Access<&(), &mut ()> {
         let index = self.inner.gen.lookup_key(key)?;
         Ok(Entry {
@@ -197,12 +208,15 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> {
         })
     }
 
+    #[inline(always)]
     fn conv_get(_: Self::ImmGet) {}
 
+    #[inline(always)]
     fn scan<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
         self.inner.gen.scan()
     }
 
+    #[inline(always)]
     fn count(&self) -> usize {
         self.inner.gen.count()
     }
@@ -211,6 +225,7 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> {
 impl<'imm> PrimaryWindowPull<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> {
     type ImmPull = ();
 
+    #[inline(always)]
     fn pull(&mut self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmPull, ()> {
         let index = self.inner.gen.pull_key(key)?;
         Ok(Entry {
@@ -222,18 +237,22 @@ impl<'imm> PrimaryWindowPull<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> 
         })
     }
 
+    #[inline(always)]
     fn insert(&mut self, _: Data<(), ()>) -> (<Self::Col as Keyable>::Key, InsertAction) {
         self.inner.gen.insert()
     }
 
+    #[inline(always)]
     fn conv_pull(_: Self::ImmPull) {}
 }
 
 impl<'imm> PrimaryWindowHide<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> {
+    #[inline(always)]
     fn hide(&mut self, key: <Self::Col as Keyable>::Key) -> Result<(), KeyError> {
         self.inner.gen.hide_key(key)
     }
 
+    #[inline(always)]
     fn reveal(&mut self, key: <Self::Col as Keyable>::Key) -> Result<(), KeyError> {
         self.inner.gen.reveal_key(key)
     }

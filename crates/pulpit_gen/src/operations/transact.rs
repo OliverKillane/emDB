@@ -1,5 +1,6 @@
 use super::{update::Update, SingleOp};
 use crate::{groups::Groups, namer::CodeNamer};
+use proc_macro2::TokenStream;
 use quote::quote;
 
 pub fn generate(
@@ -8,6 +9,7 @@ pub fn generate(
     namer: &CodeNamer,
     deletions: bool,
     _transactions: bool,
+    op_attrs: &TokenStream,
 ) -> SingleOp {
     let CodeNamer {
         struct_window,
@@ -71,6 +73,7 @@ pub fn generate(
                 /// Commit all current changes
                 /// - Requires concretely applying deletions (which until commit 
                 ///   or abort simply hide keys from the table)
+                #op_attrs
                 pub fn #method_commit(&mut self) {
                     debug_assert!(!self.#table_member_transactions.#mod_transactions_struct_data_member_rollback);
                     while let Some(entry) = self.#table_member_transactions.#mod_transactions_struct_data_member_log.pop() {
@@ -86,6 +89,7 @@ pub fn generate(
                 /// Undo the transactions applied since the last commit
                 /// - Requires re-applying all updates, deleting inserts and undoing deletes 
                 ///   (deletes' keys are actually just hidden until commit or abort)
+                #op_attrs
                 pub fn #method_abort(&mut self) {
                     self.#table_member_transactions.#mod_transactions_struct_data_member_rollback = true;
                     while let Some(entry) = self.#table_member_transactions.#mod_transactions_struct_data_member_log.pop() {
@@ -114,6 +118,7 @@ pub fn generate(
             impl <'imm> #struct_window<'imm> {
                 /// Commit all current changes
                 /// - Clears the rollback log
+                #op_attrs
                 pub fn #method_commit(&mut self) {
                     debug_assert!(!self.#table_member_transactions.#mod_transactions_struct_data_member_rollback);
                     self.#table_member_transactions.#mod_transactions_struct_data_member_log.clear()
@@ -122,6 +127,7 @@ pub fn generate(
                 /// Undo the transactions applied since the last commit
                 /// - Requires re-applying all updates, deleting inserts and undoing deletes
                 ///   (deletes' keys are actually just hidden until commit or abort)
+                #op_attrs
                 pub fn #method_abort(&mut self) {
                     self.#table_member_transactions.#mod_transactions_struct_data_member_rollback = true;
                     while let Some(entry) = self.#table_member_transactions.#mod_transactions_struct_data_member_log.pop() {

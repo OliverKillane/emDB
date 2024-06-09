@@ -9,7 +9,7 @@ use crate::{
     predicates::Predicate,
     uniques::Unique,
 };
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use quote_debug::Tokens;
 use syn::{ExprLet, Ident};
@@ -58,6 +58,7 @@ pub fn generate(
     limit: &Option<Limit>,
     deletions: bool,
     transactions: bool,
+    op_attrs: &TokenStream,
 ) -> SingleOp {
     let CodeNamer {
         type_key,
@@ -235,6 +236,7 @@ pub fn generate(
             .into(),
             op_impl: quote! {
                 impl <'imm> #struct_window<'imm> {
+                    #op_attrs
                     pub fn #method_insert(&mut self, #insert_val: #mod_insert::#mod_insert_struct_insert) -> #type_key {
                         #(#splitting;)*
                         #add_action
@@ -261,6 +263,7 @@ pub fn generate(
             .into(),
             op_impl: quote! {
                 impl <'imm> #struct_window<'imm> {
+                    #op_attrs
                     pub fn #method_insert(&mut self, #insert_val: #mod_insert::#mod_insert_struct_insert) -> Result<#type_key, #mod_insert::#mod_insert_enum_error> {
                         #limit_cons
                         #(#predicate_checks)*

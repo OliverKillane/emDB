@@ -98,7 +98,7 @@ pub fn generate_get_struct_fields<'a>(
     def_fields
 }
 
-pub fn generate(groups: &Groups, namer: &CodeNamer) -> SingleOp {
+pub fn generate(groups: &Groups, namer: &CodeNamer, op_attrs: &TokenStream) -> SingleOp {
     let CodeNamer {
         type_key_error,
         type_key,
@@ -158,6 +158,7 @@ pub fn generate(groups: &Groups, namer: &CodeNamer) -> SingleOp {
         .into(),
         op_impl: quote! {
             impl <#lifetime_imm> #struct_window<#lifetime_imm> {
+                #op_attrs
                 pub fn #method_get(&self, key: #type_key) -> Result<#mod_get::#mod_get_struct_get #lifetime, #type_key_error> {
                     let #pulpit_path::column::Entry {index, data: #name_primary_column} = match self.#table_member_columns.#name_primary_column.get(key) {
                         Ok(entry) => entry,

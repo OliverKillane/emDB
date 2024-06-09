@@ -29,7 +29,7 @@ fn generate_borrow_fields<'a>(
     })
 }
 
-pub fn generate(groups: &Groups, namer: &CodeNamer) -> SingleOp {
+pub fn generate(groups: &Groups, namer: &CodeNamer, op_attrs: &TokenStream) -> SingleOp {
     let CodeNamer {
         type_key,
         struct_window,
@@ -73,6 +73,7 @@ pub fn generate(groups: &Groups, namer: &CodeNamer) -> SingleOp {
         .into(),
         op_impl: quote! {
             impl <'imm> #struct_window<'imm> {
+                #op_attrs
                 pub fn #struct_window_method_borrow<'brw>(&'brw self, key: #type_key) -> Result<#mod_borrow::#mod_borrow_struct_borrow<'brw>, #type_key_error> {
                     let #pulpit_path::column::Entry {index, data: #name_primary_column} = match self.#struct_table_member_columns.#name_primary_column.brw(key) {
                         Ok(entry) => entry,

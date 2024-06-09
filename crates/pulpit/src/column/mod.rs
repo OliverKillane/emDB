@@ -167,8 +167,6 @@
 //!
 //! ### Optimisation Study
 //! We can further optimise the tables with:
-//! - careful use of [`std::hint::unreachable_unchecked`]
-//! - applying inlining where relevant
 //! - removing missed bounds checks in [`AssocWindow`] implementations
 
 use std::{hash::Hash, marker::PhantomData, mem::transmute};
@@ -221,6 +219,7 @@ pub struct Data<ImmData, MutData> {
 }
 
 impl<ImmData, MutData> Data<ImmData, MutData> {
+    #[inline(always)]
     pub fn convert_imm<ImmDataProcessed>(
         self,
         trans: impl Fn(ImmData) -> ImmDataProcessed,
@@ -391,18 +390,21 @@ pub struct GenKey<Store, GenCounter: Copy + Eq> {
 }
 
 impl<Store, GenCounter: Copy + Eq> PartialEq for GenKey<Store, GenCounter> {
+    #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         self.index == other.index && self.generation == other.generation
     }
 }
 impl<Store, GenCounter: Copy + Eq> Eq for GenKey<Store, GenCounter> {}
 impl<Store, GenCounter: Copy + Eq> Clone for GenKey<Store, GenCounter> {
+    #[inline(always)]
     fn clone(&self) -> Self {
         *self
     }
 }
 impl<Store, GenCounter: Copy + Eq> Copy for GenKey<Store, GenCounter> {}
 impl<Store, GenCounter: Copy + Eq + Hash> Hash for GenKey<Store, GenCounter> {
+    #[inline(always)]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.index.hash(state);
         self.generation.hash(state);
@@ -429,17 +431,18 @@ mod utils {
     }
 
     impl<Value, const BLOCK_SIZE: usize> Blocks<Value, BLOCK_SIZE> {
+        #[inline(always)]
         pub fn new(size_hint: usize) -> Self {
             Blocks {
                 count: 0,
                 data: Vec::with_capacity(size_hint / BLOCK_SIZE + 1),
             }
         }
-
+        #[inline(always)]
         pub fn count(&self) -> usize {
             self.count
         }
-
+        #[inline(always)]
         pub fn append(&mut self, val: Value) -> *mut Value {
             let (block, seq) = quotrem::<BLOCK_SIZE>(self.count);
             let data_ptr;
@@ -456,23 +459,27 @@ mod utils {
         }
 
         /// Must not be used if references to the value still exist.
+        #[inline(always)]
         pub unsafe fn unppend(&mut self) {
             let (block, seq) = quotrem::<BLOCK_SIZE>(self.count - 1);
             self.data.get_unchecked_mut(block)[seq].assume_init_drop();
             self.count -= 1;
         }
 
+        #[inline(always)]
         pub unsafe fn get(&self, ind: usize) -> &Value {
             let (block, seq) = quotrem::<BLOCK_SIZE>(ind);
             self.data.get_unchecked(block)[seq].assume_init_ref()
         }
 
+        #[inline(always)]
         pub unsafe fn get_mut(&mut self, ind: usize) -> &mut Value {
             let (block, seq) = quotrem::<BLOCK_SIZE>(ind);
             self.data.get_unchecked_mut(block)[seq].assume_init_mut()
         }
     }
 
+    #[inline(always)]
     pub fn quotrem<const DIV: usize>(val: usize) -> (usize, usize) {
         (val / DIV, val % DIV)
     }

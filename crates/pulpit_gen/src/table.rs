@@ -6,6 +6,7 @@ use crate::{
     operations::{self, get::get_struct_fields, SingleOpFn},
     uniques::UniqueDec,
 };
+use proc_macro2::TokenStream;
 use quote::quote;
 use quote_debug::Tokens;
 use syn::{Ident, ItemImpl, ItemMod, ItemStruct, Type};
@@ -17,6 +18,24 @@ use super::{
     predicates::{self, Predicate},
     uniques::{self, Unique},
 };
+
+pub enum AttrKinds {
+    Inline,
+    Custom(TokenStream)
+}
+
+/// Attributes to apply to the publicly accessible operation of the table
+/// - Inlining for example
+/// 
+/// TODO: In future add statistics (logging methods calls)
+impl AttrKinds {
+    pub fn to_tokens(&self) -> TokenStream {
+        match self {
+            AttrKinds::Inline => quote!(#[inline(always)]),
+            AttrKinds::Custom(tokens) => quote!(#[#tokens]),
+        }
+    }
+}
 
 pub struct Table {
     pub groups: Groups,
@@ -109,7 +128,7 @@ impl Table {
     pub fn insert_can_error(&self) -> bool {
         !self.predicates.is_empty() || !self.uniques.is_empty() || self.limit.is_some()
     }
-    pub fn generate(&self, namer: &CodeNamer) -> Tokens<ItemMod> {
+    pub fn generate(&self, namer: &CodeNamer, attrs: Vec<AttrKinds>) -> Tokens<ItemMod> {
         let Self {
             groups,
             uniques,
@@ -121,6 +140,8 @@ impl Table {
             transactions,
             deletions,
         } = self;
+
+        let op_attrs = attrs.iter().map(AttrKinds::to_tokens).collect::<TokenStream>();
 
         let CodeNamer {
             pulpit_path,
@@ -144,8 +165,8 @@ impl Table {
         } = uniques::generate(uniques, groups, namer);
 
         let mut ops_mod_code = vec![
-            operations::borrow::generate(groups, namer),
-            operations::get::generate(groups, namer),
+            operations::borrow::generate(groups, namer, &op_attrs),
+            operations::get::generate(groups, namer, &op_attrs),
             operations::update::generate(
                 updates,
                 groups,
@@ -153,6 +174,7 @@ impl Table {
                 predicates,
                 namer,
                 *transactions,
+                &op_attrs
             ),
             operations::insert::generate(
                 groups,
@@ -162,8 +184,9 @@ impl Table {
                 limit,
                 *deletions,
                 *transactions,
+                &op_attrs
             ),
-            operations::unique_get::generate(groups, uniques, namer),
+            operations::unique_get::generate(groups, uniques, namer, &op_attrs),
         ];
         if *transactions {
             ops_mod_code.push(operations::transact::generate(
@@ -172,12 +195,13 @@ impl Table {
                 namer,
                 *deletions,
                 *transactions,
+                &op_attrs
             ))
         }
 
         let mut ops_fn_code = vec![
-            operations::count::generate(namer),
-            operations::scan::generate(namer),
+            operations::count::generate(namer, &op_attrs),
+            operations::scan::generate(namer, &op_attrs),
         ];
 
         if *deletions {
@@ -186,6 +210,7 @@ impl Table {
                 groups,
                 uniques,
                 *transactions,
+                &op_attrs,
             ))
         }
 

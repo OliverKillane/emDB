@@ -7,7 +7,7 @@ use quote::ToTokens;
 pub fn simple(tokens: TokenStream) -> TokenStream {
     match pulpit_gen::macros::simple::simple(tokens.into()) {
         Ok(ts) => pulpit_gen::selector::basic::selector(ts)
-            .generate(&pulpit_gen::namer::CodeNamer::pulpit())
+            .generate(&pulpit_gen::namer::CodeNamer::pulpit(), vec![])
             .into_token_stream()
             .into(),
         Err(es) => {

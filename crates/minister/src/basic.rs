@@ -8,7 +8,7 @@ pub struct Basic;
 impl Physical for Basic {
     type Stream<Data> = Vec<Data>;
     type Single<Data> = Data;
-
+    
     fn consume_stream<Data>(iter: impl Iterator<Item = Data>) -> Self::Stream<Data> {
         iter.collect()
     }

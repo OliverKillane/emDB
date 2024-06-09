@@ -34,6 +34,7 @@ impl Predicate {
         let name = &self.alias;
         let body = &self.tokens;
         quote! {
+            #[inline(always)]
             pub fn #name(super::#mod_borrow::#mod_borrow_struct_borrow { #struct_args }: super::#mod_borrow::#mod_borrow_struct_borrow) -> bool {
                 #body
             }

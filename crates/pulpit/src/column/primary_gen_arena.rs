@@ -36,6 +36,7 @@ where
     type ImmGet = ImmData;
     type Col = PrimaryGenerationalArena<ImmData, MutData>;
 
+    #[inline(always)]
     fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, MutData> {
         let Entry {
             data: Data { imm_data, mut_data },
@@ -50,6 +51,7 @@ where
         })
     }
 
+    #[inline(always)]
     fn brw(&self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &MutData> {
         match self.inner.arena.get(key) {
             Some(Data { imm_data, mut_data }) => Ok(Entry {
@@ -60,6 +62,7 @@ where
         }
     }
 
+    #[inline(always)]
     fn brw_mut(&mut self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &mut MutData> {
         match self.inner.arena.get_mut(key) {
             Some(Data { imm_data, mut_data }) => Ok(Entry {
@@ -70,14 +73,17 @@ where
         }
     }
 
+    #[inline(always)]
     fn conv_get(get: Self::ImmGet) -> ImmData {
         get
     }
 
+    #[inline(always)]
     fn scan<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
         self.inner.arena.iter().map(|(key, _)| key)
     }
 
+    #[inline(always)]
     fn count(&self) -> usize {
         self.inner.arena.len()
     }
@@ -91,6 +97,7 @@ where
 {
     type ImmPull = ImmData;
 
+    #[inline(always)]
     fn insert(
         &mut self,
         val: Data<ImmData, MutData>,
@@ -107,6 +114,7 @@ where
         )
     }
 
+    #[inline(always)]
     fn pull(&mut self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmPull, MutData> {
         match self.inner.arena.remove(key) {
             Some(Data { imm_data, mut_data }) => Ok(Entry {
@@ -117,6 +125,7 @@ where
         }
     }
 
+    #[inline(always)]
     fn conv_pull(pull: Self::ImmPull) -> ImmData {
         pull
     }

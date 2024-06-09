@@ -239,6 +239,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "assume"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d6f9ca11400f14ef046700eb6401c706c587871303453a5e7586efb82340c3d"
+
+[[package]]
 name = "atoi"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1127,6 +1133,7 @@ dependencies = [
 name = "pulpit"
 version = "0.1.0"
 dependencies = [
+ "assume",
  "combi",
  "enumtrait",
  "proc-macro-error",

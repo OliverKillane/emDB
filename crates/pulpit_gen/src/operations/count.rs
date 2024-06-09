@@ -1,8 +1,9 @@
 use super::SingleOpFn;
 use crate::namer::CodeNamer;
+use proc_macro2::TokenStream;
 use quote::quote;
 
-pub fn generate(namer: &CodeNamer) -> SingleOpFn {
+pub fn generate(namer: &CodeNamer, op_attrs: &TokenStream) -> SingleOpFn {
     let CodeNamer {
         struct_window_method_count: method_count,
         struct_window,
@@ -14,6 +15,7 @@ pub fn generate(namer: &CodeNamer) -> SingleOpFn {
     SingleOpFn {
         op_impl: quote! {
             impl <'imm> #struct_window<'imm> {
+                #op_attrs
                 pub fn #method_count(&self) -> usize {
                     self.#table_member_columns.#name_primary_column.count()
                 }
