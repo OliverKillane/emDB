@@ -119,8 +119,8 @@ pub fn populate_table<DS: data_logs::Datastore>(rng: &mut ThreadRng, size: usize
                 t,
                 choose! { rng
                   3 => None,
-                  2 => Some(String::from("This is a short string")), // 22 chars
-                  1 => Some(String::from("This is a very very very very very very very very long string")), // 61 chars
+                  2 => Some(format!("This is a short {t} string")),
+                  1 => Some(format!("This is a {t} very very very {t} very very {t} very very very {t} long string")),
                 },
                 choose! { rng
                   1 => LogLevel::Error,
@@ -135,3 +135,4 @@ pub fn populate_table<DS: data_logs::Datastore>(rng: &mut ThreadRng, size: usize
 
 pub mod duckdb_impl;
 pub mod sqlite_impl;
+mod thunderdome_emdb_impl; pub use thunderdome_emdb_impl::*;

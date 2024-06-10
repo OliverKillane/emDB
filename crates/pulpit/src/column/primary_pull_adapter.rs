@@ -1,5 +1,5 @@
-use assume::assume;
 use super::*;
+use assume::assume;
 
 #[derive(Clone, Copy)]
 enum GenEntry {

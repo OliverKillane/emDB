@@ -2,7 +2,7 @@ use quote::{quote, ToTokens};
 use quote_debug::Tokens;
 use std::collections::HashMap;
 use syn::{Ident, ItemImpl, ItemMod, ItemStruct, Type};
-
+use pulpit::gen::selector::{TableSelectors, SelectorImpl};
 use super::namer::SerializedNamer;
 use crate::{backend::interface::{namer::InterfaceNamer, InterfaceTrait, public::exposed_keys}, plan};
 
@@ -21,7 +21,7 @@ pub struct TableWindow<'imm> {
 
 /// Generate the tokens for the tables, and the struct to hold them (in [`TableWindow`]).
 /// - Generates the tokens for the [`plan::ScalarType`]s of table fields assuming they are just [`plan::ScalarTypeConc::Rust`] tyes
-pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<InterfaceTrait>, namer: &SerializedNamer, inlining: bool) -> TableWindow<'imm> {
+pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<InterfaceTrait>, namer: &SerializedNamer, selector: &TableSelectors, inlining: bool) -> TableWindow<'imm> {
     // get the constraints and fields of each table
     let mut pulpit_configs = lp
         .tables
@@ -126,7 +126,7 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
     let (get_types, gen_data): (HashMap<_, _>, Vec<_>) = pulpit_configs
         .into_iter()
         .map(|(key, config)| {
-            let table_impl = pulpit::gen::selector::basic::selector(config);
+            let table_impl = selector.select_table(config);
             (
                 (key, table_impl.op_get_types(pulpit_namer)),
                 (

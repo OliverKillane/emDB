@@ -11,14 +11,14 @@ super::generate_minister_trait! { IterOps }
 /// ## Rust Iterator based Operators
 /// Implements a hybrid-push-full operator model.
 /// - **Pull** Uses lazily evaluated rust iterators as the stream type
-/// - **Push** All single values are structly evaluated, similarly for buffering 
+/// - **Push** All single values are structly evaluated, similarly for buffering
 ///   operations.
-/// 
-/// While rust iterators implement a lazily evaluated pull model at a high level. They do not suffer 
+///
+/// While rust iterators implement a lazily evaluated pull model at a high level. They do not suffer
 /// from the repeated `.next()` calls and option checking in release builds.
-/// 
+///
 /// In fact, due to in place collection, iterators can be faster than loop. (See the `iterators` benchmark).
-/// 
+///
 /// ## Interesting Reads
 /// - [Comparing Performance: Loops vs Iterators](https://doc.rust-lang.org/book/ch13-04-performance.html)
 pub struct Iter;

@@ -10,7 +10,7 @@ macro_rules! stream { ($data:ty) => { impl ParallelIterator<Item = $data> }; }
 super::generate_minister_trait! { ParallelOps }
 
 /// ## A very slow (😒) but maximally parallel implementation with [rayon]
-/// - Every single operation that can be made a task is sent to the thread pool (massive 
+/// - Every single operation that can be made a task is sent to the thread pool (massive
 ///   contention, and overhead for small tasks).
 pub struct Parallel;
 
@@ -256,10 +256,12 @@ impl ParallelOps for Parallel {
             right
                 .into_par_iter()
                 .filter_map(|r| {
-                    lefts.get(right_split(&r)).map(|ls| ls.par_iter()
-                                .map(|l| ((*l).clone(), r.clone()))
-                                .collect::<Vec<_>>()
-                                .into_par_iter())
+                    lefts.get(right_split(&r)).map(|ls| {
+                        ls.par_iter()
+                            .map(|l| ((*l).clone(), r.clone()))
+                            .collect::<Vec<_>>()
+                            .into_par_iter()
+                    })
                 })
                 .flatten()
                 .collect::<Vec<_>>()
@@ -274,10 +276,12 @@ impl ParallelOps for Parallel {
             }
             left.into_par_iter()
                 .filter_map(|l| {
-                    rights.get(left_split(&l)).map(|rs| rs.par_iter()
-                                .map(|r| (l.clone(), (*r).clone()))
-                                .collect::<Vec<_>>()
-                                .into_par_iter())
+                    rights.get(left_split(&l)).map(|rs| {
+                        rs.par_iter()
+                            .map(|r| (l.clone(), (*r).clone()))
+                            .collect::<Vec<_>>()
+                            .into_par_iter()
+                    })
                 })
                 .flatten()
                 .collect::<Vec<_>>()

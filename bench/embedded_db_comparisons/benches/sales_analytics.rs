@@ -2,10 +2,7 @@ use divan::{black_box_drop, Bencher};
 use embedded_db_comparisons::{
     sales_analytics::{
         duckdb_impl::DuckDB,
-        emdb_basic_impl::EmDBBasic,
-        emdb_parallel_impl::EmDBParallel,
         emdb_iter_impl::EmDBIter,
-        emdb_chunk_impl::EmDBChunk,
         sales_analytics::{Database, Datastore},
         sqlite_impl::SQLite,
         TableConfig,
@@ -16,7 +13,7 @@ use rand::{rngs::ThreadRng, Rng};
 
 #[divan::bench(
     name = "random_workloads",
-    types = [SQLite, EmDBParallel, EmDBBasic, EmDBIter, EmDBChunk, DuckDB],
+    types = [EmDBIter, SQLite, DuckDB],
     consts = [1024, 8192, 16384],
     max_time = 10
 )]

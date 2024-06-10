@@ -41,6 +41,7 @@ emql! {
     impl my_db as Serialized {
         // debug_file = "emdb/tests/code.rs",
         // op_impl = Parallel,
+        // table_select = Thunderdome,
     };
 
     table customers {

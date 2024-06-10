@@ -12,7 +12,6 @@ use combi::{
         basic::{collectuntil, getident, gettoken, isempty, matchident, peekident, syn}, error::error, options::{OptEnd, OptField, OptParse}, TokenDiagnostic, TokenIter, TokenParser
     }, Combi
 };
-use operators::OperatorImpls;
 use prettyplease::unparse;
 use proc_macro2::TokenStream;
 use proc_macro_error::{Diagnostic, Level};
@@ -20,9 +19,11 @@ use queries::QueriesInfo;
 use quote::quote;
 use std::{collections::LinkedList, fs::File, io::Write, path::Path};
 use syn::{parse2, File as SynFile, Ident, LitStr};
+use pulpit::gen::selector::{TableSelectors, MutabilitySelector, ThunderdomeSelector};
 
 use super::{interface::InterfaceTrait, EMDBBackend};
 use crate::utils::{misc::singlelist, on_off::on_off};
+use operators::OperatorImpls;
 
 mod closures;
 pub mod namer;
@@ -38,6 +39,7 @@ pub struct Serialized {
     ds_name: Option<Ident>,
     aggressive_inlining: bool,
     operator_impl: OperatorImpls,
+    table_selector: TableSelectors,
 }
 
 fn operator_impl_parse() -> impl TokenParser<OperatorImpls> {
@@ -47,6 +49,14 @@ fn operator_impl_parse() -> impl TokenParser<OperatorImpls> {
         peekident("Parallel") => mapsuc(matchident("Parallel"), |_| OperatorImpls::Parallel),
         peekident("Chunk") => mapsuc(matchident("Chunk"), |_| OperatorImpls::Chunk),
         otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, "Invalid Operator Choice".to_owned()))
+    )
+} 
+
+fn table_select_parse() -> impl TokenParser<TableSelectors> {
+    choices! (
+        peekident("Mutability") => mapsuc(matchident("Mutability"), |_| MutabilitySelector.into()),
+        peekident("Thunderdome") => mapsuc(matchident("Thunderdome"), |_| ThunderdomeSelector.into()),
+        otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, "Invalid Table Selector Choice".to_owned()))
     )
 }
 
@@ -58,6 +68,7 @@ impl EMDBBackend for Serialized {
         options: Option<proc_macro2::TokenStream>,
     ) -> Result<Self, std::collections::LinkedList<proc_macro_error::Diagnostic>> {
         const DEFAULT_OP_IMPL: OperatorImpls = OperatorImpls::Iter;
+        const DEFAULT_TABLE_SELECTOR: TableSelectors = TableSelectors::MutabilitySelector(MutabilitySelector);
         if let Some(opts) = options {
             let parser = (
                 OptField::new("debug_file", || syn(collectuntil(isempty()))),
@@ -73,7 +84,10 @@ impl EMDBBackend for Serialized {
                                 OptField::new("aggressive_inlining", on_off),
                                 (
                                     OptField::new("op_impl", operator_impl_parse),
-                                    OptEnd
+                                    (
+                                        OptField::new("table_select", table_select_parse),
+                                        OptEnd
+                                    )
                                 )
                             )
                         )
@@ -84,7 +98,7 @@ impl EMDBBackend for Serialized {
             let (_, res) = parser.comp(TokenIter::from(opts, backend_name.span()));
             res.to_result()
                 .map_err(TokenDiagnostic::into_list)
-                .map(|(debug, (interface, (public, (ds_name, (inline_queries, (operator_impl, ()))))))| Serialized { debug, interface, public: public.unwrap_or(false), ds_name, aggressive_inlining: inline_queries.unwrap_or(false), operator_impl: operator_impl.unwrap_or(DEFAULT_OP_IMPL) })
+                .map(|(debug, (interface, (public, (ds_name, (inline_queries, (operator_impl, (table_selector, ())))))))| Serialized { debug, interface, public: public.unwrap_or(false), ds_name, aggressive_inlining: inline_queries.unwrap_or(false), operator_impl: operator_impl.unwrap_or(DEFAULT_OP_IMPL), table_selector: table_selector.unwrap_or(DEFAULT_TABLE_SELECTOR) })
         } else {
             Ok(Self {
                 debug: None,
@@ -93,6 +107,7 @@ impl EMDBBackend for Serialized {
                 ds_name: None,
                 aggressive_inlining: false,
                 operator_impl: DEFAULT_OP_IMPL,
+                table_selector: DEFAULT_TABLE_SELECTOR,
             })
         }
     }
@@ -114,7 +129,7 @@ impl EMDBBackend for Serialized {
             datastore_impl,
             database,
             table_generated_info,
-        } = tables::generate_tables(plan, &self.interface, &namer, self.aggressive_inlining);
+        } = tables::generate_tables(plan, &self.interface, &namer, &self.table_selector, self.aggressive_inlining);
 
         let record_defs =
             types::generate_record_definitions(plan, &table_generated_info.get_types, &namer);

@@ -2,10 +2,7 @@ use divan::{black_box, black_box_drop, Bencher};
 use embedded_db_comparisons::{
     user_details::{
         duckdb_impl::DuckDB,
-        emdb_basic_impl::EmDBBasic,
-        emdb_parallel_impl::EmDBParallel,
         emdb_iter_impl::EmDBIter,
-        emdb_chunk_impl::EmDBChunk,
         random_table, random_user,
         sqlite_impl::SQLite,
         user_details::{Database, Datastore},
@@ -25,7 +22,7 @@ fn main() {
 /// Time taken for a number of inserts of random premium/non-premium
 #[divan::bench(
     name = "random_inserts",
-    types = [SQLite, EmDBParallel, EmDBBasic, EmDBIter, EmDBChunk, DuckDB],
+    types = [EmDBIter, SQLite, DuckDB],
     consts = TABLE_SIZES
 )]
 fn inserts<T, const N: usize>(bencher: Bencher)
@@ -53,7 +50,7 @@ where
 /// Time taken to get ids in random order
 #[divan::bench(
     name = "random_get_ids",
-    types = [SQLite, EmDBParallel, EmDBBasic, EmDBIter, EmDBChunk, DuckDB],
+    types = [EmDBIter, SQLite, DuckDB],
     consts = TABLE_SIZES
 )]
 fn gets<T, const N: usize>(bencher: Bencher)
@@ -73,7 +70,7 @@ where
 /// Time taken to get a snapshot
 #[divan::bench(
     name = "snapshot",
-    types = [SQLite, EmDBParallel, EmDBBasic, EmDBIter, EmDBChunk, DuckDB],
+    types = [EmDBIter, SQLite, DuckDB],
     consts = TABLE_SIZES
 )]
 fn snapshot<T, const N: usize>(bencher: Bencher)
@@ -91,7 +88,7 @@ where
 /// Time taken to get the total credits of premium users
 #[divan::bench(
     name = "get_total_prem_credits",
-    types = [SQLite, EmDBParallel, EmDBBasic, EmDBIter, EmDBChunk, DuckDB],
+    types = [EmDBIter, SQLite, DuckDB],
     consts = TABLE_SIZES,
     max_time = 1
 )]
@@ -110,7 +107,7 @@ where
 /// Time taken to reward premium users
 #[divan::bench(
     name = "reward_premium_users",
-    types = [SQLite, EmDBParallel, EmDBBasic, EmDBIter, EmDBChunk, DuckDB],
+    types = [EmDBIter, SQLite, DuckDB],
     consts = TABLE_SIZES,
     max_time = 1
 )]
@@ -129,7 +126,7 @@ where
 /// Random workload of N actions
 #[divan::bench(
     name = "random_workloads",
-    types = [SQLite, EmDBParallel, EmDBBasic, EmDBIter, EmDBChunk, DuckDB],
+    types = [EmDBIter, SQLite, DuckDB],
     consts = [1024, 2048, 4096],
     max_time = 100
 )]

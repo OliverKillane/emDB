@@ -13,7 +13,7 @@ impl ColKind for PrimaryThunderDomeTrans {
 
     fn generate_base_type(&self, namer: &CodeNamer) -> Tokens<Type> {
         let CodeNamer { pulpit_path, .. } = namer;
-        quote! { #pulpit_path::column::PrimaryThunderDome }.into()
+        quote! { #pulpit_path::column::PrimaryThunderDomeTrans }.into()
     }
 
     fn check_column_application(

@@ -1,7 +1,9 @@
 //! ## Table Implementation Selection
 //! Provides functions for determining the structure of the [`crate::table::Table`] chosen.
 
-use crate::{limit::Limit, operations::update::Update, predicates::Predicate, uniques::Unique};
+use crate::{
+    limit::Limit, operations::update::Update, predicates::Predicate, table::Table, uniques::Unique,
+};
 use quote_debug::Tokens;
 use std::collections::HashMap;
 use syn::{Ident, Type};
@@ -18,8 +20,26 @@ pub struct SelectOperations {
     pub public: bool,
 }
 
-pub mod basic;
-pub mod retain;
+mod mutability;
+pub use mutability::MutabilitySelector;
+mod thunderdome;
+pub use thunderdome::ThunderdomeSelector;
+
+#[enumtrait::store(selector_impl_trait)]
+pub trait SelectorImpl {
+    fn select_table(&self, ops: SelectOperations) -> Table;
+}
+
+#[enumtrait::quick_enum]
+#[enumtrait::quick_from]
+#[enumtrait::store(table_selector_enum)]
+pub enum TableSelectors {
+    MutabilitySelector,
+    ThunderdomeSelector,
+}
+
+#[enumtrait::impl_trait(selector_impl_trait for table_selector_enum)]
+impl SelectorImpl for TableSelectors {}
 
 mod utils {
     use std::collections::HashMap;
