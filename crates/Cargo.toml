@@ -5,5 +5,5 @@ members = ["combi", "emdb", "emdb_core", "enumtrait", "pulpit", "pulpit_gen", "p
 [workspace.package]
 homepage = "https://github.com/OliverKillane/emDB"
 repository = "https://github.com/OliverKillane/emDB"
-license-file = "LICENSE"
+license-file = "../LICENSE"
 
