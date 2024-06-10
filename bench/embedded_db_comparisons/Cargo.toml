@@ -1,24 +1,28 @@
 [package]
-name = "experiments2"
+name = "embedded_db_comparisons"
 version = "0.1.0"
 edition = "2021"
 
 readme = "README.md"
-description = "A collection of experiments to support the thesis"
+description = "A collection of experiments to demonstrate emDB performance"
 keywords = ["experiment"]
 categories = ["experiment"]
+
+repository.workspace = true
+homepage.workspace = true
+license-file.workspace = true
 
 [dependencies]
 duckdb = { version = "0.10.2", features = ["bundled"] }
 rusqlite = { version = "0.31.0", features = ["bundled"] }
-emdb = { path = "../../../crates/emdb" }
+emdb = { path = "../../crates/emdb" }
 rand = "0.8"
 
 [dev-dependencies]
 divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }
 
 [[bench]]
-name = "userdetails"
+name = "user_details"
 harness = false
 
 [[bench]]

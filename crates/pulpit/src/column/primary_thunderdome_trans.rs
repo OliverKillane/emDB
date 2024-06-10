@@ -105,7 +105,7 @@ where
     }
 
     #[inline(always)]
-    fn scan_get(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
+    fn scan_get(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'static {
         self.scan_brw().collect::<Vec<_>>().into_iter()
     }
 

@@ -293,7 +293,7 @@ fn add_query(
 }
 
 /// Add a collection of streams to a context (e.g. a [`Query`], or the inside of
-/// a [`plan::ForEach`])
+/// a [`plan::Lift`])
 #[allow(clippy::too_many_arguments)]
 pub fn add_streams_to_context(
     lp: &mut plan::Plan,

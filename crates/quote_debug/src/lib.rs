@@ -2,8 +2,7 @@
 
 use proc_macro2::TokenStream;
 use quote::ToTokens;
-use std::{any::type_name, marker::PhantomData, ops::Deref};
-use syn::parse2;
+use std::{marker::PhantomData, ops::Deref};
 
 pub struct Tokens<T: syn::parse::Parse + ToTokens> {
     tks: TokenStream,
@@ -14,10 +13,10 @@ impl<T: syn::parse::Parse + ToTokens> From<TokenStream> for Tokens<T> {
     fn from(value: TokenStream) -> Self {
         #[cfg(debug_assertions)]
         {
-            if let Err(err) = parse2::<T>(value.clone()) {
+            if let Err(err) = syn::parse2::<T>(value.clone()) {
                 panic!(
                     "Attempted to parse as `{}` but failed with message:\n`{}`\nTokens: `{}`",
-                    type_name::<T>(),
+                    std::any::type_name::<T>(),
                     err,
                     value
                 )

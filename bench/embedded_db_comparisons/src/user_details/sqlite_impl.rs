@@ -13,7 +13,7 @@ fn mod_sqlite_int(inp: i64) -> i32 {
     inp as i32
 }
 
-impl super::userdetails::Datastore for SQLite {
+impl super::user_details::Datastore for SQLite {
     type DB<'imm> = Database<'imm>;
     type users_key = usize;
     fn new() -> Self {
@@ -41,7 +41,7 @@ impl super::userdetails::Datastore for SQLite {
     }
 }
 
-impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
+impl<'imm> super::user_details::Database<'imm> for Database<'imm> {
     type Datastore = SQLite;
     fn new_user(
         &mut self,
@@ -54,7 +54,7 @@ impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
                 "INSERT INTO users (name, premium, credits) VALUES (?, ?, ?) RETURNING id",
             )
             .unwrap()
-            .query_row::<<Self::Datastore as super::userdetails::Datastore>::users_key, _, _>(
+            .query_row::<<Self::Datastore as super::user_details::Datastore>::users_key, _, _>(
                 params![username, prem, start_creds.unwrap_or(0)],
                 |row| row.get(0),
             )
@@ -63,7 +63,7 @@ impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
 
     fn get_info(
         &self,
-        user_id: <Self::Datastore as super::userdetails::Datastore>::users_key,
+        user_id: <Self::Datastore as super::user_details::Datastore>::users_key,
     ) -> Result<(usize, String, bool, i32), ()> {
         self.conn
             .prepare_cached("SELECT name, premium, credits FROM users WHERE id = ?")
@@ -99,7 +99,7 @@ impl<'imm> super::userdetails::Database<'imm> for Database<'imm> {
 
     fn add_credits(
         &mut self,
-        user: <Self::Datastore as super::userdetails::Datastore>::users_key,
+        user: <Self::Datastore as super::user_details::Datastore>::users_key,
         creds: i32,
     ) -> Result<(), ()> {
         let rows = self
@@ -165,7 +165,7 @@ impl super::GetNewUserKey for SQLite {
         username: String,
         prem: bool,
         start_creds: Option<i32>,
-    ) -> <Self as super::userdetails::Datastore>::users_key {
+    ) -> <Self as super::user_details::Datastore>::users_key {
         db.new_user(username, prem, start_creds)
     }
 }

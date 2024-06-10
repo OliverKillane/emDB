@@ -1,15 +1,16 @@
-## Experiments
-
-### Embedded Databases Comparison
-
+## Embedded Databases Comparisons
 The duckdb and sqlite dependencies are very large as they include the respective databases.
 
 - For duckDB compilation may fail if there is insufficient memory and swap.
 - Both the duckDB and sqlite benchmarks take a very long time compared to the rust implemented comparisons.
 
 Consider increasing swap to avoid build failures.
-For WSL:
 
+```bash
+cargo bench
+```
+
+#### On WSL:
 ```toml
 # In your windows home directory, in .wslconfig
 # settings apply across all Linux distros running on WSL 2

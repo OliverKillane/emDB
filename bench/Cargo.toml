@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = ["embedded_db_comparisons"]
+
+[workspace.package]
+homepage = "https://github.com/OliverKillane/emDB"
+repository = "https://github.com/OliverKillane/emDB"
+license-file = "LICENSE"

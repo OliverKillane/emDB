@@ -30,8 +30,8 @@ impl<ImmData, MutData> Column for PrimaryGenerationalArena<ImmData, MutData> {
 impl<'imm, ImmData, MutData> PrimaryWindow<'imm, ImmData, MutData>
     for Window<'imm, PrimaryGenerationalArena<ImmData, MutData>>
 where
-    ImmData: Clone,
-    MutData: Clone,
+    ImmData: Clone + 'static,
+    MutData: Clone + 'static,
 {
     type ImmGet = ImmData;
     type Col = PrimaryGenerationalArena<ImmData, MutData>;
@@ -83,7 +83,7 @@ where
         self.inner.arena.iter().map(|(key, _)| key)
     }
 
-    fn scan_get(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
+    fn scan_get(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'static {
         self.scan_brw().collect::<Vec<_>>().into_iter()
     }
 
@@ -91,14 +91,13 @@ where
     fn count(&self) -> usize {
         self.inner.arena.len()
     }
-    
 }
 
 impl<'imm, ImmData, MutData> PrimaryWindowPull<'imm, ImmData, MutData>
     for Window<'imm, PrimaryGenerationalArena<ImmData, MutData>>
 where
-    ImmData: Clone,
-    MutData: Clone,
+    ImmData: Clone + 'static,
+    MutData: Clone + 'static,
 {
     type ImmPull = ImmData;
 

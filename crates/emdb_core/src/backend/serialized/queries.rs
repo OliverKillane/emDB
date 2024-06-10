@@ -213,7 +213,7 @@ pub struct QueriesInfo {
     pub query_mod: Tokens<ItemMod>,
 
     /// If there are no queries, we should not produce an impl block that does not 
-    /// use the [`SimpleNamer::db_lifetime`] as this will cause an error with span
+    /// use the [`SerializedNamer::db_lifetime`] as this will cause an error with span
     /// [`proc_macro2::Span::call_site`]
     pub query_impls: Option<Tokens<ItemImpl>>,
 }

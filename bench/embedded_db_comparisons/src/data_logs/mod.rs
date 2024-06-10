@@ -14,16 +14,29 @@ emql! {
     impl data_logs as Interface{
         pub = on,
     };
-    impl emdb_impl as Serialized{
+    impl emdb_parallel_impl as Serialized{
         interface = data_logs,
         pub = on,
-        ds_name = EmDB,
+        ds_name = EmDBParallel,
+        op_impl = Parallel,
     };
-    impl emdb_inlined_impl as Serialized{
+    impl emdb_basic_impl as Serialized{
         interface = data_logs,
         pub = on,
-        ds_name = EmDBInlined,
-        aggressive_inlining = on,
+        ds_name = EmDBBasic,
+        op_impl = Basic,
+    };
+    impl emdb_iter_impl as Serialized{
+        interface = data_logs,
+        pub = on,
+        ds_name = EmDBIter,
+        op_impl = Iter,
+    };
+    impl emdb_chunk_impl as Serialized{
+        interface = data_logs,
+        pub = on,
+        ds_name = EmDBChunk,
+        op_impl = Chunk,
     };
 
     table logs {

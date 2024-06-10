@@ -13,5 +13,11 @@ homepage.workspace = true
 license-file.workspace = true
 
 [dependencies]
+rayon = "1.10.0"
 
 [dev-dependencies]
+divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }
+
+[[bench]]
+name = "iterators"
+harness = false

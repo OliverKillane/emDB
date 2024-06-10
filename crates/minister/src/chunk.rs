@@ -1,4 +1,5 @@
 #![allow(clippy::ptr_arg)]
+use rayon::{current_num_threads, prelude::*};
 use std::collections::HashMap;
 
 macro_rules! single {
@@ -6,30 +7,61 @@ macro_rules! single {
         $data
     };
 }
-macro_rules! stream { ($data:ty) => { Vec<$data> }; }
-super::generate_minister_trait! { BasicOps }
+macro_rules! stream { ($data:ty) => { Vec<Vec<$data>> }; }
+super::generate_minister_trait! { ChunkOps }
 
-/// ## An extremely basic push operator implementation.
-/// - Designed to be as correct as possible
-/// - Simple implementation pushed values between vectors
-/// - No extra wrapping - it is literally just vectors
-///
-/// This implementation is easy to understand, and very clearly correct.
-pub struct Basic;
+/// ## A Slow (😒) parallel operator implementation that splits streams into chunks of data.
+pub struct Chunk;
 
-impl BasicOps for Basic {
+fn split_chunks<Data>(
+    data_size: usize,
+    mut input_data: impl Iterator<Item = Data>,
+) -> Vec<Vec<Data>> {
+    let num_cores = current_num_threads();
+    let chunk_size = data_size / num_cores;
+    let mut output_data = Vec::with_capacity(num_cores + 1);
+
+    if let Some(first) = input_data.next() {
+        let mut first_vec = Vec::with_capacity(chunk_size);
+        first_vec.push(first);
+        output_data.push(first_vec);
+
+        let mut current_chunk_size = 1;
+        for data in input_data {
+            if current_chunk_size == chunk_size {
+                let mut next_vec = Vec::with_capacity(chunk_size);
+                next_vec.push(data);
+                output_data.push(next_vec);
+            } else {
+                output_data.last_mut().unwrap().push(data);
+            }
+            current_chunk_size += 1;
+        }
+        output_data
+    } else {
+        debug_assert_eq!(data_size, 0);
+        output_data
+    }
+}
+
+fn merge_chunks<Data>(chunks: Vec<Vec<Data>>) -> Vec<Data> {
+    chunks.into_iter().flat_map(|v| v.into_iter()).collect()
+}
+
+impl ChunkOps for Chunk {
     fn consume_stream<Data>(iter: impl Iterator<Item = Data>) -> stream!(Data)
     where
         Data: Send + Sync,
     {
-        iter.collect()
+        let data = iter.collect::<Vec<_>>();
+        split_chunks(data.len(), data.into_iter())
     }
 
     fn consume_buffer<Data>(buff: Vec<Data>) -> stream!(Data)
     where
         Data: Send + Sync,
     {
-        buff
+        split_chunks(buff.len(), buff.into_iter())
     }
 
     fn consume_single<Data>(data: Data) -> single!(Data)
@@ -43,14 +75,14 @@ impl BasicOps for Basic {
     where
         Data: Send + Sync,
     {
-        stream.into_iter()
+        stream.into_iter().flatten()
     }
 
     fn export_buffer<Data>(stream: stream!(Data)) -> Vec<Data>
     where
         Data: Send + Sync,
     {
-        stream
+        stream.into_iter().flatten().collect()
     }
     fn export_single<Data>(single: single!(Data)) -> Data
     where
@@ -66,7 +98,11 @@ impl BasicOps for Basic {
         Data: Send + Sync,
         Error: Send + Sync,
     {
-        stream.into_iter().collect::<Result<_, _>>()
+        let mut output = Vec::with_capacity(stream.len());
+        for substream in stream {
+            output.push(substream.into_iter().collect::<Result<Vec<_>, _>>()?);
+        }
+        Ok(output)
     }
 
     fn error_single<Data, Error>(
@@ -87,18 +123,29 @@ impl BasicOps for Basic {
         InData: Send + Sync,
         OutData: Send + Sync,
     {
-        stream.into_iter().map(mapping).collect()
+        stream
+            .into_par_iter()
+            .map(|v| v.into_iter().map(&mapping).collect())
+            .collect()
     }
 
     fn map_seq<InData, OutData>(
         stream: stream!(InData),
-        mapping: impl FnMut(InData) -> OutData,
+        mut mapping: impl FnMut(InData) -> OutData,
     ) -> stream!(OutData)
     where
         InData: Send + Sync,
         OutData: Send + Sync,
     {
-        stream.into_iter().map(mapping).collect()
+        let mut output = Vec::with_capacity(stream.len());
+        for substream in stream {
+            let mut out_substream = Vec::with_capacity(substream.len());
+            for data in substream {
+                out_substream.push(mapping(data));
+            }
+            output.push(out_substream)
+        }
+        output
     }
 
     fn map_single<InData, OutData>(
@@ -119,7 +166,10 @@ impl BasicOps for Basic {
     where
         Data: Send + Sync,
     {
-        stream.into_iter().filter(|data| predicate(data)).collect()
+        stream
+            .into_par_iter()
+            .map(|v: Vec<Data>| v.into_iter().filter(&predicate).collect())
+            .collect()
     }
 
     fn all<Data>(
@@ -129,12 +179,7 @@ impl BasicOps for Basic {
     where
         Data: Send + Sync,
     {
-        for data in &stream {
-            if !predicate(data) {
-                return (false, stream);
-            }
-        }
-        (true, stream)
+        (stream.par_iter().all(|v| v.iter().all(&predicate)), stream)
     }
 
     fn is<Data>(single: single!(Data), predicate: impl Fn(&Data) -> bool) -> (bool, single!(Data))
@@ -148,7 +193,7 @@ impl BasicOps for Basic {
     where
         Data: Send + Sync,
     {
-        stream.len()
+        stream.into_par_iter().map(|v| v.len()).sum()
     }
 
     fn fold<InData, Acc>(
@@ -161,8 +206,10 @@ impl BasicOps for Basic {
         Acc: Send + Sync,
     {
         let mut acc = initial;
-        for data in stream {
-            acc = fold_fn(acc, data);
+        for substream in stream {
+            for data in substream {
+                acc = fold_fn(acc, data);
+            }
         }
         acc
     }
@@ -175,26 +222,34 @@ impl BasicOps for Basic {
     where
         Data: Send + Sync + Clone,
     {
-        stream.into_iter().reduce(combiner).unwrap_or(alternative)
+        stream
+            .into_par_iter()
+            .filter_map(|v| v.into_iter().reduce(&combiner))
+            .reduce(|| alternative.clone(), &combiner)
     }
 
     fn sort<Data>(
-        mut stream: stream!(Data),
+        stream: stream!(Data),
         ordering: impl Fn(&Data, &Data) -> std::cmp::Ordering + Send + Sync,
     ) -> stream!(Data)
     where
         Data: Send + Sync,
     {
-        stream.sort_unstable_by(ordering);
-        stream
+        let mut data = stream
+            .into_iter()
+            .flat_map(|v| v.into_iter())
+            .collect::<Vec<_>>();
+        data.par_sort_unstable_by(ordering);
+        split_chunks(data.len(), data.into_iter())
     }
 
-    fn take<Data>(mut stream: stream!(Data), n: usize) -> stream!(Data)
+    fn take<Data>(stream: stream!(Data), n: usize) -> stream!(Data)
     where
         Data: Send + Sync,
     {
-        stream.truncate(n);
-        stream
+        let mut data = merge_chunks(stream);
+        data.truncate(n);
+        split_chunks(data.len(), data.into_iter())
     }
 
     fn group_by<Key, Rest, Data>(
@@ -207,11 +262,18 @@ impl BasicOps for Basic {
         Rest: Send + Sync,
     {
         let mut groups = HashMap::new();
-        for data in stream {
-            let (k, r) = split(data);
-            groups.entry(k).or_insert_with(Vec::new).push(r);
+        for substream in stream {
+            for data in substream {
+                let (k, r) = split(data);
+                groups.entry(k).or_insert_with(Vec::new).push(r);
+            }
         }
-        groups.into_iter().collect()
+        split_chunks(
+            groups.len(),
+            groups
+                .into_iter()
+                .map(|(k, v)| (k, split_chunks(v.len(), v.into_iter()))),
+        )
     }
 
     fn cross_join<LeftData, RightData>(
@@ -222,13 +284,19 @@ impl BasicOps for Basic {
         LeftData: Clone + Send + Sync,
         RightData: Clone + Send + Sync,
     {
-        let mut result = Vec::with_capacity(left.len() * right.len());
-        for l in left {
-            for r in &right {
-                result.push((l.clone(), r.clone()));
-            }
-        }
-        result
+        left.into_par_iter()
+            .map(|ls| {
+                let mut v = Vec::new();
+                for l in ls {
+                    for rs in &right {
+                        for r in rs {
+                            v.push((l.clone(), r.clone()))
+                        }
+                    }
+                }
+                v
+            })
+            .collect::<Vec<_>>()
     }
 
     /// A very basic optimisation is to hash the smaller side of the join.
@@ -243,6 +311,9 @@ impl BasicOps for Basic {
         LeftData: Clone + Send + Sync,
         RightData: Clone + Send + Sync,
     {
+        // NOTE: Not optimised at all, but does mantain balance of chunk sizes
+        let left = merge_chunks(left);
+        let right = merge_chunks(right);
         let mut results = Vec::with_capacity(left.len() * right.len());
         if left.len() < right.len() {
             let mut lefts = HashMap::with_capacity(left.len());
@@ -272,7 +343,7 @@ impl BasicOps for Basic {
                 }
             }
         }
-        results
+        split_chunks(results.len(), results.into_iter())
     }
 
     fn predicate_join<LeftData, RightData>(
@@ -284,15 +355,22 @@ impl BasicOps for Basic {
         LeftData: Clone + Send + Sync,
         RightData: Clone + Send + Sync,
     {
-        let mut results = Vec::with_capacity(left.len() * right.len());
-        for l in &left {
-            for r in &right {
-                if pred(l, r) {
-                    results.push((l.clone(), r.clone()));
+        // NOTE: Can unbalance the chunk sizes
+        left.into_par_iter()
+            .map(|ls| {
+                let mut v = Vec::new();
+                for l in ls {
+                    for rs in &right {
+                        for r in rs {
+                            if pred(&l, r) {
+                                v.push((l.clone(), r.clone()))
+                            }
+                        }
+                    }
                 }
-            }
-        }
-        results
+                v
+            })
+            .collect::<Vec<_>>()
     }
 
     fn union<Data>(mut left: stream!(Data), right: stream!(Data)) -> stream!(Data)
@@ -324,6 +402,9 @@ impl BasicOps for Basic {
         LeftData: Send + Sync,
         RightData: Send + Sync,
     {
-        stream.into_iter().unzip()
+        stream
+            .into_iter()
+            .map(|inner| inner.into_iter().unzip())
+            .unzip()
     }
 }

@@ -45,13 +45,13 @@ union Slot<MutData> {
 }
 
 struct MutEntry<ImmData, MutData> {
-    imm_ptr: *const ImmData,
+    imm_ptr: PtrGen<ImmData>,
     mut_data: Slot<MutData>,
 }
 
 impl<ImmData, MutData> Drop for MutEntry<ImmData, MutData> {
     fn drop(&mut self) {
-        if self.imm_ptr.is_null() {
+        if self.imm_ptr.0.is_null() {
             unsafe {
                 ManuallyDrop::drop(&mut self.mut_data.full);
             }
@@ -100,10 +100,38 @@ pub struct PrimaryRetain<ImmData, MutData, const BLOCK_SIZE: usize> {
     dummy_zero_size: (),
 }
 
+/// ## Concurrency Safe Marker for Key Type
+/// As we use the pointer as a generation counter, and only access using it once
+/// we have matched the generation, it is safe to share these.
+pub struct PtrGen<ImmData>(*const ImmData);
+
+impl<ImmData> Clone for PtrGen<ImmData> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<ImmData> Copy for PtrGen<ImmData> {}
+impl<ImmData> PartialEq for PtrGen<ImmData> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+impl<ImmData> Eq for PtrGen<ImmData> {}
+impl<ImmData> Hash for PtrGen<ImmData> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
+// Wrapping for concurrency (pointers are `!Send + !Sync` by default, we need to
+// explicitly mark this as concurrency safe)
+unsafe impl<ImmData> Send for PtrGen<ImmData> {}
+unsafe impl<ImmData> Sync for PtrGen<ImmData> {}
+
 impl<ImmData, MutData, const BLOCK_SIZE: usize> Keyable
     for PrimaryRetain<ImmData, MutData, BLOCK_SIZE>
 {
-    type Key = GenKey<PrimaryRetain<ImmData, MutData, BLOCK_SIZE>, *const ImmData>;
+    type Key = GenKey<PtrGen<ImmData>>;
 }
 
 impl<ImmData, MutData, const BLOCK_SIZE: usize> Column
@@ -132,8 +160,8 @@ impl<ImmData, MutData, const BLOCK_SIZE: usize> Column
 impl<'imm, ImmData, MutData, const BLOCK_SIZE: usize> PrimaryWindow<'imm, ImmData, MutData>
     for Window<'imm, PrimaryRetain<ImmData, MutData, BLOCK_SIZE>>
 where
-    MutData: Clone,
-    ImmData: Clone,
+    MutData: Clone + 'static,
+    ImmData: Clone + 'static,
 {
     type ImmGet = &'imm ImmData;
     type Col = PrimaryRetain<ImmData, MutData, BLOCK_SIZE>;
@@ -164,7 +192,7 @@ where
                             imm_data: if size_of::<ImmData>() == 0 {
                                 transmute::<&(), &ImmData>(&self.inner.dummy_zero_size)
                             } else {
-                                &*(*imm_ptr).cast::<ImmData>()
+                                &*(imm_ptr.0).cast::<ImmData>()
                             },
                             mut_data: &mut_data.full.data,
                         },
@@ -189,7 +217,7 @@ where
                             imm_data: if size_of::<ImmData>() == 0 {
                                 transmute::<&(), &ImmData>(&self.inner.dummy_zero_size)
                             } else {
-                                &*(*imm_ptr).cast::<ImmData>()
+                                &*(imm_ptr.0).cast::<ImmData>()
                             },
                             mut_data: &mut mut_data.full.data,
                         },
@@ -215,20 +243,19 @@ where
             .iter()
             .enumerate()
             .filter_map(|(index, entry)| {
-                if entry.imm_ptr.is_null() {
+                if entry.imm_ptr.0.is_null() {
                     None
                 } else {
                     Some(GenKey {
                         index,
                         generation: entry.imm_ptr,
-                        phantom: PhantomData,
                     })
                 }
             })
     }
 
     #[inline(always)]
-    fn scan_get(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
+    fn scan_get(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'static {
         self.scan_brw().collect::<Vec<_>>().into_iter()
     }
 
@@ -241,8 +268,8 @@ where
 impl<'imm, ImmData, MutData, const BLOCK_SIZE: usize> PrimaryWindowPull<'imm, ImmData, MutData>
     for Window<'imm, PrimaryRetain<ImmData, MutData, BLOCK_SIZE>>
 where
-    MutData: Clone,
-    ImmData: Clone,
+    MutData: Clone + 'static,
+    ImmData: Clone + 'static,
 {
     type ImmPull = &'imm ImmData;
 
@@ -256,7 +283,7 @@ where
         if let NextFree(Some(next_free)) = self.inner.next_free_mut {
             unsafe {
                 let mut_entry = self.inner.mut_data.get_unchecked_mut(next_free);
-                debug_assert!(mut_entry.imm_ptr.is_null());
+                debug_assert!(mut_entry.imm_ptr.0.is_null());
 
                 let imm_ptr = if size_of::<ImmData>() == 0 {
                     // For zero sized types, use the generation counter.
@@ -269,7 +296,7 @@ where
 
                 self.inner.next_free_mut = NextFree::decode(mut_entry.mut_data.next_free);
                 *mut_entry = MutEntry {
-                    imm_ptr,
+                    imm_ptr: PtrGen(imm_ptr),
                     mut_data: Slot {
                         full: ManuallyDrop::new(HiddenData {
                             hidden: false,
@@ -280,8 +307,7 @@ where
                 (
                     GenKey {
                         index: next_free,
-                        generation: imm_ptr,
-                        phantom: PhantomData,
+                        generation: PtrGen(imm_ptr),
                     },
                     InsertAction::Place(next_free),
                 )
@@ -289,7 +315,7 @@ where
         } else {
             let index = self.inner.mut_data.len();
             self.inner.mut_data.push(MutEntry {
-                imm_ptr,
+                imm_ptr: PtrGen(imm_ptr),
                 mut_data: Slot {
                     full: ManuallyDrop::new(HiddenData {
                         hidden: false,
@@ -300,8 +326,7 @@ where
             (
                 GenKey {
                     index,
-                    generation: imm_ptr,
-                    phantom: PhantomData,
+                    generation: PtrGen(imm_ptr),
                 },
                 InsertAction::Append,
             )
@@ -316,14 +341,14 @@ where
                     let pull_imm_ref = if size_of::<ImmData>() == 0 {
                         transmute::<&(), &ImmData>(&self.inner.dummy_zero_size)
                     } else {
-                        &*(mut_entry.imm_ptr).cast::<ImmData>()
+                        &*(mut_entry.imm_ptr.0).cast::<ImmData>()
                     };
                     let pull_mut_data = ManuallyDrop::take(&mut mut_entry.mut_data.full);
                     if !pull_mut_data.hidden {
                         self.inner.visible_count -= 1;
                     }
                     *mut_entry = MutEntry {
-                        imm_ptr: ptr::null(),
+                        imm_ptr: PtrGen(ptr::null()),
                         mut_data: Slot {
                             next_free: self.inner.next_free_mut.encode(),
                         },
@@ -353,8 +378,8 @@ where
 impl<'imm, ImmData, MutData, const BLOCK_SIZE: usize> PrimaryWindowHide<'imm, ImmData, MutData>
     for Window<'imm, PrimaryRetain<ImmData, MutData, BLOCK_SIZE>>
 where
-    MutData: Clone,
-    ImmData: Clone,
+    MutData: Clone + 'static,
+    ImmData: Clone + 'static,
 {
     #[inline(always)]
     fn hide(&mut self, key: <Self::Col as Keyable>::Key) -> Result<(), KeyError> {

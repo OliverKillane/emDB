@@ -86,7 +86,7 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryAppendAdapter> {
     }
 
     #[inline(always)]
-    fn scan_get(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
+    fn scan_get(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'static {
         0..(self.inner.max_key)
     }
 
@@ -94,7 +94,6 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryAppendAdapter> {
     fn count(&self) -> usize {
         self.inner.max_key
     }
-    
 }
 
 impl<'imm> PrimaryWindowApp<'imm, (), ()> for Window<'imm, PrimaryAppendAdapter> {

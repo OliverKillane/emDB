@@ -169,7 +169,7 @@
 //! We can further optimise the tables with:
 //! - removing missed bounds checks in [`AssocWindow`] implementations
 
-use std::{hash::Hash, marker::PhantomData, mem::transmute};
+use std::{hash::Hash, mem::transmute};
 
 mod assoc_blocks;
 pub use assoc_blocks::*;
@@ -275,7 +275,7 @@ pub trait PrimaryWindow<'imm, ImmData, MutData> {
     /// Get an iterator over the current indices, that does not keep a borrow of the window.
     /// - Typically collects indices from [`PrimaryWindow::scan_brw`].
     /// - Can return other kinds of iterators (e.g. compressed values, for append only tables - ranges)
-    fn scan_get(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key>;
+    fn scan_get(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'static;
 
     fn count(&self) -> usize;
 }
@@ -392,27 +392,26 @@ pub trait AssocWindowPull<'imm, ImmData, MutData>: AssocWindow<'imm, ImmData, Mu
 }
 
 /// A Simple Generational Index Key
-pub struct GenKey<Store, GenCounter: Copy + Eq> {
+pub struct GenKey<GenCounter: Copy + Eq> {
     index: UnsafeIndex,
     generation: GenCounter,
-    phantom: PhantomData<Store>,
 }
 
-impl<Store, GenCounter: Copy + Eq> PartialEq for GenKey<Store, GenCounter> {
+impl<GenCounter: Copy + Eq> PartialEq for GenKey<GenCounter> {
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         self.index == other.index && self.generation == other.generation
     }
 }
-impl<Store, GenCounter: Copy + Eq> Eq for GenKey<Store, GenCounter> {}
-impl<Store, GenCounter: Copy + Eq> Clone for GenKey<Store, GenCounter> {
+impl<GenCounter: Copy + Eq> Eq for GenKey<GenCounter> {}
+impl<GenCounter: Copy + Eq> Clone for GenKey<GenCounter> {
     #[inline(always)]
     fn clone(&self) -> Self {
         *self
     }
 }
-impl<Store, GenCounter: Copy + Eq> Copy for GenKey<Store, GenCounter> {}
-impl<Store, GenCounter: Copy + Eq + Hash> Hash for GenKey<Store, GenCounter> {
+impl<GenCounter: Copy + Eq> Copy for GenKey<GenCounter> {}
+impl<GenCounter: Copy + Eq + Hash> Hash for GenKey<GenCounter> {
     #[inline(always)]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.index.hash(state);
@@ -498,6 +497,7 @@ mod utils {
 mod verif {
     use super::*;
     use std::collections::HashMap;
+    use std::marker::PhantomData;
 
     trait ReferenceMap<Key, Value> {
         fn with_capacity(size_hint: usize) -> Self;

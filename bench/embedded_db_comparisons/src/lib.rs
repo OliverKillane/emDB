@@ -14,6 +14,6 @@
 // The schema implementations
 pub mod data_logs;
 pub mod sales_analytics;
-pub mod userdetails;
+pub mod user_details;
 
 pub mod utils;

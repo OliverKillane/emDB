@@ -91,8 +91,8 @@ fn public_record_types(lp: &plan::Plan) -> HashSet<plan::ImmKey<'_, plan::Record
 /// Generates the tokens for a given scalar type.
 /// - Needs to consider the values transformed by [`pulpit::gen::operations::get`]
 ///   which are determined after the table structure is chosen.
-/// - Generates types with lifetimes ([`SimpleNamer::db_lifetime`] and
-///   [`SimpleNamer::qy_lifetime`]) usable only in a [`plan::TypeContext::Query`]
+/// - Generates types with lifetimes ([`SerializedNamer::db_lifetime`] and
+///   [`SerializedNamer::qy_lifetime`]) usable only in a [`plan::TypeContext::Query`]
 ///   context.
 /// 
 /// NOTE: In some circumstances the table types are not available (e.g in [`crate::backend::interface`])
@@ -151,7 +151,7 @@ pub fn generate_record_name(
 /// - structs used to represent [`plan::RecordConc`]
 /// - publicity is determined traversing the return type of queries
 ///
-/// Each record type needs a [`SimpleNamer::phantom_field`] to ensure the query lifetime
+/// Each record type needs a [`SerializedNamer::phantom_field`] to ensure the query lifetime
 /// parameters are bound (we do not avalyse types provided by the user to check for usage).
 pub fn generate_record_definitions<'imm>(
     lp: &'imm plan::Plan,

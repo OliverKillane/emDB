@@ -25,7 +25,7 @@
 //!   cardinality of output.
 //!
 //! Potential Improvement:
-//! - Strongly type single and stream dataflows. (Key<DataStream>, Key<DataSingle>)
+//! - Strongly type single and stream dataflows. (`Key<DataStream>`, `Key<DataSingle>`)
 
 use super::{Context, Data, Key, Plan, RecordField, RecordType, Table};
 use std::collections::HashMap;

@@ -69,7 +69,9 @@ impl Default for Aggregate {
 }
 
 emql!{
-    impl my_db as Serialized;
+    impl my_db as Serialized {
+        op_impl = Parallel,
+    };
 
     table products {
         serial: usize,

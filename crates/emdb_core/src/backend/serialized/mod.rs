@@ -8,13 +8,9 @@
 //!   rules apply)
 
 use combi::{
-    core::mapsuc,
-    tokens::{
-        basic::{collectuntil, getident, isempty, syn},
-        options::{OptEnd, OptField, OptParse},
-        TokenDiagnostic, TokenIter,
-    },
-    Combi,
+    core::{choice, mapsuc}, macros::choices, tokens::{
+        basic::{collectuntil, getident, gettoken, isempty, matchident, peekident, syn}, error::error, options::{OptEnd, OptField, OptParse}, TokenDiagnostic, TokenIter, TokenParser
+    }, Combi
 };
 use operators::OperatorImpls;
 use prettyplease::unparse;
@@ -41,6 +37,17 @@ pub struct Serialized {
     public: bool,
     ds_name: Option<Ident>,
     aggressive_inlining: bool,
+    operator_impl: OperatorImpls,
+}
+
+fn operator_impl_parse() -> impl TokenParser<OperatorImpls> {
+    choices! (
+        peekident("Basic") => mapsuc(matchident("Basic"), |_| OperatorImpls::Basic),
+        peekident("Iter") => mapsuc(matchident("Iter"), |_| OperatorImpls::Iter),
+        peekident("Parallel") => mapsuc(matchident("Parallel"), |_| OperatorImpls::Parallel),
+        peekident("Chunk") => mapsuc(matchident("Chunk"), |_| OperatorImpls::Chunk),
+        otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, "Invalid Operator Choice".to_owned()))
+    )
 }
 
 impl EMDBBackend for Serialized {
@@ -50,6 +57,7 @@ impl EMDBBackend for Serialized {
         backend_name: &syn::Ident,
         options: Option<proc_macro2::TokenStream>,
     ) -> Result<Self, std::collections::LinkedList<proc_macro_error::Diagnostic>> {
+        const DEFAULT_OP_IMPL: OperatorImpls = OperatorImpls::Iter;
         if let Some(opts) = options {
             let parser = (
                 OptField::new("debug_file", || syn(collectuntil(isempty()))),
@@ -63,7 +71,10 @@ impl EMDBBackend for Serialized {
                             OptField::new("ds_name", getident),
                             (
                                 OptField::new("aggressive_inlining", on_off),
-                                OptEnd
+                                (
+                                    OptField::new("op_impl", operator_impl_parse),
+                                    OptEnd
+                                )
                             )
                         )
                     ),
@@ -73,7 +84,7 @@ impl EMDBBackend for Serialized {
             let (_, res) = parser.comp(TokenIter::from(opts, backend_name.span()));
             res.to_result()
                 .map_err(TokenDiagnostic::into_list)
-                .map(|(debug, (interface, (public, (ds_name, (inline_queries, ())))))| Serialized { debug, interface, public: public.unwrap_or(false), ds_name, aggressive_inlining: inline_queries.unwrap_or(false) })
+                .map(|(debug, (interface, (public, (ds_name, (inline_queries, (operator_impl, ()))))))| Serialized { debug, interface, public: public.unwrap_or(false), ds_name, aggressive_inlining: inline_queries.unwrap_or(false), operator_impl: operator_impl.unwrap_or(DEFAULT_OP_IMPL) })
         } else {
             Ok(Self {
                 debug: None,
@@ -81,6 +92,7 @@ impl EMDBBackend for Serialized {
                 public: false,
                 ds_name: None,
                 aggressive_inlining: false,
+                operator_impl: DEFAULT_OP_IMPL,
             })
         }
     }
@@ -107,7 +119,7 @@ impl EMDBBackend for Serialized {
         let record_defs =
             types::generate_record_definitions(plan, &table_generated_info.get_types, &namer);
 
-        let operator_impl = OperatorImpls::Basic.get_paths();
+        let operator_impl = self.operator_impl.get_paths();
         
         let QueriesInfo {
             query_mod,

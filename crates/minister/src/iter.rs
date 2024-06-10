@@ -1,4 +1,3 @@
-#![allow(clippy::ptr_arg)]
 use std::collections::HashMap;
 
 macro_rules! single {
@@ -6,30 +5,45 @@ macro_rules! single {
         $data
     };
 }
-macro_rules! stream { ($data:ty) => { Vec<$data> }; }
-super::generate_minister_trait! { BasicOps }
+macro_rules! stream { ($data:ty) => { impl Iterator<Item = $data> }; }
+super::generate_minister_trait! { IterOps }
 
-/// ## An extremely basic push operator implementation.
-/// - Designed to be as correct as possible
-/// - Simple implementation pushed values between vectors
-/// - No extra wrapping - it is literally just vectors
-///
-/// This implementation is easy to understand, and very clearly correct.
-pub struct Basic;
+/// ## Rust Iterator based Operators
+/// Implements a hybrid-push-full operator model.
+/// - **Pull** Uses lazily evaluated rust iterators as the stream type
+/// - **Push** All single values are structly evaluated, similarly for buffering 
+///   operations.
+/// 
+/// While rust iterators implement a lazily evaluated pull model at a high level. They do not suffer 
+/// from the repeated `.next()` calls and option checking in release builds.
+/// 
+/// In fact, due to in place collection, iterators can be faster than loop. (See the `iterators` benchmark).
+/// 
+/// ## Interesting Reads
+/// - [Comparing Performance: Loops vs Iterators](https://doc.rust-lang.org/book/ch13-04-performance.html)
+pub struct Iter;
 
-impl BasicOps for Basic {
+const ASSUME_SIZE: usize = 1024;
+fn get_size(left: Option<usize>, right: Option<usize>) -> usize {
+    left.unwrap_or(ASSUME_SIZE) * right.unwrap_or(ASSUME_SIZE)
+}
+fn get_side_size(hint: Option<usize>) -> usize {
+    hint.unwrap_or(ASSUME_SIZE)
+}
+
+impl IterOps for Iter {
     fn consume_stream<Data>(iter: impl Iterator<Item = Data>) -> stream!(Data)
     where
         Data: Send + Sync,
     {
-        iter.collect()
+        iter
     }
 
     fn consume_buffer<Data>(buff: Vec<Data>) -> stream!(Data)
     where
         Data: Send + Sync,
     {
-        buff
+        buff.into_iter()
     }
 
     fn consume_single<Data>(data: Data) -> single!(Data)
@@ -43,15 +57,16 @@ impl BasicOps for Basic {
     where
         Data: Send + Sync,
     {
-        stream.into_iter()
+        stream
     }
 
     fn export_buffer<Data>(stream: stream!(Data)) -> Vec<Data>
     where
         Data: Send + Sync,
     {
-        stream
+        stream.collect::<Vec<_>>()
     }
+
     fn export_single<Data>(single: single!(Data)) -> Data
     where
         Data: Send + Sync,
@@ -66,7 +81,7 @@ impl BasicOps for Basic {
         Data: Send + Sync,
         Error: Send + Sync,
     {
-        stream.into_iter().collect::<Result<_, _>>()
+        stream.collect::<Result<Vec<_>, _>>().map(Vec::into_iter)
     }
 
     fn error_single<Data, Error>(
@@ -87,7 +102,7 @@ impl BasicOps for Basic {
         InData: Send + Sync,
         OutData: Send + Sync,
     {
-        stream.into_iter().map(mapping).collect()
+        stream.map(mapping)
     }
 
     fn map_seq<InData, OutData>(
@@ -98,7 +113,7 @@ impl BasicOps for Basic {
         InData: Send + Sync,
         OutData: Send + Sync,
     {
-        stream.into_iter().map(mapping).collect()
+        stream.map(mapping)
     }
 
     fn map_single<InData, OutData>(
@@ -109,7 +124,7 @@ impl BasicOps for Basic {
         InData: Send + Sync,
         OutData: Send + Sync,
     {
-        (mapping)(single)
+        mapping(single)
     }
 
     fn filter<Data>(
@@ -119,7 +134,7 @@ impl BasicOps for Basic {
     where
         Data: Send + Sync,
     {
-        stream.into_iter().filter(|data| predicate(data)).collect()
+        stream.filter(predicate)
     }
 
     fn all<Data>(
@@ -129,12 +144,8 @@ impl BasicOps for Basic {
     where
         Data: Send + Sync,
     {
-        for data in &stream {
-            if !predicate(data) {
-                return (false, stream);
-            }
-        }
-        (true, stream)
+        let vals = stream.collect::<Vec<_>>();
+        (vals.iter().all(predicate), vals.into_iter())
     }
 
     fn is<Data>(single: single!(Data), predicate: impl Fn(&Data) -> bool) -> (bool, single!(Data))
@@ -148,7 +159,7 @@ impl BasicOps for Basic {
     where
         Data: Send + Sync,
     {
-        stream.len()
+        stream.count()
     }
 
     fn fold<InData, Acc>(
@@ -160,11 +171,7 @@ impl BasicOps for Basic {
         InData: Send + Sync,
         Acc: Send + Sync,
     {
-        let mut acc = initial;
-        for data in stream {
-            acc = fold_fn(acc, data);
-        }
-        acc
+        stream.fold(initial, fold_fn)
     }
 
     fn combine<Data>(
@@ -175,26 +182,26 @@ impl BasicOps for Basic {
     where
         Data: Send + Sync + Clone,
     {
-        stream.into_iter().reduce(combiner).unwrap_or(alternative)
+        stream.reduce(combiner).unwrap_or(alternative)
     }
 
     fn sort<Data>(
-        mut stream: stream!(Data),
+        stream: stream!(Data),
         ordering: impl Fn(&Data, &Data) -> std::cmp::Ordering + Send + Sync,
     ) -> stream!(Data)
     where
         Data: Send + Sync,
     {
-        stream.sort_unstable_by(ordering);
-        stream
+        let mut data = stream.collect::<Vec<_>>();
+        data.sort_unstable_by(ordering);
+        data.into_iter()
     }
 
-    fn take<Data>(mut stream: stream!(Data), n: usize) -> stream!(Data)
+    fn take<Data>(stream: stream!(Data), n: usize) -> stream!(Data)
     where
         Data: Send + Sync,
     {
-        stream.truncate(n);
-        stream
+        stream.take(n)
     }
 
     fn group_by<Key, Rest, Data>(
@@ -211,7 +218,7 @@ impl BasicOps for Basic {
             let (k, r) = split(data);
             groups.entry(k).or_insert_with(Vec::new).push(r);
         }
-        groups.into_iter().collect()
+        groups.into_iter().map(|(k, v)| (k, v.into_iter()))
     }
 
     fn cross_join<LeftData, RightData>(
@@ -222,16 +229,17 @@ impl BasicOps for Basic {
         LeftData: Clone + Send + Sync,
         RightData: Clone + Send + Sync,
     {
-        let mut result = Vec::with_capacity(left.len() * right.len());
+        let right_vals = right.collect::<Vec<_>>();
+        let mut result =
+            Vec::with_capacity(right_vals.len() * left.size_hint().1.unwrap_or(ASSUME_SIZE));
         for l in left {
-            for r in &right {
+            for r in &right_vals {
                 result.push((l.clone(), r.clone()));
             }
         }
-        result
+        result.into_iter()
     }
 
-    /// A very basic optimisation is to hash the smaller side of the join.
     fn equi_join<LeftData, RightData, Key>(
         left: stream!(LeftData),
         right: stream!(RightData),
@@ -243,36 +251,43 @@ impl BasicOps for Basic {
         LeftData: Clone + Send + Sync,
         RightData: Clone + Send + Sync,
     {
-        let mut results = Vec::with_capacity(left.len() * right.len());
-        if left.len() < right.len() {
-            let mut lefts = HashMap::with_capacity(left.len());
-            for l in &left {
-                lefts.entry(left_split(l)).or_insert_with(Vec::new).push(l);
-            }
-            for r in right {
-                if let Some(ls) = lefts.get(right_split(&r)) {
-                    for l in ls {
-                        results.push(((*l).clone(), r.clone()))
+        match (left.size_hint().1, right.size_hint().1) {
+            (Some(left_size), Some(right_size)) if left_size < right_size => {
+                let mut results = Vec::with_capacity(left_size * right_size);
+                let mut lefts = HashMap::with_capacity(left_size);
+                let left = left.collect::<Vec<_>>();
+                for l in &left {
+                    lefts.entry(left_split(l)).or_insert_with(Vec::new).push(l);
+                }
+                for r in right {
+                    if let Some(ls) = lefts.get(right_split(&r)) {
+                        for l in ls {
+                            results.push(((*l).clone(), r.clone()))
+                        }
                     }
                 }
+                results.into_iter()
             }
-        } else {
-            let mut rights = HashMap::with_capacity(right.len());
-            for r in &right {
-                rights
-                    .entry(right_split(r))
-                    .or_insert_with(Vec::new)
-                    .push(r);
-            }
-            for l in left {
-                if let Some(rs) = rights.get(left_split(&l)) {
-                    for r in rs {
-                        results.push((l.clone(), (*r).clone()))
+            (left_size, right_size) => {
+                let mut results = Vec::with_capacity(get_size(left_size, right_size));
+                let mut rights = HashMap::with_capacity(get_side_size(right_size));
+                let right = right.collect::<Vec<_>>();
+                for r in &right {
+                    rights
+                        .entry(right_split(r))
+                        .or_insert_with(Vec::new)
+                        .push(r);
+                }
+                for l in left {
+                    if let Some(rs) = rights.get(left_split(&l)) {
+                        for r in rs {
+                            results.push((l.clone(), (*r).clone()))
+                        }
                     }
                 }
+                results.into_iter()
             }
         }
-        results
     }
 
     fn predicate_join<LeftData, RightData>(
@@ -284,30 +299,48 @@ impl BasicOps for Basic {
         LeftData: Clone + Send + Sync,
         RightData: Clone + Send + Sync,
     {
-        let mut results = Vec::with_capacity(left.len() * right.len());
-        for l in &left {
-            for r in &right {
-                if pred(l, r) {
-                    results.push((l.clone(), r.clone()));
+        match (left.size_hint().1, right.size_hint().1) {
+            (Some(left_size), Some(right_size)) if left_size < right_size => {
+                let left = left.collect::<Vec<_>>();
+                let mut results = Vec::with_capacity(left_size * right_size);
+                for r in right {
+                    for l in &left {
+                        if pred(l, &r) {
+                            results.push((l.clone(), r.clone()));
+                        }
+                    }
                 }
+                results.into_iter()
+            }
+            (_, right_size) => {
+                let right = right.collect::<Vec<_>>();
+                let mut results = Vec::with_capacity(get_side_size(right_size));
+                for l in left {
+                    for r in &right {
+                        if pred(&l, r) {
+                            results.push((l.clone(), r.clone()));
+                        }
+                    }
+                }
+                results.into_iter()
             }
         }
-        results
     }
 
-    fn union<Data>(mut left: stream!(Data), right: stream!(Data)) -> stream!(Data)
+    fn union<Data>(left: stream!(Data), right: stream!(Data)) -> stream!(Data)
     where
         Data: Send + Sync,
     {
-        left.extend(right);
-        left
+        left.chain(right)
     }
 
     fn fork<Data>(stream: stream!(Data)) -> (stream!(Data), stream!(Data))
     where
         Data: Clone + Send + Sync,
     {
-        (stream.clone(), stream)
+        let data = stream.collect::<Vec<_>>();
+        let data2 = data.clone();
+        (data.into_iter(), data2.into_iter())
     }
 
     fn fork_single<Data>(single: single!(Data)) -> (single!(Data), single!(Data))
@@ -324,6 +357,7 @@ impl BasicOps for Basic {
         LeftData: Send + Sync,
         RightData: Send + Sync,
     {
-        stream.into_iter().unzip()
+        let (left, right): (Vec<_>, Vec<_>) = stream.unzip();
+        (left.into_iter(), right.into_iter())
     }
 }

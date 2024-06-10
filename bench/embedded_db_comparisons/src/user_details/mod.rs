@@ -4,22 +4,35 @@
 
 use emdb::macros::emql;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
-use userdetails::Database;
+use user_details::Database;
 
 emql! {
-    impl userdetails as Interface{
+    impl user_details as Interface{
         pub = on,
     };
-    impl emdb_impl as Serialized{
-        interface = userdetails,
+    impl emdb_parallel_impl as Serialized{
+        interface = user_details,
         pub = on,
-        ds_name = EmDB,
+        ds_name = EmDBParallel,
+        op_impl = Parallel,
     };
-    impl emdb_inlined_impl as Serialized{
-        interface = userdetails,
+    impl emdb_basic_impl as Serialized{
+        interface = user_details,
         pub = on,
-        ds_name = EmDBInlined,
-        aggressive_inlining = on,
+        ds_name = EmDBBasic,
+        op_impl = Basic,
+    };
+    impl emdb_iter_impl as Serialized{
+        interface = user_details,
+        pub = on,
+        ds_name = EmDBIter,
+        op_impl = Iter,
+    };
+    impl emdb_chunk_impl as Serialized{
+        interface = user_details,
+        pub = on,
+        ds_name = EmDBChunk,
+        op_impl = Chunk,
     };
 
     // Reasoning:
@@ -115,33 +128,55 @@ emql! {
 }
 
 // Required to get new user keys for other queries
-pub trait GetNewUserKey: userdetails::Datastore {
+pub trait GetNewUserKey: user_details::Datastore {
     fn new_user_wrap(
         db: &mut Self::DB<'_>,
         username: String,
         prem: bool,
         start_creds: Option<i32>,
-    ) -> <Self as userdetails::Datastore>::users_key;
+    ) -> <Self as user_details::Datastore>::users_key;
 }
 
-impl GetNewUserKey for emdb_impl::EmDB {
+impl GetNewUserKey for emdb_basic_impl::EmDBBasic {
     fn new_user_wrap(
         db: &mut Self::DB<'_>,
         username: String,
         prem: bool,
         start_creds: Option<i32>,
-    ) -> <Self as userdetails::Datastore>::users_key {
+    ) -> <Self as user_details::Datastore>::users_key {
         db.new_user(username, prem, start_creds).unwrap().user_id
     }
 }
 
-impl GetNewUserKey for emdb_inlined_impl::EmDBInlined {
+impl GetNewUserKey for emdb_parallel_impl::EmDBParallel {
     fn new_user_wrap(
         db: &mut Self::DB<'_>,
         username: String,
         prem: bool,
         start_creds: Option<i32>,
-    ) -> <Self as userdetails::Datastore>::users_key {
+    ) -> <Self as user_details::Datastore>::users_key {
+        db.new_user(username, prem, start_creds).unwrap().user_id
+    }
+}
+
+impl GetNewUserKey for emdb_iter_impl::EmDBIter {
+    fn new_user_wrap(
+        db: &mut Self::DB<'_>,
+        username: String,
+        prem: bool,
+        start_creds: Option<i32>,
+    ) -> <Self as user_details::Datastore>::users_key {
+        db.new_user(username, prem, start_creds).unwrap().user_id
+    }
+}
+
+impl GetNewUserKey for emdb_chunk_impl::EmDBChunk {
+    fn new_user_wrap(
+        db: &mut Self::DB<'_>,
+        username: String,
+        prem: bool,
+        start_creds: Option<i32>,
+    ) -> <Self as user_details::Datastore>::users_key {
         db.new_user(username, prem, start_creds).unwrap().user_id
     }
 }
@@ -166,7 +201,7 @@ pub fn random_user(rng: &mut ThreadRng, id: usize) -> (String, bool, Option<i32>
     )
 }
 
-pub fn random_table<const SIZE: usize, DS: userdetails::Datastore + GetNewUserKey>(
+pub fn random_table<const SIZE: usize, DS: user_details::Datastore + GetNewUserKey>(
 ) -> (Vec<DS::users_key>, DS) {
     let mut ds = DS::new();
     let mut ids;

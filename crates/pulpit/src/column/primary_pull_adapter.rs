@@ -1,7 +1,4 @@
-use std::marker::PhantomData;
-
 use assume::assume;
-
 use super::*;
 
 #[derive(Clone, Copy)]
@@ -20,7 +17,7 @@ struct GenInfo {
 
 impl GenInfo {
     #[inline(always)]
-    fn lookup_key<Store>(&self, key: GenKey<Store, usize>) -> Result<UnsafeIndex, KeyError> {
+    fn lookup_key(&self, key: GenKey<usize>) -> Result<UnsafeIndex, KeyError> {
         match self.generations.get(key.index) {
             Some(GenEntry::Generation(g)) if key.generation == *g => Ok(key.index),
             _ => Err(KeyError),
@@ -28,7 +25,7 @@ impl GenInfo {
     }
 
     #[inline(always)]
-    fn pull_key<Store>(&mut self, key: GenKey<Store, usize>) -> Result<UnsafeIndex, KeyError> {
+    fn pull_key(&mut self, key: GenKey<usize>) -> Result<UnsafeIndex, KeyError> {
         if let Some(entry) = self.generations.get_mut(key.index) {
             if let GenEntry::Generation(_) = entry {
                 self.visible_count -= 1;
@@ -48,7 +45,7 @@ impl GenInfo {
     }
 
     #[inline(always)]
-    fn hide_key<Store>(&mut self, key: GenKey<Store, usize>) -> Result<(), KeyError> {
+    fn hide_key(&mut self, key: GenKey<usize>) -> Result<(), KeyError> {
         if let Some(entry) = self.generations.get_mut(key.index) {
             match *entry {
                 GenEntry::Generation(g) if g == key.generation => {
@@ -64,7 +61,7 @@ impl GenInfo {
     }
 
     #[inline(always)]
-    fn reveal_key<Store>(&mut self, key: GenKey<Store, usize>) -> Result<(), KeyError> {
+    fn reveal_key(&mut self, key: GenKey<usize>) -> Result<(), KeyError> {
         if let Some(entry) = self.generations.get_mut(key.index) {
             match *entry {
                 GenEntry::Hidden(g) if g == key.generation => {
@@ -80,7 +77,7 @@ impl GenInfo {
     }
 
     #[inline(always)]
-    fn scan<Store>(&self) -> impl Iterator<Item = GenKey<Store, usize>> + '_ {
+    fn scan(&self) -> impl Iterator<Item = GenKey<usize>> + '_ {
         self.generations
             .iter()
             .enumerate()
@@ -88,14 +85,13 @@ impl GenInfo {
                 GenEntry::Generation(g) => Some(GenKey {
                     index: i,
                     generation: *g,
-                    phantom: PhantomData,
                 }),
                 GenEntry::NextFree(_) | GenEntry::Hidden(_) => None,
             })
     }
 
     #[inline(always)]
-    fn insert<Store>(&mut self) -> (GenKey<Store, usize>, InsertAction) {
+    fn insert(&mut self) -> (GenKey<usize>, InsertAction) {
         if let Some(k) = self.next_free {
             // TODO: could use unchecked here
             let entry = self.generations.get_mut(k).unwrap();
@@ -107,7 +103,6 @@ impl GenInfo {
                         GenKey {
                             index: k,
                             generation: self.gen_counter,
-                            phantom: PhantomData,
                         },
                         InsertAction::Place(k),
                     )
@@ -122,7 +117,6 @@ impl GenInfo {
                 GenKey {
                     index,
                     generation: self.gen_counter,
-                    phantom: PhantomData,
                 },
                 InsertAction::Append,
             )
@@ -145,7 +139,7 @@ pub struct PrimaryPullAdapter {
 }
 
 impl Keyable for PrimaryPullAdapter {
-    type Key = GenKey<PrimaryPullAdapter, usize>;
+    type Key = GenKey<usize>;
 }
 
 impl Column for PrimaryPullAdapter {
@@ -217,7 +211,7 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> {
     }
 
     #[inline(always)]
-    fn scan_get(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> {
+    fn scan_get(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'static {
         self.inner.gen.scan().collect::<Vec<_>>().into_iter()
     }
 
@@ -225,7 +219,6 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> {
     fn count(&self) -> usize {
         self.inner.gen.count()
     }
-    
 }
 
 impl<'imm> PrimaryWindowPull<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> {
