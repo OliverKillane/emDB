@@ -1,0 +1,46 @@
+[package]
+name = "pulpit"
+version = "0.1.0"
+edition = "2021"
+
+readme = "README.md"
+description = "A library for generating table data structures"
+keywords = ["performance", "traits", "arenas"]
+categories = ["data"]
+
+repository.workspace = true
+homepage.workspace = true
+license-file.workspace = true
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
+
+[dependencies]
+proc-macro2 = "1.0"
+proc-macro-error = "1.0.4"
+syn = { version = "2.0.45", features = ["full", "extra-traits"] }
+quote = "1.0.33"
+combi = { path = "../combi" }
+typed-generational-arena = "0.2"
+thunderdome = "0.6.1"
+enumtrait = { path = "../enumtrait" }
+pulpit_gen = { path = "../pulpit_gen" }
+pulpit_macro = { path = "../pulpit_macro" }
+assume = "0.5.0"
+
+[dev-dependencies]
+divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }
+trybuild = "1.0.91"
+glob = "0.3.1"
+
+[[bench]]
+name = "rc_vs_brw"
+harness = false
+
+[[bench]]
+name = "col_vs_tup"
+harness = false
+
+[[bench]]
+name = "pull_arena"
+harness = false

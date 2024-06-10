@@ -1,4 +1,4 @@
-use emdb::emql;
+use emdb::macros::emql;
 
 emql! {
     impl nonexistent_backend as repeated_impl;

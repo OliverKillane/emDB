@@ -1,0 +1,23 @@
+[package]
+name = "minister"
+version = "0.1.0"
+edition = "2021"
+
+readme = "README.md"
+description = "A crate for operator abstractions"
+keywords = ["performance", "traits"]
+categories = ["data"]
+
+repository.workspace = true
+homepage.workspace = true
+license-file.workspace = true
+
+[dependencies]
+rayon = "1.10.0"
+
+[dev-dependencies]
+divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }
+
+[[bench]]
+name = "iterators"
+harness = false

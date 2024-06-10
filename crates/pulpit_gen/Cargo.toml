@@ -1,0 +1,29 @@
+[package]
+name = "pulpit_gen"
+version = "0.1.0"
+edition = "2021"
+
+readme = "README.md"
+description = "A crate for generating pulpit supported data tables"
+keywords = ["performance", "traits", "arenas"]
+categories = ["data"]
+
+repository.workspace = true
+homepage.workspace = true
+license-file.workspace = true
+
+[dependencies]
+proc-macro2 = "1.0"
+syn = { version = "2.0.45", features = ["full", "extra-traits"] }
+quote = "1.0.33"
+bimap = "0.6.3"
+enumtrait = { path = "../enumtrait" }
+quote_debug = { path = "../quote_debug" }
+proc-macro-error = "1.0.4"
+combi = { path = "../combi" }
+
+[dev-dependencies]
+prettyplease = "0.2"
+divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }
+trybuild = "1.0.91"
+glob = "0.3.1"

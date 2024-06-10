@@ -1,0 +1,20 @@
+[package]
+name = "quote_debug"
+version = "0.1.0"
+edition = "2021"
+
+readme = "README.md"
+description = "A crate for wrapping checks on generated tokenstreams"
+keywords = ["macros"]
+categories = ["macros"]
+
+repository.workspace = true
+homepage.workspace = true
+license-file.workspace = true
+
+[dependencies]
+proc-macro2 = "1.0"
+syn = { version = "2.0.45", features = ["full"] }
+quote = "1.0.33"
+
+

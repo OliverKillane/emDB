@@ -1,0 +1,11 @@
+error: [EMQL-55] variables created by let cannot shadow tables, but `foos` does
+  --> tests/invalid/shadowing_groupby.rs:11:36
+   |
+11 |             |> groupby(key for let foos /* cannot shadow table here! */ in {
+   |                                    ^^^^
+   |
+note: Table defined here
+  --> tests/invalid/shadowing_groupby.rs:4:11
+   |
+4  |     table foos {
+   |           ^^^^

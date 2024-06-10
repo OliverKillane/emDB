@@ -1,0 +1,28 @@
+[package]
+name = "pulpit_macro"
+version = "0.1.0"
+edition = "2021"
+
+readme = "README.md"
+description = "A crate for the macro interface supporting pulpit"
+keywords = ["performance", "traits", "arenas"]
+categories = ["data"]
+
+repository.workspace = true
+homepage.workspace = true
+license-file.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0"
+syn = { version = "2.0.45", features = ["full", "extra-traits"] }
+quote = "1.0.33"
+pulpit_gen = { path = "../pulpit_gen" }
+proc-macro-error = "1.0.4"
+
+[dev-dependencies]
+divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }
+trybuild = "1.0.91"
+glob = "0.3.1"
