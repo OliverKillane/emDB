@@ -101,7 +101,7 @@ where
                     let Data { imm_data, mut_data } = self.inner.blocks.get(key);
                     Data {
                         imm_data: transmute::<&ImmData, &'imm ImmData>(imm_data),
-                        mut_data: mut_data,
+                        mut_data,
                     }
                 },
             })

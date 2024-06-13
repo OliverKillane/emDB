@@ -54,7 +54,7 @@ where
             index: key.slot() as usize,
             data: Data {
                 imm_data: imm_data.clone(),
-                mut_data: mut_data,
+                mut_data,
             },
         })
     }

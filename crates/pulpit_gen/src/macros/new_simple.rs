@@ -1,4 +1,3 @@
-
 #![allow(dead_code, unused_variables, unused_imports)]
 //! # A simple interface for generating tables.
 //! TODO: improve this using the new [`combi::tokens::options`] parser
@@ -12,7 +11,12 @@ use combi::{
         basic::{
             collectuntil, getident, gettoken, isempty, matchident, matchpunct, peekident,
             peekpunct, recovgroup, terminal,
-        }, derived::listseptrailing, error::{error, expectederr}, options::{DefaultField, MustField, OptEnd, OptField, OptParse}, recovery::until, TokenDiagnostic, TokenIter, TokenParser
+        },
+        derived::listseptrailing,
+        error::{error, expectederr},
+        options::{DefaultField, MustField, OptEnd, OptField, OptParse},
+        recovery::until,
+        TokenDiagnostic, TokenIter, TokenParser,
     },
     Combi, CombiResult,
 };
@@ -31,7 +35,7 @@ use crate::{
 
 struct Access {
     alias: Ident,
-    fields: Vec<Ident>
+    fields: Vec<Ident>,
 }
 
 pub fn on_off() -> impl TokenParser<bool> {
@@ -69,9 +73,7 @@ fn fields_parser() -> impl TokenParser<Vec<ASTField>> {
             },
         ),
     );
-    expectederr(
-        recovgroup(proc_macro2::Delimiter::Brace, inner),
-    )
+    expectederr(recovgroup(proc_macro2::Delimiter::Brace, inner))
 }
 
 fn parse_access() -> impl TokenParser<Vec<Access>> {
@@ -110,12 +112,12 @@ fn limit_parser() -> impl TokenParser<Limit> {
     recovgroup(
         proc_macro2::Delimiter::Brace,
         mapsuc(
-                seqs!(
-                    getident(),
-                    matchpunct(':'),
-                    collectuntil(isempty())
-                ),
-                |( alias, (_, tks))| Limit { value: LimitKind::ConstVal(tks.into()), alias })
+            seqs!(getident(), matchpunct(':'), collectuntil(isempty())),
+            |(alias, (_, tks))| Limit {
+                value: LimitKind::ConstVal(tks.into()),
+                alias,
+            },
+        ),
     )
 }
 
@@ -124,7 +126,7 @@ struct ASTField {
     unique: Option<Ident>,
 }
 
-
+#[allow(clippy::too_many_arguments)]
 fn analyse(
     fields: Vec<ASTField>,
     updates: Vec<Access>,
@@ -193,18 +195,21 @@ fn analyse(
             fields: field_types,
             uniques,
             predicates,
-            gets: gets.into_iter().map(|Access { alias, fields }| Get { alias, fields }).collect(),
-            updates: updates.into_iter().map(|Access { alias, fields }| Update { alias, fields }).collect(),
+            gets: gets
+                .into_iter()
+                .map(|Access { alias, fields }| Get { alias, fields })
+                .collect(),
+            updates: updates
+                .into_iter()
+                .map(|Access { alias, fields }| Update { alias, fields })
+                .collect(),
             public,
             limit,
         })
     } else {
         Err(TokenDiagnostic::from_list(errors).unwrap()) // at least one error! (not empty)
     }
-
 }
-
-
 
 // BUG!: Unfortunately this interface tyoe checks (`cargo check`) but crashes the rust compiler (I think out of resources)
 // TODO: determine why this nukes the compiler (I suspect too much impl trait)
@@ -236,14 +241,14 @@ fn analyse(
 //                 )
 //             )
 //         )
-//     ).gen(':'), 
+//     ).gen(':'),
 //     |(name, (transactions, (deletions, (fields, (gets, (updates, (predicates, (limit, (public, ())))))))))| {
 //         match analyse(fields, updates, gets, predicates, limit, transactions, deletions, name, public) {
 //             Ok(s) => CombiResult::Suc(s),
 //             Err(e) => CombiResult::Con(e),
 //         }
 //     })
-// } 
+// }
 
 pub fn simple(tks: TokenStream) -> Result<SelectOperations, LinkedList<Diagnostic>> {
     // parse().comp(TokenIter::from(tks, Span::call_site())).1.to_result().map_err(TokenDiagnostic::into_list)

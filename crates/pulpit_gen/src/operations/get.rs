@@ -34,11 +34,8 @@ struct GetGen {
     impl_def: Tokens<ImplItemFn>,
 }
 
-/// Provides a map of types for the entire table - used in the `TableGet` scalar type in emDB 
-pub fn get_struct_fields(
-    groups: &Groups,
-    namer: &CodeNamer,
-) -> HashMap<FieldName, Tokens<Type>> {
+/// Provides a map of types for the entire table - used in the `TableGet` scalar type in emDB
+pub fn get_struct_fields(groups: &Groups, namer: &CodeNamer) -> HashMap<FieldName, Tokens<Type>> {
     fn append<Col: ColKind>(
         fs: &mut HashMap<FieldName, Tokens<Type>>,
         col: &Col,
@@ -191,7 +188,12 @@ impl Get {
     }
 }
 
-pub fn generate(groups: &Groups, namer: &CodeNamer, get_ops: &[Get],op_attrs: &TokenStream) -> SingleOp {
+pub fn generate(
+    groups: &Groups,
+    namer: &CodeNamer,
+    get_ops: &[Get],
+    op_attrs: &TokenStream,
+) -> SingleOp {
     let CodeNamer {
         struct_window,
         mod_get,
@@ -205,18 +207,29 @@ pub fn generate(groups: &Groups, namer: &CodeNamer, get_ops: &[Get],op_attrs: &T
             .iter()
             .any(|Group { col, fields: _ }| col.requires_get_lifetime()); // TODO: implement
 
-    let (structs, impl_fns): (Vec<_>,Vec<_>) = get_ops.iter().map(|op| op.generate(include_lifetime, groups, namer, op_attrs)).map(|GetGen { struct_def, impl_def }| (struct_def, impl_def)).unzip();
+    let (structs, impl_fns): (Vec<_>, Vec<_>) = get_ops
+        .iter()
+        .map(|op| op.generate(include_lifetime, groups, namer, op_attrs))
+        .map(
+            |GetGen {
+                 struct_def,
+                 impl_def,
+             }| (struct_def, impl_def),
+        )
+        .unzip();
 
     SingleOp {
-        op_mod: quote!{
+        op_mod: quote! {
             pub mod #mod_get {
                 #(#structs)*
             }
-        }.into(),
+        }
+        .into(),
         op_impl: quote! {
             impl <#lifetime_imm> #struct_window<#lifetime_imm> {
                 #(#impl_fns)*
             }
-        }.into()
+        }
+        .into(),
     }
 }

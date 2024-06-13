@@ -681,10 +681,30 @@ pub fn query_combine_missing_field(
 }
 
 pub fn query_select_no_field(table: &plan::Table, field: &Ident) -> Diagnostic {
-    let cols = table.columns.iter().filter_map(|(rf, _)| if let plan::RecordField::User(id) = rf { Some(id) } else {None}).join(", ");
-    
-    emql_error(55, field.span(), format!("Field `{field}` is not present in the table `{}`", table.name))
-        .span_note(table.name.span(), format!("`{}` defined here with fields: {}", table.name, cols))
+    let cols = table
+        .columns
+        .iter()
+        .filter_map(|(rf, _)| {
+            if let plan::RecordField::User(id) = rf {
+                Some(id)
+            } else {
+                None
+            }
+        })
+        .join(", ");
+
+    emql_error(
+        55,
+        field.span(),
+        format!(
+            "Field `{field}` is not present in the table `{}`",
+            table.name
+        ),
+    )
+    .span_note(
+        table.name.span(),
+        format!("`{}` defined here with fields: {}", table.name, cols),
+    )
 }
 
 pub fn query_select_duplicate_field(field_original: &Ident, field: &Ident) -> Diagnostic {
@@ -693,5 +713,11 @@ pub fn query_select_duplicate_field(field_original: &Ident, field: &Ident) -> Di
 }
 
 pub fn query_use_on_variable_with_select(var_name: &Ident) -> Diagnostic {
-    emql_error(56, var_name.span(), format!("{var_name} is a variable, not a table, so cannot be selected with `.. as (fields, ..)"))
+    emql_error(
+        56,
+        var_name.span(),
+        format!(
+            "{var_name} is a variable, not a table, so cannot be selected with `.. as (fields, ..)"
+        ),
+    )
 }

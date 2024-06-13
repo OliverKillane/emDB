@@ -1,7 +1,8 @@
 //! A combi parser for parsing a structure out of order.
 
 use std::{
-    collections::{HashMap, LinkedList}, marker::PhantomData
+    collections::{HashMap, LinkedList},
+    marker::PhantomData,
 };
 
 use crate::{
@@ -215,7 +216,7 @@ impl<O, P: TokenParser<O>, R: OptParse, F: Fn() -> P> OptParse for (MustField<O,
     type Curr = O;
     type Rest = R::All;
     type All = (O, R::All);
-    
+
     fn construct(
         self,
         sep_tk: char,
@@ -263,30 +264,27 @@ impl<O, P: TokenParser<O>, R: OptParse, F: Fn() -> P> OptParse for (MustField<O,
                         (DiffRes::Second(()), CombiResult::Err(e)) => CombiResult::Err(e),
                     }
                 } else {
-                    CombiResult::Con(
-                        TokenDiagnostic::from(Diagnostic::spanned(
-                            Span::call_site(),
-                            Level::Error,
-                            format!("Missing required field `{name}`"),
-                        )),
-                    )
+                    CombiResult::Con(TokenDiagnostic::from(Diagnostic::spanned(
+                        Span::call_site(),
+                        Level::Error,
+                        format!("Missing required field `{name}`"),
+                    )))
                 }
             },
         )
     }
-    
+
     fn error_key(&self, options: &mut Vec<&'static str>) {
         options.push(self.0.name);
         self.1.error_key(options);
     }
 }
 
-
 pub struct DefaultField<O, P: TokenParser<O>, F: Fn() -> P, D: Fn() -> O> {
     name: &'static str,
     parser: F,
     default: D,
-    phantom: PhantomData<O>
+    phantom: PhantomData<O>,
 }
 
 impl<O, P: TokenParser<O>, F: Fn() -> P, D: Fn() -> O> DefaultField<O, P, F, D> {
@@ -295,16 +293,18 @@ impl<O, P: TokenParser<O>, F: Fn() -> P, D: Fn() -> O> DefaultField<O, P, F, D> 
             name,
             parser,
             default,
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 }
 
-impl<O, P: TokenParser<O>, R: OptParse, F: Fn() -> P, D: Fn() -> O> OptParse for (DefaultField<O, P, F, D>, R) {
+impl<O, P: TokenParser<O>, R: OptParse, F: Fn() -> P, D: Fn() -> O> OptParse
+    for (DefaultField<O, P, F, D>, R)
+{
     type Curr = O;
     type Rest = R::All;
     type All = (O, R::All);
-    
+
     fn construct(
         self,
         sep_tk: char,
@@ -315,7 +315,7 @@ impl<O, P: TokenParser<O>, R: OptParse, F: Fn() -> P, D: Fn() -> O> OptParse for
                 name,
                 parser,
                 default,
-                phantom: _
+                phantom: _,
             },
             rest,
         ) = self;
@@ -358,7 +358,7 @@ impl<O, P: TokenParser<O>, R: OptParse, F: Fn() -> P, D: Fn() -> O> OptParse for
             },
         )
     }
-    
+
     fn error_key(&self, options: &mut Vec<&'static str>) {
         options.push(self.0.name);
         self.1.error_key(options);
@@ -372,7 +372,10 @@ mod tests {
     use super::*;
     use quote::quote;
 
-    fn get_result<T>(parser: &impl TokenParser<T>, input: TokenStream) -> Result<T, TokenDiagnostic> {
+    fn get_result<T>(
+        parser: &impl TokenParser<T>,
+        input: TokenStream,
+    ) -> Result<T, TokenDiagnostic> {
         parser
             .comp(TokenIter::from(input, Span::call_site()))
             .1
@@ -397,20 +400,18 @@ mod tests {
             foo: foo,
         };
 
-        let (_, (_, ())) = get_result(&config_opts, input1)
-            .unwrap();
-        let (_, (_, ())) = get_result(&config_opts, input2)
-            .unwrap();
+        let (_, (_, ())) = get_result(&config_opts, input1).unwrap();
+        let (_, (_, ())) = get_result(&config_opts, input2).unwrap();
     }
 
     #[test]
     fn must_parse() {
         let config_opts = (
             OptField::new("foo", || mapsuc(getident(), |_| true)),
-            (OptField::new("bar", getident), (
-                MustField::new("baz", ||matchident("bazingah")),
-                OptEnd
-            )),
+            (
+                OptField::new("bar", getident),
+                (MustField::new("baz", || matchident("bazingah")), OptEnd),
+            ),
         )
             .gen(':');
 
@@ -431,10 +432,8 @@ mod tests {
             foo: foo,
         };
 
-        let (_, (_, (_, ()))) = get_result(&config_opts, input1)
-            .unwrap();
-        let (_, (_, (_, ()))) = get_result(&config_opts, input2)
-            .unwrap();
+        let (_, (_, (_, ()))) = get_result(&config_opts, input1).unwrap();
+        let (_, (_, (_, ()))) = get_result(&config_opts, input2).unwrap();
 
         assert!(get_result(&config_opts, error1).is_err());
     }

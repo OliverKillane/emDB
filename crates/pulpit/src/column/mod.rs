@@ -218,9 +218,12 @@ pub struct Data<ImmData, MutData> {
     pub mut_data: MutData,
 }
 
-impl <'brw, ImmData, MutData: Clone> Data<ImmData, &'brw MutData> {
+impl<'brw, ImmData, MutData: Clone> Data<ImmData, &'brw MutData> {
     pub fn extract(self) -> Data<ImmData, MutData> {
-        Data { imm_data: self.imm_data, mut_data: self.mut_data.clone() }
+        Data {
+            imm_data: self.imm_data,
+            mut_data: self.mut_data.clone(),
+        }
     }
 }
 
@@ -578,7 +581,11 @@ mod verif {
                     .expect("Key unexpectedly missing from column");
                 let imm_data = ColWindow::conv_get(entry.data.imm_data);
                 assert_eq!(imm_data, data.imm_data, "Incorrect immutable data");
-                assert_eq!(entry.data.mut_data.clone(), data.mut_data, "Incorrect mutable data");
+                assert_eq!(
+                    entry.data.mut_data.clone(),
+                    data.mut_data,
+                    "Incorrect mutable data"
+                );
                 assert_eq!(entry.index, *unsafeindex, "Incorrect index");
             } else {
                 let entry = self.colwindow.get(key);

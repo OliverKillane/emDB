@@ -2,7 +2,11 @@
 //! Provides functions for determining the structure of the [`crate::table::Table`] chosen.
 
 use crate::{
-    limit::Limit, operations::{update::Update, get::Get}, predicates::Predicate, table::Table, uniques::Unique,
+    limit::Limit,
+    operations::{get::Get, update::Update},
+    predicates::Predicate,
+    table::Table,
+    uniques::Unique,
 };
 use quote_debug::Tokens;
 use std::collections::HashMap;
@@ -64,12 +68,11 @@ mod utils {
             .map(|(name, ty)| Field { name, ty })
             .collect()
     }
-    
+
     pub fn determine_mutability(
         updates: &[Update],
         mut fields: HashMap<Ident, Tokens<Type>>,
     ) -> MutImmut<Vec<Field>> {
-
         let mut mut_fields = HashMap::new();
         for Update {
             fields: update_fields,

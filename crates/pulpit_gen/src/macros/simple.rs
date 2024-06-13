@@ -93,7 +93,7 @@ fn parse_on_off(name: &'static str) -> impl TokenParser<bool> {
 
 struct Access {
     alias: Ident,
-    fields: Vec<Ident>
+    fields: Vec<Ident>,
 }
 
 fn parse_access(name: &'static str) -> impl TokenParser<Vec<Access>> {
@@ -158,6 +158,7 @@ fn named_parse<T>(name: &'static str, inner: impl TokenParser<T>) -> impl TokenP
     mapsuc(seq(matchident(name), inner), |(_, data)| data)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn analyse(
     fields: Vec<ASTField>,
     updates: Vec<Update>,
@@ -234,8 +235,14 @@ fn analyse(
 pub fn simple(input: TokenStream) -> Result<SelectOperations, LinkedList<Diagnostic>> {
     let parser = seqs!(
         comma_after(fields_parser()),
-        comma_after(mapsuc(parse_access("updates"), |updates| updates.into_iter().map(|Access { alias, fields }| Update { alias, fields }).collect::<Vec<_>>())),
-        comma_after(mapsuc(parse_access("gets"), |updates| updates.into_iter().map(|Access { alias, fields }| Get { alias, fields }).collect::<Vec<_>>())),
+        comma_after(mapsuc(parse_access("updates"), |updates| updates
+            .into_iter()
+            .map(|Access { alias, fields }| Update { alias, fields })
+            .collect::<Vec<_>>())),
+        comma_after(mapsuc(parse_access("gets"), |updates| updates
+            .into_iter()
+            .map(|Access { alias, fields }| Get { alias, fields })
+            .collect::<Vec<_>>())),
         comma_after(parse_predicates()),
         comma_after(parse_limit()),
         comma_after(parse_on_off("transactions")),

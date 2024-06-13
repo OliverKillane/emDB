@@ -105,8 +105,8 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
                     .unwrap()
                     .deletions = true;
             },
-            plan::Operator::DeRef(plan::DeRef{ table, named, named_type, ..}) => {
-                let deref_fields = lp.get_record_type_conc(*named_type).fields.iter().map(|(rf, _)| namer.transform_field_name(rf)).collect::<Vec<_>>();
+            plan::Operator::DeRef(plan::DeRef{ table, named_type, ..}) => {
+                let deref_fields = lp.get_record_type_conc(*named_type).fields.keys().map(|rf| namer.transform_field_name(rf)).collect::<Vec<_>>();
                 pulpit_configs
                     .get_mut(&plan::Idx::new(*table, lp))
                     .unwrap()

@@ -14,7 +14,7 @@ use syn::{Ident, ItemImpl, ItemMod, ItemStruct, Type};
 use super::{
     groups::{Groups, GroupsDef},
     namer::CodeNamer,
-    operations::{update::Update, SingleOp, get::Get},
+    operations::{get::Get, update::Update, SingleOp},
     predicates::{self, Predicate},
     uniques::{self, Unique},
 };

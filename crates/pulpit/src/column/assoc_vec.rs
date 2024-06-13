@@ -38,7 +38,7 @@ where
         let Data { imm_data, mut_data } = self.assoc_brw(ind);
         Data {
             imm_data: imm_data.clone(),
-            mut_data: mut_data,
+            mut_data,
         }
     }
 
