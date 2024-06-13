@@ -19,7 +19,7 @@ use queries::QueriesInfo;
 use quote::quote;
 use std::{collections::LinkedList, fs::File, io::Write, path::Path};
 use syn::{parse2, File as SynFile, Ident, LitStr};
-use pulpit::gen::selector::{TableSelectors, MutabilitySelector, ThunderdomeSelector};
+use pulpit::gen::selector::{CopySelector, MutabilitySelector, TableSelectors, ThunderdomeSelector};
 
 use super::{interface::InterfaceTrait, EMDBBackend};
 use crate::utils::{misc::singlelist, on_off::on_off};
@@ -56,6 +56,7 @@ fn table_select_parse() -> impl TokenParser<TableSelectors> {
     choices! (
         peekident("Mutability") => mapsuc(matchident("Mutability"), |_| MutabilitySelector.into()),
         peekident("Thunderdome") => mapsuc(matchident("Thunderdome"), |_| ThunderdomeSelector.into()),
+        peekident("Copy") => mapsuc(matchident("Copy"), |_| CopySelector.into()),
         otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, "Invalid Table Selector Choice".to_owned()))
     )
 }

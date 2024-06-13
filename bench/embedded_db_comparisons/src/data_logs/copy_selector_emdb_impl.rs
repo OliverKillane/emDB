@@ -1,12 +1,13 @@
 use super::*;
 
 emql! {
-    impl emdb_table_thunderdome_impl as Serialized{
+    impl copy_selector as Serialized{
         interface = data_logs,
         pub = on,
-        ds_name = EmDBThunderdome,
+        ds_name = EmDBCopy,
+        aggressive_inlining = on,
         op_impl = Iter,
-        table_select = Thunderdome,
+        table_select = Copy,
     };
 
     table logs {

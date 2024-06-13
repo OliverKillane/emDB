@@ -1,0 +1,211 @@
+\chapter{Implementation}
+% Main diagram of the entire system
+
+\section{System Overview}
+
+% Time budget = 6 months, need to implement the entire compiler in that time
+% Decided to focus on the mutability/references, and append-only implementations
+% Rest of the system needs to be simple and correct.
+
+\section{Tool Choice}
+% Rust, C#, Zig, C++
+
+% Zig: No custom syntax, needs to work with comptime types, allows access to context
+% Rust: Custom syntax (AST), full flexibility for generation, but no access to context, everything must be manually implemented
+% C++: Custom syntax, performance not great, need to build an external tool
+
+\subsection{As a Separate Tool}
+% A method that works with all, and is common for Cpp
+% diagram source files -> (invoked by build system) -> analyse file -> generate code
+
+% disadvantages: 
+% - no IDE support
+% - no way to propagate errors back to the original file
+% - differences in build systems (tool needs to work across OSes, be simple to add to a repo)
+
+% examples of tools using this
+% clangtidy & clang libtools
+% Rather than working on a non-C++ syntax language, these work on C++, use clang AST for analysis
+
+\subsection{Zig Comptime}
+% explanation of zig
+% zig allows for compile time evaluation within the zig 
+
+% Rather than parsing, we allow users to construct comptime structs that describe the operations of 
+% queries, and tables.
+% At comptime these can be passed to a function, which analyses the structure.
+% Can then generate a structure that implements the database.
+% - Significant difficulties: captures not available
+% - Limitations on flexibility, produced plans need to be constructed as valid zig datastructures, 
+%   and implement some method for 'execute given query' 
+% - limited interaction with non-zig code, for example generating plan debug diagrams, or epresentations that can be easily debugged.
+% - error messages can be made by the library, but are managed by zig, so while expression errors are trivial and managed entirely 
+% by zig, assigning spans to certain structures using the query language semantics is difficult.
+
+\subsection{Rust Procedural Macros}
+% Procedural macros are part of the language (work across build systems (mainly cargo) and all supported platforms (windows, mac, linux, etc)).
+% macros can execute arbitrary code and interact witht eh OS (e.g. writing debug files)
+% full flexibility in parsing inputs (non-rust), passing through expressions (spans maintained), and producing error messages and lints. At the cost of needing to implement that entirely by yourself.
+% Generated code is a tokenstream, better than text, but still can create invalid (syntactic and/or semantic) code that produces confusing spans for the user.
+% IDE support by default.
+
+\section{Language Implementation}
+% Using our own syntax
+
+% Multiple syntaxes are available, specifically SQL
+% - SQL is the dominant DBMS query language
+% - Complying to SQL semantics allows for easy itnegration with other tools benchmarks, tests, etc
+% - Use of tools like SQLsmith to fuzz parsing
+
+% Downsides
+% - Semantics of types & expressions need to match the host language
+% - Emebdded application code will inveitably not match SQL
+% - SQL lacks concepts for references, and row indices
+% - SQL is unpopular and considered awkward to use (this becomes especially clear in the benchmark comparisons)
+
+% Decided to create a new language, wrapping rust expressions
+% - Inspired by the fluxql language, and iterators patterns in languages like elixir (from which |> is taken)
+% - creation of a new language removes the need to conform to a standard, more flexibility in implementation.
+
+% big example of syntax
+
+\section{Query Parsing with Combi}
+% There are few libraries that are able to manage tokenstreams
+\subsection{Rust Tokenstreams}
+% Rust tokenstreams are streams of tokentrees
+% stable API with the compiler
+% Using a wrapper to ensure macros can be used outside of a proc_macro context (for example regular unit tests & doc tests) 
+
+\subsection{Tokenstream Parsers}
+% Syn: Rust Syntax
+% Chunsky Parse: adaptor for the chunmsky library, includes combinators for recovery
+%                - issues: removes the tree structure of the tokentree, significant performance disadvantage
+%                - as the macro runs each time the user compiles (e.g. saves the file in the IDE) we need to 
+%                  ensure good performance
+
+% Design of combinators allows for multiple errors that can be recovered, without requiring them to be 
+% part of the output
+% - Simplifies the design of the AST
+% - Can still generate error nodes by mapping continuations into success of error nodes
+
+% NOTE: Inability to parallelise due to the restricttions !Send + !Sync on tokens by the rust compiler.
+
+\subsection{Recovery}
+% Recovery over queries and parsers.
+% screenshot of example for recovery
+
+\subsection{Performance}
+% Comparison of performance
+
+\subsection{Rust Error Messages}
+% Rust supports a diagnostics interface, however this has not yet been stabilised, 
+% therefore errors are passed through a wrapper library to either generate the older style 
+% error messages using the stable compiler, or emit diagnostics for the nightly compiler.
+
+% Error message causing failure in rustc
+
+% segfaults in rustc due to error messages
+
+\section{Table Generation with Pulpit}
+
+\subsection{Immutable Values}
+% need to pass out immutable values (bind to what lifetime?)
+
+% INCLUDE: docs from pulpit
+
+\subsection{Table Structure}
+% Diagram of the table structure
+
+% implements a window structure
+
+% associated columns
+% table of allowed operations
+% values for deletion
+
+% insert
+% delete
+% hide
+% update
+
+% Wrapped with a single table structure
+% inlining of update, get values (can eliminate column accesses)
+
+% demonstrate with a simple test
+% - check generated assembly
+
+\subsection{Retaining Values}
+% The retaintable structure
+
+% A data structure for accessing immutable data, from tables supporting deletions.
+% - Mutable data held in a large vector
+% - Pointers to immutable data held in blocks
+% - Blocks are retained even when rows are deleted, until the column is removed.
+% - The immutable pointers can be used as generation counters for the mutable_data
+% - Hence access to all the data requires no actual access to the immutable blocks, just to copy the data pointer (qualified by the lifetime of the window and as a reference) 
+
+\subsection{Performance}
+% graph of the performance results
+
+\section{Logical Analysis}
+% Access to types through rustc driver interface
+% type graph
+% debug views can be generated live
+
+\subsection{Evaluating Rust Expressions}
+% Can use the rustc driver interface
+% turns out this is quite hard
+% interface is unstable
+% no context from outside the database, so limited ability to analyse
+
+% potential:
+% - analyse where possible, default to pass through if not (complex to implement, so decided this was beyond the scope of the project)
+
+% instead, validate the synax, and pass through to the output (maintaining the same spans)
+
+\subsection{Logical Plan Structure}
+% Displaying plans as a graph, rather than a tree.
+% Much dataflow is expressed as DAGs (data flows in streams, streams are copied)
+% inner context operators (context within a stream)
+
+% By designing a simple & strongly typed plan structure, we lay the groundwork for further optimisations.
+% - Analysis of concurrent interactions
+% - Analysis of dataflow (parallelism)
+% - Inter-procedural analysis (a requirement for future optimisations in premptive Preemptive Materialisation and IVM)
+
+\subsection{Plan Tooling}
+% Also created tools for debugging plans:
+% - Large plan debug view, showing types, the type graph etc
+
+\section{Code Generation}
+% Quasi-quoting with the quote library (wraps the rust-compiler specific quote macro)
+% - construction of types manually is more complex, more difficult to refactor & amend
+% - However quotes generate tokenstreams, so invalid syntax could be present. Hence using a 
+%   wrapper that checks parsability based on the AST type the tokenstream is meant to represent 
+%   is done using syn (only on debug mode, so it does not affect the macro's normal performance) 
+
+\subsection{Ordering of Operations}
+% Important due to rust move semantics
+% - the first expression can move the value
+% - Hence the order of operators needs to follow dataflow analysis, while the order of expressions 
+%   generated needs to capture according to the user's ordering in the emQL source code.
+% - To fix this for each context (a collection of connected operators with some variables available 
+%   for the whole scope (and therefore to the expressions)) we generate a closure containing the body 
+%   of the query, preceded by the expressions generated in their original ordering.
+
+% Note that these closures cannot make use of the database's `self`' type variable, as it would result in 
+% closures capturing references, which could result in compile failures due to mutating operators inferring 
+% their capture as a mutable borrow of self, held while others have an immutable borrow.
+
+% To get around this we nest query context closures, and pass a `__internal_self` alias of `self` to send 
+%`self` as a parameter, rather than a capture.
+
+% Example with a lift closure
+
+\subsection{Operators with Minister}
+% Use a macro to generate the interface for minister operators de to the lack of associated traits.
+% Need to maintain use of ananymous types for iterators, using `impl Trait'
+
+% Introduction to rust iterators
+% - Simple to use
+% Great performance
+% Example with in-place-collect

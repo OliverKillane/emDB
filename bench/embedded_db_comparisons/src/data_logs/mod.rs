@@ -14,29 +14,12 @@ emql! {
     impl data_logs as Interface{
         pub = on,
     };
-    impl emdb_parallel_impl as Serialized{
+    impl emdb_impl as Serialized{
         interface = data_logs,
         pub = on,
-        ds_name = EmDBParallel,
-        op_impl = Parallel,
-    };
-    impl emdb_basic_impl as Serialized{
-        interface = data_logs,
-        pub = on,
-        ds_name = EmDBBasic,
-        op_impl = Basic,
-    };
-    impl emdb_iter_impl as Serialized{
-        interface = data_logs,
-        pub = on,
-        ds_name = EmDBIter,
+        ds_name = EmDB,
+        aggressive_inlining = on,
         op_impl = Iter,
-    };
-    impl emdb_chunk_impl as Serialized{
-        interface = data_logs,
-        pub = on,
-        ds_name = EmDBChunk,
-        op_impl = Chunk,
     };
 
     table logs {
@@ -118,14 +101,15 @@ pub fn populate_table<DS: data_logs::Datastore>(rng: &mut ThreadRng, size: usize
             db.add_event(
                 t,
                 choose! { rng
-                  3 => None,
-                  2 => Some(format!("This is a short {t} string")),
-                  1 => Some(format!("This is a {t} very very very {t} very very {t} very very very {t} long string")),
+                  1 => None,
+                  1 => Some({
+                    random_string(rng)
+                  }),
                 },
                 choose! { rng
                   1 => LogLevel::Error,
                   2 => LogLevel::Warning,
-                  3 => LogLevel::Info,
+                  2 => LogLevel::Info,
                 },
             );
         }
@@ -133,6 +117,15 @@ pub fn populate_table<DS: data_logs::Datastore>(rng: &mut ThreadRng, size: usize
     ds
 }
 
+pub fn random_string(rng: &mut ThreadRng) -> String {
+    let size = rng.gen_range(0..1024);
+    let mut s = String::with_capacity(size);
+    for _ in 0..size {
+        s.push(rng.gen_range(b'a'..b'z') as char);
+    }
+    s
+}
+
 pub mod duckdb_impl;
 pub mod sqlite_impl;
-mod thunderdome_emdb_impl; pub use thunderdome_emdb_impl::*;
+mod copy_selector_emdb_impl; pub use copy_selector_emdb_impl::*;

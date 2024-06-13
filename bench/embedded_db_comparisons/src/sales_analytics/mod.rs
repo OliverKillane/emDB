@@ -56,29 +56,11 @@ emql! {
     impl sales_analytics as Interface{
         pub = on,
     };
-    impl emdb_parallel_impl as Serialized{
+    impl emdb_impl as Serialized{
         interface = sales_analytics,
         pub = on,
-        ds_name = EmDBParallel,
-        op_impl = Parallel,
-    };
-    impl emdb_basic_impl as Serialized{
-        interface = sales_analytics,
-        pub = on,
-        ds_name = EmDBBasic,
-        op_impl = Basic,
-    };
-    impl emdb_iter_impl as Serialized{
-        interface = sales_analytics,
-        pub = on,
-        ds_name = EmDBIter,
+        ds_name = EmDB,
         op_impl = Iter,
-    };
-    impl emdb_chunk_impl as Serialized{
-        interface = sales_analytics,
-        pub = on,
-        ds_name = EmDBChunk,
-        op_impl = Chunk,
     };
 
     table products {
@@ -336,5 +318,64 @@ impl TableConfig {
             }
         }
         ds
+    }
+
+    pub fn append_database<'imm, DS: sales_analytics::Datastore>(
+        current: &Self,
+        additional: &Self,
+        rng: &mut ThreadRng,
+        db: &mut impl sales_analytics::Database<'imm, Datastore=DS>,
+    ) -> Self {
+        let end = Self { customers: current.customers + additional.customers, sales: current.sales + additional.sales, products: current.products + additional.products };
+
+        fn random_range(rng: &mut ThreadRng, bottom : usize, top: usize) -> usize {
+            if top == bottom {
+                return top;
+            } else {
+                return rng.gen_range(bottom..top);
+            }
+        } 
+
+        for i in (current.customers)..end.customers {
+            db.new_customer(
+                i,
+                format!("Test Subject {i}"),
+                format!("Address for person {i}"),
+            );
+        }
+
+        for i in  current.products..end.products {
+            db.new_product(
+                i,
+                format!("Product {i}"),
+                choose! { rng
+                    1 => ProductCategory::Electronics,
+                    1 => ProductCategory::Clothing,
+                    1 => ProductCategory::Food,
+                },
+            );
+        }
+        for _ in current.sales..end.sales {
+            let currency = choose! { rng
+                1 => Currency::GBP,
+                1 => Currency::USD,
+                1 => Currency::BTC,
+            };
+
+            let price = match currency {
+                Currency::GBP => rng.gen_range(0..100000),
+                Currency::USD => rng.gen_range(0..=10000),
+                Currency::BTC => rng.gen_range(0..20),
+            };
+
+            db.new_sale(
+                random_range(rng, 0,end.customers),
+                random_range(rng, 0,end.products),
+                rng.gen_range(0..10),
+                price,
+                currency,
+            );
+        }
+        end
     }
 }

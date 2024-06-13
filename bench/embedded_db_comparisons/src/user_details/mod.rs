@@ -10,29 +10,11 @@ emql! {
     impl user_details as Interface{
         pub = on,
     };
-    impl emdb_parallel_impl as Serialized{
+    impl emdb_impl as Serialized{
         interface = user_details,
         pub = on,
-        ds_name = EmDBParallel,
-        op_impl = Parallel,
-    };
-    impl emdb_basic_impl as Serialized{
-        interface = user_details,
-        pub = on,
-        ds_name = EmDBBasic,
-        op_impl = Basic,
-    };
-    impl emdb_iter_impl as Serialized{
-        interface = user_details,
-        pub = on,
-        ds_name = EmDBIter,
+        ds_name = EmDB,
         op_impl = Iter,
-    };
-    impl emdb_chunk_impl as Serialized{
-        interface = user_details,
-        pub = on,
-        ds_name = EmDBChunk,
-        op_impl = Chunk,
     };
 
     // Reasoning:
@@ -137,40 +119,7 @@ pub trait GetNewUserKey: user_details::Datastore {
     ) -> <Self as user_details::Datastore>::users_key;
 }
 
-impl GetNewUserKey for emdb_basic_impl::EmDBBasic {
-    fn new_user_wrap(
-        db: &mut Self::DB<'_>,
-        username: String,
-        prem: bool,
-        start_creds: Option<i32>,
-    ) -> <Self as user_details::Datastore>::users_key {
-        db.new_user(username, prem, start_creds).unwrap().user_id
-    }
-}
-
-impl GetNewUserKey for emdb_parallel_impl::EmDBParallel {
-    fn new_user_wrap(
-        db: &mut Self::DB<'_>,
-        username: String,
-        prem: bool,
-        start_creds: Option<i32>,
-    ) -> <Self as user_details::Datastore>::users_key {
-        db.new_user(username, prem, start_creds).unwrap().user_id
-    }
-}
-
-impl GetNewUserKey for emdb_iter_impl::EmDBIter {
-    fn new_user_wrap(
-        db: &mut Self::DB<'_>,
-        username: String,
-        prem: bool,
-        start_creds: Option<i32>,
-    ) -> <Self as user_details::Datastore>::users_key {
-        db.new_user(username, prem, start_creds).unwrap().user_id
-    }
-}
-
-impl GetNewUserKey for emdb_chunk_impl::EmDBChunk {
+impl GetNewUserKey for emdb_impl::EmDB {
     fn new_user_wrap(
         db: &mut Self::DB<'_>,
         username: String,

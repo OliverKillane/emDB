@@ -105,6 +105,12 @@ pub use assoc_blocks::*;
 mod primary_thunderdome_trans;
 pub use primary_thunderdome_trans::*;
 
+// for the data structures used for comparative benchmarks on passing references
+mod assoc_blocks_copy;
+pub use assoc_blocks_copy::*;
+mod primary_retain_copy;
+pub use primary_retain_copy::*;
+
 #[enumtrait::quick_enum]
 #[enumtrait::quick_from]
 #[enumtrait::store(enum_primary)]
@@ -114,6 +120,10 @@ pub enum Primary {
     PrimaryThunderdome,
     PrimaryThunderDomeTrans,
     PrimaryGenArena,
+
+    // Benchmark Data Structures
+    PrimaryRetainCopy,
+    AssocBlocksCopy,
 }
 
 #[enumtrait::impl_trait(col_kind_trait for enum_primary)]

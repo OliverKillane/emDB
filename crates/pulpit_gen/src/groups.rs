@@ -189,6 +189,7 @@ impl<Col: ColKind> Group<Col> {
 
                 #imm_unpacked
 
+                #[inline(always)]
                 #unpacker
             }
         }

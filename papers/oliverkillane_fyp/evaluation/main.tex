@@ -1,0 +1,227 @@
+\chapter{Evaluation}
+
+\section{Representative Benchmarks}
+To determine the advantage provided by the core concept of the project requires assessing the impact of:
+\begin{enumerate}
+    \setlength\itemsep{0em}
+    \item Optimising table access into returning references.
+    \item Optimising table structures for append only workloads.
+    \item Embedding application logic inside database queries.
+\end{enumerate}
+A direct comparison and evaluation of the specific benefits of code generation is not in the scope of this evaluation.
+While there is clearly a performance advantage to be gained from running native, optimised code (without a runtime cost), \emdb
+is implemented with different operators, and is currently running a simple \& easily debuggable backend that has not been optimised.
+\\
+\\ Ideally we would use a benchmark considered representative of embedded database workloads,
+and contains schemas for which the 3 features we want to investigate are applicable.
+\subsubsection{TCP-H}
+Covers aggregation as well as concurrent data modification, adherence to specification
+requires either using a separate driver - not easily embeddable while adhering to the specification.
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item The benchmark is designed for a persisted buisness database, so uses all mutations (insert update, delete)
+          which prevents the mutability optimisations that emDB performs,
+          some embedded database workloads are append only, and thus choosing a benchmark that also
+          supports
+    \item Concurrent modification is only possible with the current Serialized emDB backend by placing
+          the entire database behind a RWLock, but TCP-H is designed in part for benchmarking \textit{concurrent data modifications}\cite{TCPHSpec}
+\end{itemize}
+It would be possible to heavily modify TCP-H (data generator linked with benchmarks \& in-memory, on a
+low scale factor with benchmarks including no updates or deletes).
+\\
+\\ However this benchmark would be TCP-H in schema \& queries only (not useful to compare with other TCP-H results)
+and would not be particularly useful in validating the 4 key optimisations imlemented without modifying
+the sets of queries used (i.e. TCP-H, but append only).
+
+\subsubsection{H2O.ai Database Benchmark}
+This benchmark is designed for \textit{database like-tools [in] data-science}, and benchmarks aggregations
+using groupby and join on an in-memory dataset\cite{H2Oai}.
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item It is used by, and since 2023 has been maintained by the DuckDb project\cite{DuckDBH2O}, and is used by that project to benchmark DuckDB's
+          aggregations.
+    \item As it is primarily for benchmarking aggregations over dataframes, it does not consider the impact of updates, or extracting
+          data from the database. Meaning it cannot be used to assess append only workloads or returning references.
+\end{itemize}
+\subsubsection{CrossDB Bench}
+Designed by the CrossDB project, the (self advertised) \textit{"fastest embedded database"}\cite{CrossDBWebsite}. The incuded benchmark compares against lmdb and sqlite3.
+\\
+\\ CrossDB is more comparable to a key-value store, and does not support complex operators (SELECT with computation, groupby, join etc.).
+As a result the benchmark benchmarks inserts, deletes, and updates.
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item CrossDB could even be used as a backend for emDB, as emDB's operators are separate from the data storage.
+    \item Despite being integrated into C (schemas are defined with C structs, custors into tables are directly accessible as part of the API,
+          and reference C types)
+\end{itemize}
+
+\subsubsection{Yahoo Cloud Serving Benchmark}
+A popular and highly configurable set of benchmarks for key-value stores. Much like the CrossDB
+benchmarks, the lack of complex queries means it is not useful in investigating the 3 features.
+
+\subsubsection{Custom Benchmarks}
+Rather than adapting an existing benchmark, designing a new set of test schemas and queries allowed the 3 key features to be targetted. 
+Given the popularity of SQLite and DuckDB in the Rust ecosystem, these were the other embedded databases chosen for the comparison. 
+\begin{center}
+    \begin{tabular}{r | r | r |r | r |}
+        Embedded Database & SQLite & DuckDB & ExtremeDB & MonetDB/e \\
+        \hline 
+        crates.io All-TIme downloads &  $17,780,740$ & $174,602$ & $1,757$ & (not available) \\
+    \end{tabular}
+\end{center}
+Other more popular \textit{embedded databases} were ommitted from the selection as they are more akin 
+to transactional key-value stored. The popular \textit{"pure-rust transactional embedded database"} sled\cite{SledRepo}, LmDB\cite{LMDBWebsite} and CrossDB\cite{CrossDBWebsite} were ommitted for this reason.
+\\
+\\ In order to simplify the creation of new benchmarks, \emdb includes an \mintinline{rust}{Interface} backend that generates traits that can be consumed and implemented by \emdb's \mintinline{rust}{Serialized} backend, or implemented manually (to wrap other databases).
+\section{[Quantitative] Performance}
+\subsection{Benchmark Setup}
+
+% fat lto for inlining - impotant for pulpit
+% profile guided optimisation is optional
+% using divan benchmarking library, using traits generated by emDB
+% All used with entirely default configurations (except for the NoCopy)
+
+% Benchmarks are singel threaded
+% Explanation of graphs
+
+\subsection{Data Logs}
+\subsubsection{Schema}
+Designed to demonstrate the impact of removing large copies (in this case of the \mintinline{rust}{comment} string), for a query on static data (i.e. a typical ETL pattern, loading data into memory and then computing).
+\begin{minted}{rust}
+table logs { timestamp: usize, comment: Option<String>, level: LogLevel }
+pub enum LogLevel { Error, Warning, Info }
+\end{minted}
+Prior to the benchmarks being run, the table is populated with a number of rows equal to the scale factor.
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item \mintinline{rust}{timestamp} is added sequentially up to the scale factor.
+    \item \mintinline{rust}{level} is added randomly, with $20\%$ \mintinline{rust}{LogLevel::Error}, $40\%$ \mintinline{rust}{LogLevel::Warning} and $40\%$ \mintinline{rust}{LogLevel::Info}.
+    \item \mintinline{rust}{comment} is added with $50\%$ \mintinline{rust}{None}, and $50\%$ containing a random string of random (uniformly distributed) lengths from $0$ to $1024$ characters.
+\end{itemize}
+\noindent
+\begin{tabular}{l p{.8\textwidth}}
+    \textbf{Comment Summaries} & For each comment, get the length and the first 30 characters. \\
+    \textbf{Errors per minute} & Group each error by its minute, and return the number of error logs. \\
+    \textbf{Data Cleaning} & Demote all \mintinline{rust}{LogLevel::Error} logs to \mintinline{rust}{LogLevel::Warn}. \\ 
+\end{tabular}
+
+\subsubsection{EmDB Implementations}
+The \mintinline{rust}{NoCopySelector} table implementation selector is enabled for the no-copy \emdb
+implementation. It chooses the same column data structures as the default \mintinline{rust}{MutabilitySelector}
+but adds a step to copy values taken from the table.
+
+\subsubsection{Results}
+\begin{figure}[h!]
+    \centering
+    \vspace{-0.4em}
+    \resizebox{\textwidth}{!}{\input{scripts/data_logs.pgf}}
+    \caption{Various benchmarks}
+    \label{fig:data_log_benchmark_results}
+\end{figure}
+
+\subsubsection{Observations}
+\textbf{\emdb performance deteriorates at higher scale factors}
+\begin{quote}
+
+\end{quote}
+\noindent
+\textbf{DuckDB performs better than \emdb for updates at large scale factors}
+\begin{quote}
+
+\end{quote}
+\noindent
+\subsubsection{Sales Analytics}
+% An OLAP workload with embedded logic
+% Demonstrates the performance advantage from embedding the application logic 
+
+\subsubsection{User Details}
+% An OLTP workload with some analysis, with key-access.
+% Demonstrates applicability to live data (e.g. for a live service)
+
+\subsection{Parallelism}
+% Due to the lack of a performant parallel operator implementation for emDB, performance suffers for extremely large workloads.
+% - The `minister' operator library supports concurrency in its interface (and thus rustc has ensured any safe parallel implementation will compile, and will be data race-free).
+
+% We can see performance suffer at large sale factors
+
+\section{[Qualitative] Correctness}
+\subsection{Correctness of Supporting Libraries}
+Very few instances of unsafe code, ensuring normal rust safety guarantees apply.
+\begin{itemize}
+    \item For the unsafe code used in implementing some column data structures, kani\cite{KaniGithub} (a CBMC\cite{DiffBlueCBMC} wrapper) is used to verify abcense of generic bugs.
+    \item No large test suites are present, this is a weakness for logical errors.
+\end{itemize}
+
+\subsection{Correctness of Code Generation}
+With one key exception (accessing secondary columns without bounds checking) no \mintinline{rust}{unsafe} code is generated. Hence normal rust safety guarentees apply (no data races, no undefined behaviour, no use after free, etc.).
+\begin{itemize}
+    \item Normal rust safety guarentees apply to the generated code.
+    \item Wrappers inside \emdb's code generation ensure quasiquotes can be re-parsed as the AST nodes they should represent (only on debug mode for performance).
+    \item The produced code is human readable, a debug write mode is included to divert generated code to separate files for inspection.
+\end{itemize}
+
+The \emdb compiler currently runs on rust nightly, and hence is subject to some of the bugs associated with it.
+For example 
+
+
+\subsection{Durability to User Error}
+Given emDB allows the user to access internal state safely to immutable values, it is critical to 
+prevent bugs in user code mainfesting in difficult to debug issues inside the database.
+\\
+\\ For example, invalid access through an \emdb provided reference corrupting memory in a table, 
+resulting in a difficult bug manifesting in failures for unrelated queries.
+\\
+\\ The qualification of user provided references with the database lifetime, and the accessiblity to 
+internal data structures only through the safe query interface limit the exposure to bugs in user code.
+However, there are still three ways in which this can be damaged.
+\begin{enumerate}
+    \item {
+        \textbf{Use of unsafe code by the user.} \\
+        There is no way to prevent this, and it is clear to the user that they are using unsafe code.
+    }
+    \item { 
+        \textbf{Use of a rust soundness hole by the user.} \\
+        This is a rust compiler issue (for example the demonstrations in cve-rs\cite{CVERS})
+    }
+    \item { 
+        \textbf{Access to internal database data structures through code embedded in operators.} \\
+        User code substituted to inside the body of a query 
+        can access internal variables that are in scope. This is somewhat limited by placing the generation of expressions and closures 
+        before the operator implementation, however symbols such as the \mintinline{rust}{__internal_self_alias} used to access internal 
+        tables are still in scope.
+    }
+\end{enumerate}
+
+\begin{futurebox}{Barriers to Production Use}
+    A larger test suite is required to ensure no logical errors in the `minister' operator implementations.
+\end{futurebox}
+
+\section{[Quantitative] Compile Time Cost}
+% The proc-macro needs to run at compile time in order to generate the code.
+% - Using cargo's internal timings data, we can see the time taken to compile the benchmarks repository.
+
+% The current emDB compiler has a significant compile time cost when code inside the module is editted
+% The upfront cost of compiling sqlite and duckDB is enormous
+% emDB compiles fast enough to be usable live in the IDE (propagating error messages), even during development when modifying emDB internals.
+% significant time is taken for optimising the generated data structures in 
+% The data structures and operator implementations are in separate crates from the emdb proc macro.
+
+% TODO: cargo build --timings from scratch
+% TODO: cargo build --timings for second build
+% TODO: cargo build --timings for bench
+
+% Further improvements can be made to reduce compile times (feature gating operator implementations, 
+% improving performance of emDB compiler).
+
+% However there is a consideration for correctness, when using other systems a developer may need to 
+% write, then test queries to catch bugs that are caught by the rust compiler and propagated to the 
+% user through emDB.
+
+\section{[Qualitative] Error Messages}
+% emDB produces multiple syntax errors effectively
+% some bugs to exist (cargo panic on syn)
+
+% comparison sqlx
+% requires recompile
+
+% \section{[] }

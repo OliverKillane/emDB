@@ -1,0 +1,63 @@
+\chapter{Concepts}
+
+\section{Compile Time Generated Database}
+% TODO: Diagram of the whole system (parts at runtime to parts at compile time)
+
+\subsection{Logical Optimisation} 
+
+\subsubsection{Mutability Optimisation}
+% When values are not updated, can be shared when accessed from the  database, without needing to copy.
+% - Wrapped by reference count works (at the cost of heap allocation, or complexity in the database)
+
+% Example for linear types with a reference counted database
+
+% If pointer stability is ensured, then a pointer can be provided, given the pointer is qualified to only live for the duration of the instance of the database.
+% - In rust we can express this using references, which are bound by the lifetime of the database.  
+
+\subsubsection{Append Only Optimisation}
+% Append only indices are better
+% - simple to insert
+
+\begin{futurebox}{Limit Optimisation}
+    % For some workloads, the size of a table is known at application compile time.
+    % This constraint is currently supported in emdb
+    % The pulpit table generation can use this as an option, in future tables will be 
+    % implemented to use this.
+\end{futurebox}
+
+\subsection{Elimination of Query Parse \& Plan Overhead}
+% https://sqlite.org/lemon.html
+% Parsing queries is a significant cost
+
+\subsubsection{Serialization Elimination}
+% Deal with types from the language querying
+% we can copy values (or even move) to the database without needing to serialize (expensive)
+% Most benchmarks consider serializing/deserializing data to be a fixed, required costs. 
+% - Not measured in benchmarks
+% - Not separately measured in 
+% But at this level of embedding, it is no longer required.
+
+\subsubsection{Preemptive Materialisation}
+% Some examples
+% When access performance is more important than insert performance 
+% - pre-joining, pre-aggregating data
+% - storing data according to predicates
+% - eliminating redundant data
+
+\subsubsection{Incremental View Maintenance}
+% Lazily computing updates based on derivatives
+
+\subsection{Physical Optimisation}
+
+
+\subsubsection{Code Generation}
+% The typical advantages of code generation for performance hold, with the advantage of:
+% More optimisation does not result in worse performance, because the code generation is not done at runtime
+% producing a higher level representation (Rust, C++, etc) does not negatively impact peformance (not runtime) but improes ability to debug, and to use associated tooling for testing, profiling & optimisation (e.g. profile guided optimisation) etc
+
+% emdb with pgo example
+
+\subsubsection{Ownership transfer}
+% Allow data the database to take ownership of data from the application.
+% - Requires no copy
+% - Singificant for types that own large heap allocated values

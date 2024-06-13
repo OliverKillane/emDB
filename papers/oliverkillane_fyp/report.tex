@@ -1,0 +1,104 @@
+\documentclass{report}
+\usepackage{xcolor}
+\usepackage[a4paper,  total={185mm,260mm},
+ left=10mm,
+ top=20mm]{geometry}
+\usepackage{tikz}
+\usepackage{graphicx}
+\usepackage{svg}
+\usepackage{minted}
+\usepackage{moresize}
+\usepackage{nth}
+\usepackage{lmodern}
+\usepackage{relsize}
+\usepackage[only,llbracket,rrbracket]{stmaryrd}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage{biblatex}
+\usepackage{fontawesome}
+\usepackage[most]{tcolorbox}
+\addbibresource{refs.bib}
+
+% \begin{definitionbox}{term}
+%	... the term's definition ...
+% \end{definitionbox}
+\newtcolorbox[auto counter,number within=section]{definitionbox}[2][]{%
+	colback=black!5!white,colframe=black,arc=0mm,sharp corners=all,fonttitle=\bfseries,%
+	title=#2}
+
+% \begin{definitionbox}{futurebox}
+%	... the future work to be completed ...
+% \end{futurebox}
+\newtcolorbox[auto counter,number within=section]{futurebox}[2][]{%
+	colback=black!5!white,colframe=black,arc=0mm,sharp corners=all,fonttitle=\bfseries,%
+	title=#2}
+
+% \begin{prosbox}
+%	... the term's definition ...
+% \end{prosbox}
+\newtcolorbox[]{prosbox}[1][]{%
+	colback=green!5!white,breakable,colframe=green!75!black,leftrule=3mm,arc=0mm,sharp corners=all, #1}
+ 
+% \begin{prosbox}
+%	... the term's definition ...
+% \end{prosbox}
+\newtcolorbox[]{consbox}[1][]{%
+	colback=red!5!white,breakable,colframe=red!75!black,leftrule=3mm,arc=0mm,sharp corners=all, #1}
+
+\newcommand{\emdb}{\raisebox{-0.2\baselineskip}{\includegraphics[height=1.1\baselineskip]{titlepage/images/emdb_logo.png}}}
+
+\newcommand{\github}[2]{\textcolor{imperialblue}{\mbox{\faGithub\hspace{0.5em}\href{#1}{#2}\hspace{1em}}}}
+
+\usepackage{fontspec}
+\setmainfont{Fira Sans}
+
+\begin{document}
+
+\include{titlepage/main}
+
+\centerline{\textbf{Abstract}}
+\noindent
+Embedded databases allow developers to easily embed a data store within an
+application while providing a convenient query interface. For many
+applications, the schema of the data store is static, and the set of
+parameterized queries is known at application compile time.
+\\
+\\ No existing embedded databases take advantage of this knowledge for
+logical optimisation. The goal of this project is to build one that does.
+\\
+\\ The main outcome of this project is \emdb: a prototype embedded
+database compiler that generates the optimised code for a data store from a
+schema and queries.
+\\[2cm]
+\centerline{\textbf{Acknowledgements}}
+\noindent
+I would like to thank my suprvisor, Dr. Holger Pirk, for his willingness to
+supervise my wild idea, and for his teaching of the data processing module
+that inspired it. I would also like to thank my friends, family,and the staff of Imperial
+College for enabling me to persue my passion in computer science.
+\\
+\\ Finally I would like to thank the public at large for not implementing
+this project before I could.
+\\[2cm]
+\centerline{\textbf{Produced Work}}
+\noindent
+The code the project, documentation and this report can be found at \github{https://github.com/OliverKillane/emDB}{OliverKillane/emDB}
+\pagebreak
+
+
+\tableofcontents
+% \listoffigures
+% \listoftables
+
+\newpage
+
+\input{introduction/main}
+\input{background/main}
+\input{concepts/main}
+\input{implementation/main}
+\input{evaluation/main}
+\input{related_work/main}
+
+\printbibliography
+
+\end{document}

@@ -1,6 +1,6 @@
 //! An easily extensible function combinator library
 #![allow(internal_features)]
-#![feature(rustc_attrs)]
+#![cfg_attr(feature = "nightly", feature(rustc_attrs))]
 // TODO: Add further verification to ensure
 #![warn(clippy::style)]
 #![warn(clippy::perf)]

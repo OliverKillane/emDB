@@ -24,6 +24,8 @@ mod mutability;
 pub use mutability::MutabilitySelector;
 mod thunderdome;
 pub use thunderdome::ThunderdomeSelector;
+mod copy;
+pub use copy::*;
 
 #[enumtrait::store(selector_impl_trait)]
 pub trait SelectorImpl {
@@ -36,6 +38,9 @@ pub trait SelectorImpl {
 pub enum TableSelectors {
     MutabilitySelector,
     ThunderdomeSelector,
+
+    // For Benchmarks
+    CopySelector,
 }
 
 #[enumtrait::impl_trait(selector_impl_trait for table_selector_enum)]

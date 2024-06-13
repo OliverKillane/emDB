@@ -1,0 +1,39 @@
+\definecolor{myblue}{RGB}{0, 102, 204}  % Adjust the RGB values for your desired shade of blue
+
+\newcommand{\titlecredit}[2]{\begin{minipage}[t]{.3\textwidth}
+        \Large
+        \centering
+        \textbf{#1}
+        \\ \vspace{1mm} #2
+    \end{minipage}}
+
+\definecolor{imperialblue}{RGB}{0,0,205}
+
+\begin{titlepage}
+    % The main title page
+    \begin{tikzpicture}[remember picture,overlay]
+        \fill[imperialblue] (current page.north west) rectangle ++(\paperwidth,-40mm);
+        \node[align=center, anchor=center] at ([shift={(0cm,-2cm)}]current page.north) {\includesvg[height=20mm]{titlepage/images/imperial_logo2}};
+    \end{tikzpicture}
+    \begin{center}
+        \vspace{4cm}
+        \Huge
+        \textbf{MEng Individual Project}
+        \huge
+        \\ \vspace{1mm}
+        \textbf{Department of Computing}
+        \\ \vspace{40mm}
+        \includegraphics[height=30mm]{titlepage/images/emdb_logo.png}
+        \\ \HUGE Schema Compilation with Query-Set \\ Aware Optimisation for Embedded Database Generation
+        \vspace{35mm}
+        \normalsize
+        \\ \vspace{3cm}
+        \begin{center}
+            \titlecredit{Author}{Oliver Killane}
+            \titlecredit{Supervisor}{Holger Pirk}
+            \titlecredit{Second Marker}{Tony Field}
+        \end{center}
+        \vspace{5mm}
+        \nth{14} November 2023
+    \end{center}
+\end{titlepage}
