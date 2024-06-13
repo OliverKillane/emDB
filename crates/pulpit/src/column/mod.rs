@@ -269,6 +269,12 @@ pub trait PrimaryWindow<'imm, ImmData, MutData> {
     /// does not need the `'imm` lifetime parameter)
     type Col: Keyable + Column;
 
+    /// Get provides values to the user. If the immutable data can be optimised it is done so 
+    /// and returned wrapped in the [`PrimaryWindow::ImmGet`].
+    /// 
+    /// Mutable data is returned as a borrow, to allow the user to copy the data in the 
+    /// most efficient way.
+    /// - For example ignoring copying some fields.
     fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, &MutData>;
     fn brw(&self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &MutData>;
     fn brw_mut(&mut self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &mut MutData>;
