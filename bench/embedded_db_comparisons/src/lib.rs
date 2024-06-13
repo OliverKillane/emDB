@@ -15,5 +15,6 @@
 pub mod data_logs;
 pub mod sales_analytics;
 pub mod user_details;
+pub mod string_copy;
 
 pub mod utils;

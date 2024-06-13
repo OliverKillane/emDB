@@ -7,3 +7,4 @@ pub mod limited_table;
 pub mod sums;
 pub mod counts;
 pub mod filter;
+pub mod deref_some;

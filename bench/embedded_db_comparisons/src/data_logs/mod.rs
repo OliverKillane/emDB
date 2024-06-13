@@ -82,7 +82,7 @@ emql! {
     //   A data cleaning workload.
     query demote_error_logs() {
         ref logs as log_ref
-            |> deref(log_ref as log_data)
+            |> deref(log_ref as log_data use level)
             |> update(log_ref use level = (
                 if crate::data_logs::LogLevel::Error == log_data.level {
                     crate::data_logs::LogLevel::Warning

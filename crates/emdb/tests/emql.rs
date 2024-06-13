@@ -50,6 +50,7 @@ valid_tests!(
         basic_join,
         limited_table,
         sums,
-        counts
+        counts,
+        deref_some
     }
 );

@@ -14,7 +14,7 @@ use syn::{Ident, ItemImpl, ItemMod, ItemStruct, Type};
 use super::{
     groups::{Groups, GroupsDef},
     namer::CodeNamer,
-    operations::{update::Update, SingleOp},
+    operations::{update::Update, SingleOp, get::Get},
     predicates::{self, Predicate},
     uniques::{self, Unique},
 };
@@ -42,6 +42,7 @@ pub struct Table {
     pub uniques: Vec<Unique>,
     pub predicates: Vec<Predicate>,
     pub updates: Vec<Update>,
+    pub gets: Vec<Get>,
     pub name: Ident,
     pub limit: Option<Limit>,
     pub transactions: bool,
@@ -134,6 +135,7 @@ impl Table {
             uniques,
             predicates,
             updates,
+            gets,
             limit,
             name,
             public,
@@ -169,7 +171,7 @@ impl Table {
 
         let mut ops_mod_code = vec![
             operations::borrow::generate(groups, namer, &op_attrs),
-            operations::get::generate(groups, namer, &op_attrs),
+            operations::get::generate(groups, namer, gets, &op_attrs),
             operations::update::generate(
                 updates,
                 groups,

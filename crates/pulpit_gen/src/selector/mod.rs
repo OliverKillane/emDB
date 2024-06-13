@@ -2,7 +2,7 @@
 //! Provides functions for determining the structure of the [`crate::table::Table`] chosen.
 
 use crate::{
-    limit::Limit, operations::update::Update, predicates::Predicate, table::Table, uniques::Unique,
+    limit::Limit, operations::{update::Update, get::Get}, predicates::Predicate, table::Table, uniques::Unique,
 };
 use quote_debug::Tokens;
 use std::collections::HashMap;
@@ -14,6 +14,7 @@ pub struct SelectOperations {
     pub deletions: bool,
     pub fields: HashMap<Ident, Tokens<Type>>,
     pub uniques: Vec<Unique>,
+    pub gets: Vec<Get>,
     pub predicates: Vec<Predicate>,
     pub updates: Vec<Update>,
     pub limit: Option<Limit>,

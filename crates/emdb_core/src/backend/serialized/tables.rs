@@ -77,6 +77,7 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
                     }
                 },
                 updates: Vec::new(),
+                gets: Vec::new(),
                 public: true,
             };
 
@@ -103,6 +104,16 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
                     .get_mut(&plan::Idx::new(*table, lp))
                     .unwrap()
                     .deletions = true;
+            },
+            plan::Operator::DeRef(plan::DeRef{ table, named, named_type, ..}) => {
+                let deref_fields = lp.get_record_type_conc(*named_type).fields.iter().map(|(rf, _)| namer.transform_field_name(rf)).collect::<Vec<_>>();
+                pulpit_configs
+                    .get_mut(&plan::Idx::new(*table, lp))
+                    .unwrap()
+                    .gets.push(pulpit::gen::operations::get::Get {
+                        fields: deref_fields,
+                        alias: namer.pulpit_table_interaction(key),
+                    });
             }
             _ => (),
         }

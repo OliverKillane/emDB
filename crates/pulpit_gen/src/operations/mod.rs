@@ -1,12 +1,13 @@
 pub mod borrow;
 pub mod count;
 pub mod delete;
-pub mod get;
 pub mod insert;
 pub mod scan;
 pub mod transact;
 pub mod unique_get;
 pub mod update;
+pub mod get;
+
 
 use quote_debug::Tokens;
 use syn::{ItemImpl, ItemMod};

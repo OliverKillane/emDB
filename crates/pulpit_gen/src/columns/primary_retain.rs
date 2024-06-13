@@ -41,6 +41,7 @@ impl ColKind for PrimaryRetain {
                     }
                 }.into(),
                 unpacker:  quote!{
+                    #[inline(always)]
                     pub fn #mod_columns_fn_imm_unpack<'imm>(#mod_columns_struct_imm { #(#fields),* }: &'imm #mod_columns_struct_imm) -> #mod_columns_struct_imm_unpacked<'imm> {
                         #mod_columns_struct_imm_unpacked { #(#unpack_fields),* }
                     }

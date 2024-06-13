@@ -32,3 +32,8 @@ harness = false
 [[bench]]
 name = "data_logs"
 harness = false
+
+[[bench]]
+name = "string_copy"
+harness = false
+

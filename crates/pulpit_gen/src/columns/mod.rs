@@ -80,6 +80,7 @@ pub trait ColKind {
             }
             .into(),
             unpacker: quote! {
+                #[inline(always)]
                 pub fn #mod_columns_fn_imm_unpack(#mod_columns_struct_imm { #(#fields),* }: #mod_columns_struct_imm) -> #mod_columns_struct_imm_unpacked {
                     #mod_columns_struct_imm_unpacked { #(#unpack_fields),* }
                 }

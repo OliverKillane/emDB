@@ -1,5 +1,5 @@
 //! # A simple interface for generating tables.
-//! TODO: improve this using the new [`combi::tokens::options`] parser
+//! TODO: This interface is improved in [`super::new_simple`] but fails due to compiler resource consumption.
 use std::collections::{HashMap, HashSet, LinkedList};
 
 use combi::{
@@ -25,7 +25,7 @@ use syn::Ident;
 use crate::{
     groups::Field,
     limit::{Limit, LimitKind},
-    operations::update::Update,
+    operations::{get::Get, update::Update},
     predicates::Predicate,
     selector::SelectOperations,
     uniques::Unique,
@@ -91,7 +91,12 @@ fn parse_on_off(name: &'static str) -> impl TokenParser<bool> {
     )
 }
 
-fn parse_updates() -> impl TokenParser<Vec<Update>> {
+struct Access {
+    alias: Ident,
+    fields: Vec<Ident>
+}
+
+fn parse_access(name: &'static str) -> impl TokenParser<Vec<Access>> {
     let update_parser = mapsuc(
         seqs!(
             getident(),
@@ -101,10 +106,10 @@ fn parse_updates() -> impl TokenParser<Vec<Update>> {
                 listseptrailing(',', getident())
             )
         ),
-        |(alias, (_, fields))| Update { alias, fields },
+        |(alias, (_, fields))| Access { alias, fields },
     );
     named_parse(
-        "updates",
+        name,
         recovgroup(
             proc_macro2::Delimiter::Brace,
             listseptrailing(',', update_parser),
@@ -156,6 +161,7 @@ fn named_parse<T>(name: &'static str, inner: impl TokenParser<T>) -> impl TokenP
 fn analyse(
     fields: Vec<ASTField>,
     updates: Vec<Update>,
+    gets: Vec<Get>,
     predicates: Vec<Predicate>,
     limit: Option<Limit>,
     transactions: bool,
@@ -216,6 +222,7 @@ fn analyse(
         transactions,
         deletions,
         fields: field_types,
+        gets,
         uniques,
         predicates,
         updates,
@@ -227,7 +234,8 @@ fn analyse(
 pub fn simple(input: TokenStream) -> Result<SelectOperations, LinkedList<Diagnostic>> {
     let parser = seqs!(
         comma_after(fields_parser()),
-        comma_after(parse_updates()),
+        comma_after(mapsuc(parse_access("updates"), |updates| updates.into_iter().map(|Access { alias, fields }| Update { alias, fields }).collect::<Vec<_>>())),
+        comma_after(mapsuc(parse_access("gets"), |updates| updates.into_iter().map(|Access { alias, fields }| Get { alias, fields }).collect::<Vec<_>>())),
         comma_after(parse_predicates()),
         comma_after(parse_limit()),
         comma_after(parse_on_off("transactions")),
@@ -240,11 +248,12 @@ pub fn simple(input: TokenStream) -> Result<SelectOperations, LinkedList<Diagnos
 
     let (_, res) = mapsuc(seqdiff(parser, terminal), |(o, ())| o)
         .comp(TokenIter::from(input, Span::call_site()));
-    let (fields, (updates, (predicates, (limit, (transactions, (deletions, name)))))) =
+    let (fields, (updates, (gets, (predicates, (limit, (transactions, (deletions, name))))))) =
         res.to_result().map_err(TokenDiagnostic::into_list)?;
     analyse(
         fields,
         updates,
+        gets,
         predicates,
         limit,
         transactions,

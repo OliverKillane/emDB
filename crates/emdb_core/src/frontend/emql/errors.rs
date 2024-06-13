@@ -679,3 +679,15 @@ pub fn query_combine_missing_field(
     emql_error(54, field.span(), format!("Field `{field}` is required but not present in the type for `{call}` (same fields in input as output)"))
     .span_note(field.span(), format!("The type is: `{}`", plan::With { plan: lp, extended: data_type }))
 }
+
+pub fn query_select_no_field(table: &plan::Table, field: &Ident) -> Diagnostic {
+    let cols = table.columns.iter().filter_map(|(rf, _)| if let plan::RecordField::User(id) = rf { Some(id) } else {None}).join(", ");
+    
+    emql_error(55, field.span(), format!("Field `{field}` is not present in the table `{}`", table.name))
+        .span_note(table.name.span(), format!("`{}` defined here with fields: {}", table.name, cols))
+}
+
+pub fn query_select_duplicate_field(field_original: &Ident, field: &Ident) -> Diagnostic {
+    emql_error(56, field.span(), format!("Duplicate selection on {field}"))
+        .span_note(field_original.span(), format!("`{field}` selected here"))
+}
