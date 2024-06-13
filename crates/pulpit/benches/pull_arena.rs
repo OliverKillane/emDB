@@ -10,6 +10,7 @@ use pulpit::column::{
 fn workload<ImmData, MutData, Col>(to_insert: Vec<Data<ImmData, MutData>>)
 where
     Col: Column,
+    MutData: Clone,
     for<'a> Col::WindowKind<'a>: PrimaryWindowPull<'a, ImmData, MutData>,
 {
     let mut col = Col::new(to_insert.len());
@@ -19,7 +20,7 @@ where
     for val in to_insert {
         let (key, _) = win.insert(val);
         let Entry { index: _, data } = win.get(key).unwrap();
-        vals.push(data);
+        vals.push(data.extract());
     }
 
     divan::black_box_drop(win);

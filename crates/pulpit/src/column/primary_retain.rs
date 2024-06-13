@@ -167,7 +167,7 @@ where
     type Col = PrimaryRetain<ImmData, MutData, BLOCK_SIZE>;
 
     #[inline(always)]
-    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, MutData> {
+    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, &MutData> {
         let Entry {
             index,
             data: Data { imm_data, mut_data },
@@ -176,7 +176,7 @@ where
             index,
             data: Data {
                 imm_data: unsafe { transmute::<&ImmData, &'imm ImmData>(imm_data) },
-                mut_data: mut_data.clone(),
+                mut_data,
             },
         })
     }

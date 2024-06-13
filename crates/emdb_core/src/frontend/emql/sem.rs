@@ -759,7 +759,11 @@ pub mod generate_access {
                 }));
                 record_fields.insert(field, scalar_type);
             }
-            lp.record_types.insert(plan::RecordConc { fields: record_fields }.into())
+            if errors.is_empty() {
+                lp.record_types.insert(plan::RecordConc { fields: record_fields }.into())
+            } else {
+                return Err(errors)
+            }
         } else {
             let cols = get_all_cols(lp, table_id);
             lp.record_types.insert(cols.into())

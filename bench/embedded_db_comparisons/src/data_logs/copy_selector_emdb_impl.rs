@@ -29,9 +29,10 @@ emql! {
     }
 
     query get_errors_per_minute() {
-        use logs
-            |> filter(*level == crate::data_logs::LogLevel::Error)
-            |> map(min: usize = timestamp % 60)
+        ref logs as logs_ref
+            |> deref(logs_ref as log use timestamp, level)
+            |> filter(log.level == crate::data_logs::LogLevel::Error)
+            |> map(min: usize = log.timestamp % 60)
             |> groupby(min for let errors in {
                 use errors
                     |> count(num_logs)
@@ -55,7 +56,7 @@ emql! {
 
     query demote_error_logs() {
         ref logs as log_ref
-            |> deref(log_ref as log_data)
+            |> deref(log_ref as log_data use level)
             |> update(log_ref use level = (
                 if crate::data_logs::LogLevel::Error == log_data.level {
                     crate::data_logs::LogLevel::Warning

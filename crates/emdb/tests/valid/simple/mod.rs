@@ -8,3 +8,4 @@ pub mod sums;
 pub mod counts;
 pub mod filter;
 pub mod deref_some;
+pub mod mutable_string;

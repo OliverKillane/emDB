@@ -218,6 +218,12 @@ pub struct Data<ImmData, MutData> {
     pub mut_data: MutData,
 }
 
+impl <'brw, ImmData, MutData: Clone> Data<ImmData, &'brw MutData> {
+    pub fn extract(self) -> Data<ImmData, MutData> {
+        Data { imm_data: self.imm_data, mut_data: self.mut_data.clone() }
+    }
+}
+
 impl<ImmData, MutData> Data<ImmData, MutData> {
     #[inline(always)]
     pub fn convert_imm<ImmDataProcessed>(
@@ -260,7 +266,7 @@ pub trait PrimaryWindow<'imm, ImmData, MutData> {
     /// does not need the `'imm` lifetime parameter)
     type Col: Keyable + Column;
 
-    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, MutData>;
+    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, &MutData>;
     fn brw(&self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &MutData>;
     fn brw_mut(&mut self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &mut MutData>;
 
@@ -340,7 +346,7 @@ pub trait AssocWindow<'imm, ImmData, MutData> {
     /// # Safety
     /// - No bounds checks applied
     /// - index assumed to be in valid state
-    unsafe fn assoc_get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, MutData>;
+    unsafe fn assoc_get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, &MutData>;
 
     /// Borrow a value from an index in the column for a smaller lifetime
     /// - Zero cost, a normal reference.
@@ -572,7 +578,7 @@ mod verif {
                     .expect("Key unexpectedly missing from column");
                 let imm_data = ColWindow::conv_get(entry.data.imm_data);
                 assert_eq!(imm_data, data.imm_data, "Incorrect immutable data");
-                assert_eq!(entry.data.mut_data, data.mut_data, "Incorrect mutable data");
+                assert_eq!(entry.data.mut_data.clone(), data.mut_data, "Incorrect mutable data");
                 assert_eq!(entry.index, *unsafeindex, "Incorrect index");
             } else {
                 let entry = self.colwindow.get(key);

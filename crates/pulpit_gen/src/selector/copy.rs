@@ -1,6 +1,6 @@
 use crate::{
-    columns::{AssocBlocksCopy, PrimaryRetainCopy, PrimaryThunderDomeTrans, PrimaryThunderdome},
-    groups::{Group, GroupConfig},
+    columns::{AssocBlocks, PrimaryThunderDomeTrans, PrimaryThunderdome},
+    groups::{Group, GroupConfig, MutImmut},
     table::Table,
 };
 
@@ -26,20 +26,19 @@ impl SelectorImpl for CopySelector {
             limit,
         }: SelectOperations,
     ) -> Table {
-        let primary_fields = utils::determine_mutability(&updates, fields);
+        let primary_fields = MutImmut {
+            imm_fields: Vec::new(),
+            mut_fields: utils::convert_fields(fields),
+        };
 
         let prim_col = if deletions {
-            if primary_fields.imm_fields.is_empty() {
-                if transactions {
-                    PrimaryThunderDomeTrans.into()
-                } else {
-                    PrimaryThunderdome.into()
-                }
+            if transactions {
+                PrimaryThunderDomeTrans.into()
             } else {
-                PrimaryRetainCopy { block_size: 1024 }.into()
+                PrimaryThunderdome.into()
             }
         } else {
-            AssocBlocksCopy { block_size: 1024 }.into()
+            AssocBlocks { block_size: 1024 }.into()
         };
 
         Table {

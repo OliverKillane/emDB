@@ -34,11 +34,11 @@ where
     type ImmGet = ImmData;
 
     #[inline(always)]
-    unsafe fn assoc_get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, MutData> {
+    unsafe fn assoc_get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, &MutData> {
         let Data { imm_data, mut_data } = self.assoc_brw(ind);
         Data {
             imm_data: imm_data.clone(),
-            mut_data: mut_data.clone(),
+            mut_data: mut_data,
         }
     }
 

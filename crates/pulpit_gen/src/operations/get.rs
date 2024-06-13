@@ -82,13 +82,13 @@ impl Get {
                 } => namer.name_assoc_column(*assoc_ind),
             };
 
-            let imm_access = if field_index.is_imm() {
-                quote!(imm_data)
+            let (imm_access, clone) = if field_index.is_imm() {
+                (quote!(imm_data), quote!())
             } else {
-                quote!(mut_data)
+                (quote!(mut_data), quote!(.clone()))
             };
 
-            quote!(#field_name: #data.#imm_access.#field_name)
+            quote!(#field_name: #data.#imm_access.#field_name #clone)
         })
     }
 

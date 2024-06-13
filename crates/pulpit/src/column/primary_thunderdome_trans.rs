@@ -45,7 +45,7 @@ where
     type Col = PrimaryThunderDomeTrans<ImmData, MutData>;
 
     #[inline(always)]
-    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, MutData> {
+    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, &MutData> {
         let Entry {
             data: Data { imm_data, mut_data },
             index: _,
@@ -54,7 +54,7 @@ where
             index: key.slot() as usize,
             data: Data {
                 imm_data: imm_data.clone(),
-                mut_data: mut_data.clone(),
+                mut_data: mut_data,
             },
         })
     }

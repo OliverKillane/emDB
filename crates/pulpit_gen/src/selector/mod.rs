@@ -58,16 +58,17 @@ mod utils {
         operations::update::Update,
     };
 
+    pub fn convert_fields(fields: HashMap<Ident, Tokens<Type>>) -> Vec<Field> {
+        fields
+            .into_iter()
+            .map(|(name, ty)| Field { name, ty })
+            .collect()
+    }
+    
     pub fn determine_mutability(
         updates: &[Update],
         mut fields: HashMap<Ident, Tokens<Type>>,
     ) -> MutImmut<Vec<Field>> {
-        fn convert_fields(fields: HashMap<Ident, Tokens<Type>>) -> Vec<Field> {
-            fields
-                .into_iter()
-                .map(|(name, ty)| Field { name, ty })
-                .collect()
-        }
 
         let mut mut_fields = HashMap::new();
         for Update {
