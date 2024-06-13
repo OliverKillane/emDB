@@ -12,7 +12,7 @@ const TABLE_SIZES: [usize; 4] = [32768, 65536, 131072, 262144];
 
 #[divan::bench(
     name = "data cleaning",
-    types = [EmDB, EmDBCopy],
+    types = [EmDB, EmDBCopy, DuckDB, SQLite],
     consts = TABLE_SIZES,
     sample_size = 5,
     sample_count = 3,
@@ -29,7 +29,7 @@ fn demote_errors_data_cleaning<DS: Datastore, const SIZE: usize>(bencher: Benche
 
 #[divan::bench(
     name = "errors per minute",
-    types = [EmDB, EmDBCopy],
+    types = [EmDB, EmDBCopy, DuckDB, SQLite],
     consts = TABLE_SIZES,
     sample_size = 5,
     sample_count = 3,
@@ -46,7 +46,7 @@ fn get_errors_per_minute<DS: Datastore, const SIZE: usize>(bencher: Bencher) {
 
 #[divan::bench(
     name = "comment summaries",
-    types = [EmDB, EmDBCopy],
+    types = [EmDB, EmDBCopy, DuckDB, SQLite],
     consts = TABLE_SIZES,
     sample_size = 5,
     sample_count = 3,

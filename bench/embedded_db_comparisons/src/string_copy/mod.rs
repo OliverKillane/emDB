@@ -38,9 +38,8 @@ emql! {
             ~> return;
     }
 
-    query count_values_deref() {
-        ref values as values_ref
-            |> deref(values_ref as bob use )
+    query count_values_ignore() {
+        use values as ()
             |> map(unrelated_value: () = ())
             |> count(count)
             ~> return;

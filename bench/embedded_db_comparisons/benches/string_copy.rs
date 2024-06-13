@@ -48,13 +48,13 @@ fn count_refs<DS: interface::Datastore, const STR_LEN: usize>(bencher: divan::Be
     types = [EmDBRef, EmDBCopy],
     consts = STR_LEN_SIZES,
 )]
-fn count_values_deref<DS: interface::Datastore, const STR_LEN: usize>(bencher: divan::Bencher) {
+fn count_values_ignore<DS: interface::Datastore, const STR_LEN: usize>(bencher: divan::Bencher) {
     bencher
         .with_inputs(|| divan::black_box(populate_database(DB_SIZE, STR_LEN)))
         .bench_local_values(|mut ds: DS| {
             {
                 let db = ds.db();
-                db.count_values_deref();
+                db.count_values_ignore();
             }
             ds
         })

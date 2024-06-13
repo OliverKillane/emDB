@@ -74,7 +74,7 @@ emql! {
     //   - Database can see only credits is updated
     query add_credits(user: ref users, creds: i32) {
         row(user_id: ref users = user)
-            ~> deref(user_id as user)
+            ~> deref(user_id as user use credits)
             ~> update(user_id use credits = user.credits + creds);
     }
 
@@ -86,7 +86,7 @@ emql! {
     //   - can be inlined to very simple iterate over &mut and increment sum
     query reward_premium(cred_bonus: f32) {
         ref users as users_ref
-            |> deref(users_ref as it)
+            |> deref(users_ref as it use premium, credits)
             |> filter(*it.premium)
             |> map(users_ref: ref users = users_ref, new_creds: i32 = ((it.credits as f32) * cred_bonus) as i32)
             |> update(users_ref use credits = new_creds)

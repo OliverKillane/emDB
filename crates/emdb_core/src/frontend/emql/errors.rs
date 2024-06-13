@@ -691,3 +691,7 @@ pub fn query_select_duplicate_field(field_original: &Ident, field: &Ident) -> Di
     emql_error(56, field.span(), format!("Duplicate selection on {field}"))
         .span_note(field_original.span(), format!("`{field}` selected here"))
 }
+
+pub fn query_use_on_variable_with_select(var_name: &Ident) -> Diagnostic {
+    emql_error(56, var_name.span(), format!("{var_name} is a variable, not a table, so cannot be selected with `.. as (fields, ..)"))
+}

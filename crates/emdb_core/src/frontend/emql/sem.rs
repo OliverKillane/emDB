@@ -727,6 +727,37 @@ pub mod generate_access {
         pub inner_record: plan::Key<plan::RecordType>,
     }
 
+    pub fn validate_select(table_id: plan::Key<plan::Table>,lp: &mut plan::Plan,fields: Vec<Ident>) -> Result<plan::Key<plan::RecordType>, LinkedList<Diagnostic>> {
+        let mut errors = LinkedList::new();
+        let mut unique_fields: HashSet<plan::RecordField> = HashSet::new();
+        let table = lp.get_table(table_id);
+        let rf_fields = fields.into_iter().map(plan::RecordField::from).collect::<Vec<_>>();
+        for field in rf_fields {
+            // NOTE: Though there are currently no allowances for tables with internal fields, this could be true in the future
+            if !table.columns.contains_key(&field) {
+                errors.push_back(errors::query_select_no_field(table, &field.get_field()));
+            } else if let Some(original) = unique_fields.get(&field) {
+                errors.push_back(errors::query_select_duplicate_field(original.get_field(), &field.get_field()));
+            } else {
+                unique_fields.insert(field);
+            }
+        }
+        let mut record_fields = HashMap::new();
+
+        for field in unique_fields {
+            let scalar_type = lp.scalar_types.insert(plan::ConcRef::Conc(plan::ScalarTypeConc::TableGet {
+                table: table_id,
+                field: field.clone(),
+            }));
+            record_fields.insert(field, scalar_type);
+        }
+        if errors.is_empty() {
+            Ok(lp.record_types.insert(plan::RecordConc { fields: record_fields }.into()))
+        } else {
+            return Err(errors)
+        }
+    }
+
     pub fn dereference(
         table_id: plan::Key<plan::Table>,
         lp: &mut plan::Plan,
@@ -736,34 +767,7 @@ pub mod generate_access {
     ) -> Result<DereferenceTypes, LinkedList<Diagnostic>> {
         // Generates the dereference type using the select fields, or if none are specified, all the fields
         let inner_record = if let Some(fields) = select_fields {
-            let mut errors = LinkedList::new();
-            let mut unique_fields: HashSet<plan::RecordField> = HashSet::new();
-            let table = lp.get_table(table_id);
-            let rf_fields = fields.into_iter().map(plan::RecordField::from).collect::<Vec<_>>();
-            for field in rf_fields {
-                // NOTE: Though there are currently no allowances for tables with internal fields, this could be true in the future
-                if !table.columns.contains_key(&field) {
-                    errors.push_back(errors::query_select_no_field(table, &field.get_field()));
-                } else if let Some(original) = unique_fields.get(&field) {
-                    errors.push_back(errors::query_select_duplicate_field(original.get_field(), &field.get_field()));
-                } else {
-                    unique_fields.insert(field);
-                }
-            }
-            let mut record_fields = HashMap::new();
-
-            for field in unique_fields {
-                let scalar_type = lp.scalar_types.insert(plan::ConcRef::Conc(plan::ScalarTypeConc::TableGet {
-                    table: table_id,
-                    field: field.clone(),
-                }));
-                record_fields.insert(field, scalar_type);
-            }
-            if errors.is_empty() {
-                lp.record_types.insert(plan::RecordConc { fields: record_fields }.into())
-            } else {
-                return Err(errors)
-            }
+            validate_select(table_id, lp, fields)?
         } else {
             let cols = get_all_cols(lp, table_id);
             lp.record_types.insert(cols.into())

@@ -164,7 +164,7 @@ emql! {
                     |> filter(**customer_reference == cust_ref_outer)
                     |> let customer_purchases;
 
-                use products |> let all_prods;
+                use products as (serial, category) |> let all_prods;
 
                 join(use all_prods [inner equi(serial = product_serial)] use customer_purchases)
                     |> map(result: crate::sales_analytics::Aggregate = {
@@ -225,7 +225,7 @@ emql! {
     //   Demonstrating aggregation over a large table
     query category_sales(btc_rate: f64, usd_rate: f64) {
         use purchases |> let purchase_data;
-        use products |> let product_data;
+        use products as (serial, category) |> let product_data;
 
         join(use purchase_data [inner equi(product_serial = serial)] use product_data)
             |> map(

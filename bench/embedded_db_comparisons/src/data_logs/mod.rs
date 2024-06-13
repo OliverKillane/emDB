@@ -46,10 +46,9 @@ emql! {
     //   Requires a large mapping (accellerated by parallelism), and a groupby
     //   aggregation. For demonstrating OLAP performance.
     query get_errors_per_minute() {
-        ref logs as logs_ref
-            |> deref(logs_ref as log use timestamp, level)
-            |> filter(log.level == crate::data_logs::LogLevel::Error)
-            |> map(min: usize = log.timestamp % 60)
+        use logs as (timestamp, level)
+            |> filter(*level == crate::data_logs::LogLevel::Error)
+            |> map(min: usize = timestamp % 60)
             |> groupby(min for let errors in {
                 use errors
                     |> count(num_logs)
@@ -66,7 +65,7 @@ emql! {
     // Reasoning:
     //   Requires a fast map over a large stream of values, a common OLAP workload.
     query get_comment_summaries(time_start: usize, time_end: usize) {
-        use logs
+        use logs as (comment, timestamp)
             |> filter(**timestamp >= time_start && **timestamp <= time_end && comment.is_some())
             |> map(slice: &'db str = comment.as_ref().unwrap())
             |> map(
