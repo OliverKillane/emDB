@@ -1,5 +1,3 @@
-#![feature(associated_const_equality)]
-
 pub mod columns;
 pub mod groups;
 pub mod limit;
