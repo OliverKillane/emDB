@@ -1,14 +1,14 @@
 use divan::{self, black_box_drop, Bencher};
 use embedded_db_comparisons::data_logs::{
+    copy_selector::EmDBCopy,
     data_logs::{Database, Datastore},
     duckdb_impl::DuckDB,
-    copy_selector::EmDBCopy,
     emdb_impl::EmDB,
     populate_table,
     sqlite_impl::SQLite,
 };
 
-const TABLE_SIZES: [usize; 4] = [32768, 65536, 131072, 262144];
+const TABLE_SIZES: [usize; 6] = [2048, 8192, 32768, 65536, 131072, 262144];
 
 #[divan::bench(
     name = "data cleaning",
@@ -19,7 +19,6 @@ const TABLE_SIZES: [usize; 4] = [32768, 65536, 131072, 262144];
 )]
 fn demote_errors_data_cleaning<DS: Datastore, const SIZE: usize>(bencher: Bencher) {
     bencher
-        
         .with_inputs(|| populate_table(&mut rand::thread_rng(), SIZE))
         .bench_local_values(|mut ds: DS| {
             let mut db = ds.db();
@@ -36,7 +35,6 @@ fn demote_errors_data_cleaning<DS: Datastore, const SIZE: usize>(bencher: Benche
 )]
 fn get_errors_per_minute<DS: Datastore, const SIZE: usize>(bencher: Bencher) {
     bencher
-        
         .with_inputs(|| populate_table(&mut rand::thread_rng(), SIZE))
         .bench_local_values(|mut ds: DS| {
             let db = ds.db();
@@ -53,7 +51,6 @@ fn get_errors_per_minute<DS: Datastore, const SIZE: usize>(bencher: Bencher) {
 )]
 fn get_comment_summaries<DS: Datastore, const SIZE: usize>(bencher: Bencher) {
     bencher
-        
         .with_inputs(|| populate_table(&mut rand::thread_rng(), SIZE))
         .bench_local_values(|mut ds: DS| {
             let db = ds.db();

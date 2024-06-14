@@ -16,7 +16,8 @@
 
 \subsubsection{Append Only Optimisation}
 % Append only indices are better
-% - simple to insert
+% - if providing user accessible keys - no need to keep a generation counter
+% - Insert always by append
 
 \begin{futurebox}{Limit Optimisation}
     % For some workloads, the size of a table is known at application compile time.
@@ -29,13 +30,6 @@
 % https://sqlite.org/lemon.html
 % Parsing queries is a significant cost
 
-\subsubsection{Serialization Elimination}
-% Deal with types from the language querying
-% we can copy values (or even move) to the database without needing to serialize (expensive)
-% Most benchmarks consider serializing/deserializing data to be a fixed, required costs. 
-% - Not measured in benchmarks
-% - Not separately measured in 
-% But at this level of embedding, it is no longer required.
 
 \subsubsection{Preemptive Materialisation}
 % Some examples
@@ -45,15 +39,20 @@
 % - eliminating redundant data
 
 \subsubsection{Incremental View Maintenance}
-% Lazily computing updates based on derivatives
+% Lazily computing updates based the change in tuples (derivatives)
+% Each operator maintains a view of output tuples
+% Each operator triggered by update, insert, delete and can then trigger sucessive operators
+
+% - Complex to implement, simples includes select only queries, and only allowing simple INSERT INTO TABLE, DELETE FROM TABLE.
+% Implemented by dbtoaster, which generates code for a schema and query set, but only supports limited mutation of table (not UPDATE WHERE)
+% Even simple cases for 
 
 \subsection{Physical Optimisation}
-
 
 \subsubsection{Code Generation}
 % The typical advantages of code generation for performance hold, with the advantage of:
 % More optimisation does not result in worse performance, because the code generation is not done at runtime
-% producing a higher level representation (Rust, C++, etc) does not negatively impact peformance (not runtime) but improes ability to debug, and to use associated tooling for testing, profiling & optimisation (e.g. profile guided optimisation) etc
+% producing a higher level representation (Rust, C++, etc) does not negatively impact peformance (not runtime) but improves ability to debug, and to use associated tooling for testing, profiling & optimisation (e.g. profile guided optimisation) etc
 
 % emdb with pgo example
 
@@ -61,3 +60,11 @@
 % Allow data the database to take ownership of data from the application.
 % - Requires no copy
 % - Singificant for types that own large heap allocated values
+
+\subsubsection{Serialization Elimination}
+% Deal with types from the language querying
+% we can copy values (or even move) to the database without needing to serialize (expensive)
+% Most benchmarks consider serializing/deserializing data to be a fixed, required costs. 
+% - Not measured in benchmarks
+% - Not separately measured in 
+% But at this level of embedding, it is no longer required.

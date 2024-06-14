@@ -10,3 +10,6 @@ license-file = "LICENSE"
 [profile.release]
 lto = "fat"
 codegen-units = 1
+
+# [profile.dev.package.emdb_core]
+# opt-level = 3

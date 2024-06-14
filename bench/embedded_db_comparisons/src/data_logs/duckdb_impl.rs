@@ -100,11 +100,7 @@ impl<'imm> Database<'imm> for DuckDBDatabase<'imm> {
             .unwrap()
     }
 
-    fn get_comment_summaries(
-        &self,
-        time_start: usize,
-        time_end: usize,
-    ) -> Vec<(String, usize)> {
+    fn get_comment_summaries(&self, time_start: usize, time_end: usize) -> Vec<(String, usize)> {
         self.conn
             .prepare_cached(
                 "

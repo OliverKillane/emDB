@@ -118,7 +118,7 @@ pub fn populate_table<DS: data_logs::Datastore>(rng: &mut ThreadRng, size: usize
 }
 
 pub fn random_string(rng: &mut ThreadRng) -> String {
-    let size = rng.gen_range(0..1024);
+    let size = rng.gen_range(0..4096);
     let mut s = String::with_capacity(size);
     for _ in 0..size {
         s.push(rng.gen_range(b'a'..b'z') as char);
@@ -126,6 +126,7 @@ pub fn random_string(rng: &mut ThreadRng) -> String {
     s
 }
 
+mod copy_selector_emdb_impl;
 pub mod duckdb_impl;
 pub mod sqlite_impl;
-mod copy_selector_emdb_impl; pub use copy_selector_emdb_impl::*;
+pub use copy_selector_emdb_impl::*;

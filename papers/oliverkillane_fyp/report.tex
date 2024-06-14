@@ -15,6 +15,7 @@
 \usepackage{hyperref}
 \usepackage{longtable}
 \usepackage{biblatex}
+\usepackage{subfigure}
 \usepackage{fontawesome}
 \usepackage[most]{tcolorbox}
 \addbibresource{refs.bib}
@@ -23,15 +24,22 @@
 %	... the term's definition ...
 % \end{definitionbox}
 \newtcolorbox[auto counter,number within=section]{definitionbox}[2][]{%
-	colback=black!5!white,colframe=black,arc=0mm,sharp corners=all,fonttitle=\bfseries,%
+	colback=white,colframe=black,arc=0mm,sharp corners=all,fonttitle=\bfseries,%
+	title=#2}
+
+% \begin{definitionbox}{term}
+%	... the term's definition ...
+% \end{definitionbox}
+\newtcolorbox[auto counter,number within=section]{notesbox}[2][]{%
+	colback=white,colframe=gray,arc=0mm,sharp corners=all,fonttitle=\bfseries,%
 	title=#2}
 
 % \begin{definitionbox}{futurebox}
 %	... the future work to be completed ...
 % \end{futurebox}
 \newtcolorbox[auto counter,number within=section]{futurebox}[2][]{%
-	colback=black!5!white,colframe=black,arc=0mm,sharp corners=all,fonttitle=\bfseries,%
-	title=#2}
+	colback=white,colframe=purple,arc=0mm,sharp corners=all,fonttitle=\bfseries,%
+	title=Future Work: #2}
 
 % \begin{prosbox}
 %	... the term's definition ...
@@ -85,6 +93,11 @@ this project before I could.
 The code the project, documentation and this report can be found at \github{https://github.com/OliverKillane/emDB}{OliverKillane/emDB}
 \pagebreak
 
+
+% TODO:
+% 1. explanation of graphs
+% 2. generate graphs for each benchmark
+% 3. build timings
 
 \tableofcontents
 % \listoffigures

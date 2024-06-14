@@ -12,8 +12,7 @@ use embedded_db_comparisons::{
 };
 use rand::Rng;
 
-// const TABLE_SIZES: [usize; 9] = [1, 8, 64, 128, 512, 4096, 16384, 65536, 262144];
-const TABLE_SIZES: [usize; 4] = [1, 8, 16, 512];
+const TABLE_SIZES: [usize; 5] = [2048, 8192, 32768, 131072, 524288];
 
 fn main() {
     divan::main();
@@ -21,7 +20,7 @@ fn main() {
 
 /// Time taken for a number of inserts of random premium/non-premium
 #[divan::bench(
-    name = "random_inserts",
+    name = "random inserts",
     types = [EmDB, SQLite, DuckDB],
     consts = TABLE_SIZES
 )]
@@ -30,7 +29,6 @@ where
     T: Datastore,
 {
     bencher
-        
         .with_inputs(|| {
             let db = T::new();
             let mut rng = rand::thread_rng();
@@ -59,7 +57,6 @@ where
     T: Datastore + GetNewUserKey,
 {
     bencher
-        
         .with_inputs(random_table::<N, T>)
         .bench_local_refs(|(ids, ds)| {
             let db = ds.db();
@@ -80,7 +77,6 @@ where
     T: Datastore + GetNewUserKey,
 {
     bencher
-        
         .with_inputs(random_table::<N, T>)
         .bench_local_refs(|(_, ds)| {
             let db = ds.db();
@@ -100,7 +96,6 @@ where
     T: Datastore + GetNewUserKey,
 {
     bencher
-        
         .with_inputs(random_table::<N, T>)
         .bench_local_refs(|(_, ds)| {
             let db = ds.db();
@@ -120,7 +115,6 @@ where
     T: Datastore + GetNewUserKey,
 {
     bencher
-        
         .with_inputs(random_table::<SIZE, T>)
         .bench_local_refs(|(_, ds)| {
             let mut db = ds.db();
@@ -140,7 +134,6 @@ where
     DS: Datastore + GetNewUserKey,
 {
     bencher
-    
         .bench_local(|| {
         let mut ds = DS::new();
         let mut db = ds.db();

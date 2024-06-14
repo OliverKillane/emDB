@@ -34,6 +34,7 @@ Unlike DuckDB it is designed for OLTP workloads, and as such stores rows in an n
 \begin{center}
     \includegraphics[scale=1]{related_work/_diagrams/sqlite_system.pdf}
 \end{center}
+
 \subsubsection{Virtual Database Engine Bytecode}
 One of the key elements of SQLite's design is that rather than using traditional physical plan (i.e. trees of operators) it instead uses a simple bytecode, interpreted on the virtual database engine.
 \begin{minted}{SQL}

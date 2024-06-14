@@ -6,8 +6,8 @@ use embedded_db_comparisons::string_copy::{
     populate_database,
 };
 
-const STR_LEN_SIZES: [usize; 3] = [16, 64, 256]; // 1024, 4096, 16384];
-const DB_SIZE: usize = 8096; // 262144; // 2**18
+const STR_LEN_SIZES: [usize; 3] = [512, 1024, 4096];
+const DB_SIZE: usize = 262144; // 2**18
 
 #[divan::bench(
     name = "count values",

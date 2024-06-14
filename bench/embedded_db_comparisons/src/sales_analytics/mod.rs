@@ -42,15 +42,13 @@ fn exchange(btc_rate: f64, usd_rate: f64, price: u64, currency: Currency) -> u64
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-#[derive(Default)]
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
 struct Aggregate {
     clothes: usize,
     electronics: usize,
     food: usize,
     money_spent: u64,
 }
-
 
 emql! {
     impl sales_analytics as Interface{
@@ -93,6 +91,7 @@ emql! {
     table old_customers {
         reference: usize,
     }
+
 
     // Basic queries for data population =======================================
     query new_customer(
@@ -179,7 +178,12 @@ emql! {
                             clothes,
                             electronics,
                             food,
-                            money_spent: (*customer_purchases.quantity as u64) * crate::sales_analytics::exchange(btc_rate, usd_rate, *customer_purchases.price, *customer_purchases.currency),
+                            money_spent: (*customer_purchases.quantity as u64) * crate::sales_analytics::exchange(
+                                btc_rate,
+                                usd_rate,
+                                *customer_purchases.price,
+                                *customer_purchases.currency
+                            ),
                         }
                     })
                     |> combine(use left + right in result[crate::sales_analytics::Aggregate::default()] = [crate::sales_analytics::Aggregate {
@@ -226,7 +230,6 @@ emql! {
     query category_sales(btc_rate: f64, usd_rate: f64) {
         use purchases |> let purchase_data;
         use products as (serial, category) |> let product_data;
-
         join(use purchase_data [inner equi(product_serial = serial)] use product_data)
             |> map(
                 category: crate::sales_analytics::ProductCategory = *product_data.category,
@@ -324,17 +327,21 @@ impl TableConfig {
         current: &Self,
         additional: &Self,
         rng: &mut ThreadRng,
-        db: &mut impl sales_analytics::Database<'imm, Datastore=DS>,
+        db: &mut impl sales_analytics::Database<'imm, Datastore = DS>,
     ) -> Self {
-        let end = Self { customers: current.customers + additional.customers, sales: current.sales + additional.sales, products: current.products + additional.products };
+        let end = Self {
+            customers: current.customers + additional.customers,
+            sales: current.sales + additional.sales,
+            products: current.products + additional.products,
+        };
 
-        fn random_range(rng: &mut ThreadRng, bottom : usize, top: usize) -> usize {
+        fn random_range(rng: &mut ThreadRng, bottom: usize, top: usize) -> usize {
             if top == bottom {
                 return top;
             } else {
-                return rng.gen_range(bottom..top);
+                return rng.gen_range(bottom..=top);
             }
-        } 
+        }
 
         for i in (current.customers)..end.customers {
             db.new_customer(
@@ -344,7 +351,7 @@ impl TableConfig {
             );
         }
 
-        for i in  current.products..end.products {
+        for i in current.products..end.products {
             db.new_product(
                 i,
                 format!("Product {i}"),
@@ -369,8 +376,8 @@ impl TableConfig {
             };
 
             db.new_sale(
-                random_range(rng, 0,end.customers),
-                random_range(rng, 0,end.products),
+                random_range(rng, 0, end.customers),
+                random_range(rng, 0, end.products),
                 rng.gen_range(0..10),
                 price,
                 currency,

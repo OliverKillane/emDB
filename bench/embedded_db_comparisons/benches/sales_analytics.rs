@@ -11,10 +11,12 @@ use embedded_db_comparisons::{
 };
 use rand::{rngs::ThreadRng, Rng};
 
+const SCALE_FACTORS: [usize; 4] = [1024, 8192, 16384, 32768];
+
 #[divan::bench(
     name = "category sales",
     types = [EmDB, SQLite, DuckDB],
-    consts = [1024, 8192, 16384],
+    consts = SCALE_FACTORS,
     max_time = 10
 )]
 fn category_sales<DS: Datastore, const SIZE: usize>(bencher: Bencher) {
@@ -33,12 +35,11 @@ fn category_sales<DS: Datastore, const SIZE: usize>(bencher: Bencher) {
 #[divan::bench(
     name = "product customers",
     types = [EmDB, SQLite, DuckDB],
-    consts = [1024, 8192, 16384],
+    consts = SCALE_FACTORS,
     max_time = 10
 )]
 fn product_customers<DS: Datastore, const SIZE: usize>(bencher: Bencher) {
     bencher
-        
         .with_inputs(|| {
             let mut rng = rand::thread_rng();
             let config = TableConfig::from_size(SIZE);
@@ -57,12 +58,11 @@ fn product_customers<DS: Datastore, const SIZE: usize>(bencher: Bencher) {
 #[divan::bench(
     name = "customer value",
     types = [EmDB, SQLite, DuckDB],
-    consts = [1024, 8192, 16384],
+    consts = SCALE_FACTORS,
     max_time = 10
 )]
 fn customer_value<DS: Datastore, const SIZE: usize>(bencher: Bencher) {
     bencher
-        
         .with_inputs(|| {
             let mut rng = rand::thread_rng();
             let config = TableConfig::from_size(SIZE);
@@ -81,12 +81,11 @@ fn customer_value<DS: Datastore, const SIZE: usize>(bencher: Bencher) {
 #[divan::bench(
     name = "mixed workload",
     types = [EmDB, SQLite, DuckDB],
-    consts = [1024, 8192, 16384],
+    consts = SCALE_FACTORS,
     max_time = 10
 )]
 fn mixed_workload<DS: Datastore, const SIZE: usize>(bencher: Bencher) {
     bencher
-        
         .with_inputs(|| {
             let mut rng = rand::thread_rng();
             let config = TableConfig{ customers: 0, sales: 0, products: 10 };
@@ -94,6 +93,7 @@ fn mixed_workload<DS: Datastore, const SIZE: usize>(bencher: Bencher) {
         })
         .bench_local_values(|(mut ds, mut rng, mut config): (DS, ThreadRng, TableConfig)| {
             let mut db = ds.db();
+            config = TableConfig::append_database(&config, &TableConfig { customers: 1, sales: 10, products: 0 }, &mut rng, &mut db);
             for _ in 0..SIZE {
                 choose! { rng
                     1 => black_box_drop(db.category_sales(0.2, 2.3)),

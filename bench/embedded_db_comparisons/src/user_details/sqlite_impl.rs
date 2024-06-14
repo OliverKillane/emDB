@@ -17,6 +17,7 @@ impl super::user_details::Datastore for SQLite {
     type DB<'imm> = Database<'imm>;
     type users_key = usize;
     fn new() -> Self {
+        // See https://sqlite.org/rowidtable.html, the primary key becomes the rowid
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(
             "
@@ -43,12 +44,7 @@ impl super::user_details::Datastore for SQLite {
 
 impl<'imm> super::user_details::Database<'imm> for Database<'imm> {
     type Datastore = SQLite;
-    fn new_user(
-        &mut self,
-        username: String,
-        prem: bool,
-        start_creds: Option<i32>,
-    ) -> usize {
+    fn new_user(&mut self, username: String, prem: bool, start_creds: Option<i32>) -> usize {
         self.conn
             .prepare_cached(
                 "INSERT INTO users (name, premium, credits) VALUES (?, ?, ?) RETURNING id",
@@ -77,7 +73,8 @@ impl<'imm> super::user_details::Database<'imm> for Database<'imm> {
                 ))
             })
             .optional()
-            .unwrap().ok_or(())
+            .unwrap()
+            .ok_or(())
     }
 
     fn get_snapshot(&self) -> Vec<(usize, String, bool, i32)> {

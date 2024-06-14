@@ -84,5 +84,5 @@ be used to view documentation built in the [target directory](../target/doc/emdb
 ### [Rustonomicon](https://doc.rust-lang.org/nomicon/)
 ### [Rust Performance Book](https://nnethercote.github.io/perf-book/introduction.html)
 
-## Rustc Issues
-For rare failure, see the [./emdb/tests/valid/fixme](./emdb/tests/valid/fixme) directory.
+## Issues
+- For rare failure, see the [./emdb/tests/valid/fixme](./emdb/tests/valid/fixme) directory.
