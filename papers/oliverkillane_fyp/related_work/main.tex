@@ -107,28 +107,8 @@ The cost of using a full C++ compiler at compile time is the only major downside
 \\ The only performance downside of this is that chip-specific parameters (e.g. cache sizes) are only available when the binary is run, if it compiled for an architecture in general, rather than for the exact chip of the machine the application will run on.
 
 \section{Incremental View Maintenance}
-
-\begin{tcbraster}[raster columns=2,raster equal height]
-    \begin{definitionbox}{Views}
-        \centerline{\textbf{Recompute on Access}}
-        \begin{minted}{SQL}
-CREATE VIEW my_view AS SELECT * FROM ..;            
-        \end{minted}
-        An alias for a query, typically a \mintinline{SQL}{SELECT} statement, that can be queried like a table. The view's query is used each time it is accessed.\cite{Postgres16Docs}
-    \end{definitionbox}
-    \begin{definitionbox}{Materialized Views}
-        \centerline{\textbf{Recompute on Change}}
-        Views with results cached. The contained query is only recomputed after a change in the data the query relies on. Beneficial for expensive queries that are frequently accessed and depend on infrequently changing data.
-    \end{definitionbox}
-\end{tcbraster}
-\noindent
-The aim of incremental view maintenance is to support views on data that \textbf{Never Recompute} in their entirety, but instead can updated \textit{incrementally} using changes applied to source relations.
-\begin{center}
-    \includegraphics[scale=1]{related_work/_diagrams/ivm.pdf}
-\end{center}
-The cost reduction from recomputing operators to recomputing the deltas of operators can also be applied recursively.
-
 \subsection{DBToaster}
+\label{sec:db_toaster}
 DBToaster is an incremental view maintenance code generation tool, that generates C++, Spark (including a distributed spark target) and OCaml implementations from queries.
 \subsubsection{SQL Support}
 A SQL syntax is supported (with incomplete compliance with ASNI SQL-92) to construct select queries

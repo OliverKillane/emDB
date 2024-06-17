@@ -17,7 +17,8 @@
 \usepackage{biblatex}
 \usepackage{subfigure}
 \usepackage{fontawesome}
-\usepackage[most]{tcolorbox}
+\usepackage[most, minted]{tcolorbox}
+\tcbuselibrary{minted}
 \addbibresource{refs.bib}
 
 % \begin{definitionbox}{term}
@@ -55,10 +56,11 @@
 
 \newcommand{\emdb}{\raisebox{-0.2\baselineskip}{\includegraphics[height=1.1\baselineskip]{titlepage/images/emdb_logo.png}}}
 
-\newcommand{\github}[2]{\textcolor{imperialblue}{\mbox{\faGithub\hspace{0.5em}\href{#1}{#2}\hspace{1em}}}}
+\newcommand{\github}[2]{{\mbox{\faGithub\hspace{0.5em}\href{#1}{#2}\hspace{1em}}}}
 
 \usepackage{fontspec}
-\setmainfont{Fira Sans}
+\setmainfont{Roboto}
+% \usepackage{libertine}
 
 \begin{document}
 
@@ -106,7 +108,6 @@ The code the project, documentation and this report can be found at \github{http
 \newpage
 
 \input{introduction/main}
-\input{background/main}
 \input{concepts/main}
 \input{implementation/main}
 \input{evaluation/main}

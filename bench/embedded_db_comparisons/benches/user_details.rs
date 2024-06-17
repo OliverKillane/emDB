@@ -21,7 +21,7 @@ fn main() {
 /// Time taken for a number of inserts of random premium/non-premium
 #[divan::bench(
     name = "random inserts",
-    types = [EmDB, SQLite, DuckDB],
+    types = [EmDB, SQLite],
     consts = TABLE_SIZES
 )]
 fn inserts<T, const N: usize>(bencher: Bencher)
@@ -49,7 +49,7 @@ where
 /// Time taken to get ids in random order
 #[divan::bench(
     name = "get random ids",
-    types = [EmDB, SQLite, DuckDB],
+    types = [EmDB, SQLite],
     consts = TABLE_SIZES
 )]
 fn gets<T, const N: usize>(bencher: Bencher)
@@ -69,7 +69,7 @@ where
 /// Time taken to get a snapshot
 #[divan::bench(
     name = "snapshot",
-    types = [EmDB, SQLite, DuckDB],
+    types = [EmDB, SQLite],
     consts = TABLE_SIZES
 )]
 fn snapshot<T, const N: usize>(bencher: Bencher)
@@ -125,8 +125,8 @@ where
 /// Random workload of N actions
 #[divan::bench(
     name = "random workloads",
-    types = [EmDB, SQLite, DuckDB],
-    consts = [1024, 2048, 4096],
+    types = [EmDB, SQLite],
+    consts = TABLE_SIZES,
     max_time = 100
 )]
 fn mixed_workload<DS, const SIZE: usize>(bencher: Bencher)
@@ -149,7 +149,7 @@ where
                 20 => { black_box(db.get_info(ids[rng.gen_range(0..ids.len())])); },
                 1 => { black_box(db.get_snapshot()); },
                 2 => { black_box(db.total_premium_credits()); },
-                1 => { let _ = black_box(db.reward_premium(1.2f32)); },
+                1 => { let _ = black_box(db.reward_premium(0.9f32)); },
                 20 => { let _ = black_box(db.add_credits(ids[rng.gen_range(0..ids.len())], rng.gen_range(2..100))); },
             }
         }

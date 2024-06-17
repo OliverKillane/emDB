@@ -50,20 +50,40 @@ def data_rates(data: pd.DataFrame):
         data[name] = data["scale_factor"] / data[col]
 
 
+
+
 MEAN_COLOUR_MAP = {
+    "PrimaryThunderDome": "purple",
+    "Loops": "purple",
+    "Rcs": "purple",
     "EmDB": "purple",
     "EmDBCopy": "green",
+    "EmDBCopyIgnore": "blue",
     "EmDBRef" : "red",
+    "EmDBRefIgnore" : "orange",
+    "PrimaryRetain":  "orange",
+    "Refs" : "orange",
+    "Iters" : "orange",
     "DuckDB": "yellow",
     "SQLite": "blue",
+    "PrimaryGenerationalArena": "blue",
 }
 
 MEDIAN_COLOUR_MAP = {
+    "PrimaryThunderDome": "indigo",
+    "Loops": "indigo",
+    "Rcs": "indigo",
     "EmDB": "indigo",
     "EmDBCopy": "darkgreen",
+    "EmDBCopyIgnore": "darkcyan",
     "EmDBRef" : "darkred",
+    "EmDBRefIgnore" : "darkorange",
+    "Refs" : "darkorange",
+    "Iters" : "darkorange",
+    "PrimaryRetain":  "darkorange",
     "DuckDB": "goldenrod",
     "SQLite": "darkcyan",
+    "PrimaryGenerationalArena": "darkcyan",
 }
 
 
@@ -477,6 +497,18 @@ def plot_rates_fn(bench_name: str) -> Callable[[Path, Path], None]:
         with open(bench_dir / f"{bench_name}.json", "r") as f:
             data = json.load(f)
         plt = plot_rates_separate_lines(process_data(data))
+        plt.savefig(output_dir / f"{bench_name}.pgf", backend="pgf")
+        print("✅")
+
+    return do
+
+
+def plot_rates_fn_single(bench_name: str) -> Callable[[Path, Path], None]:
+    def do(bench_dir: Path, output_dir: Path) -> None:
+        print(f"Generating {bench_name}...", end="", flush=True)
+        with open(bench_dir / f"{bench_name}.json", "r") as f:
+            data = json.load(f)
+        plt = plot_rates(process_data(data))
         plt.savefig(output_dir / f"{bench_name}.pgf", backend="pgf")
         print("✅")
 

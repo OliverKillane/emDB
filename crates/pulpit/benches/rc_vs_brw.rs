@@ -9,6 +9,7 @@ use divan;
 use std::{ops::Deref, rc::Rc};
 type Contained = [u8; 100];
 
+const SCALE_FACTOR: [usize; 7] = [512, 1024, 2048, 4096, 8192, 16384, 32768];
 trait RcRefCmp {
     type Value<'a>: Deref<Target = Contained>
     where
@@ -64,7 +65,7 @@ impl RcRefCmp for Rcs {
 #[divan::bench(
     name="Scanning values",
     types=[Rcs, Refs],
-    consts=[10,100,1000],
+    consts=SCALE_FACTOR,
 )]
 fn get_vals<C: RcRefCmp, const SIZE: usize>(bencher: divan::Bencher) {
     let data = (0..SIZE).map(|_| [0; 100]).collect();
@@ -79,7 +80,7 @@ fn get_vals<C: RcRefCmp, const SIZE: usize>(bencher: divan::Bencher) {
 #[divan::bench(
     name="Pushing values",
     types=[Rcs, Refs],
-    consts=[10,100,1000],
+    consts=SCALE_FACTOR,
 )]
 fn push_vals<C: RcRefCmp, const SIZE: usize>(bencher: divan::Bencher) {
     bencher.bench_local(|| {

@@ -59,6 +59,13 @@
 
 }
 
+@online{CopyElision,
+  author  = {},
+  title   = {Copy Elision - Cppreference},
+  year    = 2024,
+  url     = {https://en.cppreference.com/w/cpp/language/copy_elision}
+}
+
 @online{DuckDBDocs,
   author  = {DuckDB Labs},
   title   = {DuckDB Documentation},
@@ -309,3 +316,68 @@
   series    = {ICFP '13}
 }
 
+@article{HyperCodegen,
+author = {Neumann, Thomas},
+title = {Efficiently compiling efficient query plans for modern hardware},
+year = {2011},
+issue_date = {June 2011},
+publisher = {VLDB Endowment},
+volume = {4},
+number = {9},
+issn = {2150-8097},
+url = {https://doi.org/10.14778/2002938.2002940},
+doi = {10.14778/2002938.2002940},
+abstract = {As main memory grows, query performance is more and more determined by the raw CPU costs of query processing itself. The classical iterator style query processing technique is very simple and exible, but shows poor performance on modern CPUs due to lack of locality and frequent instruction mispredictions. Several techniques like batch oriented processing or vectorized tuple processing have been proposed in the past to improve this situation, but even these techniques are frequently out-performed by hand-written execution plans.In this work we present a novel compilation strategy that translates a query into compact and efficient machine code using the LLVM compiler framework. By aiming at good code and data locality and predictable branch layout the resulting code frequently rivals the performance of hand-written C++ code. We integrated these techniques into the HyPer main memory database system and show that this results in excellent query performance while requiring only modest compilation time.},
+journal = {Proc. VLDB Endow.},
+month = {jun},
+pages = {539–550},
+numpages = {12}
+}
+@online{SQLiteLemonParser,
+  author  = {Sqlite},
+  title   = {The Lemon LALR(1) Parser Generator},
+  year    = 2024,
+  url     = {https://sqlite.org/lemon.html},
+  urldate = {2024-06-15}
+}
+@online{SQLiteRowIDTables,
+  author  = {Sqlite},
+  title   = {SQLite Rowid Tables},
+  year    = 2024,
+  url     = {https://sqlite.org/rowidtable.html},
+  urldate = {2024-06-12}
+}
+
+@online{DuckDBRowid,
+  author  = {DuckDB Labs},
+  title   = {DuckDB Rowid Tables},
+  year    = 2024,
+  url     = {https://duckdb.org/docs/sql/statements/select.html#row-ids},
+  urldate = {2024-06-12}
+}
+
+@article{HyperQueryPlan,
+author = {Neumann, Thomas},
+title = {Efficiently compiling efficient query plans for modern hardware},
+year = {2011},
+issue_date = {June 2011},
+publisher = {VLDB Endowment},
+volume = {4},
+number = {9},
+issn = {2150-8097},
+url = {https://doi.org/10.14778/2002938.2002940},
+doi = {10.14778/2002938.2002940},
+abstract = {As main memory grows, query performance is more and more determined by the raw CPU costs of query processing itself. The classical iterator style query processing technique is very simple and exible, but shows poor performance on modern CPUs due to lack of locality and frequent instruction mispredictions. Several techniques like batch oriented processing or vectorized tuple processing have been proposed in the past to improve this situation, but even these techniques are frequently out-performed by hand-written execution plans.In this work we present a novel compilation strategy that translates a query into compact and efficient machine code using the LLVM compiler framework. By aiming at good code and data locality and predictable branch layout the resulting code frequently rivals the performance of hand-written C++ code. We integrated these techniques into the HyPer main memory database system and show that this results in excellent query performance while requiring only modest compilation time.},
+journal = {Proc. VLDB Endow.},
+month = {jun},
+pages = {539–550},
+numpages = {12}
+}
+
+@online{RustInPlaceCollect,
+  author  = {Rust Repository in place collector for alloc::Vec},
+  title   = {Rust Library Team and Contributors},
+  year    = 2024,
+  url     = {https://github.com/rust-lang/rust/blob/master/library/alloc/src/vec/in_place_collect.rs},
+  urldate = {2024-06-12}
+}

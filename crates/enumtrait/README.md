@@ -96,7 +96,7 @@ core drawback of requiring language/compiler changes.
 
 I hope such a feature (e.g. crate local macro persistent state, message passing between macros, etc ) is implemented, but in the meantime, we have this.
 
-*Rust macro invocations are independent.* However, macro definitions are ordered. We can 
+*Rust macro invocations are independent.* However, [macro definitions are ordered](https://rustc-dev-guide.rust-lang.org/macro-expansion.html#the-macro-definition-hierarchy)!. We can 
 use changing macro definitions to force an ordered invocation of other macros.
 
 *See [Little Book of Rust macros > Callbacks](https://veykril.github.io/tlborm/decl-macros/patterns/callbacks.html)*

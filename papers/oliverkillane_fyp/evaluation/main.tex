@@ -9,7 +9,7 @@ To determine the advantage provided by the core concept of the project requires 
     \item Embedding application logic inside database queries.
 \end{enumerate}
 A direct comparison and evaluation of the specific benefits of code generation is not in the scope of this evaluation.
-While there is clearly a performance advantage to be gained from running native, optimised code (without a runtime cost), \emdb
+While there is clearly a performance advantage to be gained from running native, optimised code (without a runtime cost), emDB
 is implemented with different operators, and is currently running a simple \& easily debuggable backend that has not been optimised.
 \\
 \\ Ideally we would use a benchmark considered representative of embedded database workloads,
@@ -72,9 +72,9 @@ Given the popularity of SQLite and DuckDB in the Rust ecosystem, these were the 
 Other more popular \textit{embedded databases} were ommitted from the selection as they are more akin
 to transactional key-value stored. The popular \textit{"pure-rust transactional embedded database"} sled\cite{SledRepo}, LmDB\cite{LMDBWebsite} and CrossDB\cite{CrossDBWebsite} were ommitted for this reason.
 \\
-\\ In order to simplify the creation of new benchmarks, \emdb includes an \mintinline{rust}{Interface} backend that generates traits that can be consumed and implemented by \emdb's \mintinline{rust}{Serialized} backend, or implemented manually (to wrap other databases).
+\\ In order to simplify the creation of new benchmarks, emDB includes an \mintinline{rust}{Interface} backend that generates traits that can be consumed and implemented by emDB's \mintinline{rust}{Serialized} backend, or implemented manually (to wrap other databases).
 \begin{futurebox}{Develop a more comprehensive benchmark suite}
-    Given there are no ideal existing suites that mix mutability, and test embedded logic, one will need to be properly developed for \emdb (also serving as a higher coverage test suite).
+    Given there are no ideal existing suites that mix mutability, and test embedded logic, one will need to be properly developed for emDB (also serving as a higher coverage test suite).
 \end{futurebox}
 
 \section{[Quantitative] Performance}
@@ -146,9 +146,9 @@ Prior to the benchmarks being run, the table is populated with a number of rows 
 \end{tabular}
 
 \subsubsection{EmDB Implementations}
-The \mintinline{rust}{NoCopySelector} table implementation selector is enabled for the no-copy \emdb
+The \mintinline{rust}{NoCopySelector} table implementation selector is enabled for the no-copy emDB
 implementation. It chooses the same column data structures as the default \mintinline{rust}{MutabilitySelector}
-but adds a step to copy values taken from the table.
+but places all values in the mutable side of the rows.
 \subsubsection{Results}
 \begin{figure}[h!]
     \centering
@@ -157,6 +157,10 @@ but adds a step to copy values taken from the table.
     \caption{Data Logs Schema Benchmark Results}
     \label{fig:data_log_benchmark_results}
 \end{figure}
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item DuckDB scales extremely well over $\approx 33,000$ rows. This schema benefits from columnar storage, allowing. 
+\end{itemize}
 \subsection{Sales Analytics}
 \subsubsection{Schema}
 The aim of this benchmark is to demonstrate the performance advantage of embedding logic.
@@ -291,17 +295,17 @@ With one key exception (accessing secondary columns without bounds checking) no 
 \begin{itemize}
     \setlength\itemsep{0em}
     \item Normal rust safety guarentees apply to the generated code.
-    \item Wrappers inside \emdb's code generation ensure quasiquotes can be re-parsed as the AST nodes they should represent (only on debug mode for performance).
+    \item Wrappers inside emDB's code generation ensure quasiquotes can be re-parsed as the AST nodes they should represent (only on debug mode for performance).
     \item The produced code is human readable, a debug write mode is included to divert generated code to separate files for inspection.
 \end{itemize}
 
-The \emdb compiler currently compiles with both stable and nightly rust compilers (with improved error diagnostics).
+The emDB compiler currently compiles with both stable and nightly rust compilers (with improved error diagnostics).
 
 \subsection{Susceptibility to User Error}
 Given emDB allows the user to access internal state safely to immutable values, it is critical to
 prevent bugs in user code mainfesting in difficult to debug issues inside the database.
 \\
-\\ For example, invalid access through an \emdb provided reference corrupting memory in a table,
+\\ For example, invalid access through an emDB provided reference corrupting memory in a table,
 resulting in a difficult bug manifesting in failures for unrelated queries.
 \\
 \\ The qualification of user provided references with the database lifetime, and the accessiblity to
@@ -331,7 +335,7 @@ However, there are still three ways in which this can be damaged.
 \end{futurebox}
 
 \section{[Quantitative] Compile Time Cost}
-Given the emql proc macro needs to run at compile time, the compile time cost is a significant factor in \emdb's usability.
+Given the emql proc macro needs to run at compile time, the compile time cost is a significant factor in emDB's usability.
 \begin{itemize}
     \setlength\itemsep{0em}
     \item Increased compile times delay delay the reporting of error messages by the language server.
@@ -365,9 +369,9 @@ opt-level = 3 # Optional additional confuguration for maximum proc macro perform
     \item The cost of compiling DuckDB and SQLite is comparably large.
 \end{itemize}
 \begin{futurebox}{Feature gating crates}
-    Improvements to the initial/from fresh compile time can be gained by feature gating unused features included in the \emdb crate.
+    Improvements to the initial/from fresh compile time can be gained by feature gating unused features included in the emDB crate.
     \begin{itemize}
-        \item Pulpit table generation macros are included in the \emdb crate, for convenience, but are not a requirement to use the emql macro.
+        \item Pulpit table generation macros are included in the emDB crate, for convenience, but are not a requirement to use the emql macro.
     \end{itemize}
 \end{futurebox}
 \begin{futurebox}{Improved trait resolution}
@@ -394,7 +398,7 @@ opt-level = 3 # Optional additional confuguration for maximum proc macro perform
 [dependencies]
 emdb = { git = "https://github.com/OliverKillane/emDB.git" }
 \end{minted}
-\emdb generates rust diagnostics, which are already integrated with rust supporting IDEs.
+emDB generates rust diagnostics, which are already integrated with rust supporting IDEs.
 This is not possible with either SQLite or DuckDB without using a tool like sqlx.
 \begin{itemize}
     \setlength\itemsep{0em}
@@ -411,7 +415,7 @@ This is not possible with either SQLite or DuckDB without using a tool like sqlx
     \caption{Stages of error message generation}
     \label{fig:error_message_gen}
 \end{figure}
-A significant weakness of \emdb is that the correctness of user embedded code depends on the optimisations applied to data structures.
+A significant weakness of emDB is that the correctness of user embedded code depends on the optimisations applied to data structures.
 \begin{itemize}
     \setlength\itemsep{0em}
     \item Values versus references for items gotten from tables, only known after analysing all queries and determining the data structure to use.
@@ -431,7 +435,7 @@ Multiple synax errors is managed by the combi library (a part of this project), 
 
 \begin{center}
     \begin{tabular}{l | l l l l }
-        \textbf{feature}                                  & \textbf{\emdb} & \textbf{DuckDB} & \textbf{SQLite} & \textbf{SQLite + sqlx} \\
+        \textbf{feature}                                  & \textbf{emDB} & \textbf{DuckDB} & \textbf{SQLite} & \textbf{SQLite + sqlx} \\
         \hline
         \textbf{\mintinline{bash}{Cargo.toml} only setup} & Yes           & Yes             & Yes             & No                     \\
         \textbf{Compile Time Checks}                      & Yes           & No              & No              & Yes                    \\

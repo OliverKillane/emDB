@@ -17,6 +17,7 @@ impl Datastore for DuckDB {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(
             "
+            SET threads = 1;
             CREATE TABLE logs (
                 timestamp INTEGER, 
                 comment TEXT, 

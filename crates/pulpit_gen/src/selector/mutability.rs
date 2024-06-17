@@ -38,10 +38,10 @@ impl SelectorImpl for MutabilitySelector {
                     PrimaryThunderdome.into()
                 }
             } else {
-                PrimaryRetain { block_size: 1024 }.into()
+                PrimaryRetain { block_size: 4096 }.into()
             }
         } else {
-            AssocBlocks { block_size: 1024 }.into()
+            AssocBlocks { block_size: 4096 }.into()
         };
 
         Table {

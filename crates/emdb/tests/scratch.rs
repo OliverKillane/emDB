@@ -31,12 +31,12 @@ emql! {
     //     ds_name = EmDBDebug,
     //     // aggressive_inlining = on,
     // };
-    // impl code_display as PlanViz{
-    //     path = "emdb/tests/debug/code.dot",
-    //     types = off,
-    //     ctx = on,
-    //     control = on,
-    // };
+    impl code_display as PlanViz{
+        path = "emdb/tests/debug/code.dot",
+        types = off,
+        ctx = on,
+        control = on,
+    };
 
     impl my_db as Serialized {
         // debug_file = "emdb/tests/code.rs",
@@ -44,6 +44,7 @@ emql! {
         // table_select = Thunderdome,
     };
 
+    
     table customers {
         forename: String,
         surname: String,
@@ -73,6 +74,7 @@ emql! {
             ~> return;
     }
 }
+
 
 fn main() {
     // use my_interface::Datastore;
