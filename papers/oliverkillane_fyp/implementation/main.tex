@@ -43,7 +43,7 @@ queries, and tables.
 \begin{itemize}
     \setlength\itemsep{0em}
     \item Limitations on flexibility, produced plans need to be constructed as valid zig datastructures, and implement some method for \textit{execute given query}.
-    \item Limited interaction with non-zig code, for example generating plan debug diagrams, or epresentations that can be easily debugged.
+    \item Limited interaction with non-zig code, for example generating plan debug diagrams, or representations that can be easily debugged.
     \item Error messages can be made by the library, but are managed by zig, so while expression errors are trivial and managed entirely by zig, assigning spans to certain structures using the query language semantics is difficult.
 \end{itemize}
 
@@ -57,7 +57,7 @@ queries, and tables.
 Procedural macros are functions which take rust compiler provided tokenstreams as input, and return rust tokenstreams as output and run at compile time. They can interact with the compiler, and the environment (file system, network).
 \begin{itemize}
     \setlength\itemsep{0em}
-    \item They are a key language feature of rust, and are ubiqutous across the rust standard library and ecosystem.
+    \item They are a key language feature of rust, and are ubiquitous across the rust standard library and ecosystem.
     \item They can contain arbitrary code, which includes a schema compiler.
     \item The tokens provided to proc macros are basic tokens (identifiers/words, punctuation, literals, brackets), and do not have to conform to rust syntax.
 \end{itemize}
@@ -104,14 +104,14 @@ Hence the chosen option was a rust procedural macro.
 Given the limited time, and the requirement to complete the entire end-to-end compilation in order to test optimisations:
 \begin{itemize}
     \setlength\itemsep{0em}
-    \item Implement only the mutable\ref{sec:app_opt} \& append only\ref{sec:mut_opt} optimisations.
+    \item Implement only the append only (\ref{sec:app_opt}) \& immutable value (\ref{sec:mut_opt}) optimisations.
     \item Build the system to be easily extendable (need to support multiple backends, and have a backend-agnostic logical plan).
     \item Rather than implementing and optimising a small subset of functionality, to implement all functionality required for a database and use the remaining time for optimisation.
 \end{itemize}
 
 
 \section{Language Design}
-In deciding the query language for any database, SQL was a natural choice.
+In deciding the query language for any database, SQL is the default choice, however it has several disadvantages in the context of an embedded (in host language) database.
 \begin{center}
     \begin{tabular}{l l | l l l l}
                           &                                   & \multicolumn{4}{c}{\textbf{Language}}                                 \\
@@ -125,17 +125,19 @@ In deciding the query language for any database, SQL was a natural choice.
 \end{center}
 \noindent
 Embedding rust expressions and types into the database avoids a costly (query language) $\to$ rust translation
-requirement, and allows for simple embedding of application code.
+requirement, and allows for simple embedding of application code. Given the difficulties with a SQL-based language design, and 
+few upsides when compared to the flexibility in designing a custom language, a custom language was chosen (emQL).
+
 \subsection{emQL Overview}
 The emQL language developed for this project is inspired by both the flux language syntax, and by iterators (specifically the \mintinline{elixir}{|>} elixir pipe).
 \begin{itemize}
     \setlength\itemsep{0em}
-    \item Queries are directed acyclical graphs (DAGs). Unlike SQL which represents queries (with some exceptions\footnote{Recursive Common Table Expressions})
+    \item Queries are directed acyclic graphs (DAGs). Unlike SQL which represents queries (with some exceptions\footnote{Recursive Common Table Expressions})
           as trees, emQL allows for streams to me merged, forked, and have stream elements be individually lifted
           into a subcontext (another DAG inside a query DAG).
     \item Operators are ordered by dataflow (\mintinline{rust}{op1 |> op2 |> op3}), rather than by operation
           (SQL requires a rigid ordering of \mintinline{SQL}{SELECT .. FROM .. WHERE .. }). This means that queries
-          can be written in a more concise, and more intutive imperative style.
+          can be written in a more concise, and more intuitive imperative style.
     \item Row references are a core concept in emQL. They are fast lookup keys into tables that are used in
           \mintinline{rust}{update} and \mintinline{rust}{delete} operations and are provided by \mintinline{rust}{insert},
           \mintinline{rust}{ref} and \mintinline{rust}{unique} operations. As row references are just data, they can be mapped,
@@ -260,11 +262,11 @@ in an expression, while also using \mintinline{rust}{user_name} from the query's
         \item Allowing queries to consume streams requires modifying the interface to take a struct argument with the specified fields.
         \item Returning streams without collecting values is more difficult, and requires allowing records to contain a variable number of generic parameters for the types of contained streams, implementing some trait (for example \mintinline{rust}{impl Iterator<Item=T>}).
     \end{itemize}
-    This feature would preventremove the requirement for immediate collection before return (some potential performance benefits if users intend to iterate over results), and for flattening nested streams (rather than collecting to \mintinline{rust}{Vec}, and then concatenating them - expensive).
+    This feature would remove the requirement for immediate collection before return (some potential performance benefits if users intend to iterate over results), and for flattening nested streams (rather than collecting to \mintinline{rust}{Vec}, and then concatenating them - expensive).
 \end{futurebox}
 \begin{futurebox}{Subqueries}
     Subqueries can be enabled by connecting a \mintinline{rust}{call} operator to the context used by the other query. The semantic analysis however requires the called query's return type to be known.
-    This requires significant modifcation to the current semantic analyser to track incomplete analyses, and must include a restriction on recursive (or even mutually recursive) queries.
+    This requires significant modification to the current semantic analyser to track incomplete analyses, and must include a restriction on recursive (or even mutually recursive) queries.
 \end{futurebox}
 \section{Query Parsing with Combi}
 \subsection{Rust Tokenstreams}
@@ -336,8 +338,8 @@ A helper method for describing a combinator (useful in debug messages and for ex
 Rust token parsing combinators are implemented atop a group of generic core combinators (such as \mintinline{rust}{seq} (sequence two combis), \mintinline{rust}{nothing}, \mintinline{rust}{mapsuc}(map a combinator's success value) and \mintinline{rust}{recursive}).
 \begin{itemize}
     \setlength\itemsep{0em}
-    \item Additional derived parsers include \mintinline{rust}{listseptrailing}, and the \mintinline{rust}{Fields} builder which generate combinators that parse a set of options (with embedded semantic checks for duplicate, optional, must and default choices), without needing to implement any new combi combinators.
-    \item Error embelishment is also included for wrapping errors in expectation messages, based on the structure of combis, and for rewriting
+    \item Additional derived parsers include \mintinline{rust}{listseptrailing}, and the \mintinline{rust}{Fields} builder which generate combinators that parse a set of options (with embedded semantic checks for duplicate, optional, must and default choices), without needing to implement any additional Combi combinators.
+    \item Error embellishment is also included for wrapping errors in expectation messages, based on the structure of Combis, and for rewriting
 \end{itemize}
 \subsection{Performance}
 A generated tokenstream (see repository for details) was applied to each parser. All parsers should succeed for all inputs however they have different error capabilities.
@@ -354,7 +356,8 @@ A generated tokenstream (see repository for details) was applied to each parser.
     \resizebox{\textwidth}{!}{\input{evaluation/_graphs/tokens.pgf}}
     \caption{Comparative Benchmarks}
 \end{figure}
-Unsurprisingly the best performance is for the hand-written, panicking parser.  However Combi demonstrates a significant performance advantage over Chumsky-Proc.
+Unsurprisingly the best performance is for the hand-written, panicking parser.  However Combi demonstrates 
+a significant performance advantage over Chumsky-Proc.
 \\
 \\ Combi's versatility is evidenced by its use for the emDB's emQL frontend, pulpit's table generation macro, and enumtrait's option parsing.
 \section{Table Generation with Pulpit}
@@ -427,7 +430,7 @@ let imm_ref_dangling_unavailable = imm_ref_dangling;
     \begin{tabular}{l p{.8\textwidth}}
         \textbf{Flexible Design}     & Can be easily configured to support new column data structures, and new selectors.                                                                                                                                                                                          \\
         \textbf{Row vs Column Store} & For emDB an n-ary selector is used, however it is also possible to configure selectors to store data separately from the keys, or to spread data across several columns (decomposed storage).                                                                               \\
-        \textbf{Transactions}        & Required for emDB queries, a simple rollback log is used. Due to the support for row references, deletion operations do not drop data or free indices (just ide the row) until commit if trnasactions are enabled to prevent insertions during the commit redusing indices. \\
+        \textbf{Transactions}        & Required for emDB queries, a simple rollback log is used. Due to the support for row references, deletion operations do not drop data or free indices (just ide the row) until commit if transactions are enabled to prevent insertions during the commit reusing indices. \\
         \textbf{Precise Errors}      & The return types of methods are constrained to only include possible errors (rather than a generalised error type). This allows for easy matching on errors, and for some operations (such as insert) to have their error type removed when no constraints can be violated. \\
     \end{tabular}
 \end{center}
@@ -442,6 +445,7 @@ When using a \mintinline{rust}{get}, to get a mutable value from a column the va
     \item Given the ability to store \textbf{any} \mintinline{rust}{Sized} rust types in emDB, a user may implement a side-effecting clone.
 \end{itemize}
 We can see this in a comparison of generated code for different selects, when streaming out values, the copy implementation does not have its \mintinline{rust}{clone} of the value (a string) eliminated, decreasing performance.
+\vspace{1cm}
 \\
 \begin{minipage}{.45\textwidth}
     \subsubsection{EmDBCopyIgnore and EmDBRefIgnore}
@@ -468,7 +472,7 @@ query count_values() {
     \centering
     \vspace{-0.4em}
     \resizebox{\textwidth}{!}{\input{evaluation/_graphs/string_copy.pgf}}
-    \caption{Comparative Benchmarks}
+    \caption{Comparison showing the effect of a redundant string clone not being eliminated}
 \end{figure}
 
 \subsection{Retaining Values}
@@ -506,7 +510,7 @@ For some workloads this leakage is acceptable (e.g. low deletion rate, short liv
 \subsection{Rust Expressions}
 emQL uses rust types and expressions, so need to be able to properly pass these through to the backend for code generation.
 \\
-\\ There are significant advantages possible from analysing these rust expressions:
+\\ There are significant advantages possible from analyzing these rust expressions:
 \begin{itemize}
     \setlength\itemsep{0em}
     \item Detecting unused record fields in \mintinline{rust}{map} operations (can allow us to remove fields and improve performance, for example in unused accessed fields\ref{sec:clone_side_effects})
@@ -516,9 +520,9 @@ emQL uses rust types and expressions, so need to be able to properly pass these 
 However the current procedural macro interface has limitations:
 \begin{enumerate}
     \setlength\itemsep{0em}
-    \item emQL only recieves tokens the macro is invoked with, meaning it is not possible to analyse user types defined outside this context.
+    \item emQL only receives tokens the macro is invoked with, meaning it is not possible to analyse user types defined outside this context.
     \item {
-          Even for \mintinline{rust}{std} and \mintinline{rust}{core} types, a user may shadown these inside the expression.
+          Even for \mintinline{rust}{std} and \mintinline{rust}{core} types, a user may shadow these inside the expression.
           }
 \end{enumerate}
 \noindent
@@ -538,7 +542,7 @@ It is possible to analyse rust expressions by using the \mintinline{rust}{rustc_
     \item All stages of compilation can be accessed, for example dropping from tokens to an AST, to the HIR for running type inference on rust expressions.
     \item \mintinline{rust}{rustc_interface} is unstable as a policy, and the compiler development team are willing to make breaking changes while improving the compiler.
 \end{itemize}
-The advantage gained was low compared to the maintenance and development costs to analyse, so instead emDB passes rust code through to the backend.
+The advantage gained was low compared to the maintenance and development costs to analyze, so instead emDB passes rust code through to the backend.
 \begin{itemize}
     \setlength\itemsep{0em}
     \item The syntax for types and expressions is checked (by the syn rust ast parsing library) to prevent syntactically invalid code (which could result in spans emDB generated code being part of error messages - resulting in confusing error messages) from being passed through to the generated code.
@@ -567,7 +571,7 @@ EmDB represents logical plans as a graph of operators, contexts and types.
         outputs, and to name these.                                                                      \\
     \end{tabular}
 \end{center}
-All operators, types and contexts are included in areans, and are not partitioned by query. This provides
+All operators, types and contexts are included in arenas, and are not partitioned by query. This provides
 both simple unique identifiers (indexes), and allows for easier inter-query optimisation (as is intended
 in future).
 \begin{figure}[h!]
@@ -590,7 +594,7 @@ pub struct Plan {
 In order to allow for easy debugging of generated plans, and of plan-mutating optimisations in future, the \mintinline{rust}{Planviz} backend generates graphViz dot files at compile time.
 \begin{itemize}
     \setlength\itemsep{0em}
-    \item emDB compiles emQL fast enough to display near-live plan visualisations during editing.
+    \item emDB compiles emQL fast enough to display near-live plan visualizations during editing.
     \item Additional display of the type graph can also be generated.
 \end{itemize}
 \begin{minted}{rust}
@@ -639,7 +643,7 @@ emql! {
     \begin{minted}{rust}
     \end{minted}
     \includegraphics[width=\textwidth]{implementation/diagrams/code.pdf}
-    \caption{A plan vizualisation generated at compile time}
+    \caption{A plan visualization generated at compile time}
 \end{figure}
 
 
@@ -712,7 +716,7 @@ macro_rules! single { ($data:ty) => { $data }; }
 macro_rules! stream { ($data:ty) => { impl Iterator<Item = $data> }; }
 super::generate_minister_trait! { IterOps }
 \end{minted}
-The \mintinline{rust}{Iter} implementation makes use of the rust iterators, whicn are lazily evaluated, monomorphised (no virtuals, can be inlined) streams of data.
+The \mintinline{rust}{Iter} implementation makes use of the rust iterators, which are lazily evaluated, monomorphised (no virtuals, can be inlined) streams of data.
 \begin{enumerate}
     \setlength\itemsep{0em}
     \item Operators appear push based, \mintinline{rust}{let output = Iter::map(input)}. This makes code generation simple.
@@ -728,8 +732,9 @@ This is the same model implemented by hyper\cite{HyperQueryPlan}, though with si
     \hfill -- \textit{Efficiently Compiling Efficient Query Plans
         for Modern Hardware\cite{HyperQueryPlan}}
 \end{quote}
-Additionally the rust compiler performs special optimisation for iterators. Specifically in-place-collect for vectors\cite{RustInPlaceCollect}.
-This can remove the cost of allocating the output buffer, by reusing the same allocation as the input.
+Additionally the in-place-collection optimisation for vectors\cite{RustInPlaceCollect} can remove the cost of allocating 
+the output buffer, by reusing the same allocation as the input (when running the above benchmark, the iterator 
+implementation does not allocate, but the vector version does - tracked by the Divan AllocProfiler).
 \\
 \\ \begin{minipage}{.5\textwidth}
     \textbf{Iterator}
@@ -756,14 +761,7 @@ fn op<I,O>(values: Vec<I>, f: impl Fn(I) -> O)
 }
     \end{minted}
 \end{minipage}
-\begin{figure}[h!]
-    \centering
-    \begin{tabular}{l l l}
-                                              & \textbf{Iters} & \textbf{Loops} \\
-        \textbf{Calls to divan AllocProfiler} & 0              & 1              \\
-    \end{tabular}
-    \caption{Allocations for each implementation when benchmarked with the Divan AllocProfiler}
-\end{figure}
+
 \begin{figure}[h!]
     \centering
     \vspace{-0.4em}

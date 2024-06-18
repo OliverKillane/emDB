@@ -187,6 +187,10 @@ mod primary_thunderdome;
 pub use primary_thunderdome::*;
 mod primary_thunderdome_trans;
 pub use primary_thunderdome_trans::*;
+mod assoc_app_vec;
+pub use assoc_app_vec::*;
+mod assoc_pull_blocks;
+pub use assoc_pull_blocks::*;
 
 /// A single window type holding a mutable references through which windows for
 /// columns and primary indexes can be generated.
@@ -269,10 +273,10 @@ pub trait PrimaryWindow<'imm, ImmData, MutData> {
     /// does not need the `'imm` lifetime parameter)
     type Col: Keyable + Column;
 
-    /// Get provides values to the user. If the immutable data can be optimised it is done so 
+    /// Get provides values to the user. If the immutable data can be optimised it is done so
     /// and returned wrapped in the [`PrimaryWindow::ImmGet`].
-    /// 
-    /// Mutable data is returned as a borrow, to allow the user to copy the data in the 
+    ///
+    /// Mutable data is returned as a borrow, to allow the user to copy the data in the
     /// most efficient way.
     /// - For example ignoring copying some fields.
     fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, &MutData>;

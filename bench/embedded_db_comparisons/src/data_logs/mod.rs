@@ -21,6 +21,14 @@ emql! {
         aggressive_inlining = on,
         op_impl = Iter,
     };
+    impl emdb_columnar_impl as Serialized{
+        interface = data_logs,
+        pub = on,
+        ds_name = EmDBColumnar,
+        aggressive_inlining = on,
+        op_impl = Iter,
+        table_select = Columnar,
+    };
 
     table logs {
         timestamp: usize,
@@ -121,7 +129,7 @@ pub fn random_string(rng: &mut ThreadRng) -> String {
     let size = rng.gen_range(0..4096);
     let mut s = String::with_capacity(size);
     for _ in 0..size {
-        s.push(rng.gen_range(b'a'..b'z') as char);
+        s.push(rng.gen_range(b'a'..=b'z') as char);
     }
     s
 }

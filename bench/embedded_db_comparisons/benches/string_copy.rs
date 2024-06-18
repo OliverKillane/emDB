@@ -1,8 +1,8 @@
 use divan;
 use embedded_db_comparisons::string_copy::{
     copy_string::{self as interface, Database},
-    emdb_copy_impl::EmDBCopy,
     emdb_copy_ignore_impl::EmDBCopyIgnore,
+    emdb_copy_impl::EmDBCopy,
     emdb_ref_ignore_impl::EmDBRefIgnore,
     emdb_ref_impl::EmDBRef,
     populate_database,

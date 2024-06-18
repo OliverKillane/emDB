@@ -113,7 +113,7 @@ where
     ],
     consts=SCALE_FACTORS,
 )]
-fn bench_workload_no_imm<Col, const ELEMENTS: usize >(bencher: divan::Bencher)
+fn bench_workload_no_imm<Col, const ELEMENTS: usize>(bencher: divan::Bencher)
 where
     Col: Column,
     for<'a> Col::WindowKind<'a>: PrimaryWindowPull<'a, usize, usize>,

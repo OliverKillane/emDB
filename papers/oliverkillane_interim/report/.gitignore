@@ -8,7 +8,6 @@
 *.toc
 *.bak*
 *.listing
-*.pdf
 *.bbl
 *.bcf
 *.blg

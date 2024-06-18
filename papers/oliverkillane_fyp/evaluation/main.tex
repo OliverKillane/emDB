@@ -10,16 +10,16 @@ To determine the advantage provided by the core concept of the project requires 
 \end{enumerate}
 A direct comparison and evaluation of the specific benefits of code generation is not in the scope of this evaluation.
 While there is clearly a performance advantage to be gained from running native, optimised code (without a runtime cost), emDB
-is implemented with different operators, and is currently running a simple \& easily debuggable backend that has not been optimised.
+is implemented with different operators, and is currently running a very simple iterator based backend.
 \\
 \\ Ideally we would use a benchmark considered representative of embedded database workloads,
 and contains schemas for which the 3 features we want to investigate are applicable.
 \subsubsection{TCP-H}
 Covers aggregation as well as concurrent data modification, adherence to specification
-requires either using a separate driver - not easily embeddable while adhering to the specification.
+requires either using a separate driver - not easily embedable while adhering to the specification.
 \begin{itemize}
     \setlength\itemsep{0em}
-    \item The benchmark is designed for a persisted buisness database, so uses all mutations (insert update, delete)
+    \item The benchmark is designed for a persisted business database, so uses all mutations (insert update, delete)
           which prevents the mutability optimisations that emDB performs,
           some embedded database workloads are append only, and thus choosing a benchmark that also
           supports
@@ -30,7 +30,7 @@ It would be possible to heavily modify TCP-H (data generator linked with benchma
 low scale factor with benchmarks including no updates or deletes).
 \\
 \\ However this benchmark would be TCP-H in schema \& queries only (not useful to compare with other TCP-H results)
-and would not be particularly useful in validating the 4 key optimisations imlemented without modifying
+and would not be particularly useful in validating the 4 key optimisations implemented without modifying
 the sets of queries used (i.e. TCP-H, but append only).
 
 \subsubsection{H2O.ai Database Benchmark}
@@ -51,7 +51,7 @@ As a result the benchmark benchmarks inserts, deletes, and updates.
 \begin{itemize}
     \setlength\itemsep{0em}
     \item CrossDB could even be used as a backend for emDB, as emDB's operators are separate from the data storage.
-    \item Despite being integrated into C (schemas are defined with C structs, custors into tables are directly accessible as part of the API,
+    \item Despite being integrated into C (schemas are defined with C structs, cursors into tables are directly accessible as part of the API,
           and reference C types)
 \end{itemize}
 
@@ -159,7 +159,10 @@ but places all values in the mutable side of the rows.
 \end{figure}
 \begin{itemize}
     \setlength\itemsep{0em}
-    \item DuckDB scales extremely well over $\approx 33,000$ rows. This schema benefits from columnar storage, allowing. 
+    \item DuckDB scales extremely well over $\approx 33,000$ rows and sees a significant improvement in performance per row. Its is not due to multithreading, or the columnar storage (tested with single thread (same result) and against emDB with the \mintinline{rust}{Columnar} table selector).
+    \item I have not determined the root technique to explain this performance improvement, but suspect large scale factors are amortizing fixed overhead.
+    \item The advantage from returning references for immutable data is significant (over $2\times$ performance improvement for comment summaries).
+    \item  There is significant inefficiency in emDB for scans and table accesses (requires collecting a buffer of row references, and re-checking bounds for each access).  
 \end{itemize}
 \subsection{Sales Analytics}
 \subsubsection{Schema}
@@ -235,6 +238,14 @@ fn exchange(btc_rate: f64, usd_rate: f64, price: u64, currency: Currency) -> u64
 \end{center}
 \noindent
 The schema also includes a \textbf{Customer Leaving} query, this prevents the emDB database from optimising the \mintinline{rust}{current_customers} table for append only workloads.
+\begin{notesbox}{DuckDB Enums}
+    For the DuckDB implementation \mintinline{SQL}{UTINYINT} instead if \mintinline{rust}{enum}. This is due to a bug in duckDB $0.10.1$ 
+    that causes the allocator to fail on some \mintinline{SQL}{CHECK} constraints using enumerations, which includes the purchase currency constraint.
+    \begin{minted}{rust}
+duckdb::data_t* duckdb::Allocator::AllocateData(duckdb::idx_t): Assertion `size > 0` failed
+    \end{minted}
+\end{notesbox}
+
 \subsubsection{Results}
 \begin{figure}[h!]
     \centering
@@ -243,13 +254,19 @@ The schema also includes a \textbf{Customer Leaving} query, this prevents the em
     \caption{Sales Analytics Schema Benchmark Results}
     \label{fig:sales_analysis_access_queries}
 \end{figure}
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item EmDB performs well on the mixed workload (includes fast inserts), but has worse performance for the larger scale factors.
+    \item DuckDB improves for large scale factors, as in the previous \textbf{data logs} benchmark.
+    \item SQLite performs well on the \textbf{customer value} groupby and the \textbf{product customers} join, emDB has not optimised these operators, and suffers for it.
+\end{itemize}
 \subsection{User Details}
 \subsubsection{Schema}
 The aim of this benchmark is to demonstrate performance in simpler key-value stores.
 \begin{itemize}
     \setlength\itemsep{0em}
     \item Include predicates and aggregation (meaning traditional, more optimised key values stores are not applicable).
-    \item Allows access directly to data through row references, and in the case of DuckDB and SQLite a gennerated unique ID.
+    \item Allows access directly to data through row references, and in the case of DuckDB and SQLite a generated unique ID.
     \item Demonstrates a performance advantage for returning references (for snapshotting the data).
 \end{itemize}
 \begin{minted}{rust}
@@ -268,9 +285,13 @@ table users {
     \resizebox{\textwidth}{!}{\input{evaluation/_graphs/user_details_0.pgf}}
     \resizebox{\textwidth}{!}{\input{evaluation/_graphs/user_details_1.pgf}}
     \caption{User Details Schema Benchmark Results}
-    \label{fig:sales_analysis_access_queries}
+    \label{fig:user_details_benchmark_results}
 \end{figure}
-
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item This schema benefits from fast lookup of row references, DuckDB's performance is too slow for this to avoid timeout on a sufficient number of iterations.
+    \item EmDB's fast row references are a huge performance advantage for the OLTP queries (getting random ids, random inserts), SQlite's row identifiers have significantly more expensive lookup. DuckDB is only competitive on the larger aggregations (OLAP workloads it was designed for).
+\end{itemize}
 \begin{futurebox}{Parallel Operators}
     At large scale factors performance could be improved by applying operators in parallel.
     \begin{itemize}
@@ -294,8 +315,8 @@ Very few instances of unsafe code, ensuring normal rust safety guarantees apply.
 With one key exception (accessing secondary columns without bounds checking) no \mintinline{rust}{unsafe} code is generated. Hence normal rust safety guarentees apply (no data races, no undefined behaviour, no use after free, etc.).
 \begin{itemize}
     \setlength\itemsep{0em}
-    \item Normal rust safety guarentees apply to the generated code.
-    \item Wrappers inside emDB's code generation ensure quasiquotes can be re-parsed as the AST nodes they should represent (only on debug mode for performance).
+    \item Normal rust safety guarantees apply to the generated code.
+    \item Wrappers inside emDB's code generation ensure quasi-quotes can be re-parsed as the AST nodes they should represent (only on debug mode for performance).
     \item The produced code is human readable, a debug write mode is included to divert generated code to separate files for inspection.
 \end{itemize}
 
@@ -308,7 +329,7 @@ prevent bugs in user code mainfesting in difficult to debug issues inside the da
 \\ For example, invalid access through an emDB provided reference corrupting memory in a table,
 resulting in a difficult bug manifesting in failures for unrelated queries.
 \\
-\\ The qualification of user provided references with the database lifetime, and the accessiblity to
+\\ The qualification of user provided references with the database lifetime, and the accessibility to
 internal data structures only through the safe query interface limit the exposure to bugs in user code.
 However, there are still three ways in which this can be damaged.
 \begin{enumerate}
@@ -343,25 +364,20 @@ Given the emql proc macro needs to run at compile time, the compile time cost is
 By using cargo's built in compilation timing to produce this.
 \begin{minted}{toml}
 [profile.dev.package.emdb_core]
-opt-level = 3 # Optional additional confuguration for maximum proc macro performance
+opt-level = 3 # Optional additional configuration for maximum proc macro performance
 \end{minted}
 \noindent
-\begin{figure}
+\begin{figure}[h!]
     \centering
-    \begin{subfigure}
-      \centering
-    %   \includegraphics[width=.4\linewidth]{image1}
-      \caption{A subfigure}
-      \label{fig:sub1}
-    \end{subfigure}%
-    \begin{subfigure}
-      \centering
-    %   \includegraphics[width=.4\linewidth]{image1}
-      \caption{A subfigure}
-      \label{fig:sub2}
-    \end{subfigure}
-    \caption{A figure with two subfigures}
-    \label{fig:test}
+    \includegraphics[width=\textwidth]{evaluation/images/recompile.png}
+    \caption{Cargo timings for a recompile on no change of the embedded database comparison benchmarks.}
+    \label{fig:recompile}
+\end{figure}
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{evaluation/images/fresh.png}
+    \caption{Cargo timings for a fresh compilation of the embedded database comparison benchmarks.}
+    \label{fig:freshcompile}
 \end{figure}
 \begin{itemize}
     \setlength\itemsep{0em}
@@ -371,9 +387,10 @@ opt-level = 3 # Optional additional confuguration for maximum proc macro perform
 \begin{futurebox}{Feature gating crates}
     Improvements to the initial/from fresh compile time can be gained by feature gating unused features included in the emDB crate.
     \begin{itemize}
-        \item Pulpit table generation macros are included in the emDB crate, for convenience, but are not a requirement to use the emql macro.
+        \item Pulpit table generation macros are included in the emDB crate, for convenience, but are not a requirement to use the emQL macro.
     \end{itemize}
 \end{futurebox}
+\newpage
 \begin{futurebox}{Improved trait resolution}
     Trait resolution\cite{TraitSolving} is an expensive operation. The heavy reliance on traits to define parameters for Combi combinators 
     is therefore a considerable cost to the initial/from fresh compile of emDB.
@@ -418,10 +435,10 @@ This is not possible with either SQLite or DuckDB without using a tool like sqlx
 A significant weakness of emDB is that the correctness of user embedded code depends on the optimisations applied to data structures.
 \begin{itemize}
     \setlength\itemsep{0em}
-    \item Values versus references for items gotten from tables, only known after analysing all queries and determining the data structure to use.
-    \item Structure selection requires the full context, so no code is generated (and hence user code checked) if there are any emql semantic or sytactic errors.
+    \item Values versus references for items gotten from tables, only known after analyzing all queries and determining the data structure to use.
+    \item Structure selection requires the full context, so no code is generated (and hence user code checked) if there are any emQL semantic or syntactic errors.
 \end{itemize}
-Multiple synax errors is managed by the combi library (a part of this project), which allows for multiple syntax errors without error AST nodes, keeping the semantic analysis code relatively simple.
+Multiple syntax errors is managed by the Combi library (a part of this project), which allows for multiple syntax errors without error AST nodes, keeping the semantic analysis code relatively simple.
 
 \begin{futurebox}{Allow both syntax and semantic Errors}
     Some language features are independent.
@@ -447,6 +464,12 @@ Multiple synax errors is managed by the combi library (a part of this project), 
     The syntax \& semantics of emql have been chosen through an iterative \textit{dogfooding} process, and lacks a more general justification.
     \begin{itemize}
         \setlength\itemsep{0em}
-        \item User feedback requires a stabilisation of the emql interface and a commitment to support the library long term.
+        \item User feedback requires a stabilization of the emQL interface and a commitment to support the library long term.
     \end{itemize}
 \end{futurebox}
+
+\section{Conclusion}
+This project has been successful in implementing a novel, usable \& performant kind of embedded database that has not previously existed.
+There remain significant opportunities to improve performance, both through optimising the current operator and table implementation, 
+and by improving logical optimisations (most importantly incremental view maintenance). This will be aided by the simple, modular \& easy 
+to use design of the emDB compiler.

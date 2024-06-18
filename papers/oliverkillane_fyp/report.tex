@@ -76,16 +76,17 @@ parameterized queries is known at application compile time.
 \\ No existing embedded databases take advantage of this knowledge for
 logical optimisation. The goal of this project is to build one that does.
 \\
-\\ The main outcome of this project is \emdb: a prototype embedded
-database compiler that generates the optimised code for a data store from a
-schema and queries.
+\\ The main outcome of this project is \emdb: an embedded
+database compiler wrapped in a procedural macro that generates the code for a 
+data store from a schema and queries, and achieves significant performance 
+improvements over SQLite and DuckDB on a selection of queries.
 \\[2cm]
 \centerline{\textbf{Acknowledgements}}
 \noindent
-I would like to thank my suprvisor, Dr. Holger Pirk, for his willingness to
+I would like to thank my supervisor, Dr. Holger Pirk, for his willingness to
 supervise my wild idea, and for his teaching of the data processing module
-that inspired it. I would also like to thank my friends, family,and the staff of Imperial
-College for enabling me to persue my passion in computer science.
+that inspired it. I would also like to thank my friends, family, and the staff of Imperial
+College for enabling me to pursue my passion in computer science.
 \\
 \\ Finally I would like to thank the public at large for not implementing
 this project before I could.
@@ -94,12 +95,6 @@ this project before I could.
 \noindent
 The code the project, documentation and this report can be found at \github{https://github.com/OliverKillane/emDB}{OliverKillane/emDB}
 \pagebreak
-
-
-% TODO:
-% 1. explanation of graphs
-% 2. generate graphs for each benchmark
-% 3. build timings
 
 \tableofcontents
 % \listoffigures

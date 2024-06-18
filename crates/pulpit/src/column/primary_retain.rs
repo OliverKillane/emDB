@@ -103,7 +103,7 @@ pub struct PrimaryRetain<ImmData, MutData, const BLOCK_SIZE: usize> {
 /// ## Concurrency Safe Marker for Key Type
 /// As we use the pointer as a generation counter, and only access using it once
 /// we have matched the generation, it is safe to share these.
-pub struct PtrGen<ImmData>(*const ImmData);
+pub struct PtrGen<ImmData>(pub *const ImmData);
 
 impl<ImmData> Clone for PtrGen<ImmData> {
     fn clone(&self) -> Self {

@@ -16,22 +16,19 @@ use divan;
 // static ALLOC: divan::AllocProfiler = divan::AllocProfiler::system();
 
 trait Operate {
-    fn op<I,O>(values: Vec<I>, f: impl Fn(I) -> O) -> Vec<O>;
+    fn op<I, O>(values: Vec<I>, f: impl Fn(I) -> O) -> Vec<O>;
 }
 
 struct Iters;
 impl Operate for Iters {
-    fn op<I,O>(values: Vec<I>, f: impl Fn(I) -> O) -> Vec<O> {
-        values
-            .into_iter()
-            .map(f)
-            .collect()
+    fn op<I, O>(values: Vec<I>, f: impl Fn(I) -> O) -> Vec<O> {
+        values.into_iter().map(f).collect()
     }
 }
 
 struct Loops;
 impl Operate for Loops {
-    fn op<I,O>(values: Vec<I>, f: impl Fn(I) -> O) -> Vec<O> {
+    fn op<I, O>(values: Vec<I>, f: impl Fn(I) -> O) -> Vec<O> {
         let mut result = Vec::with_capacity(values.len());
         for item in values {
             result.push(f(item));
@@ -47,11 +44,9 @@ impl Operate for Loops {
 )]
 fn comparison<T: Operate, const SIZE: usize>(bencher: divan::Bencher) {
     bencher
-        .with_inputs(|| (0..SIZE).map(|i| (i,i)).collect::<Vec<_>>())
+        .with_inputs(|| (0..SIZE).map(|i| (i, i)).collect::<Vec<_>>())
         .bench_local_values(|r| T::op(r, |(x, y)| x + y));
 }
-
-
 
 fn main() {
     divan::main()

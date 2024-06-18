@@ -17,7 +17,6 @@ impl Datastore for DuckDB {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(
             "
-            SET threads = 1;
             CREATE TABLE logs (
                 timestamp INTEGER, 
                 comment TEXT, 
@@ -43,7 +42,8 @@ impl<'imm> Database<'imm> for DuckDBDatabase<'imm> {
         comment: Option<String>,
         log_level: crate::data_logs::LogLevel,
     ) {
-        self.conn
+        let rows = self
+            .conn
             .prepare_cached("INSERT INTO logs (timestamp, comment, level) VALUES (?, ?, ?);")
             .unwrap()
             .execute(params![
@@ -56,6 +56,7 @@ impl<'imm> Database<'imm> for DuckDBDatabase<'imm> {
                 }
             ])
             .unwrap();
+        assert_eq!(rows, 1);
     }
 
     fn get_errors_per_minute(&self) -> Vec<(usize, usize)> {

@@ -1,7 +1,7 @@
 \chapter{Related Work}
 \section{Embedded Databases}
 \subsection{DuckDB}
-DuckDB is an in-memory, embedded, columnar, OLAP Database\cite{DuckDBPaper} developed as a successor to MonetDBLite\cite{MonetDBLitePaper} in the embedable database OLAP niche.
+DuckDB is an in-memory, embedded, columnar, OLAP Database\cite{DuckDBPaper} developed as a successor to MonetDBLite\cite{MonetDBLitePaper} in the embeddable database OLAP niche.
 \begin{center}
     \begin{tabular}{l p{.8\textwidth}}
         \textbf{Embedable}         & The database is a single file with no dependencies, and is easily embeddable in and usable from applications written in Python, R, Java, Julia, Swift and Rust\cite{DuckDBDocs}. \\
@@ -9,16 +9,18 @@ DuckDB is an in-memory, embedded, columnar, OLAP Database\cite{DuckDBPaper} deve
         \textbf{Extensible}        & DuckDB supports loadable WASM extensions.                                                                                                                                        \\
         \textbf{Language Agnostic} & DuckDB communicates through the C-ABI and uses its heap, as a result it cannot take advantage of language/compiler specifics (e.g. data representation).                         \\
         \textbf{Columnar}          & To better support OLAP access patterns. This hurts OLTP performance, which is better suited to a nary storage, furthermore the only supported indexes are zonemaps/min-max
-        indexes and adaptive radix trees. Neither offer lookup performance comparable to hash indecies, or indexed arenas as demonstrated in \ref{sec:intro_experimentation}.                                         \\
+        indexes and adaptive radix trees. Neither offer lookup performance comparable to hash indices.                                         \\
         \textbf{Concurrency}       & DuckDB uses a combination of optimistic and multiversion concurrency control.                                                                                                    \\
     \end{tabular}
 \end{center}
 \noindent
 \subsubsection{System Design}
 The authors describe the design as \textit{"textbook"}\cite{DuckDBPaper}.
-\begin{center}
+\begin{figure}[h!]
+    \centering
     \includegraphics[scale=1]{related_work/_diagrams/duckdb_system.pdf}
-\end{center}
+    \caption{An overview of the DuckDB system design.}
+\end{figure}
 \subsubsection{Vector Volcano Processing}
 DuckDB uses a \textit{vector volcano} processing model. The interpreter takes a dynamically constructed tree of operators, wherein each operator pulls data from input operators on demand much like with volano processing.
 However instead of pulling individual tuples, \mintinline{Cpp}{DataChunks} are passed, each containing a tuple of column vectors for a row-range of the previous operator's output.
@@ -31,9 +33,11 @@ However instead of pulling individual tuples, \mintinline{Cpp}{DataChunks} are p
 SQlite is a lightweight embedded database\cite{SQLitePaper}, and is currently the most deployed database in the world\cite{SQLiteWebsite}.
 Unlike DuckDB it is designed for OLTP workloads, and as such stores rows in an nary record format.
 \subsubsection{System Design}
-\begin{center}
+\begin{figure}[h!]
+    \centering
     \includegraphics[scale=1]{related_work/_diagrams/sqlite_system.pdf}
-\end{center}
+    \caption{An overview of the SQLite system design.}
+\end{figure}
 
 \subsubsection{Virtual Database Engine Bytecode}
 One of the key elements of SQLite's design is that rather than using traditional physical plan (i.e. trees of operators) it instead uses a simple bytecode, interpreted on the virtual database engine.
@@ -96,13 +100,15 @@ By using the known types of fixed-length tuples, and accessing through direct re
 \\
 \\ HIQUE also uses a Partitioned Attributed Across (PAX) record layout\cite{PAXStorageModel} that stores fixed size ranges of rows as a tuples of column vectors, this provides the row lookup advantages of nary stprage (all items of a given row are stored in the same page, requiring at most of page load for access), as well as the better cache performance of columnar storage (allowing simple linear scans over columns). This is conceptually similar to the \mintinline{Cpp}{DataChunks} abstraction used by DuckDB.
 \subsubsection{System Design}
-\begin{center}
+\begin{figure}[h!]
+    \centering
     \includegraphics[scale=1]{related_work/_diagrams/HIQUE_system.pdf}
-\end{center}
+    \caption{An overview of the HIQUE system design.}
+\end{figure}
 \subsubsection{Relevance to emdb}
 The cost of using a full C++ compiler at compile time is the only major downside to the many upsides of generating high-level code.
 \\
-\\ By lifting query compilation to the application's compile time, the same benefits can be achieved with emdb, without needing to do any query compilation work at runtime.
+\\ By lifting query compilation to the application's compile time, the same benefits can be achieved with emDB, without needing to do any query compilation work at runtime.
 \\
 \\ The only performance downside of this is that chip-specific parameters (e.g. cache sizes) are only available when the binary is run, if it compiled for an architecture in general, rather than for the exact chip of the machine the application will run on.
 
@@ -122,19 +128,26 @@ relation mutation).
 \\ A restricted set of conditionals \& functions are supported, and external functions are possible (depending on backend used).
 
 \subsubsection{System Design}
-\begin{center}
+\begin{figure}[h!]
+    \centering
     \includegraphics[scale=1]{related_work/_diagrams/dbtoaster_system.pdf}
-\end{center}
-One of the key advantages for DToaster is that the code generated is easily embeddable in applications, which provides the same advantages as discussed in \ref{sec:intro_experimentation}.
+    \caption{An overview of the DBToaster system design.}
+\end{figure}
+One of the key advantages for DBToaster is that the code generated is easily embeddable in applications, which provides the same advantages as discussed in \ref{sec:intro_experimentation}.
 
 \subsubsection{Aggregation Calculus}
 DBToaster lifts queries parsed from SQL and represented by a simplified relational algebra into its own aggregation calculus (AGCA). AGCA represents data through generalized multiset relations (GMRs) which are mappings from the set of tuples to the multiplicites of those tuples in relations.
-\begin{center}
+\begin{figure}[h!]
+    \centering
+    
     \includegraphics[scale=1]{related_work/_diagrams/dbtoaster_agca_syntax.pdf}
-\end{center}
-\begin{center}
+    \caption{DBToaster AGCA syntax.}
+\end{figure}
+\begin{figure}[h!]
+    \centering
     \includegraphics[scale=1]{related_work/_diagrams/dbtoaster_agca_eval_gmrs.pdf}
-\end{center}
+    \caption{DBToaster AGCA Generalised Multiset Relations.}
+\end{figure}
 Evaluation rules for the language are provided in the paper \textit{DBToaster: Higher-order Delta Processing for Dynamic, Frequently Fresh Views}\cite{DBToasterHigherOrderDeltaProcessing} and are ommitted for brevity.
 \\
 \\ SQL translation is done by converting to relational algebra (with bag semantics), upon which operations can be reduced to union ($+$) and join ($\bowtie$) by judicial allowance for infinite relations. For example $\sigma_{A<B}(R)$ is rewritten as $R \bowtie (A < B)$ despite $A < B$ being an infinitely large set of possible tuples.

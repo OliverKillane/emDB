@@ -337,9 +337,9 @@ impl TableConfig {
 
         fn random_range(rng: &mut ThreadRng, bottom: usize, top: usize) -> usize {
             if top == bottom {
-                return top;
+                top
             } else {
-                return rng.gen_range(bottom..=top);
+                rng.gen_range(bottom..=top)
             }
         }
 

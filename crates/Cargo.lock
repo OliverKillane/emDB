@@ -354,6 +354,7 @@ version = "0.1.0"
 dependencies = [
  "divan",
  "rayon",
+ "rustc-hash",
 ]
 
 [[package]]
@@ -458,6 +459,7 @@ dependencies = [
  "pulpit_gen",
  "pulpit_macro",
  "quote 1.0.36",
+ "rustc-hash",
  "syn 2.0.65",
  "thunderdome",
  "trybuild",
@@ -578,6 +580,12 @@ name = "regex-lite"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30b661b2f27137bdbc16f00eda72866a92bb28af1753ffbd56744fb6e2e9cd8e"
+
+[[package]]
+name = "rustc-hash"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 
 [[package]]
 name = "rustc_version"

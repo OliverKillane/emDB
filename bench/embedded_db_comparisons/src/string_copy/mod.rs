@@ -39,8 +39,7 @@ emql! {
     }
 }
 
-
-emql!{
+emql! {
     impl emdb_ref_ignore_impl as Serialized{
         interface = copy_string,
         pub = on,
@@ -75,8 +74,6 @@ emql!{
     }
 }
 
-
-
 pub fn populate_database<DS: copy_string::Datastore>(values: usize, str_len: usize) -> DS {
     let mut ds = DS::new();
     {
@@ -85,7 +82,7 @@ pub fn populate_database<DS: copy_string::Datastore>(values: usize, str_len: usi
         for _ in 0..values {
             let mut s = String::with_capacity(str_len);
             for _ in 0..str_len {
-                s.push('a' as char);
+                s.push('a');
             }
             db.add_string(s);
         }

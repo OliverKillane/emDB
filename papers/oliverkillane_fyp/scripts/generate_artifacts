@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# A basic bash file for regenerating the artifacts needed for generating the pdf 
+# for the project.
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+OUT_FILE='data.json'
+FYP_DIR=$SCRIPT_DIR/..
+BENCH_DIR=$FYP_DIR/../../bench
+CRATES_DIR=$FYP_DIR/../../crates
+BENCH_DATA_DIR=$FYP_DIR/bench_data
+GRAPH_DIR=$FYP_DIR/_graphs
+
+set -x
+
+cd $SCRIPT_DIR
+python3.10 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+
+cd $BENCH_DIR
+DIVAN_WRITE_FILE=$OUT_FILE cargo bench
+
+cd $CRATES_DIR
+DIVAN_WRITE_FILE=$OUT_FILE cargo bench
+
+cd $FYP_DIR
+./scripts/convert_drawio
+./scripts/bench --workspace $CRATES_DIR --output-dir $BENCH_DATA_DIR
+./scripts/bench --workspace $BENCH_DIR --output-dir $BENCH_DATA_DIR
+./scripts/graphs --input-dir $BENCH_DATA_DIR --output-dir $GRAPH_DIR --script=all

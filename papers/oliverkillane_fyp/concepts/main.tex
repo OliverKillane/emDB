@@ -72,7 +72,7 @@ Keys to data structures that allow deletions require checks that append only dat
 \begin{enumerate}
     \setlength\itemsep{0em}
     \item If the database supports queries returning stable row references / \mintinline{SQL}{rowid}, if there are no deletions then no additional data is required other than an index (which can be used to lookup the table), versus requiring a generation count and generation check for tables supporting deletion. DuckDB supports returning unsatble \mintinline{SQL}{rowid} (row ids for deleted rows may be later reused)\cite{DuckDBRowid}, SQLite supports stable \mintinline{SQL}{rowid} if the table has an \mintinline{SQL}{INTEGER PRIMARY KEY} for rowid tables\cite{SQLiteRowIDTables}.   
-    \item If the database is using immutable value optimisation\ref{sec:mut_opt}, the lack of deletion operations can inform the choice of data structure \& hence the type of reference. 
+    \item If the database is using immutable value optimisation (\ref{sec:mut_opt}), the lack of deletion operations can inform the choice of data structure \& hence the type of reference. 
     \item Negligable cost of checking for free slots in a table can be removed, only need to append.
 \end{enumerate}
 
@@ -121,7 +121,7 @@ The aim of incremental view maintenance is to support views on data that \textbf
 \end{figure}
 \noindent
 The cost reduction from recomputing operators to recomputing the deltas of operators can also be applied recursively. 
-DBToaster\ref{sec:db_toaster} generates IVM C++ code for a schema of select queries and input streams. As a 
+DBToaster (\ref{sec:db_toaster}) generates IVM C++ code for a schema of select queries and input streams. As a 
 result it cannot support complex mutation:
 \begin{minted}{SQL}
 UPDATE .. WHERE ( COMPLEX EXPRESSION )

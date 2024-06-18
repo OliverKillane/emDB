@@ -12,7 +12,7 @@ def do(bench_dir: Path, output_dir: Path) -> None:
     processed_data = process_data(data)
     
     dataframes = split_dataframe(processed_data, 3)
-        
+    dataframes.reverse()
     for index, frame in enumerate(dataframes):
         plt = plot_rates_separate_lines(frame, include_legend=index==0)
         plt.savefig(output_dir / f"{bench_name}_{index}.pgf", backend="pgf")
