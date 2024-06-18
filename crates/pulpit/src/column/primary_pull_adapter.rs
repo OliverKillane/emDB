@@ -167,13 +167,13 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> {
     type Col = PrimaryPullAdapter;
 
     #[inline(always)]
-    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, ()> {
+    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, &()> {
         let index = self.inner.gen.lookup_key(key)?;
         Ok(Entry {
             index,
             data: Data {
                 imm_data: (),
-                mut_data: (),
+                mut_data: &(),
             },
         })
     }

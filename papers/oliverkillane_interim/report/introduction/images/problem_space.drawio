@@ -1,0 +1,101 @@
+<mxfile host="65bd71144e">
+    <diagram id="unF_wlMiWg0aBAhUbvfF" name="Page-1">
+        <mxGraphModel dx="560" dy="2286" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="9" value="Abstraction" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="90" y="110" width="680" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="26" value="" style="endArrow=none;html=1;exitX=0;exitY=0;exitDx=0;exitDy=0;" parent="1" source="28" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="10" y="80" as="sourcePoint"/>
+                        <mxPoint x="770" y="80" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="27" value="Relational Algebra + ACID" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="620" y="80" width="150" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="28" value="No abstraction above a general purpose language (e.g. C++)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="90" y="80" width="170" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="29" value="Data Management Abstractions in A General Purpose Language" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="302.5" y="80" width="175" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="30" value="Manual Implementation" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="105" y="60" width="140" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="56" style="edgeStyle=none;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fontSize=8;startArrow=baseDash;startFill=0;endArrow=baseDash;endFill=0;" parent="1" source="31" target="34" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="31" value="DataFrames" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="450" y="60" width="70" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="32" value="In-Memory LINQ" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="330" y="30" width="70" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="34" value="Embedded DataBases" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="640" y="60" width="130" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="39" style="edgeStyle=none;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;fontSize=8;" parent="1" source="36" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="190" y="125" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="36" value="Burden of implementation's correctness &amp;amp; performance on the programmer" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=2" parent="1" vertex="1">
+                    <mxGeometry x="250" y="110" width="130" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="40" style="edgeStyle=none;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;fontSize=8;" parent="1" source="37" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="677.5" y="125" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="37" value="Implementation hidden by strong abstraction managing concurrency, consistency &amp;amp; atomicity.&amp;nbsp;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=2" parent="1" vertex="1">
+                    <mxGeometry x="477.5" y="110" width="130" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="42" value="DuckDB" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="640" y="35" width="50" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="44" value="SQLite" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="705" y="35" width="50" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="46" value="Full freedom to use any optimisation conceivable by programmer" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=2" parent="1" vertex="1">
+                    <mxGeometry x="110" y="-10" width="130" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="51" value="Pandas" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="405" y="35" width="50" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="52" value="Polars" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="515" y="35" width="50" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="58" value="Limited optimisation of individual queries, but queries can be constructed at application compile time - getting the code generation advantage and&amp;nbsp;&lt;br&gt;compiler provided optimisations for free" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=2" vertex="1" parent="1">
+                    <mxGeometry x="305" y="-20" width="190" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="59" value="interface for a dbms engine, which has no knowledge of the semantics of the program it is embedded in" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=2" vertex="1" parent="1">
+                    <mxGeometry x="510" y="-10" width="140" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="61" style="edgeStyle=none;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;fontSize=8;" edge="1" parent="1" source="60" target="59">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="60" value="a design feature to support multiple languages &amp;amp; independent CLIs" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=2" vertex="1" parent="1">
+                    <mxGeometry x="665" y="-10" width="130" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="62" value="" style="shape=curlyBracket;whiteSpace=wrap;html=1;rounded=1;flipH=1;labelPosition=right;verticalLabelPosition=middle;align=left;verticalAlign=middle;fontSize=8;rotation=-90;" vertex="1" parent="1">
+                    <mxGeometry x="625" y="-90" width="20" height="240" as="geometry"/>
+                </mxCell>
+                <mxCell id="63" value="" style="shape=curlyBracket;whiteSpace=wrap;html=1;rounded=1;flipH=1;labelPosition=right;verticalLabelPosition=middle;align=left;verticalAlign=middle;fontSize=8;rotation=-90;" vertex="1" parent="1">
+                    <mxGeometry x="390" y="-55" width="20" height="170" as="geometry"/>
+                </mxCell>
+                <mxCell id="64" value="Embeddable Data Stores" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1" vertex="1" parent="1">
+                    <mxGeometry x="90" y="-50" width="680" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="65" value="Can use knowledge of all queries to optimise and make data structure decisions." style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=2" vertex="1" parent="1">
+                    <mxGeometry x="110" y="25" width="130" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="66" value="ArcticDB" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="575" y="35" width="50" height="20" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

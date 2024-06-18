@@ -1,0 +1,91 @@
+<mxfile host="65bd71144e">
+    <diagram id="i5sK2yK4htf3sO6do5VU" name="Page-1">
+        <mxGraphModel dx="1452" dy="2208" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;strokeWidth=2;" parent="1" source="XSlXfkg2FwHnw0k_7yCL-2" target="XSlXfkg2FwHnw0k_7yCL-3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-2" value="" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12.410268930288446;" parent="1" vertex="1">
+                    <mxGeometry x="230" y="20" width="60" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-3" value="" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=16.48147696035879;" parent="1" vertex="1">
+                    <mxGeometry x="390" y="15" width="150" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-10" value="" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="20" width="90" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-15" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;" parent="1" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="120" y="60" as="sourcePoint"/>
+                        <mxPoint x="230" y="59.849999999999994" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-16" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;" parent="1" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="120" y="80" as="sourcePoint"/>
+                        <mxPoint x="230" y="80.00000000000003" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-17" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;" parent="1" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="120" y="40" as="sourcePoint"/>
+                        <mxPoint x="230" y="40" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-18" value="Delta" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="230" y="105" width="60" height="15" as="geometry"/>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-19" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;" parent="1" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="-10" y="20" as="sourcePoint"/>
+                        <mxPoint x="30" y="40.00000000000002" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-20" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;" parent="1" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="-30" y="60" as="sourcePoint"/>
+                        <mxPoint x="30" y="59.85" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-21" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;" parent="1" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="-10" y="100" as="sourcePoint"/>
+                        <mxPoint x="30" y="80.00000000000003" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-23" value="Main" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="435" y="105" width="60" height="15" as="geometry"/>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-24" value="Service" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="45" y="105" width="60" height="15" as="geometry"/>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-26" value="Large long-term database optimised for low cost disk storage. Needs to allow for schema changes and ad-hoc queries." style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;rounded=0;fontStyle=2;fontSize=8;" parent="1" vertex="1">
+                    <mxGeometry x="388.75" y="120" width="152.5" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-27" value="Fast intermediary database periodically flushed to &lt;b&gt;main&lt;/b&gt;. Recieves the same set of parameterized queries from the &lt;b&gt;service&lt;/b&gt;. Needs to be performant and available." style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;rounded=0;fontStyle=2;fontSize=8;" parent="1" vertex="1">
+                    <mxGeometry x="155" y="120" width="210" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-28" value="Wraps access to the database to provide a protocol to serve clients, process data.&amp;nbsp;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;rounded=0;fontStyle=2;fontSize=8;" parent="1" vertex="1">
+                    <mxGeometry x="10" y="120" width="130" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-30" value="schema changes require upgrading services" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=2" parent="1" vertex="1">
+                    <mxGeometry x="215" y="-10" width="90" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-31" value="periodic &amp;amp; high &lt;br&gt;throughput" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=2" parent="1" vertex="1">
+                    <mxGeometry x="310" y="60" width="60" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="XSlXfkg2FwHnw0k_7yCL-32" value="low latency &amp;amp; &lt;br&gt;high throughput" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=2" parent="1" vertex="1">
+                    <mxGeometry x="145" y="80" width="70" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="Latency cost of network connection" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#FF0000;fontSize=8;" vertex="1" parent="1">
+                    <mxGeometry x="130" y="10" width="85" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" value="Delta does not use knowledge of all possible parameterized queries&amp;nbsp;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#FF0000;fontSize=8;" vertex="1" parent="1">
+                    <mxGeometry x="290" y="20" width="100" height="30" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

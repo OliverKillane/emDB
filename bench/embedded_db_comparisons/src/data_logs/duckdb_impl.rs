@@ -42,7 +42,8 @@ impl<'imm> Database<'imm> for DuckDBDatabase<'imm> {
         comment: Option<String>,
         log_level: crate::data_logs::LogLevel,
     ) {
-        self.conn
+        let rows = self
+            .conn
             .prepare_cached("INSERT INTO logs (timestamp, comment, level) VALUES (?, ?, ?);")
             .unwrap()
             .execute(params![
@@ -55,6 +56,7 @@ impl<'imm> Database<'imm> for DuckDBDatabase<'imm> {
                 }
             ])
             .unwrap();
+        assert_eq!(rows, 1);
     }
 
     fn get_errors_per_minute(&self) -> Vec<(usize, usize)> {
@@ -100,11 +102,7 @@ impl<'imm> Database<'imm> for DuckDBDatabase<'imm> {
             .unwrap()
     }
 
-    fn get_comment_summaries(
-        &self,
-        time_start: usize,
-        time_end: usize,
-    ) -> Vec<(String, usize)> {
+    fn get_comment_summaries(&self, time_start: usize, time_end: usize) -> Vec<(String, usize)> {
         self.conn
             .prepare_cached(
                 "

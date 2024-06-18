@@ -13,8 +13,8 @@
 //! ## Correct Design
 //! To save dev time: just `get` the value (cringe but easy).
 
-use std::{collections::HashMap, hash::Hash};
-
+use rustc_hash::FxHashMap;
+use std::hash::{BuildHasherDefault, Hash};
 #[derive(Debug)]
 pub struct MissingUniqueValue;
 #[derive(Debug)]
@@ -23,13 +23,13 @@ pub struct UniqueConflict;
 /// A simple wrapper for storing copies of keys and associated unique values in
 /// an index.
 pub struct Unique<Field, Key> {
-    mapping: HashMap<Field, Key>,
+    mapping: FxHashMap<Field, Key>,
 }
 
 impl<Field: Eq + Hash + Clone, Key: Copy + Eq> Unique<Field, Key> {
     pub fn new(size_hint: usize) -> Self {
         Self {
-            mapping: HashMap::with_capacity(size_hint),
+            mapping: FxHashMap::with_capacity_and_hasher(size_hint, BuildHasherDefault::default()),
         }
     }
 
@@ -90,12 +90,3 @@ impl<Field: Eq + Hash + Clone, Key: Copy + Eq> Unique<Field, Key> {
         debug_assert!(res.is_none(), "Undo replace failed");
     }
 }
-
-/*
-if !self.additionals.<unique_name>.replace(&update.fields, &<brw_mut_field>) {
-}
-
-// to reverse
-self.additionals.<unique_name>.replace(&mut <unique_name>, &update.fields)
-
-*/

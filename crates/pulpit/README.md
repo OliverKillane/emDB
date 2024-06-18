@@ -29,7 +29,8 @@ let mut window_2 = table.window();
 ## Macro Interface
 Macros to generate table implementations (using associateds, with indexes, tracked with a transaction log) are included.
 
-```rust
+*TODO: The below example causes a rustc segfault as of rustc 1.80.0-nightly (032af18af 2024-06-02)*
+```rust,ignore
 #[allow(dead_code)]
 #[derive(Clone)]
 enum RGB {
@@ -47,6 +48,9 @@ pulpit::macros::simple! {
     },
     updates {
         update_age: [age],
+    },
+    gets {
+        get_all: [name, id, age, fav_rgb_colour],
     },
     predicates {
         adults_only: *age > 18,

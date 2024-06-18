@@ -2,7 +2,11 @@
 //! Provides functions for determining the structure of the [`crate::table::Table`] chosen.
 
 use crate::{
-    limit::Limit, operations::update::Update, predicates::Predicate, table::Table, uniques::Unique,
+    limit::Limit,
+    operations::{get::Get, update::Update},
+    predicates::Predicate,
+    table::Table,
+    uniques::Unique,
 };
 use quote_debug::Tokens;
 use std::collections::HashMap;
@@ -14,6 +18,7 @@ pub struct SelectOperations {
     pub deletions: bool,
     pub fields: HashMap<Ident, Tokens<Type>>,
     pub uniques: Vec<Unique>,
+    pub gets: Vec<Get>,
     pub predicates: Vec<Predicate>,
     pub updates: Vec<Update>,
     pub limit: Option<Limit>,
@@ -24,6 +29,10 @@ mod mutability;
 pub use mutability::MutabilitySelector;
 mod thunderdome;
 pub use thunderdome::ThunderdomeSelector;
+mod copy;
+pub use copy::*;
+mod columnar;
+pub use columnar::*;
 
 #[enumtrait::store(selector_impl_trait)]
 pub trait SelectorImpl {
@@ -36,6 +45,10 @@ pub trait SelectorImpl {
 pub enum TableSelectors {
     MutabilitySelector,
     ThunderdomeSelector,
+    ColumnarSelector,
+
+    // For Benchmarks
+    CopySelector,
 }
 
 #[enumtrait::impl_trait(selector_impl_trait for table_selector_enum)]
@@ -52,17 +65,17 @@ mod utils {
         operations::update::Update,
     };
 
+    pub fn convert_fields(fields: HashMap<Ident, Tokens<Type>>) -> Vec<Field> {
+        fields
+            .into_iter()
+            .map(|(name, ty)| Field { name, ty })
+            .collect()
+    }
+
     pub fn determine_mutability(
         updates: &[Update],
         mut fields: HashMap<Ident, Tokens<Type>>,
     ) -> MutImmut<Vec<Field>> {
-        fn convert_fields(fields: HashMap<Ident, Tokens<Type>>) -> Vec<Field> {
-            fields
-                .into_iter()
-                .map(|(name, ty)| Field { name, ty })
-                .collect()
-        }
-
         let mut mut_fields = HashMap::new();
         for Update {
             fields: update_fields,

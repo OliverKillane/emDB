@@ -187,6 +187,10 @@ mod primary_thunderdome;
 pub use primary_thunderdome::*;
 mod primary_thunderdome_trans;
 pub use primary_thunderdome_trans::*;
+mod assoc_app_vec;
+pub use assoc_app_vec::*;
+mod assoc_pull_blocks;
+pub use assoc_pull_blocks::*;
 
 /// A single window type holding a mutable references through which windows for
 /// columns and primary indexes can be generated.
@@ -216,6 +220,15 @@ pub type UnsafeIndex = usize;
 pub struct Data<ImmData, MutData> {
     pub imm_data: ImmData,
     pub mut_data: MutData,
+}
+
+impl<'brw, ImmData, MutData: Clone> Data<ImmData, &'brw MutData> {
+    pub fn extract(self) -> Data<ImmData, MutData> {
+        Data {
+            imm_data: self.imm_data,
+            mut_data: self.mut_data.clone(),
+        }
+    }
 }
 
 impl<ImmData, MutData> Data<ImmData, MutData> {
@@ -260,7 +273,13 @@ pub trait PrimaryWindow<'imm, ImmData, MutData> {
     /// does not need the `'imm` lifetime parameter)
     type Col: Keyable + Column;
 
-    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, MutData>;
+    /// Get provides values to the user. If the immutable data can be optimised it is done so
+    /// and returned wrapped in the [`PrimaryWindow::ImmGet`].
+    ///
+    /// Mutable data is returned as a borrow, to allow the user to copy the data in the
+    /// most efficient way.
+    /// - For example ignoring copying some fields.
+    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, &MutData>;
     fn brw(&self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &MutData>;
     fn brw_mut(&mut self, key: <Self::Col as Keyable>::Key) -> Access<&ImmData, &mut MutData>;
 
@@ -340,7 +359,7 @@ pub trait AssocWindow<'imm, ImmData, MutData> {
     /// # Safety
     /// - No bounds checks applied
     /// - index assumed to be in valid state
-    unsafe fn assoc_get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, MutData>;
+    unsafe fn assoc_get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, &MutData>;
 
     /// Borrow a value from an index in the column for a smaller lifetime
     /// - Zero cost, a normal reference.
@@ -572,7 +591,11 @@ mod verif {
                     .expect("Key unexpectedly missing from column");
                 let imm_data = ColWindow::conv_get(entry.data.imm_data);
                 assert_eq!(imm_data, data.imm_data, "Incorrect immutable data");
-                assert_eq!(entry.data.mut_data, data.mut_data, "Incorrect mutable data");
+                assert_eq!(
+                    entry.data.mut_data.clone(),
+                    data.mut_data,
+                    "Incorrect mutable data"
+                );
                 assert_eq!(entry.index, *unsafeindex, "Incorrect index");
             } else {
                 let entry = self.colwindow.get(key);

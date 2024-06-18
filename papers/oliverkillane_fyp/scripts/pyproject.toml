@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[project]
+authors = [
+    { name = "Oliver Killane", email = "ok220@ic.ac.uk" },
+]
+name = "fypscripts"
+version = "0.0.1"
+description = "Basic scripts for generating benchmarks and converting drawio files"
+requires-python = "==3.10.12"
+dependencies = [
+    "pandas==2.2.0",
+    "matplotlib==3.7",
+    "PyQt6==6.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "darker[isort]==1.7.2",
+    "mypy==1.7.1",
+    "pytest==7.4.3",
+    "pandas-stubs==2.1.4.231227",
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+packages = ['src', 'tests']
+
+[tool.darker]
+src = ["src"]
+revision = "master"
+isort = true
+line-length = 80

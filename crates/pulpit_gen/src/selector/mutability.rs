@@ -21,6 +21,7 @@ impl SelectorImpl for MutabilitySelector {
             deletions,
             fields,
             uniques,
+            gets,
             predicates,
             updates,
             public,
@@ -37,10 +38,10 @@ impl SelectorImpl for MutabilitySelector {
                     PrimaryThunderdome.into()
                 }
             } else {
-                PrimaryRetain { block_size: 1024 }.into()
+                PrimaryRetain { block_size: 4096 }.into()
             }
         } else {
-            AssocBlocks { block_size: 1024 }.into()
+            AssocBlocks { block_size: 4096 }.into()
         };
 
         Table {
@@ -55,6 +56,7 @@ impl SelectorImpl for MutabilitySelector {
             uniques,
             predicates,
             updates,
+            gets,
             limit,
             name,
             transactions,

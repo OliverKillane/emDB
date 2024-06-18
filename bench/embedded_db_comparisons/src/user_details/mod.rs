@@ -10,29 +10,11 @@ emql! {
     impl user_details as Interface{
         pub = on,
     };
-    impl emdb_parallel_impl as Serialized{
+    impl emdb_impl as Serialized{
         interface = user_details,
         pub = on,
-        ds_name = EmDBParallel,
-        op_impl = Parallel,
-    };
-    impl emdb_basic_impl as Serialized{
-        interface = user_details,
-        pub = on,
-        ds_name = EmDBBasic,
-        op_impl = Basic,
-    };
-    impl emdb_iter_impl as Serialized{
-        interface = user_details,
-        pub = on,
-        ds_name = EmDBIter,
+        ds_name = EmDB,
         op_impl = Iter,
-    };
-    impl emdb_chunk_impl as Serialized{
-        interface = user_details,
-        pub = on,
-        ds_name = EmDBChunk,
-        op_impl = Chunk,
     };
 
     // Reasoning:
@@ -92,7 +74,7 @@ emql! {
     //   - Database can see only credits is updated
     query add_credits(user: ref users, creds: i32) {
         row(user_id: ref users = user)
-            ~> deref(user_id as user)
+            ~> deref(user_id as user use credits)
             ~> update(user_id use credits = user.credits + creds);
     }
 
@@ -104,7 +86,7 @@ emql! {
     //   - can be inlined to very simple iterate over &mut and increment sum
     query reward_premium(cred_bonus: f32) {
         ref users as users_ref
-            |> deref(users_ref as it)
+            |> deref(users_ref as it use premium, credits)
             |> filter(*it.premium)
             |> map(users_ref: ref users = users_ref, new_creds: i32 = ((it.credits as f32) * cred_bonus) as i32)
             |> update(users_ref use credits = new_creds)
@@ -137,40 +119,7 @@ pub trait GetNewUserKey: user_details::Datastore {
     ) -> <Self as user_details::Datastore>::users_key;
 }
 
-impl GetNewUserKey for emdb_basic_impl::EmDBBasic {
-    fn new_user_wrap(
-        db: &mut Self::DB<'_>,
-        username: String,
-        prem: bool,
-        start_creds: Option<i32>,
-    ) -> <Self as user_details::Datastore>::users_key {
-        db.new_user(username, prem, start_creds).unwrap().user_id
-    }
-}
-
-impl GetNewUserKey for emdb_parallel_impl::EmDBParallel {
-    fn new_user_wrap(
-        db: &mut Self::DB<'_>,
-        username: String,
-        prem: bool,
-        start_creds: Option<i32>,
-    ) -> <Self as user_details::Datastore>::users_key {
-        db.new_user(username, prem, start_creds).unwrap().user_id
-    }
-}
-
-impl GetNewUserKey for emdb_iter_impl::EmDBIter {
-    fn new_user_wrap(
-        db: &mut Self::DB<'_>,
-        username: String,
-        prem: bool,
-        start_creds: Option<i32>,
-    ) -> <Self as user_details::Datastore>::users_key {
-        db.new_user(username, prem, start_creds).unwrap().user_id
-    }
-}
-
-impl GetNewUserKey for emdb_chunk_impl::EmDBChunk {
+impl GetNewUserKey for emdb_impl::EmDB {
     fn new_user_wrap(
         db: &mut Self::DB<'_>,
         username: String,

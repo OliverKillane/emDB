@@ -6,6 +6,7 @@ pub struct DeRef {
     call: Ident,
     reference: Ident,
     named: Ident,
+    select_fields: Option<Vec<Ident>>
 }
 
 impl EMQLOperator for DeRef {
@@ -16,11 +17,17 @@ impl EMQLOperator for DeRef {
             functional_style(Self::NAME, seqs!(
                 setrepr(getident(), "<field containing ref>"), 
                 matchident("as"), 
-                setrepr(getident(), "<new field to copy row to>"))),
-            |(call, (reference, (_, named)))| DeRef {
+                setrepr(getident(), "<new field to copy row to>"),
+                choices!{
+                    peekident("use") => mapsuc(seq(matchident("use"), listseptrailing(',', getident())), |(_, fields)| Some(fields)),
+                    otherwise => mapsuc(nothing(), |_| None)
+                })
+            ),
+            |(call, (reference, (_, (named, select_fields))))| DeRef {
                 call,
                 reference,
                 named,
+                select_fields
             },
         )
     }
@@ -38,6 +45,7 @@ impl EMQLOperator for DeRef {
             call,
             reference,
             named,
+            select_fields,
         } = self;
 
         if let Some(cont) = cont
@@ -74,7 +82,8 @@ impl EMQLOperator for DeRef {
                             plan::ScalarTypeConc::TableRef(table_id) => {
                                 let table_id_copy = *table_id;
                                 let table_name = lp.get_table(*table_id).name.clone();
-                                let generate_access::DereferenceTypes{outer_record: dt, inner_record} = generate_access::dereference(*table_id, lp, named, data_type.fields)?;                                
+
+                                let generate_access::DereferenceTypes{outer_record: dt, inner_record} = generate_access::dereference(*table_id, lp, named, data_type.fields, select_fields)?;                                
                                 let new_type = plan::Data { fields: dt, stream: data_type.stream };
     
                                 Ok(

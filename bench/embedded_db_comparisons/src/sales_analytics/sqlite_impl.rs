@@ -55,7 +55,12 @@ impl Datastore for SQLite {
                 product_serial UNSIGNED BIG INT,
                 quantity UTINYINT,
                 price UNSIGNED BIG INT,
-                currency INT8 NOT NULL
+                currency INT8 NOT NULL,
+                CONSTRAINT sensible_prices CHECK (
+                    (currency = 1 AND price <= 10000 * 100) OR
+                    (currency = 2 AND price < 20) OR
+                    (currency = 0)  -- No constraint for GBP
+                )
             );
 
             CREATE TABLE customers (

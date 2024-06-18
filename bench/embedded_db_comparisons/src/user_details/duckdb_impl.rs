@@ -13,6 +13,7 @@ impl super::user_details::Datastore for DuckDB {
     type DB<'imm> = Database<'imm>;
     type users_key = usize;
     fn new() -> Self {
+        // See: https://duckdb.org/docs/sql/statements/select.html#row-ids
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(
             "
@@ -40,12 +41,7 @@ impl super::user_details::Datastore for DuckDB {
 
 impl<'imm> super::user_details::Database<'imm> for Database<'imm> {
     type Datastore = DuckDB;
-    fn new_user(
-        &mut self,
-        username: String,
-        prem: bool,
-        start_creds: Option<i32>,
-    ) -> usize {
+    fn new_user(&mut self, username: String, prem: bool, start_creds: Option<i32>) -> usize {
         self.conn
             .prepare_cached(
                 "INSERT INTO users (name, premium, credits) VALUES (?, ?, ?) RETURNING id",
@@ -69,7 +65,8 @@ impl<'imm> super::user_details::Database<'imm> for Database<'imm> {
                 Ok((user_id, row.get(0)?, row.get(1)?, row.get(2)?))
             })
             .optional()
-            .unwrap().ok_or(())
+            .unwrap()
+            .ok_or(())
     }
 
     fn get_snapshot(&self) -> Vec<(usize, String, bool, i32)> {

@@ -42,8 +42,7 @@ fn exchange(btc_rate: f64, usd_rate: f64, price: u64, currency: Currency) -> u64
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-#[derive(Default)]
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
 struct Aggregate {
     clothes: usize,
     electronics: usize,
@@ -51,34 +50,15 @@ struct Aggregate {
     money_spent: u64,
 }
 
-
 emql! {
     impl sales_analytics as Interface{
         pub = on,
     };
-    impl emdb_parallel_impl as Serialized{
+    impl emdb_impl as Serialized{
         interface = sales_analytics,
         pub = on,
-        ds_name = EmDBParallel,
-        op_impl = Parallel,
-    };
-    impl emdb_basic_impl as Serialized{
-        interface = sales_analytics,
-        pub = on,
-        ds_name = EmDBBasic,
-        op_impl = Basic,
-    };
-    impl emdb_iter_impl as Serialized{
-        interface = sales_analytics,
-        pub = on,
-        ds_name = EmDBIter,
+        ds_name = EmDB,
         op_impl = Iter,
-    };
-    impl emdb_chunk_impl as Serialized{
-        interface = sales_analytics,
-        pub = on,
-        ds_name = EmDBChunk,
-        op_impl = Chunk,
     };
 
     table products {
@@ -111,6 +91,7 @@ emql! {
     table old_customers {
         reference: usize,
     }
+
 
     // Basic queries for data population =======================================
     query new_customer(
@@ -182,7 +163,7 @@ emql! {
                     |> filter(**customer_reference == cust_ref_outer)
                     |> let customer_purchases;
 
-                use products |> let all_prods;
+                use products as (serial, category) |> let all_prods;
 
                 join(use all_prods [inner equi(serial = product_serial)] use customer_purchases)
                     |> map(result: crate::sales_analytics::Aggregate = {
@@ -197,7 +178,12 @@ emql! {
                             clothes,
                             electronics,
                             food,
-                            money_spent: (*customer_purchases.quantity as u64) * crate::sales_analytics::exchange(btc_rate, usd_rate, *customer_purchases.price, *customer_purchases.currency),
+                            money_spent: (*customer_purchases.quantity as u64) * crate::sales_analytics::exchange(
+                                btc_rate,
+                                usd_rate,
+                                *customer_purchases.price,
+                                *customer_purchases.currency
+                            ),
                         }
                     })
                     |> combine(use left + right in result[crate::sales_analytics::Aggregate::default()] = [crate::sales_analytics::Aggregate {
@@ -243,8 +229,7 @@ emql! {
     //   Demonstrating aggregation over a large table
     query category_sales(btc_rate: f64, usd_rate: f64) {
         use purchases |> let purchase_data;
-        use products |> let product_data;
-
+        use products as (serial, category) |> let product_data;
         join(use purchase_data [inner equi(product_serial = serial)] use product_data)
             |> map(
                 category: crate::sales_analytics::ProductCategory = *product_data.category,
@@ -336,5 +321,68 @@ impl TableConfig {
             }
         }
         ds
+    }
+
+    pub fn append_database<'imm, DS: sales_analytics::Datastore>(
+        current: &Self,
+        additional: &Self,
+        rng: &mut ThreadRng,
+        db: &mut impl sales_analytics::Database<'imm, Datastore = DS>,
+    ) -> Self {
+        let end = Self {
+            customers: current.customers + additional.customers,
+            sales: current.sales + additional.sales,
+            products: current.products + additional.products,
+        };
+
+        fn random_range(rng: &mut ThreadRng, bottom: usize, top: usize) -> usize {
+            if top == bottom {
+                top
+            } else {
+                rng.gen_range(bottom..=top)
+            }
+        }
+
+        for i in (current.customers)..end.customers {
+            db.new_customer(
+                i,
+                format!("Test Subject {i}"),
+                format!("Address for person {i}"),
+            );
+        }
+
+        for i in current.products..end.products {
+            db.new_product(
+                i,
+                format!("Product {i}"),
+                choose! { rng
+                    1 => ProductCategory::Electronics,
+                    1 => ProductCategory::Clothing,
+                    1 => ProductCategory::Food,
+                },
+            );
+        }
+        for _ in current.sales..end.sales {
+            let currency = choose! { rng
+                1 => Currency::GBP,
+                1 => Currency::USD,
+                1 => Currency::BTC,
+            };
+
+            let price = match currency {
+                Currency::GBP => rng.gen_range(0..100000),
+                Currency::USD => rng.gen_range(0..=10000),
+                Currency::BTC => rng.gen_range(0..20),
+            };
+
+            db.new_sale(
+                random_range(rng, 0, end.customers),
+                random_range(rng, 0, end.products),
+                rng.gen_range(0..10),
+                price,
+                currency,
+            );
+        }
+        end
     }
 }

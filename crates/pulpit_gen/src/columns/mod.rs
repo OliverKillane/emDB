@@ -80,6 +80,7 @@ pub trait ColKind {
             }
             .into(),
             unpacker: quote! {
+                #[inline(always)]
                 pub fn #mod_columns_fn_imm_unpack(#mod_columns_struct_imm { #(#fields),* }: #mod_columns_struct_imm) -> #mod_columns_struct_imm_unpacked {
                     #mod_columns_struct_imm_unpacked { #(#unpack_fields),* }
                 }
@@ -104,6 +105,10 @@ mod assoc_blocks;
 pub use assoc_blocks::*;
 mod primary_thunderdome_trans;
 pub use primary_thunderdome_trans::*;
+mod assoc_app_vec;
+pub use assoc_app_vec::*;
+mod assoc_pull_block;
+pub use assoc_pull_block::*;
 
 #[enumtrait::quick_enum]
 #[enumtrait::quick_from]
@@ -114,6 +119,7 @@ pub enum Primary {
     PrimaryThunderdome,
     PrimaryThunderDomeTrans,
     PrimaryGenArena,
+    AssocAppVec,
 }
 
 #[enumtrait::impl_trait(col_kind_trait for enum_primary)]
@@ -125,6 +131,8 @@ impl ColKind for Primary {}
 pub enum Associated {
     AssocVec,
     AssocBlocks,
+    AssocAppVec,
+    AssocPullBlocks,
 }
 
 #[enumtrait::impl_trait(col_kind_trait for enum_associated)]

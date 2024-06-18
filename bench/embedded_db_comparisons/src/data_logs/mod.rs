@@ -14,29 +14,20 @@ emql! {
     impl data_logs as Interface{
         pub = on,
     };
-    impl emdb_parallel_impl as Serialized{
+    impl emdb_impl as Serialized{
         interface = data_logs,
         pub = on,
-        ds_name = EmDBParallel,
-        op_impl = Parallel,
-    };
-    impl emdb_basic_impl as Serialized{
-        interface = data_logs,
-        pub = on,
-        ds_name = EmDBBasic,
-        op_impl = Basic,
-    };
-    impl emdb_iter_impl as Serialized{
-        interface = data_logs,
-        pub = on,
-        ds_name = EmDBIter,
+        ds_name = EmDB,
+        aggressive_inlining = on,
         op_impl = Iter,
     };
-    impl emdb_chunk_impl as Serialized{
+    impl emdb_columnar_impl as Serialized{
         interface = data_logs,
         pub = on,
-        ds_name = EmDBChunk,
-        op_impl = Chunk,
+        ds_name = EmDBColumnar,
+        aggressive_inlining = on,
+        op_impl = Iter,
+        table_select = Columnar,
     };
 
     table logs {
@@ -63,7 +54,7 @@ emql! {
     //   Requires a large mapping (accellerated by parallelism), and a groupby
     //   aggregation. For demonstrating OLAP performance.
     query get_errors_per_minute() {
-        use logs
+        use logs as (timestamp, level)
             |> filter(*level == crate::data_logs::LogLevel::Error)
             |> map(min: usize = timestamp % 60)
             |> groupby(min for let errors in {
@@ -82,7 +73,7 @@ emql! {
     // Reasoning:
     //   Requires a fast map over a large stream of values, a common OLAP workload.
     query get_comment_summaries(time_start: usize, time_end: usize) {
-        use logs
+        use logs as (comment, timestamp)
             |> filter(**timestamp >= time_start && **timestamp <= time_end && comment.is_some())
             |> map(slice: &'db str = comment.as_ref().unwrap())
             |> map(
@@ -99,7 +90,7 @@ emql! {
     //   A data cleaning workload.
     query demote_error_logs() {
         ref logs as log_ref
-            |> deref(log_ref as log_data)
+            |> deref(log_ref as log_data use level)
             |> update(log_ref use level = (
                 if crate::data_logs::LogLevel::Error == log_data.level {
                     crate::data_logs::LogLevel::Warning
@@ -118,14 +109,15 @@ pub fn populate_table<DS: data_logs::Datastore>(rng: &mut ThreadRng, size: usize
             db.add_event(
                 t,
                 choose! { rng
-                  3 => None,
-                  2 => Some(format!("This is a short {t} string")),
-                  1 => Some(format!("This is a {t} very very very {t} very very {t} very very very {t} long string")),
+                  1 => None,
+                  1 => Some({
+                    random_string(rng)
+                  }),
                 },
                 choose! { rng
                   1 => LogLevel::Error,
                   2 => LogLevel::Warning,
-                  3 => LogLevel::Info,
+                  2 => LogLevel::Info,
                 },
             );
         }
@@ -133,6 +125,16 @@ pub fn populate_table<DS: data_logs::Datastore>(rng: &mut ThreadRng, size: usize
     ds
 }
 
+pub fn random_string(rng: &mut ThreadRng) -> String {
+    let size = rng.gen_range(0..4096);
+    let mut s = String::with_capacity(size);
+    for _ in 0..size {
+        s.push(rng.gen_range(b'a'..=b'z') as char);
+    }
+    s
+}
+
+mod copy_selector_emdb_impl;
 pub mod duckdb_impl;
 pub mod sqlite_impl;
-mod thunderdome_emdb_impl; pub use thunderdome_emdb_impl::*;
+pub use copy_selector_emdb_impl::*;

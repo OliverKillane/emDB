@@ -1,0 +1,475 @@
+\chapter{Evaluation}
+
+\section{Representative Benchmarks}
+To determine the advantage provided by the core concept of the project requires assessing the impact of:
+\begin{enumerate}
+    \setlength\itemsep{0em}
+    \item Optimising table access into returning references.
+    \item Optimising table structures for append only workloads.
+    \item Embedding application logic inside database queries.
+\end{enumerate}
+A direct comparison and evaluation of the specific benefits of code generation is not in the scope of this evaluation.
+While there is clearly a performance advantage to be gained from running native, optimised code (without a runtime cost), emDB
+is implemented with different operators, and is currently running a very simple iterator based backend.
+\\
+\\ Ideally we would use a benchmark considered representative of embedded database workloads,
+and contains schemas for which the 3 features we want to investigate are applicable.
+\subsubsection{TCP-H}
+Covers aggregation as well as concurrent data modification, adherence to specification
+requires either using a separate driver - not easily embedable while adhering to the specification.
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item The benchmark is designed for a persisted business database, so uses all mutations (insert update, delete)
+          which prevents the mutability optimisations that emDB performs,
+          some embedded database workloads are append only, and thus choosing a benchmark that also
+          supports
+    \item Concurrent modification is only possible with the current Serialized emDB backend by placing
+          the entire database behind a RWLock, but TCP-H is designed in part for benchmarking \textit{concurrent data modifications}\cite{TCPHSpec}
+\end{itemize}
+It would be possible to heavily modify TCP-H (data generator linked with benchmarks \& in-memory, on a
+low scale factor with benchmarks including no updates or deletes).
+\\
+\\ However this benchmark would be TCP-H in schema \& queries only (not useful to compare with other TCP-H results)
+and would not be particularly useful in validating the 4 key optimisations implemented without modifying
+the sets of queries used (i.e. TCP-H, but append only).
+
+\subsubsection{H2O.ai Database Benchmark}
+This benchmark is designed for \textit{database like-tools [in] data-science}, and benchmarks aggregations
+using groupby and join on an in-memory dataset\cite{H2Oai}.
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item It is used by, and since 2023 has been maintained by the DuckDb project\cite{DuckDBH2O}, and is used by that project to benchmark DuckDB's
+          aggregations.
+    \item As it is primarily for benchmarking aggregations over dataframes, it does not consider the impact of updates, or extracting
+          data from the database. Meaning it cannot be used to assess append only workloads or returning references.
+\end{itemize}
+\subsubsection{CrossDB Bench}
+Designed by the CrossDB project, the (self advertised) \textit{"fastest embedded database"}\cite{CrossDBWebsite}. The incuded benchmark compares against lmdb and sqlite3.
+\\
+\\ CrossDB is more comparable to a key-value store, and does not support complex operators (SELECT with computation, groupby, join etc.).
+As a result the benchmark benchmarks inserts, deletes, and updates.
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item CrossDB could even be used as a backend for emDB, as emDB's operators are separate from the data storage.
+    \item Despite being integrated into C (schemas are defined with C structs, cursors into tables are directly accessible as part of the API,
+          and reference C types)
+\end{itemize}
+
+\subsubsection{Yahoo Cloud Serving Benchmark}
+A popular and highly configurable set of benchmarks for key-value stores. Much like the CrossDB
+benchmarks, the lack of complex queries means it is not useful in investigating the 3 features.
+
+\subsubsection{Custom Benchmarks}
+Rather than adapting an existing benchmark, designing a new set of test schemas and queries allowed the 3 key features to be targetted.
+Given the popularity of SQLite and DuckDB in the Rust ecosystem, these were the other embedded databases chosen for the comparison.
+\begin{center}
+    \begin{tabular}{r | l | l | l | l |}
+        Embedded Database            & SQLite       & DuckDB    & ExtremeDB & MonetDB/e       \\
+        \hline
+        crates.io All-TIme downloads & $17,780,740$ & $174,602$ & $1,757$   & (not available) \\
+    \end{tabular}
+\end{center}
+Other more popular \textit{embedded databases} were ommitted from the selection as they are more akin
+to transactional key-value stored. The popular \textit{"pure-rust transactional embedded database"} sled\cite{SledRepo}, LmDB\cite{LMDBWebsite} and CrossDB\cite{CrossDBWebsite} were ommitted for this reason.
+\\
+\\ In order to simplify the creation of new benchmarks, emDB includes an \mintinline{rust}{Interface} backend that generates traits that can be consumed and implemented by emDB's \mintinline{rust}{Serialized} backend, or implemented manually (to wrap other databases).
+\begin{futurebox}{Develop a more comprehensive benchmark suite}
+    Given there are no ideal existing suites that mix mutability, and test embedded logic, one will need to be properly developed for emDB (also serving as a higher coverage test suite).
+\end{futurebox}
+
+\section{[Quantitative] Performance}
+\subsection{Benchmark Setup}
+\subsubsection{Compilation}
+All benchmarks were built with the following cargo build profile on \mintinline{bash}{rustc 1.80.0-nightly (032af18af 2024-06-02)}
+\begin{minted}{toml}
+[profile.release]
+lto = "fat"        # Maximum link-time optimisation - important for linking for DuckDB and SQLite 
+codegen-units = 1  # Single codegen unit gives compiler full context of benchmarks for optimisation
+\end{minted}
+Profile guided optimisation was not used in this case as while it is supported by DuckDB and SQLite it cannot be applied as they are built by separate build systems and compilers that do not interact with the \mintinline{bash}{cargo pgo}\cite{Cargopgo} tool.
+\begin{center}
+    \begin{tabular}{l l l }
+        \textbf{Database} & \textbf{Version} & \textbf{Crate}                                                               \\
+        DuckDB            & $0.10.1$         & \mintinline{toml}{duckdb =   { version = "0.10.2", features = ["bundled"] }} \\
+        SQLite            & $3.46.0$         & \mintinline{toml}{rusqlite = { version = "0.31.0", features = ["bundled"] }} \\
+    \end{tabular}
+\end{center}
+Both are build using gcc $11.4.0$ in release mode. Full build configuration used can be found in their associated crates.
+\subsubsection{Benchmarking}
+For each benchmark emDB generates a trait that is manually implemented for DuckDB and SQLite. A single benchmark function is used which takes a generic type implementing the trait.
+\begin{minted}{rust}
+#[divan::bench(
+    name = "benchmark name",
+    types = [EmDB, SQLite, DuckDB],
+    consts = TABLE_SIZES,
+)]
+fn some_benchmark<DS: Datastore, const SCALE_FACTOR: usize>(bencher: Bencher) {
+    // ... benchmark code
+}
+\end{minted}
+\noindent
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item All implementations have freedom of return type (i.e. on failure emDB returns errors, DuckDB and SQLite panic the benchmark).
+    \item Each benchmark runs from a single threaded interface (query must end before another begins) but implementations can use multiple threads.
+    \item \mintinline{rust}{prepare_cached("..query")} is used for the SQLite and DuckDB queries.
+\end{itemize}
+\noindent
+\begin{minipage}{.24\textwidth}
+    \includegraphics{evaluation/_diagrams/graph_notation.pdf}
+\end{minipage}\hfill\begin{minipage}{.76\textwidth}
+    For each benchmark we re-scale the results by the scale factor, and take the inverse (higher is better).
+\end{minipage}
+
+\subsubsection{Hardware}
+All benchmarks were run on a single machine running Ubuntu 22.04.3 LTS on WSL version: 2.1.5.0 (Windows 11) with 12th Gen Intel i7-12800H and 8GB of available memory.
+
+\subsection{Data Logs}
+\subsubsection{Schema}
+Designed to demonstrate the impact of removing large copies (in this case of the \mintinline{rust}{comment} string), for a query on static data (i.e. a typical ETL pattern, loading data into memory and then computing).
+\begin{minted}{rust}
+table logs { timestamp: usize, comment: Option<String>, level: LogLevel }
+pub enum LogLevel { Error, Warning, Info }
+\end{minted}
+Prior to the benchmarks being run, the table is populated with a number of rows equal to the scale factor.
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item \mintinline{rust}{timestamp} is added sequentially up to the scale factor.
+    \item \mintinline{rust}{level} is added randomly, with $20\%$ \mintinline{rust}{LogLevel::Error}, $40\%$ \mintinline{rust}{LogLevel::Warning} and $40\%$ \mintinline{rust}{LogLevel::Info}.
+    \item \mintinline{rust}{comment} is added with $50\%$ \mintinline{rust}{None}, and $50\%$ containing a random string of random (uniformly distributed) lengths from $0$ to $1024$ characters.
+\end{itemize}
+\noindent
+\begin{tabular}{l p{.8\textwidth}}
+    \textbf{Comment Summaries} & For each comment, get the length and the first 30 characters.                            \\
+    \textbf{Errors per minute} & Group each error by its minute, and return the number of error logs.                     \\
+    \textbf{Data Cleaning}     & Demote all \mintinline{rust}{LogLevel::Error} logs to \mintinline{rust}{LogLevel::Warn}. \\
+\end{tabular}
+
+\subsubsection{EmDB Implementations}
+The \mintinline{rust}{NoCopySelector} table implementation selector is enabled for the no-copy emDB
+implementation. It chooses the same column data structures as the default \mintinline{rust}{MutabilitySelector}
+but places all values in the mutable side of the rows.
+\subsubsection{Results}
+\begin{figure}[h!]
+    \centering
+    \vspace{-0.4em}
+    \resizebox{\textwidth}{!}{\input{evaluation/_graphs/data_logs.pgf}}
+    \caption{Data Logs Schema Benchmark Results}
+    \label{fig:data_log_benchmark_results}
+\end{figure}
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item DuckDB scales extremely well over $\approx 33,000$ rows and sees a significant improvement in performance per row. Its is not due to multithreading, or the columnar storage (tested with single thread (same result) and against emDB with the \mintinline{rust}{Columnar} table selector).
+    \item I have not determined the root technique to explain this performance improvement, but suspect large scale factors are amortizing fixed overhead.
+    \item The advantage from returning references for immutable data is significant (over $2\times$ performance improvement for comment summaries).
+    \item  There is significant inefficiency in emDB for scans and table accesses (requires collecting a buffer of row references, and re-checking bounds for each access).  
+\end{itemize}
+\subsection{Sales Analytics}
+\subsubsection{Schema}
+The aim of this benchmark is to demonstrate the performance advantage of embedding logic.
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item The rust compiler can use the context of functions, values passed for queries (exchange rates) in optimisation.
+    \item For the \textit{customer value}, \textit{product customers} and \textit{category sales} queries, random data is added to the tables before the query is run.
+    \item For the \textit{mixed workload} a loop (of scale factor iterations) either runs one of the other 3 workloads (each with probability $12.5\%$), or inserts a single new customer and $10$ more sales ($62.5\%$)
+\end{itemize}
+\begin{minted}{rust}
+table products {
+    serial: usize,
+    name: String, // String of form format!("Product {serial}")
+    category: crate::sales_analytics::ProductCategory,
+} @ [unique(serial) as unique_serial_number]
+
+table purchases {
+    customer_reference: usize,
+    product_serial: usize,
+    quantity: u8,
+    price: u64,
+    currency: crate::sales_analytics::Currency,
+} @ [pred(crate::sales_analytics::validate_price(price, currency)) as sensible_prices]
+
+// We delete old customers, but keep their references
+table current_customers {
+    reference: usize,
+    name: String,     // format!("Test Subject {i}")
+    address: String,  // format!("Address for person {i}")
+} @ [
+    unique(reference) as unique_customer_reference,
+    unique(address) as unique_customer_address,
+    pred(name.len() > 2) as sensible_name,
+    pred(!address.is_empty()) as non_empty_address,
+]
+\end{minted}
+This schema includes several types defined outside the schema by the user, and some functions.
+\begin{minted}{rust}
+pub enum Currency { GBP, USD, BTC }
+struct Aggregate {
+    clothes: usize,
+    electronics: usize,
+    food: usize,
+    money_spent: u64,
+}
+
+/// Validate a proce by the rules: 1. No more than $10k in dollars, 2. Fewer than 20 in BTC
+fn validate_price(price: &u64, currency: &Currency) -> bool {
+    const DECIMAL: u64 = 100;
+    match currency {
+        Currency::GBP => true,
+        Currency::USD => *price <= 10_000 * DECIMAL,
+        Currency::BTC => *price < 20,
+    }
+}
+
+fn exchange(btc_rate: f64, usd_rate: f64, price: u64, currency: Currency) -> u64 {
+    match currency {
+        Currency::GBP => price,
+        Currency::USD => (price as f64 * usd_rate) as u64,
+        Currency::BTC => (price as f64 * btc_rate) as u64,
+    }
+}
+\end{minted}
+\begin{center}
+    \begin{tabular}{l p{.8\textwidth}}
+        \textbf{Customer Value} & Get the total value of a customer's purchases, using the current exchange
+         rate. Additionally get the sum of all products they have purchased in each product category. \\
+        \textbf{Product Customers} & For a given product get for each purchasing customer the customer reference and total spent by the customer on the product. \\
+        \textbf{Category Sales}     &  Get the total sales per category, in the different currencies. \\
+    \end{tabular}
+\end{center}
+\noindent
+The schema also includes a \textbf{Customer Leaving} query, this prevents the emDB database from optimising the \mintinline{rust}{current_customers} table for append only workloads.
+\begin{notesbox}{DuckDB Enums}
+    For the DuckDB implementation \mintinline{SQL}{UTINYINT} instead if \mintinline{rust}{enum}. This is due to a bug in duckDB $0.10.1$ 
+    that causes the allocator to fail on some \mintinline{SQL}{CHECK} constraints using enumerations, which includes the purchase currency constraint.
+    \begin{minted}{rust}
+duckdb::data_t* duckdb::Allocator::AllocateData(duckdb::idx_t): Assertion `size > 0` failed
+    \end{minted}
+\end{notesbox}
+
+\subsubsection{Results}
+\begin{figure}[h!]
+    \centering
+    \vspace{-0.4em}
+    \resizebox{\textwidth}{!}{\input{evaluation/_graphs/sales_analytics.pgf}}
+    \caption{Sales Analytics Schema Benchmark Results}
+    \label{fig:sales_analysis_access_queries}
+\end{figure}
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item EmDB performs well on the mixed workload (includes fast inserts), but has worse performance for the larger scale factors.
+    \item DuckDB improves for large scale factors, as in the previous \textbf{data logs} benchmark.
+    \item SQLite performs well on the \textbf{customer value} groupby and the \textbf{product customers} join, emDB has not optimised these operators, and suffers for it.
+\end{itemize}
+\subsection{User Details}
+\subsubsection{Schema}
+The aim of this benchmark is to demonstrate performance in simpler key-value stores.
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item Include predicates and aggregation (meaning traditional, more optimised key values stores are not applicable).
+    \item Allows access directly to data through row references, and in the case of DuckDB and SQLite a generated unique ID.
+    \item Demonstrates a performance advantage for returning references (for snapshotting the data).
+\end{itemize}
+\begin{minted}{rust}
+table users {
+    name: String, // never updated
+    premium: bool,
+    credits: i32,
+} @ [
+    pred(*premium || *credits > 0) as prem_credits
+]
+\end{minted}
+\subsubsection{Results}
+\begin{figure}[h!]
+    \centering
+    \vspace{-0.4em}
+    \resizebox{\textwidth}{!}{\input{evaluation/_graphs/user_details_0.pgf}}
+    \resizebox{\textwidth}{!}{\input{evaluation/_graphs/user_details_1.pgf}}
+    \caption{User Details Schema Benchmark Results}
+    \label{fig:user_details_benchmark_results}
+\end{figure}
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item This schema benefits from fast lookup of row references, DuckDB's performance is too slow for this to avoid timeout on a sufficient number of iterations.
+    \item EmDB's fast row references are a huge performance advantage for the OLTP queries (getting random ids, random inserts), SQlite's row identifiers have significantly more expensive lookup. DuckDB is only competitive on the larger aggregations (OLAP workloads it was designed for).
+\end{itemize}
+\begin{futurebox}{Parallel Operators}
+    At large scale factors performance could be improved by applying operators in parallel.
+    \begin{itemize}
+        \setlength\itemsep{0em}
+        \item This can be trivially applied to \mintinline{rust}{map}, \mintinline{rust}{filter}, \mintinline{rust}{asset}, \mintinline{rust}{deref}
+        \item The operator interface supports parallel operators through trait bounds on \mintinline{rust}{Send + Sync} data and closures (e.g. closure provided for map).
+        \item A basic rayon\cite{RayonExplainer} based backend is present, however it has poor performance due to being maximally parallel (large number of tasks generated with considerable overhead).
+    \end{itemize}
+\end{futurebox}
+
+\section{[Qualitative] Correctness}
+\subsection{Correctness of Supporting Libraries}
+Very few instances of unsafe code, ensuring normal rust safety guarantees apply.
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item For the unsafe code used in implementing some column data structures, kani\cite{KaniGithub} (a CBMC\cite{DiffBlueCBMC} wrapper) is used to verify abcense of generic bugs.
+    \item No large test suites are present, this is a weakness for logical errors.
+\end{itemize}
+
+\subsection{Correctness of Code Generation}
+With one key exception (accessing secondary columns without bounds checking) no \mintinline{rust}{unsafe} code is generated. Hence normal rust safety guarentees apply (no data races, no undefined behaviour, no use after free, etc.).
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item Normal rust safety guarantees apply to the generated code.
+    \item Wrappers inside emDB's code generation ensure quasi-quotes can be re-parsed as the AST nodes they should represent (only on debug mode for performance).
+    \item The produced code is human readable, a debug write mode is included to divert generated code to separate files for inspection.
+\end{itemize}
+
+The emDB compiler currently compiles with both stable and nightly rust compilers (with improved error diagnostics).
+
+\subsection{Susceptibility to User Error}
+Given emDB allows the user to access internal state safely to immutable values, it is critical to
+prevent bugs in user code mainfesting in difficult to debug issues inside the database.
+\\
+\\ For example, invalid access through an emDB provided reference corrupting memory in a table,
+resulting in a difficult bug manifesting in failures for unrelated queries.
+\\
+\\ The qualification of user provided references with the database lifetime, and the accessibility to
+internal data structures only through the safe query interface limit the exposure to bugs in user code.
+However, there are still three ways in which this can be damaged.
+\begin{enumerate}
+    \setlength\itemsep{0em}
+    \item {
+          \textbf{Use of unsafe code by the user.} \\
+          There is no way to prevent this, and it is clear to the user that they are using unsafe code.
+          }
+    \item {
+          \textbf{Use of a rust soundness hole by the user.} \\
+          This is a rust compiler issue (for example the demonstrations in cve-rs\cite{CVERS})
+          }
+    \item {
+          \textbf{Access to internal database data structures through code embedded in operators.} \\
+          User code substituted to inside the body of a query
+          can access internal variables that are in scope. This is somewhat limited by placing the generation of expressions and closures
+          before the operator implementation, however symbols such as the \mintinline{rust}{__internal_self_alias} used to access internal
+          tables are still in scope.
+          }
+\end{enumerate}
+
+\begin{futurebox}{Barriers to Production Use}
+    A larger test suite is required to ensure no logical errors in the `minister' operator implementations.
+\end{futurebox}
+
+\section{[Quantitative] Compile Time Cost}
+Given the emql proc macro needs to run at compile time, the compile time cost is a significant factor in emDB's usability.
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item Increased compile times delay delay the reporting of error messages by the language server.
+\end{itemize}
+By using cargo's built in compilation timing to produce this.
+\begin{minted}{toml}
+[profile.dev.package.emdb_core]
+opt-level = 3 # Optional additional configuration for maximum proc macro performance
+\end{minted}
+\noindent
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{evaluation/images/recompile.png}
+    \caption{Cargo timings for a recompile on no change of the embedded database comparison benchmarks.}
+    \label{fig:recompile}
+\end{figure}
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{evaluation/images/fresh.png}
+    \caption{Cargo timings for a fresh compilation of the embedded database comparison benchmarks.}
+    \label{fig:freshcompile}
+\end{figure}
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item The initial compile takes significant time, however incremental builds afterward are fast enough for a responsive IDE experience.
+    \item The cost of compiling DuckDB and SQLite is comparably large.
+\end{itemize}
+\begin{futurebox}{Feature gating crates}
+    Improvements to the initial/from fresh compile time can be gained by feature gating unused features included in the emDB crate.
+    \begin{itemize}
+        \item Pulpit table generation macros are included in the emDB crate, for convenience, but are not a requirement to use the emQL macro.
+    \end{itemize}
+\end{futurebox}
+\newpage
+\begin{futurebox}{Improved trait resolution}
+    Trait resolution\cite{TraitSolving} is an expensive operation. The heavy reliance on traits to define parameters for Combi combinators 
+    is therefore a considerable cost to the initial/from fresh compile of emDB.
+    \\
+    \\ Combi is in fact so expensive, that some constructs cannot be compiled by the latest nightly or stable compilers (as of \mintinline{bash}{rustc 1.80.0-nightly (032af18af 2024-06-02)}).
+    \\ (from \github{https://github.com/OliverKillane/emDB/blob/main/crates/pulpit_gen/src/macros/new_simple.rs}{emDB/pulpit\_gen/src/macros/new\_simple}).
+    \begin{minted}{rust}
+        mapall( MustField::new("name", getident),
+        ( DefaultField::new("transactions", on_off, ||false),
+          ( DefaultField::new("deletions", on_off, ||false),
+            ( /* ... singificant nesting of Fields which construct a combinator tree ... */ )
+         )
+       )
+    ).gen(':'),
+    \end{minted}
+    This will hopefully be improved through both performance improvements to rustc and in future the a Chalk-based trait solver.\cite{ChalktraitSolver}
+\end{futurebox}
+
+\section{[Qualitative] Ease of Use}
+\begin{minted}{toml}
+# in rust project `Cargo.toml`
+[dependencies]
+emdb = { git = "https://github.com/OliverKillane/emDB.git" }
+\end{minted}
+emDB generates rust diagnostics, which are already integrated with rust supporting IDEs.
+This is not possible with either SQLite or DuckDB without using a tool like sqlx.
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item The sqlx project contains several database access libraries, including the
+          \mintinline{rust}{sqlx::query!} macro, which connects to a live database to syntax
+          \& semantics check the queries.
+    \item This requires the developer to keep a development database running for access. But also
+          allows sqlx to work with a variety of different databases \& SQL variants.
+    \item sqlx cannot propagate errors back to individual spans inside a query string.
+\end{itemize}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{evaluation/_diagrams/compile_stages.pdf}
+    \caption{Stages of error message generation}
+    \label{fig:error_message_gen}
+\end{figure}
+A significant weakness of emDB is that the correctness of user embedded code depends on the optimisations applied to data structures.
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item Values versus references for items gotten from tables, only known after analyzing all queries and determining the data structure to use.
+    \item Structure selection requires the full context, so no code is generated (and hence user code checked) if there are any emQL semantic or syntactic errors.
+\end{itemize}
+Multiple syntax errors is managed by the Combi library (a part of this project), which allows for multiple syntax errors without error AST nodes, keeping the semantic analysis code relatively simple.
+
+\begin{futurebox}{Allow both syntax and semantic Errors}
+    Some language features are independent.
+    \begin{itemize}
+        \setlength\itemsep{0em}
+        \item The emql syntax and semantics of independent queries.
+        \item Queries that do not use a given table are independent of syntax or semantic errors with the table.
+    \end{itemize}
+    By adding some error AST nodes, or alternatively hoisting some of the semantic analysis in to Combi reporting more errors could be facilitated.
+\end{futurebox}
+
+\begin{center}
+    \begin{tabular}{l | l l l l }
+        \textbf{feature}                                  & \textbf{emDB} & \textbf{DuckDB} & \textbf{SQLite} & \textbf{SQLite + sqlx} \\
+        \hline
+        \textbf{\mintinline{bash}{Cargo.toml} only setup} & Yes           & Yes             & Yes             & No                     \\
+        \textbf{Compile Time Checks}                      & Yes           & No              & No              & Yes                    \\
+        \textbf{Identifier Precise Errors}                & Yes           & No              & No              & No                     \\
+    \end{tabular}
+\end{center}
+
+\begin{futurebox}{User Survey}
+    The syntax \& semantics of emql have been chosen through an iterative \textit{dogfooding} process, and lacks a more general justification.
+    \begin{itemize}
+        \setlength\itemsep{0em}
+        \item User feedback requires a stabilization of the emQL interface and a commitment to support the library long term.
+    \end{itemize}
+\end{futurebox}
+
+\section{Conclusion}
+This project has been successful in implementing a novel, usable \& performant kind of embedded database that has not previously existed.
+There remain significant opportunities to improve performance, both through optimising the current operator and table implementation, 
+and by improving logical optimisations (most importantly incremental view maintenance). This will be aided by the simple, modular \& easy 
+to use design of the emDB compiler.

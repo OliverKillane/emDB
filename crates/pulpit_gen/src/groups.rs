@@ -62,6 +62,16 @@ impl<Col: ColKind> Group<Col> {
             );
         }
     }
+
+    pub fn get_field(&self, index: &FieldIndexInner) -> &Field {
+        if index.imm {
+            &self.fields.imm_fields
+        } else {
+            &self.fields.mut_fields
+        }
+        .get(index.field_num)
+        .unwrap()
+    }
 }
 
 pub struct GroupConfig {
@@ -189,6 +199,7 @@ impl<Col: ColKind> Group<Col> {
 
                 #imm_unpacked
 
+                #[inline(always)]
                 #unpacker
             }
         }

@@ -103,7 +103,7 @@ pub struct PrimaryRetain<ImmData, MutData, const BLOCK_SIZE: usize> {
 /// ## Concurrency Safe Marker for Key Type
 /// As we use the pointer as a generation counter, and only access using it once
 /// we have matched the generation, it is safe to share these.
-pub struct PtrGen<ImmData>(*const ImmData);
+pub struct PtrGen<ImmData>(pub *const ImmData);
 
 impl<ImmData> Clone for PtrGen<ImmData> {
     fn clone(&self) -> Self {
@@ -167,7 +167,7 @@ where
     type Col = PrimaryRetain<ImmData, MutData, BLOCK_SIZE>;
 
     #[inline(always)]
-    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, MutData> {
+    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, &MutData> {
         let Entry {
             index,
             data: Data { imm_data, mut_data },
@@ -176,7 +176,7 @@ where
             index,
             data: Data {
                 imm_data: unsafe { transmute::<&ImmData, &'imm ImmData>(imm_data) },
-                mut_data: mut_data.clone(),
+                mut_data,
             },
         })
     }

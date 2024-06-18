@@ -231,11 +231,6 @@ impl OperatorGen for plan::DeRef {
         let SerializedNamer {
             operator_error_parameter,
             self_alias,
-            pulpit:
-                pulpit::gen::namer::CodeNamer {
-                    struct_window_method_get,
-                    ..
-                },
             ..
         } = namer;
         let DataFlowNaming {
@@ -256,6 +251,7 @@ impl OperatorGen for plan::DeRef {
         let error_variant = namer.operator_error_value_name(self_key);
         let inner_type = generate_record_name(lp, self.named_type, namer);
         let get_value_id = new_id("get_value");
+        let get_op_name = namer.pulpit_table_interaction(self_key);
 
         // In order to expand fields from the old type into the new one
         let transfer_fields_get_struct = transfer_fields(
@@ -277,7 +273,7 @@ impl OperatorGen for plan::DeRef {
                     #impl_alias::#consume(#impl_alias::#buffer(#impl_alias::#map_kind(
                         #input_holding,
                         |#input_holding| {
-                            match #self_alias.#table_name.#struct_window_method_get(#input_holding.#deref_field) {
+                            match #self_alias.#table_name.#get_op_name(#input_holding.#deref_field) {
                                 Ok(#get_value_id) => #data_type {
                                     #new_field: #inner_type {
                                         #(#transfer_fields_get_struct,)*
@@ -297,7 +293,7 @@ impl OperatorGen for plan::DeRef {
                     let result = #impl_alias::#map_kind(
                         #input_holding,
                         |#input_holding| {
-                            match #self_alias.#table_name.#struct_window_method_get(#input_holding.#deref_field) {
+                            match #self_alias.#table_name.#get_op_name(#input_holding.#deref_field) {
                                 Ok(#get_value_id) => Ok(#data_type {
                                     #new_field: #inner_type {
                                         #(#transfer_fields_get_struct,)*

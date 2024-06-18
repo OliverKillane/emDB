@@ -34,13 +34,13 @@ where
     type ImmGet = &'imm ImmData;
 
     #[inline(always)]
-    unsafe fn assoc_get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, MutData> {
+    unsafe fn assoc_get(&self, ind: UnsafeIndex) -> Data<Self::ImmGet, &MutData> {
         unsafe {
             let Data { imm_data, mut_data } =
                 <Self as AssocWindow<'imm, ImmData, MutData>>::assoc_brw(self, ind);
             Data {
                 imm_data: transmute::<&ImmData, &'imm ImmData>(imm_data),
-                mut_data: mut_data.clone(),
+                mut_data,
             }
         }
     }
@@ -93,7 +93,7 @@ where
     type Col = AssocBlocks<ImmData, MutData, BLOCK_SIZE>;
 
     #[inline(always)]
-    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, MutData> {
+    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, &MutData> {
         if key <= self.inner.blocks.count() {
             Ok(Entry {
                 index: key,
@@ -101,7 +101,7 @@ where
                     let Data { imm_data, mut_data } = self.inner.blocks.get(key);
                     Data {
                         imm_data: transmute::<&ImmData, &'imm ImmData>(imm_data),
-                        mut_data: mut_data.clone(),
+                        mut_data,
                     }
                 },
             })

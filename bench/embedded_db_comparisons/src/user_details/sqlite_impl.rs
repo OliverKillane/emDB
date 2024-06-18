@@ -17,11 +17,12 @@ impl super::user_details::Datastore for SQLite {
     type DB<'imm> = Database<'imm>;
     type users_key = usize;
     fn new() -> Self {
+        // See https://sqlite.org/rowidtable.html, the primary key becomes the rowid
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(
             "
             CREATE TABLE users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                rowid INTEGER PRIMARY KEY, -- aliasing the rowid column (stable rowids)
                 name VARCHAR NOT NULL,
                 premium BOOLEAN NOT NULL,
                 credits MEDIUMINT NOT NULL,
@@ -43,15 +44,10 @@ impl super::user_details::Datastore for SQLite {
 
 impl<'imm> super::user_details::Database<'imm> for Database<'imm> {
     type Datastore = SQLite;
-    fn new_user(
-        &mut self,
-        username: String,
-        prem: bool,
-        start_creds: Option<i32>,
-    ) -> usize {
+    fn new_user(&mut self, username: String, prem: bool, start_creds: Option<i32>) -> usize {
         self.conn
             .prepare_cached(
-                "INSERT INTO users (name, premium, credits) VALUES (?, ?, ?) RETURNING id",
+                "INSERT INTO users (name, premium, credits) VALUES (?, ?, ?) RETURNING rowid",
             )
             .unwrap()
             .query_row::<<Self::Datastore as super::user_details::Datastore>::users_key, _, _>(
@@ -66,7 +62,7 @@ impl<'imm> super::user_details::Database<'imm> for Database<'imm> {
         user_id: <Self::Datastore as super::user_details::Datastore>::users_key,
     ) -> Result<(usize, String, bool, i32), ()> {
         self.conn
-            .prepare_cached("SELECT name, premium, credits FROM users WHERE id = ?")
+            .prepare_cached("SELECT name, premium, credits FROM users WHERE rowid = ?")
             .unwrap()
             .query_row(params![user_id], |row| {
                 Ok((
@@ -77,12 +73,13 @@ impl<'imm> super::user_details::Database<'imm> for Database<'imm> {
                 ))
             })
             .optional()
-            .unwrap().ok_or(())
+            .unwrap()
+            .ok_or(())
     }
 
     fn get_snapshot(&self) -> Vec<(usize, String, bool, i32)> {
         self.conn
-            .prepare_cached("SELECT id, name, premium, credits FROM users")
+            .prepare_cached("SELECT rowid, name, premium, credits FROM users")
             .unwrap()
             .query_map(params![], |row| {
                 Ok((
@@ -104,7 +101,7 @@ impl<'imm> super::user_details::Database<'imm> for Database<'imm> {
     ) -> Result<(), ()> {
         let rows = self
             .conn
-            .prepare_cached("UPDATE users SET credits = credits + ? WHERE id = ?")
+            .prepare_cached("UPDATE users SET credits = credits + ? WHERE rowid = ?")
             .unwrap()
             .execute(params![creds, user])
             .unwrap();

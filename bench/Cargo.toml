@@ -6,3 +6,10 @@ members = ["embedded_db_comparisons"]
 homepage = "https://github.com/OliverKillane/emDB"
 repository = "https://github.com/OliverKillane/emDB"
 license-file = "LICENSE"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+
+# [profile.dev.package.emdb_core]
+# opt-level = 3

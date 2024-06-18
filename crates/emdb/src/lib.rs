@@ -6,7 +6,7 @@ pub use emdb_core as macros;
 /// - Needs to be exported from emdb so the library can support the code it
 ///   generates
 /// - Cannot export both proc-macros and normal items from a proc-macro crate,
-///   hence this separation between [`emdb`](crate) and [`emdb_core`](macros)
+///   hence this separation between [`emdb`](crate) and [`emdb_core`].
 pub mod dependencies {
     pub use minister;
     pub use pulpit;

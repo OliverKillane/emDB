@@ -29,12 +29,13 @@ macro_rules! valid_tests {
 }
 
 valid_tests!(
-    // complex {
-    //     favourite_colours,
-    //     dereferencing,
-    //     userdetails,
-    //     sales_analytics
-    // },
+    complex {
+        favourite_colours,
+        dereferencing,
+        userdetails,
+        sales_analytics,
+        thesis_example
+    },
     context {
         lift_stream,
         lift_single,
@@ -50,6 +51,7 @@ valid_tests!(
         basic_join,
         limited_table,
         sums,
-        counts
+        counts,
+        deref_some
     }
 );

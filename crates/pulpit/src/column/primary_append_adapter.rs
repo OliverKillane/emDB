@@ -33,13 +33,13 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryAppendAdapter> {
     type Col = PrimaryAppendAdapter;
 
     #[inline(always)]
-    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, ()> {
+    fn get(&self, key: <Self::Col as Keyable>::Key) -> Access<Self::ImmGet, &()> {
         if key < self.inner.max_key {
             Ok(Entry {
                 index: key,
                 data: Data {
                     imm_data: (),
-                    mut_data: (),
+                    mut_data: &(),
                 },
             })
         } else {

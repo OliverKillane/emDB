@@ -6,18 +6,19 @@
 //! - Saving this file should re-run the emql macro, to generate outputs.
 use emdb::macros::emql;
 
-#[derive(Debug, Clone, Copy)]
-enum RGB {
-    Red,
-    Blue,
-    Green,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LogLevel {
     Error,
     Warning,
     Info,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
+enum RGB {
+    Red,
+    Blue,
+    Green,
 }
 
 emql! {
@@ -39,39 +40,10 @@ emql! {
     // };
 
     impl my_db as Serialized {
-        // debug_file = "emdb/tests/code.rs",
+        // debug_file = "emdb/tests/code2.rs",
         // op_impl = Parallel,
         // table_select = Thunderdome,
     };
-
-    table customers {
-        forename: String,
-        surname: String,
-        age: u8,
-    } @ [pred(*age < 255) as sensible_ages]
-
-    query customer_age_brackets() {
-        use customers
-            |> groupby(age for let people in {
-                use people
-                    |> collect(people as type age_group)
-                    ~> map(age_bracket: u8 = *age, group: type age_group = people)
-                    ~> return;
-            })
-            |> filter(*age_bracket > 16)
-            |> collect(brackets)
-            ~> return;
-    }
-
-    query new_customer(forename: &str, surname: &str, age: u8) {
-        row(
-            forename: String = String::from(forename),
-            surname: String = String::from(surname),
-            age: u8 = age
-        )
-            ~> insert(customers as ref name)
-            ~> return;
-    }
 }
 
 fn main() {

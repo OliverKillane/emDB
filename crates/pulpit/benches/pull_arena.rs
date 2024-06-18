@@ -6,10 +6,14 @@ use pulpit::column::{
     PrimaryWindow, PrimaryWindowPull,
 };
 
+const STRING_LEN: usize = 128;
+const SCALE_FACTORS: [usize; 5] = [1024, 2048, 4096, 8192, 16384];
+
 /// Sequential insert & access. assumes the user needs to get a value lasting longer than a borrow.   
 fn workload<ImmData, MutData, Col>(to_insert: Vec<Data<ImmData, MutData>>)
 where
     Col: Column,
+    MutData: Clone,
     for<'a> Col::WindowKind<'a>: PrimaryWindowPull<'a, ImmData, MutData>,
 {
     let mut col = Col::new(to_insert.len());
@@ -19,7 +23,7 @@ where
     for val in to_insert {
         let (key, _) = win.insert(val);
         let Entry { index: _, data } = win.get(key).unwrap();
-        vals.push(data);
+        vals.push(data.extract());
     }
 
     divan::black_box_drop(win);
@@ -46,20 +50,19 @@ where
 }
 
 #[divan::bench(
-    name="Basic workload to get (immutable: String, mutable: usize)",
+    name="Get (String, mut usize)",
     types=[
         PrimaryGenerationalArena<String, usize>,
         PrimaryThunderDome<String, usize>,
         PrimaryRetain<String, usize, 1024>
     ],
-    consts=[64,512,4096],
+    consts=SCALE_FACTORS,
 )]
-fn bench_workload<Col, const STRING_LEN: usize>(bencher: divan::Bencher)
+fn bench_workload<Col, const ELEMENTS: usize>(bencher: divan::Bencher)
 where
     Col: Column,
     for<'a> Col::WindowKind<'a>: PrimaryWindowPull<'a, String, usize>,
 {
-    const ELEMENTS: usize = 100000;
     bencher
         .counter(divan::counter::ItemsCount::new(ELEMENTS))
         .with_inputs(|| {
@@ -75,20 +78,19 @@ where
 }
 
 #[divan::bench(
-    name="Basic workload to brw (immutable: String, mutable: usize)",
+    name="Brw (String, mut usize)",
     types=[
         PrimaryGenerationalArena<String, usize>,
         PrimaryThunderDome<String, usize>,
         PrimaryRetain<String, usize, 1024>
         ],
+        consts=SCALE_FACTORS,
     )]
-fn bench_workload_brw<Col>(bencher: divan::Bencher)
+fn bench_workload_brw<Col, const ELEMENTS: usize>(bencher: divan::Bencher)
 where
     Col: Column,
     for<'a> Col::WindowKind<'a>: PrimaryWindowPull<'a, String, usize>,
 {
-    const STRING_LEN: usize = 128;
-    const ELEMENTS: usize = 100000;
     bencher
         .counter(divan::counter::ItemsCount::new(ELEMENTS))
         .with_inputs(|| {
@@ -103,19 +105,19 @@ where
 }
 
 #[divan::bench(
-    name="Comparing a workload with no immutable advantage",
+    name="Workload (usize, mut usize)",
     types=[
         PrimaryGenerationalArena<usize, usize>,
         PrimaryThunderDome<usize, usize>,
         PrimaryRetain<usize, usize, 1024>
     ],
+    consts=SCALE_FACTORS,
 )]
-fn bench_workload_no_imm<Col>(bencher: divan::Bencher)
+fn bench_workload_no_imm<Col, const ELEMENTS: usize>(bencher: divan::Bencher)
 where
     Col: Column,
     for<'a> Col::WindowKind<'a>: PrimaryWindowPull<'a, usize, usize>,
 {
-    const ELEMENTS: usize = 100000;
     bencher
         .counter(divan::counter::ItemsCount::new(ELEMENTS))
         .with_inputs(|| {
@@ -130,19 +132,19 @@ where
 }
 
 #[divan::bench(
-    name="Comparing a workload of zero size types",
+    name="Workload ((), mut ())",
     types=[
         PrimaryGenerationalArena<(), ()>,
         PrimaryThunderDome<(), ()>,
         PrimaryRetain<(), (), 1024>
     ],
+    consts=SCALE_FACTORS,
 )]
-fn bench_workload_zero_size<Col>(bencher: divan::Bencher)
+fn bench_workload_zero_size<Col, const ELEMENTS: usize>(bencher: divan::Bencher)
 where
     Col: Column,
     for<'a> Col::WindowKind<'a>: PrimaryWindowPull<'a, (), ()>,
 {
-    const ELEMENTS: usize = 100000;
     bencher
         .counter(divan::counter::ItemsCount::new(ELEMENTS))
         .with_inputs(|| {

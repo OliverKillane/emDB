@@ -12,50 +12,40 @@
 
 use divan;
 
-#[global_allocator]
-static ALLOC: divan::AllocProfiler = divan::AllocProfiler::system();
-
-fn apply(x: usize) -> usize {
-    x * 2
-}
+// #[global_allocator]
+// static ALLOC: divan::AllocProfiler = divan::AllocProfiler::system();
 
 trait Operate {
-    fn op(values: Vec<usize>) -> Vec<usize>;
+    fn op<I, O>(values: Vec<I>, f: impl Fn(I) -> O) -> Vec<O>;
 }
 
 struct Iters;
 impl Operate for Iters {
-    fn op(values: Vec<usize>) -> Vec<usize> {
-        values
-            .into_iter()
-            .map(apply)
-            .map(apply)
-            .map(apply)
-            .map(apply)
-            .collect()
+    fn op<I, O>(values: Vec<I>, f: impl Fn(I) -> O) -> Vec<O> {
+        values.into_iter().map(f).collect()
     }
 }
 
 struct Loops;
 impl Operate for Loops {
-    fn op(values: Vec<usize>) -> Vec<usize> {
+    fn op<I, O>(values: Vec<I>, f: impl Fn(I) -> O) -> Vec<O> {
         let mut result = Vec::with_capacity(values.len());
         for item in values {
-            result.push(apply(apply(apply(apply(item)))));
+            result.push(f(item));
         }
         result
     }
 }
 
 #[divan::bench(
-    name = "compare_loops_and_iterators",
+    name = "Iterators versus Loops",
     types = [Iters, Loops],
-    consts = [1, 128, 8388608]
+    consts = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288]
 )]
 fn comparison<T: Operate, const SIZE: usize>(bencher: divan::Bencher) {
     bencher
-        .with_inputs(|| (0..SIZE).collect::<Vec<_>>())
-        .bench_local_values(|r| T::op(r));
+        .with_inputs(|| (0..SIZE).map(|i| (i, i)).collect::<Vec<_>>())
+        .bench_local_values(|r| T::op(r, |(x, y)| x + y));
 }
 
 fn main() {

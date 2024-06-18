@@ -83,3 +83,7 @@ be used to view documentation built in the [target directory](../target/doc/emdb
 ## Other Resources
 ### [Rustonomicon](https://doc.rust-lang.org/nomicon/)
 ### [Rust Performance Book](https://nnethercote.github.io/perf-book/introduction.html)
+
+## Issues
+- For rare failure, see the [./emdb/tests/valid/fixme](./emdb/tests/valid/fixme) directory.
+- Nondeterministic compile behaviour for [./emdb/tests/valid/complex/favourite_colours.rs](./emdb/tests/valid/complex/favourite_colours.rs)
