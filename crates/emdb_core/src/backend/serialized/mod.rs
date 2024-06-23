@@ -6,6 +6,20 @@
 //! - Generates a table object that uses parallelism internally, but only allows
 //!   queries to execute in parallel if they are read only (normal borrow checker
 //!   rules apply)
+//! 
+//! ## Potential Improvements
+//! 1. More precise checking of borrows ([`borrow_tracker`]) will allow for a lazy 
+//!    backend that does not collect intermediate results until absolutely necessary
+//! 2. Removal of unnecessary transaction log append. When no more errors are possible, 
+//!    commit and successive mutations (that cannot error) do not write to the log.
+//! 3. Better parallel operator implementation, needs to be more coarse grained.
+//! 4. Borrow operator instead of get for some operations.
+//! 5. Separating borrows of values and keys (insert, delete affect set of keys, 
+//!    update affects set of values)
+//! 6. More unchecked operations (update, delete), using dataflow analysis.
+//!    Will need to `assume!(@unreachable)` for invalid error returns.
+//! 7. Improve [`super::plan::GroupBy`] and [`super::plan::Join`] performance, 
+//!    include multi-way joins.
 
 use combi::{
     core::{choice, mapsuc},
@@ -39,7 +53,11 @@ mod operators;
 mod queries;
 mod tables;
 mod types;
+<<<<<<< HEAD
 mod stats;
+=======
+mod borrow_tracker;
+>>>>>>> ade54f7 (Added a skeleton for the borrow tracking addition to serialized)
 
 pub struct Serialized {
     debug: Option<LitStr>,
