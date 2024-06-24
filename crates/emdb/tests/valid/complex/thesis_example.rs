@@ -17,7 +17,7 @@ emql!{
         // provided names are used in the error return types on constraint breach
         unique(name) as unique_names, 
         limit(1000) as max_people, 
-        pred(name.len() < 100) as sensible_name_length 
+        pred(name.len() < 100) as sensible_name_length
     ]
 
     // Each query is expressed as a method on the generated database object

@@ -22,7 +22,7 @@ pub enum Currency {
     BTC,
 }
 
-/// Validate a proce by the rules:
+/// Validate a process by the rules:
 /// - No more than $10k in dollars
 /// - Fewer than 20 in BTC
 fn validate_price(price: &u64, currency: &Currency) -> bool {
@@ -228,8 +228,12 @@ emql! {
     // Reasoning:
     //   Demonstrating aggregation over a large table
     query category_sales(btc_rate: f64, usd_rate: f64) {
-        use purchases |> let purchase_data;
-        use products as (serial, category) |> let product_data;
+        use purchases 
+            |> let purchase_data;
+            
+        use products as (serial, category) 
+            |> let product_data;
+
         join(use purchase_data [inner equi(product_serial = serial)] use product_data)
             |> map(
                 category: crate::sales_analytics::ProductCategory = *product_data.category,

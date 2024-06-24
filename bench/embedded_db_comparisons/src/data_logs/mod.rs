@@ -51,7 +51,7 @@ emql! {
     // Description:
     //   Get the number of errors per minute counter
     // Reasoning:
-    //   Requires a large mapping (accellerated by parallelism), and a groupby
+    //   Requires a large mapping (accelerated by parallelism), and a groupby
     //   aggregation. For demonstrating OLAP performance.
     query get_errors_per_minute() {
         use logs as (timestamp, level)
