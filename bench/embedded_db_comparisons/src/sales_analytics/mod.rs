@@ -22,7 +22,7 @@ pub enum Currency {
     BTC,
 }
 
-/// Validate a proce by the rules:
+/// Validate a process by the rules:
 /// - No more than $10k in dollars
 /// - Fewer than 20 in BTC
 fn validate_price(price: &u64, currency: &Currency) -> bool {
