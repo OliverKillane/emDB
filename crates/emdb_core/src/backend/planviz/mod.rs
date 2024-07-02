@@ -9,6 +9,11 @@
 //! - If using vscode, the [graphviz interactive preview extension](vscode:extension/tintinweb.graphviz-interactive-preview)
 //!   is recommended (open dots file, save in scratch rust file and watch preview
 //!   automatically update live).
+//! 
+//! ## Potential Improvement
+//! - Nicely formatted labels for nodes that contain extra information.
+//! - Legend for showing the meaning for plan
+//! - Colouring options (e.g. for different queries)
 
 use std::{fs::File, path::Path};
 

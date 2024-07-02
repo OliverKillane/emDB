@@ -96,6 +96,9 @@ Implement easy to use fuzzing for parsers expressed using combi.
 - Use combi structure to generate likely inputs (for some we cannot tell from structure of combis - e.g. code that panics inside a `mapsuc`, a pipe to a custom), then test parser
 - Can modify the `Combi` trait for this (e.g. add a 'fuzz input` method to generate input)
 
+Ideally this would mean that system using combi for parsing (e.g. proc macros using `combi::tokens`) 
+can be easily fuzz tested for bugs in the stages following parsing.
+
 Evaluation:
  - Use this to find bugs in the current emQL language frontend.
  - Compare with non-grammar aware fuzzer
