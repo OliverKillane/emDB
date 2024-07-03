@@ -1,0 +1,100 @@
+<mxfile host="65bd71144e">
+    <diagram id="unF_wlMiWg0aBAhUbvfF" name="Page-1">
+        <mxGraphModel dx="1024" dy="3840" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="113" value="" style="endArrow=none;dashed=1;html=1;strokeWidth=2;fontSize=13;fontColor=#C516D8;" parent="1" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="453.94" y="-795" as="sourcePoint"/>
+                        <mxPoint x="453.94" y="-1090" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="68" value="" style="endArrow=open;html=1;exitX=0;exitY=0;exitDx=0;exitDy=0;startArrow=none;startFill=0;endFill=0;strokeWidth=1;endSize=15;" parent="1" source="70" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="-116.06" y="-840" as="sourcePoint"/>
+                        <mxPoint x="720" y="-840" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="69" value="Relational Algebra + Transactions" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=1;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="553.94" y="-840" width="140" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="70" value="No abstraction above a general purpose language (e.g. C++)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=1;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="53.94" y="-840" width="170" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="71" value="Data Management Abstractions in A General Purpose Language" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=1;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="228.94" y="-840" width="175" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="72" value="Data Structures" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="53.94" y="-860" width="140" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="73" style="edgeStyle=none;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fontSize=8;startArrow=baseDash;startFill=0;endArrow=baseDash;endFill=0;" parent="1" source="74" target="75" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="74" value="DataFrames" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="333.94" y="-860" width="70" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="75" value="Embedded DataBases" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="553.94" y="-860" width="130" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="80" value="Entirely Manual Implementation" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#C516D8;" parent="1" vertex="1">
+                    <mxGeometry x="53.94" y="-890" width="140" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="81" value="In-Memory LINQ" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#C516D8;" parent="1" vertex="1">
+                    <mxGeometry x="353.94" y="-880" width="101.5" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="82" value="Polars" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#C516D8;" parent="1" vertex="1">
+                    <mxGeometry x="333.94" y="-920" width="50" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="83" value="Pandas" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#C516D8;" parent="1" vertex="1">
+                    <mxGeometry x="353.94" y="-900" width="50" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="85" value="LMDB" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#0000CC;" parent="1" vertex="1">
+                    <mxGeometry x="451.44" y="-970" width="50" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="86" value="SQLite" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#660000;" parent="1" vertex="1">
+                    <mxGeometry x="643.94" y="-1040" width="50" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="87" value="DuckDB" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#660000;" parent="1" vertex="1">
+                    <mxGeometry x="553.94" y="-1050" width="50" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="89" value="MonetDB/e" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#660000;" parent="1" vertex="1">
+                    <mxGeometry x="633.94" y="-1010" width="50" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="92" value="FrostDB" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#660000;" parent="1" vertex="1">
+                    <mxGeometry x="518.94" y="-1010" width="50" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="93" value="NumPy" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#C516D8;" parent="1" vertex="1">
+                    <mxGeometry x="303.94" y="-890" width="50" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="95" value="CrossDB" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#0000CC;" parent="1" vertex="1">
+                    <mxGeometry x="393.94" y="-970" width="60" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="96" value="Boost&lt;br&gt;Multi-index" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#C516D8;" parent="1" vertex="1">
+                    <mxGeometry x="208.94" y="-880" width="80" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="97" value="Operations &amp;amp; Aggregations&amp;nbsp;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=1;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="428.94" y="-840" width="115" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="100" value="Static Schema &amp;amp; &lt;br&gt;Queries Known" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#C516D8;fontStyle=1;fontSize=13;rotation=-90;" parent="1" vertex="1">
+                    <mxGeometry x="-26.060000000000002" y="-890" width="120" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="101" value="&lt;font color=&quot;#660000&quot; style=&quot;font-size: 13px;&quot;&gt;Runtime Schema &amp;amp; &lt;br&gt;Ad-Hoc Queries&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#C516D8;fontStyle=1;fontSize=13;rotation=-90;" parent="1" vertex="1">
+                    <mxGeometry x="-40" y="-1010" width="148.94" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="5eeCJY4S87DXX6dZWtL2-113" value="ExtremeDB" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#660000;" parent="1" vertex="1">
+                    <mxGeometry x="593.94" y="-990" width="50" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="5eeCJY4S87DXX6dZWtL2-114" value="ArcticDB" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#660000;" parent="1" vertex="1">
+                    <mxGeometry x="478.94" y="-990" width="50" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="114" value="Abstraction" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#000000;" vertex="1" parent="1">
+                    <mxGeometry x="720" y="-850" width="70" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="115" value="emDB" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#C516D8;" vertex="1" parent="1">
+                    <mxGeometry x="568.19" y="-890" width="101.5" height="20" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
