@@ -117,7 +117,7 @@ of a higher level of abstraction that still benefits from the restrictions prese
     \label{fig:query-lifespan}
 \end{figure*}
 
-\subsection{Eliminating the Cost of Code Generation}
+\subsection{Eliminating the Cost of Query Compilation}
 % In typical systems a careful balance between time spent on code generation (where high-level (whole compiler needed, but more checks & can be human readable for debugging) or 
 % heavily optimised (optimiser takes time) code takes longer) and time on the query.
 % - Discussed in Incremental Fusion 
@@ -233,16 +233,29 @@ allows for significant optimizations. Immutable values can be stored in a data s
 stability, enabling the return of references qualified by the lifetime of the database. This approach
 ensures efficient access and manipulation of data.
 
-Additionally, append-only tables benefit from not requiring a generation counter for row references,
-simplifying their implementation and reducing overhead. By tailoring data structures to the characteristics
-of the data and the nature of the queries, overall system efficiency and performance are greatly
-enhanced.
+Additionally, append-only tables benefit from not requiring a generation counter for row references, 
+eliminating the cost of storing and checking this.
 
-
-Test\cite{wagner2024incremental}
 \section{Implementation}
 
+\begin{figure*}[b]
+    \centering
+    \includegraphics[width=\textwidth]{_diagrams/system.pdf}
+    \caption{The full emDB system}
+    \label{fig:emdb-system}
+\end{figure*}
+
 \subsection{Rust Procedural Macros}
+% Take a tokentree of input, can only access tokentree (no context from outside macro invocation, invocations are independent)
+% - Using a library developed for the project to produce multiple syntax errors, also produce db multiple semantic errors, pass through useer code to be checked when placed in 
+% - No analysis of user code is done by emDB, rust provides an unstable interface for compiling code.
+
+\subsection{emQL}
+% - Language based on streams, addresses a common complaint of unintuitive ordering of SQL operators (outward last, inner first), rather than first, first last, last
+% - Row references as a proper par of the language, supported as SQL extensions (in SQLite, not in duckDB)
+% - contexts allow convenient use of parameters from streams (e.g. groupby, or use in lift - analogous to a for loop)
+% - 
+
 
 \bibliographystyle{IEEEtran}
 \bibliography{IEEEabrv,refs}
