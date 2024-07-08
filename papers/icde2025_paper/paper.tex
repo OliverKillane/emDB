@@ -10,11 +10,8 @@
 \usepackage{stfloats}
 \usepackage{minted}
 
-
-
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
-
 
 
 \begin{document}
@@ -38,24 +35,25 @@
     \and
     \IEEEauthorblockN{ChatGPT 4o}
     \IEEEauthorblockA{\textit{OpenAI} \\
-        San Francisco, California}
+        San Francisco, California \\
+        chat.openai.com}
 }
 
 \maketitle
 
 \begin{abstract}
-    In this paper, we introduce emDB - the easy macro database system embeddable in rust programs. 
+    In this paper, we introduce emDB - the easy macro database system embeddable in rust programs.
     EmDB challenges traditional assumptions about embedded databases, such as the
-    need for a SQL interface, schema changes, and ad-hoc queries. By using a static schema and known 
-    parameterized queries, emDB moves query parsing, semantic analysis, and code generation to compile 
+    need for a SQL interface, schema changes, and ad-hoc queries. By using a static schema and known
+    parameterized queries, emDB moves query parsing, semantic analysis, and code generation to compile
     time, and eliminates the need for a complex execution engine.
 
     Implemented as a Rust procedural macro, emDB reads schemas and queries, selects appropriate data
-    structures, reports type and query errors and generates optimized query code at compile time. 
-    This approach, based on a known set of queries, allows for the use of optimal data structures 
-    and integrates seamlessly with standard debugging, benchmarking, verification, and testing tools. 
-    EmDB also makes use of language-specific features like move semantics and borrow checking, providing 
-    an efficient and safe interface for developers, including support for user-defined types and code to be embedded 
+    structures, reports type and query errors and generates optimized query code at compile time.
+    This approach, based on a known set of queries, allows for the use of optimal data structures
+    and integrates seamlessly with standard debugging, benchmarking, verification, and testing tools.
+    EmDB also makes use of language-specific features like move semantics and borrow checking, providing
+    an efficient and safe interface for developers, including support for user-defined types and code to be embedded
     into the database.
 \end{abstract}
 
@@ -98,13 +96,13 @@ selection, and query optimization, there is a discontinuity. This level of abstr
 removes the aforementioned restrictions at significant cost.
 
 Moving query parsing, planning, optimization, as well as schema altering queries to application
-runtime incurs significant implementation complexity (ratalogue management, runtime types information)
+runtime incurs significant implementation complexity (catalogue management, runtime types information)
 and runtime overhead (for example query compilation in codegen, or virtual calls in interpreted queries).
 
 Additionally some level of serialization/deserialization is needed to move data from the host application
 (i.e. statically typed, without a stable ABI) into the embedded database (i.e. dynamically typed, over SQL string interface and/or C-ABI).
 
-Given for the vast majority of applications using embedded databases, the queries are known, and the schema does not change, we argue there 
+Given for the vast majority of applications using embedded databases, the queries are known, and the schema does not change, we argue there
 is no clear rationale for this disjointness in the spectrum of abstraction, nor for the absence
 of a higher level of abstraction that still benefits from the restrictions present in lower levels.
 
@@ -155,33 +153,35 @@ small (typical OLTP) queries.
 % 4. Cache query complications
 % 5. Use interpreted queries for smaller query plans 
 % 6. A form on JIT: Interpret the query while compiling, and switch 
+
 There are several mitigations.
 \begin{enumerate}
     \item Ignore the problem for non-OLTP workloads, and target the system for use in OLAP workloads where this is not a weakness. (\cite{HIQUE}) % HIQUE was only evalueted on large aggregations/joins, mentions cost of query compilation
+    \item Allow the user to remove the problem using prepared statements. % Compile prepared, assume they prepare parameterized queries for OLTP
     \item Generate a lower-level representation for query code to compile (e.g. LLVM IR or asm, instead of C++), at the cost of
           removing checking of queries (semantic analysis) and more difficult implementation. (\cite{HyperEfficientCompilation}, \cite{AdaptiveExecution}, \cite{PracticalCodegen}) % LLVM IR, hyper paper also has an asm backend and C++ backend to compare
     \item Reduce the level of optimisation performed, reduces the performance benefit of code generation.
     \item Cache query compilations to take advantage of repeat OLTP queries, some complexity is introduced to manage the cache. (\cite{MemSQL}) % memsql plan cache
     \item Hybrid execution of queries with an interpreter, before switching to the compiled version (a JIT-based system). (\cite{wagner2024incremental}, \cite{AdaptiveExecution}) % Both are JIT
 \end{enumerate}
-These mitigations are often complex to implement, and require a careful balance of trade-offs between performance for different 
+These mitigations are often complex to implement, and require a careful balance of trade-offs between performance for different
 kinds of workloads.
 
-We choose to avoid tackling this hard problem. As we have the restriction that all parameterized queries are 
+We choose to avoid tackling this hard problem. As we have the restriction that all parameterized queries are
 known, we can instead simply move query compilation from application runtime to application compile time.
 
-This enables the maximal benefits of code generation (high level code, semantic analysis, expensive 
+This enables the maximal benefits of code generation (high level code, semantic analysis, expensive
 optimisations), with no runtime cost.
 
 Furthermore as all queries and tables are generated at application compile time, the types of all data in all queries
 and tables are known, meaning no explicit runtime type information or catalogue is required. This also allows arbitrary
-types to used in the database (closures, custom user types, user data structures, smart pointers, etc.) and pure expressions 
+types to used in the database (closures, custom user types, user data structures, smart pointers, etc.) and pure expressions
 (calling user defined functions) to be embedded into the database.
 
-A significant difficulty with developing runtime codegen systems is tooling, for example requiring engine-integrated custom debuggers to be implemented.\cite{PracticalCodegen} 
+A significant difficulty with developing runtime codegen systems is tooling, for example requiring engine-integrated custom debuggers to be implemented.\cite{PracticalCodegen}
 Generating human readable code (compiled with the application) has auxiliary tooling benefits, it becomes easily usable with any tooling
 available for the language, such as debuggers, profilers, testing, benchmarking and verification tools -
-it's not a bespoke, complex runtime codegen system needing its own special tooling; it's \textit{just} (mostly human readable) code.  
+it's not a bespoke, complex runtime codegen system needing its own special tooling; it's \textit{just} (mostly human readable) code.
 
 \subsection{Compile Time Errors}
 % Query errors (syntactic and semantic) can be reported at compile time and propagated to the IDE.
@@ -216,10 +216,17 @@ query catalogue_error() {
     \label{fig:query-error}
 \end{figure}
 
+This kinda of integration with the language (and IDEs), particularly reporting
+errors with correct spans, is difficult to implement in other languages that do
+not support procedural macros, or syntax extensions.
+
+% This is BS, I haven't got a solid reason for why no one has done this before
+This is a primary reason for such a system not being implemented previously.
+
 \subsection{Data Structure Selection}
 % Choosing Data Structure
 % - Optimise choice of data structure for tables based on queries.
-%
+% 
 % For example determining which columns of a table are immutable, and which tables are append-only.
 % - Immutable values, stored in a data structure that has pointer stability can return references 
 %   qualified by the lifetime of the database, given values are not deleted or are reference counted.
@@ -233,7 +240,7 @@ allows for significant optimizations. Immutable values can be stored in a data s
 stability, enabling the return of references qualified by the lifetime of the database. This approach
 ensures efficient access and manipulation of data.
 
-Additionally, append-only tables benefit from not requiring a generation counter for row references, 
+Additionally, append-only tables benefit from not requiring a generation counter for row references,
 eliminating the cost of storing and checking this.
 
 \section{Implementation}
@@ -247,15 +254,150 @@ eliminating the cost of storing and checking this.
 
 \subsection{Rust Procedural Macros}
 % Take a tokentree of input, can only access tokentree (no context from outside macro invocation, invocations are independent)
-% - Using a library developed for the project to produce multiple syntax errors, also produce db multiple semantic errors, pass through useer code to be checked when placed in 
-% - No analysis of user code is done by emDB, rust provides an unstable interface for compiling code.
+Rust procedural macros are rust code that is run by the compiler, that takes rust
+tokens as input, and outputs rust tokens and diagnostics as output. There are
+very few restrictions on what procedural macros can do, they can interact with the
+OS (files, network, subprocesses).
 
-\subsection{emQL}
+They have previously been used for non-rust embedded languages.
+\begin{itemize}
+    \item Multiple rust frontend frameworks make use of html-like embedded languages (containing rust expressions) (yew, leptos), or custom interface declaring DSLs (rsx for dioxis).
+    \item Programming languages such as C (using inline\_c which invokes the system's toolchain compile and then link), or lisp (AST generated at compile time by rust\_lisp).
+    \item sqlx (checking SQL queries using a test database with migrations applied, at application compile time).
+\end{itemize}
+
+Tokenstreams contain no semantic information, this can be generated using the built-in
+rustc-interface library (re-invoking compiler stages on some tokenstream to
+extract THIR (types), MIR (borrow checking) information). For emDB we instead pass
+rust expressions through to the generated code, but maintain the original spans so
+semantic errors generated errors in user's embedded code (expressions and types) are
+attributed to the correct location in the user's code.
+
+For emDB we developed our own basic parser-combinators library to efficiently parse tokenstreams,
+and produce multiple syntactic errors (with a simple parser, and simple (error-node type free) AST).
+
+\subsection{emQL Language}
+% Cannot use standard compliant SQL if we want to embed types and expressions from the language.
+EmDB uses its own query language, emQL, to define queries.
+
+% - advantage of SQL would be related tooling (fuzzers), and familiarity (most popular query language), the disadvantage is SQL smells.
+% - Go with custom language, avoid some grievances with the design of SQL (unintuvive null semantics, inward-out order of operators)
+% - Use rust keywords to piggyback on rust syntax highlighting
+
 % - Language based on streams, addresses a common complaint of unintuitive ordering of SQL operators (outward last, inner first), rather than first, first last, last
-% - Row references as a proper par of the language, supported as SQL extensions (in SQLite, not in duckDB)
-% - contexts allow convenient use of parameters from streams (e.g. groupby, or use in lift - analogous to a for loop)
-% - 
+% - Row references as a proper par of the language, supported as SQL extensions (in SQLite, not in duckDB), and are great for many OLTP workloads that allow the database to generate unique ids
+% - Contexts allow convenient use of parameters from streams (e.g. groupby, or use in lift - analogous to a for loop)
+% - Queries are analogous to SQL transactions and can contain a many mutations, accesses, all mixed together.
 
+Using standard compliant SQL poses limitations when embedding types and expressions
+from a host programming language. To address this, emDB employs its own query language,
+emQL, for defining queries.
+
+While standard SQL has the advantage of extensive related tooling (such as fuzzers)
+and widespread familiarity as the most popular query language, it also comes with
+inherent disadvantages, often referred to as "SQL smells." These include unintuitive
+null semantics and the outward-in order of operators. By opting for a custom query
+language, emQL, emDB circumvents these issues, leveraging the syntax and semantics
+of Rust to enhance usability and integration. For instance, emQL uses Rust keywords
+to benefit from Rust's syntax highlighting.
+
+EmQL is designed around streams, addressing a common complaint about SQL's
+unintuitive operator ordering. In contrast to SQL's outward-last, inner-first
+processing order, emQL follows a more intuitive first-in, first-out approach.
+Additionally, emQL incorporates row references as a fundamental part of the
+language, a feature supported as extensions in some SQL implementations (e.g.
+SQLite) but not universally (e.g., not in DuckDB). Row references are particularly
+advantageous for many OLTP workloads, enabling the database to generate unique
+identifiers.
+
+Furthermore, emQL's contexts facilitate the convenient use of parameters from
+streams, analogous to constructs like groupby or loop iterations in programming
+languages. Queries in emQL are similar to SQL transactions, with each query potentially
+containing many different table access and/or mutation operations.
+
+\begin{figure*}[b]
+    \begin{minipage}{.45\textwidth}
+        \begin{minted}{rust}
+query foobars(max_bar: usize) {
+    use foos
+        |> filter(bar < max_bar)
+        |> map(
+              foobar: super::UserType = {
+                  let logic = /* complex expressions */;
+                  super::user_defined_function(logic, &bar)
+              },
+              zing: usize = bar + 1, 
+          )
+        |> sort(zing asc)
+        |> lift(
+              /* .. some subquery */
+          )
+        |> collect(foobars)
+        ~> return;
+}
+        \end{minted}
+    \end{minipage}
+    \begin{minipage}{.45\textwidth}
+        \begin{minted}{sql}
+
+        \end{minted}
+    \end{minipage}
+    \centering
+    \caption{Some examples of emQL syntax}
+    \label{fig:emql-example}
+\end{figure*}
+
+\subsection{Table Implementation}
+% nOTE: using subtable here, language is column in emDB, dont want to confuse these
+
+% Using rollback log for each query/transaction
+% Tables include a primary subtable and n associated subtables, Each can contain multiple columns marked as mutable or immutable.
+% Each column structure can use a different column datatype, the primary subtable performs index checks on access.
+% Allows for different levels of decomposition to be implemented.
+
+% Tables support row predicates, unique constraints and limit constraints. Each has a rollback log for supporting transactions.
+% Rows are accessed through row references, which are fast O(1) indices into the table, and are checked using the primary column.
+% Fast access is beneficial for OLTP workloads involving access using a generated key.
+
+
+emDB employs a rollback log for each query or transaction to ensure data integrity
+and support transactional operations. Each table in emDB consists of a primary
+subtable and multiple associated subtables, which can contain several columns marked
+as mutable or immutable. This structure allows for different column data types,
+with the primary subtable performing index checks on access, enabling various
+levels of decomposition to be implemented.
+
+Tables in emDB support row predicates, unique constraints, and limit constraints,
+each maintained through a rollback log to facilitate transactions. Rows are accessed
+using row references, which serve as fast O(1) indices into the table, validated
+through the primary column. This efficient access mechanism is particularly
+beneficial for OLTP workloads that involve frequent access using generated keys,
+enhancing performance and reliability in transactional environments.
+
+\subsection{Pull versus Push}
+% - Basically we did the hyper paper push-to-pipeline-breaker operators part, but in a few lines of code (rust iterators already did it for us) + in-place collect 
+
+% For code generation, a push based model is convenient
+% By pushing lazily evaluated iterators between operators, we can implement a pull-based model.
+% As the next() calls to rust iterators can be inlined, and values are collected at pripeline 
+% breaking operators (e.g. sort).
+% the actual model used is push-based (similar used in hyper db).
+
+% Simultaneously provides the benefit of only materializing values when required (keeps passed 
+% rows transfered registers through pipelinable operators)
+% but! Without overhead & complex control flow of many function calls.
+
+For code generation, a push-based model proves to be convenient. By utilizing lazily
+evaluated iterators between operators, we can effectively implement a pull-based model.
+In this approach, \mintinline{rust}{Iterator::next()} calls to Rust iterators can be
+inlined, and values are collected at pipeline-breaking operators, such as sort.
+Despite this, the underlying model used remains push-based. This model is also used
+by Hyper\cite{HyperEfficientCompilation}.
+
+\section{Evaluation}
+% Basically it is fantastic at OLTP, and good but not the best at very large OLAP
+% Operator impls for joins and groupby are easy & simple, but not performant
+% I should really just spend some time on them
 
 \bibliographystyle{IEEEtran}
 \bibliography{IEEEabrv,refs}
