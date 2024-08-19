@@ -353,6 +353,7 @@ name = "minister"
 version = "0.1.0"
 dependencies = [
  "divan",
+ "rand",
  "rayon",
  "rustc-hash",
 ]

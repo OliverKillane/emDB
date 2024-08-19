@@ -1,4 +1,5 @@
 #![allow(clippy::ptr_arg)]
+
 use rayon::{current_num_threads, prelude::*};
 use std::collections::HashMap;
 

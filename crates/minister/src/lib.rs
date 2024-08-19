@@ -10,6 +10,7 @@ pub mod basic;
 pub mod chunk;
 pub mod iter;
 pub mod parallel;
+pub mod morsel;
 
 /// ## Minister Trait Generation
 /// In order to ensure correct implementation of different operator implementations (important for
