@@ -2,7 +2,6 @@
 //! Nodes in the physical plan which can provide morsels
 
 use std::{cell::UnsafeCell, ops::Range, sync::Arc};
-
 use super::{datum::Datum, splitter::Splitter};
 
 pub struct BufferSpan<Data> {
