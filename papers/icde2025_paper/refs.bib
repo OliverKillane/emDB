@@ -1,0 +1,75 @@
+@INPROCEEDINGS{wagner2024incremental,
+  title={Incremental Fusion: Unifying Compiled and Vectorized Query Execution},
+  author={Wagner, Benjamin and Kohn, Andre and Boncz, Peter and Leis, Viktor},
+  year={2024},
+  organization={ICDE}
+}
+
+@INPROCEEDINGS{AdaptiveExecution,
+  author={Kohn, André and Leis, Viktor and Neumann, Thomas},
+  booktitle={2018 IEEE 34th International Conference on Data Engineering (ICDE)}, 
+  title={Adaptive Execution of Compiled Queries}, 
+  year={2018},
+  volume={},
+  number={},
+  pages={197-208},
+  keywords={Engines;Throughput;Pipelines;Optimization;Monitoring;Tools;Semantics;query execution;compilation;LLVM;interpretation},
+  doi={10.1109/ICDE.2018.00027}}
+
+@ARTICLE{PracticalCodegen,
+  author={Kohn, André and Leis, Viktor and Neumann, Thomas},
+  journal={IEEE Transactions on Knowledge and Data Engineering}, 
+  title={Making Compiling Query Engines Practical}, 
+  year={2021},
+  volume={33},
+  number={2},
+  pages={597-612},
+  keywords={Engines;Throughput;Optimization;Debugging;Tools;Computer bugs;Semantics;Query processing;query compilation;bytecode interpreter;register allocation;debugging},
+  doi={10.1109/TKDE.2019.2905235}}
+
+@article{HyperEfficientCompilation,
+author = {Neumann, Thomas},
+title = {Efficiently compiling efficient query plans for modern hardware},
+year = {2011},
+issue_date = {June 2011},
+publisher = {VLDB Endowment},
+volume = {4},
+number = {9},
+issn = {2150-8097},
+url = {https://doi.org/10.14778/2002938.2002940},
+doi = {10.14778/2002938.2002940},
+abstract = {As main memory grows, query performance is more and more determined by the raw CPU costs of query processing itself. The classical iterator style query processing technique is very simple and exible, but shows poor performance on modern CPUs due to lack of locality and frequent instruction mispredictions. Several techniques like batch oriented processing or vectorized tuple processing have been proposed in the past to improve this situation, but even these techniques are frequently out-performed by hand-written execution plans.In this work we present a novel compilation strategy that translates a query into compact and efficient machine code using the LLVM compiler framework. By aiming at good code and data locality and predictable branch layout the resulting code frequently rivals the performance of hand-written C++ code. We integrated these techniques into the HyPer main memory database system and show that this results in excellent query performance while requiring only modest compilation time.},
+journal = {Proc. VLDB Endow.},
+month = {jun},
+pages = {539–550},
+numpages = {12}
+}
+
+@INPROCEEDINGS{HIQUE,
+  author={Krikellas, Konstantinos and Viglas, Stratis D. and Cintra, Marcelo},
+  booktitle={2010 IEEE 26th International Conference on Data Engineering (ICDE 2010)}, 
+  title={Generating code for holistic query evaluation}, 
+  year={2010},
+  volume={},
+  number={},
+  pages={613-624},
+  keywords={Query processing;Engines;Hardware;Prototypes;Database systems;Optimizing compilers;Informatics;Proposals;System performance;Heuristic algorithms},
+  doi={10.1109/ICDE.2010.5447892}}
+
+@article{MemSQL,
+author = {Chen, Jack and Jindel, Samir and Walzer, Robert and Sen, Rajkumar and Jimsheleishvilli, Nika and Andrews, Michael},
+title = {The MemSQL query optimizer: a modern optimizer for real-time analytics in a distributed database},
+year = {2016},
+issue_date = {September 2016},
+publisher = {VLDB Endowment},
+volume = {9},
+number = {13},
+issn = {2150-8097},
+url = {https://doi.org/10.14778/3007263.3007277},
+doi = {10.14778/3007263.3007277},
+abstract = {Real-time analytics on massive datasets has become a very common need in many enterprises. These applications require not only rapid data ingest, but also quick answers to analytical queries operating on the latest data. MemSQL is a distributed SQL database designed to exploit memory-optimized, scale-out architecture to enable real-time transactional and analytical workloads which are fast, highly concurrent, and extremely scalable. Many analytical queries in MemSQL's customer workloads are complex queries involving joins, aggregations, sub-queries, etc. over star and snowflake schemas, often ad-hoc or produced interactively by business intelligence tools. These queries often require latencies of seconds or less, and therefore require the optimizer to not only produce a high quality distributed execution plan, but also produce it fast enough so that optimization time does not become a bottleneck.In this paper, we describe the architecture of the MemSQL Query Optimizer and the design choices and innovations which enable it quickly produce highly efficient execution plans for complex distributed queries. We discuss how query rewrite decisions oblivious of distribution cost can lead to poor distributed execution plans, and argue that to choose high-quality plans in a distributed database, the optimizer needs to be distribution-aware in choosing join plans, applying query rewrites, and costing plans. We discuss methods to make join enumeration faster and more effective, such as a rewrite-based approach to exploit bushy joins in queries involving multiple star schemas without sacrificing optimization time. We demonstrate the effectiveness of the MemSQL optimizer over queries from the TPC-H benchmark and a real customer workload.},
+journal = {Proc. VLDB Endow.},
+month = {sep},
+pages = {1401–1412},
+numpages = {12}
+}

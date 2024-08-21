@@ -10,6 +10,7 @@ pub mod basic;
 pub mod chunk;
 pub mod iter;
 pub mod parallel;
+pub mod morsel;
 
 /// ## Minister Trait Generation
 /// In order to ensure correct implementation of different operator implementations (important for
@@ -62,6 +63,9 @@ pub mod parallel;
 macro_rules! generate_minister_trait {
     ($trait_name:ident) => {
         pub trait $trait_name {
+            // type Buffer<'db, Data>: 'db;
+
+
             fn consume_stream<Data>(iter: impl Iterator<Item = Data>) -> stream!(Data)
             where
                 Data: Send + Sync;

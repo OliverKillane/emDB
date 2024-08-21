@@ -6,7 +6,9 @@ macro_rules! single {
         $data
     };
 }
+
 macro_rules! stream { ($data:ty) => { Vec<$data> }; }
+
 super::generate_minister_trait! { BasicOps }
 
 /// ## An extremely basic push operator implementation.
@@ -327,3 +329,4 @@ impl BasicOps for Basic {
         stream.into_iter().unzip()
     }
 }
+

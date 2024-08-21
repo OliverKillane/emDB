@@ -15,10 +15,16 @@ license-file.workspace = true
 [dependencies]
 rayon = "1.10.0"
 rustc-hash = "1.1.0"
+itertools = "0.13.0"
 
 [dev-dependencies]
 divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }
+rand = "0.8"
 
 [[bench]]
 name = "iterators"
+harness = false
+
+[[bench]]
+name = "micros"
 harness = false
