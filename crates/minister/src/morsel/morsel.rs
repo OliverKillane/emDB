@@ -1,19 +1,17 @@
 //! Morsels are operators that can be parallelised (by some runtime determined degree
 //! through a [`Splitter`])
 
-use std::{mem, sync::Arc};
-
 use super::{
     buffer::BufferSpan,
     datum::Datum,
     splitter::Splitter,
-    statistics::{Cardinality, Estimate, reduce},
+    statistics::{combine, reduce, Cardinality, Estimate},
 };
 
 /// As per [`Morsel::work`].
 const CONSUME_MSG: &'static str = "Operator has been consumed";
 
-pub trait Morsel {
+pub trait Morsel: Send + Sync {
     type Data: Send;
     type Statistics: Sync;
     const COMPTIME_CARDINALITY: Cardinality;
@@ -33,7 +31,7 @@ pub trait Morsel {
     fn work(
         &mut self,
         splitter: &impl Splitter,
-    ) -> impl Iterator<Item = impl Iterator<Item = Self::Data>>;
+    ) -> impl Iterator<Item = impl Iterator<Item = Self::Data> + Send + Sync>;
 }
 
 pub struct Read<Data> {
@@ -56,7 +54,7 @@ impl<Data> Read<Data> {
 
 impl<Data> Morsel for Read<Data>
 where
-    Data: Send,
+    Data: Send + Sync,
 {
     type Data = Data;
     type Statistics = ();
@@ -77,7 +75,7 @@ where
     fn work(
         &mut self,
         splitter: &impl Splitter,
-    ) -> impl Iterator<Item = impl Iterator<Item = Self::Data>> {
+    ) -> impl Iterator<Item = impl Iterator<Item = Self::Data> + Send + Sync> {
         self.buffer.take().expect(CONSUME_MSG).split(splitter)
     }
 }
@@ -116,7 +114,7 @@ where
 impl<I, O, M, F> Morsel for Map<I, O, M, F>
 where
     M: Morsel<Data = I>,
-    F: Fn(I) -> O,
+    F: Fn(I) -> O + Send + Sync,
     O: Send,
 {
     type Data = O;
@@ -136,7 +134,7 @@ where
     fn work(
         &mut self,
         splitter: &impl Splitter,
-    ) -> impl Iterator<Item = impl Iterator<Item = Self::Data>> {
+    ) -> impl Iterator<Item = impl Iterator<Item = Self::Data> + Send + Sync> {
         self.morsel
             .work(splitter)
             .map(|iter| iter.map(|c| (self.mapping)(c)))
@@ -165,7 +163,7 @@ where
 impl<I, M, P> Morsel for Filter<I, M, P>
 where
     M: Morsel<Data = I>,
-    P: Fn(&I) -> bool,
+    P: Fn(&I) -> bool + Send + Sync,
     I: Send,
 {
     type Data = I;
@@ -183,8 +181,8 @@ where
     fn work(
         &mut self,
         splitter: &impl Splitter,
-    ) -> impl Iterator<Item = impl Iterator<Item = Self::Data>> {
-        // NOTE: Because filter takes an FnMut (why?) we need to create unique 
+    ) -> impl Iterator<Item = impl Iterator<Item = Self::Data> + Send + Sync> {
+        // NOTE: Because filter takes an FnMut (why?) we need to create unique
         //       `FnMut`s, that can all borrow the same `Fn`
         self.morsel
             .work(splitter)
@@ -192,6 +190,49 @@ where
     }
 }
 
+struct Union<Data, LM, RM>
+where
+    LM: Morsel<Data = Data>,
+    RM: Morsel<Data = Data>,
+{
+    left: LM,
+    right: RM,
+}
+
+impl <Data, LM, RM> Union<Data, LM, RM> where
+LM: Morsel<Data = Data>,
+RM: Morsel<Data = Data>, {
+    fn new(left: LM, right: RM) -> Self {
+        Self { left, right }
+    }
+}
+
+impl <Data, LM, RM> Morsel for Union<Data, LM, RM> where
+Data: Send,
+LM: Morsel<Data = Data>,
+RM: Morsel<Data = Data>  {
+    type Data = Data;
+    type Statistics = ();
+
+    const COMPTIME_CARDINALITY: Cardinality = combine(LM::COMPTIME_CARDINALITY, RM::COMPTIME_CARDINALITY);
+
+    fn runtime_cardinality(&self) -> Cardinality {
+        combine(self.left.runtime_cardinality(), self.right.runtime_cardinality())
+    }
+
+    fn estimate_cardinality(&self) -> Estimate {
+        todo!()
+    }
+
+    /// To keep work even, zips together the iterators from each
+    /// INV: the splitting returns the same number of splits.
+    fn work(
+        &mut self,
+        splitter: &impl Splitter,
+    ) -> impl Iterator<Item = impl Iterator<Item = Self::Data> + Send + Sync> {
+        self.left.work(splitter).zip(self.right.work(splitter)).map(|(l, r)| l.chain(r))
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -201,11 +242,17 @@ mod test {
     #[test]
     fn foo() {
         let x = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
+        let y = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
+        let read_x = super::Read::from(x);
+        let map = super::Map::new(read_x, |x| x * 2);
+        let filt = super::Filter::new(map, |x| x % 2 == 0);
 
-        let read = super::Read::from(x);
-        let map = super::Map::new(read, |x| x * 2);
-        let mut filt = super::Filter::new(map, |x| x % 2 == 0);
-        filt.work(&splitter::SingleSplit).for_each(|iter| {
+        let read_y = super::Read::from(y);
+        let map_y = super::Map::new(read_y, |x| x + 100);
+
+        let mut union = super::Union::new(filt, map_y);
+
+        union.work(&splitter::SingleSplit).for_each(|iter| {
             iter.for_each(|x| {
                 println!("{}", x);
             });

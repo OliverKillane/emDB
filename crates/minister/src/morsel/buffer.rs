@@ -2,11 +2,11 @@
 //! Nodes in the physical plan which can provide morsels
 
 use std::{cell::UnsafeCell, ops::Range, sync::Arc};
-use super::{datum::Datum, splitter::Splitter};
+use super::{datum::{Datum, SyncUnsafeCellWrap}, splitter::Splitter};
 
 pub struct BufferSpan<Data> {
     span: Range<usize>,
-    arr: Arc<[UnsafeCell<Datum<Data>>]>,
+    arr: Arc<[SyncUnsafeCellWrap<Datum<Data>>]>,
 }
 
 impl<Data> From<Vec<Data>> for BufferSpan<Data> {
@@ -14,9 +14,9 @@ impl<Data> From<Vec<Data>> for BufferSpan<Data> {
     fn from(value: Vec<Data>) -> Self {
         let wrapped_data = value
             .into_iter()
-            .map(|d| UnsafeCell::new(Datum::new(d)))
+            .map(|d| SyncUnsafeCellWrap(UnsafeCell::new(Datum::new(d))))
             .collect::<Vec<_>>();
-        let arr: Arc<[UnsafeCell<Datum<Data>>]> = Arc::from(wrapped_data.into_boxed_slice());
+        let arr: Arc<[SyncUnsafeCellWrap<Datum<Data>>]> = Arc::from(wrapped_data.into_boxed_slice());
         Self {
             span: Range::from(0..arr.len()),
             arr,

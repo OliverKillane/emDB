@@ -63,6 +63,9 @@ pub mod morsel;
 macro_rules! generate_minister_trait {
     ($trait_name:ident) => {
         pub trait $trait_name {
+            // type Buffer<'db, Data>: 'db;
+
+
             fn consume_stream<Data>(iter: impl Iterator<Item = Data>) -> stream!(Data)
             where
                 Data: Send + Sync;
