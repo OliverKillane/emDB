@@ -1,6 +1,4 @@
 //! generate the closures needed to use in the database, which capture parameters from the query.
-//!
-
 
 use crate::{
     plan,
@@ -10,7 +8,7 @@ use quote::quote;
 use quote_debug::Tokens;
 use syn::{ExprClosure, Ident, Path};
 
-use super::{namer::{dataflow_fields, DataFlowNaming, SerializedNamer}, operators::OperatorImpl};
+use super::{namer::{dataflow_fields, DataFlowNaming, SerializedNamer}, operators::OperatorImpl, stats::RequiredStats};
 use super::operators::OperatorGen;
 use super::tables::GeneratedInfo;
 use super::types::generate_scalar_type;
@@ -34,6 +32,7 @@ pub fn generate_application<'imm, 'brw>(
     gen_info: &GeneratedInfo<'imm>,
     namer: &SerializedNamer,
     operator_impl: &OperatorImpl,
+    required_stats: &mut RequiredStats,
 ) -> ContextGen {
     let context = lp.get_context(ctx);
     let SerializedNamer { self_alias, .. } = namer;
@@ -56,6 +55,7 @@ pub fn generate_application<'imm, 'brw>(
                 gen_info,
                 &mut context_vals,
                 operator_impl,
+                required_stats
             )
         })
         .collect::<Vec<_>>();

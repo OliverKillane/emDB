@@ -24,6 +24,9 @@ pub struct SerializedNamer {
     pub operator_error_parameter: Ident,
     pub interface: InterfaceNamer,
     pub self_alias: Ident,
+    pub struct_datastore_member_stats: Ident,
+    pub struct_database_member_stats: Ident,
+    pub struct_stats: Ident,
 }
 
 impl SerializedNamer {
@@ -45,6 +48,9 @@ impl SerializedNamer {
             operator_error_parameter: new_id("err"),
             interface: InterfaceNamer::new(),
             self_alias: new_id(&format!("{INTERNAL_FIELD_PREFIX}self")),
+            struct_datastore_member_stats: new_id(&format!("{INTERNAL_FIELD_PREFIX}stats")),
+            struct_database_member_stats: new_id(&format!("{INTERNAL_FIELD_PREFIX}stats")),
+            struct_stats: new_id("Stats"),
         }
     }
 
@@ -102,6 +108,16 @@ impl SerializedNamer {
 
     pub fn operator_error_variant_name(&self, key: plan::Key<plan::Operator>) -> Ident {
         new_id(&format!("Error{}", key.arr_idx()))
+    }
+
+    pub fn name_stat_member(&self, stats_ind: usize) -> Ident {
+        Ident::new(&format!("stat_{stats_ind}"), Span::call_site())
+    }
+
+    pub fn access_stat_member(&self, stats_ind: usize) -> Tokens<Expr> {
+        let Self {struct_database_member_stats, self_alias, ..} = self;
+        let member = self.name_stat_member(stats_ind);
+        quote!( &#self_alias.#struct_database_member_stats.#member ).into()
     }
 }
 

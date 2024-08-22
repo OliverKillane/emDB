@@ -10,7 +10,7 @@ use crate::{
 };
 
 use super::{
-    closures::{generate_application, ContextGen}, namer::SerializedNamer, operators::OperatorImpl, tables::GeneratedInfo, types::generate_scalar_type
+    closures::{generate_application, ContextGen}, namer::SerializedNamer, operators::OperatorImpl, tables::GeneratedInfo, types::generate_scalar_type, stats::RequiredStats
 };
 
 fn generate_errors(
@@ -101,6 +101,7 @@ fn generate_query<'imm>(
     namer: &SerializedNamer,
     plan::Query { name, ctx }: &'imm plan::Query,
     operator_impl: &OperatorImpl,
+    required_stats: &mut RequiredStats,
 ) -> QueryMod {
     let OperatorImpl { impl_alias, .. } = operator_impl;
     let SerializedNamer {
@@ -134,7 +135,8 @@ fn generate_query<'imm>(
         &mut PushSet::new(&mut mutated_tables),
         gen_info,
         namer,
-        operator_impl
+        operator_impl,
+        required_stats,
     );
 
     let run_query = quote!((#code)(self, #(#params_use),* ));
@@ -216,6 +218,10 @@ pub struct QueriesInfo {
     /// use the [`SerializedNamer::db_lifetime`] as this will cause an error with span
     /// [`proc_macro2::Span::call_site`]
     pub query_impls: Option<Tokens<ItemImpl>>,
+
+    /// The statistics that need to be added for the queries' operators to make 
+    /// use of.
+    pub required_stats: RequiredStats,
 }
 
 // TODO: determine error type
@@ -237,10 +243,11 @@ pub fn generate_queries<'imm>(
         interface: InterfaceNamer { trait_database, trait_database_type_datastore, ..},
         ..
     } = namer;
+    let mut required_stats = RequiredStats::new();
     let (mods, impls): (Vec<Tokens<ItemMod>>, Vec<Tokens<ImplItemFn>>) = lp
         .queries
         .iter()
-        .map(move |(_, query)| generate_query(lp, gen_info, namer, query, operator_impl).extract())
+        .map(|(_, query)| generate_query(lp, gen_info, namer, query, operator_impl, &mut required_stats).extract())
         .unzip();
 
     QueriesInfo {
@@ -275,5 +282,6 @@ pub fn generate_queries<'imm>(
                 .into(),
             )
         },
+        required_stats,
     }
 }

@@ -1,0 +1,13 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{n}{table}\PYG{+w}{ }\PYG{n}{people}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{n}{name}: \PYG{n+nb}{String}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{friend}: \PYG{n+nb}{Option}\PYG{o}{\PYGZlt{}}\PYG{n+nb}{String}\PYG{o}{\PYGZgt{}}\PYG{p}{,}
+\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{o}{@}\PYG{+w}{ }\PYG{p}{[}\PYG{+w}{ }\PYG{n}{unique}\PYG{p}{(}\PYG{n}{name}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{as}\PYG{+w}{ }\PYG{n}{unique\PYGZus{}names}\PYG{+w}{ }\PYG{p}{]}
+
+\PYG{n}{query}\PYG{+w}{ }\PYG{n}{catalogue\PYGZus{}error}\PYG{p}{()}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{use}\PYG{+w}{ }\PYG{n}{not\PYGZus{}people}\PYG{+w}{ }\PYG{c+c1}{// no such table}
+\PYG{+w}{        }\PYG{o}{|\PYGZgt{}}\PYG{+w}{ }\PYG{n}{filter}\PYG{p}{(}\PYG{+w}{ }\PYG{n}{name}\PYG{p}{.}\PYG{n}{len}\PYG{p}{()}\PYG{+w}{ }\PYG{o}{\PYGZlt{}}\PYG{+w}{ }\PYG{l+m+mi}{10}\PYG{+w}{ }\PYG{p}{)}
+\PYG{+w}{        }\PYG{o}{|\PYGZgt{}}\PYG{+w}{ }\PYG{n}{collect}\PYG{p}{(}\PYG{n}{users}\PYG{p}{)}
+\PYG{+w}{        }\PYG{o}{\PYGZti{}\PYGZgt{}}\PYG{+w}{ }\PYG{k}{return}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+\end{Verbatim}

@@ -1,0 +1,19 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{n}{query}\PYG{+w}{ }\PYG{n}{foobars}\PYG{p}{(}\PYG{n}{max\PYGZus{}bar}: \PYG{k+kt}{usize}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{    }\PYG{k}{use}\PYG{+w}{ }\PYG{n}{foos}
+\PYG{+w}{        }\PYG{o}{|\PYGZgt{}}\PYG{+w}{ }\PYG{n}{filter}\PYG{p}{(}\PYG{n}{bar}\PYG{+w}{ }\PYG{o}{\PYGZlt{}}\PYG{+w}{ }\PYG{n}{max\PYGZus{}bar}\PYG{p}{)}
+\PYG{+w}{        }\PYG{o}{|\PYGZgt{}}\PYG{+w}{ }\PYG{n}{map}\PYG{p}{(}
+\PYG{+w}{              }\PYG{n}{foobar}: \PYG{n+nc}{super}::\PYG{n}{UserType}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{                  }\PYG{k+kd}{let}\PYG{+w}{ }\PYG{n}{logic}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{c+cm}{/* complex expressions */}\PYG{p}{;}
+\PYG{+w}{                  }\PYG{k}{super}::\PYG{n}{user\PYGZus{}defined\PYGZus{}function}\PYG{p}{(}\PYG{n}{logic}\PYG{p}{,}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{n}{bar}\PYG{p}{)}
+\PYG{+w}{              }\PYG{p}{\PYGZcb{},}
+\PYG{+w}{              }\PYG{n}{zing}: \PYG{k+kt}{usize} \PYG{o}{=}\PYG{+w}{ }\PYG{n}{bar}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{,}
+\PYG{+w}{          }\PYG{p}{)}
+\PYG{+w}{        }\PYG{o}{|\PYGZgt{}}\PYG{+w}{ }\PYG{n}{sort}\PYG{p}{(}\PYG{n}{zing}\PYG{+w}{ }\PYG{n}{asc}\PYG{p}{)}
+\PYG{+w}{        }\PYG{o}{|\PYGZgt{}}\PYG{+w}{ }\PYG{n}{lift}\PYG{p}{(}
+\PYG{+w}{              }\PYG{c+cm}{/* .. some subquery */}
+\PYG{+w}{          }\PYG{p}{)}
+\PYG{+w}{        }\PYG{o}{|\PYGZgt{}}\PYG{+w}{ }\PYG{n}{collect}\PYG{p}{(}\PYG{n}{foobars}\PYG{p}{)}
+\PYG{+w}{        }\PYG{o}{\PYGZti{}\PYGZgt{}}\PYG{+w}{ }\PYG{k}{return}\PYG{p}{;}
+\PYG{p}{\PYGZcb{}}
+\end{Verbatim}

@@ -15,6 +15,8 @@ super::generate_minister_trait! { ParallelOps }
 pub struct Parallel;
 
 impl ParallelOps for Parallel {
+    type Buffer<Data: Send + Sync> = Vec<Data>;
+
     fn consume_stream<Data>(iter: impl Iterator<Item = Data>) -> stream!(Data)
     where
         Data: Send + Sync,
@@ -23,7 +25,7 @@ impl ParallelOps for Parallel {
         iter.collect::<Vec<_>>().into_par_iter()
     }
 
-    fn consume_buffer<Data>(buff: Vec<Data>) -> stream!(Data)
+    fn consume_buffer<Data>(buff: Self::Buffer<Data>) -> stream!(Data)
     where
         Data: Send + Sync,
     {
@@ -44,7 +46,7 @@ impl ParallelOps for Parallel {
         stream.collect::<Vec<_>>().into_iter()
     }
 
-    fn export_buffer<Data>(stream: stream!(Data)) -> Vec<Data>
+    fn export_buffer<Data>(stream: stream!(Data)) -> Self::Buffer<Data>
     where
         Data: Send + Sync,
     {
@@ -78,9 +80,11 @@ impl ParallelOps for Parallel {
         single
     }
 
+    type MapStats = ();
     fn map<InData, OutData>(
         stream: stream!(InData),
         mapping: impl Fn(InData) -> OutData + Send + Sync,
+        _stats: &Self::MapStats,
     ) -> stream!(OutData)
     where
         InData: Send + Sync,
@@ -89,9 +93,11 @@ impl ParallelOps for Parallel {
         stream.map(mapping)
     }
 
+    type MapSeqStats = ();
     fn map_seq<InData, OutData>(
         stream: stream!(InData),
         mapping: impl FnMut(InData) -> OutData,
+        _stats: &Self::MapSeqStats,
     ) -> stream!(OutData)
     where
         InData: Send + Sync,
@@ -105,9 +111,11 @@ impl ParallelOps for Parallel {
             .into_par_iter()
     }
 
+    type MapSingleStats = ();
     fn map_single<InData, OutData>(
         single: single!(InData),
         mapping: impl FnOnce(InData) -> OutData,
+        _stats: &Self::MapSingleStats,
     ) -> single!(OutData)
     where
         InData: Send + Sync,
@@ -116,9 +124,11 @@ impl ParallelOps for Parallel {
         (mapping)(single)
     }
 
+    type FilterStats = ();
     fn filter<Data>(
         stream: stream!(Data),
         predicate: impl Fn(&Data) -> bool + Send + Sync,
+        _stats: &Self::FilterStats,
     ) -> stream!(Data)
     where
         Data: Send + Sync,
@@ -126,9 +136,11 @@ impl ParallelOps for Parallel {
         stream.filter(predicate)
     }
 
+    type AllStats = ();
     fn all<Data>(
         stream: stream!(Data),
         predicate: impl Fn(&Data) -> bool + Send + Sync,
+        _stats: &Self::AllStats,
     ) -> (bool, stream!(Data))
     where
         Data: Send + Sync,
@@ -138,24 +150,35 @@ impl ParallelOps for Parallel {
         (res, vals.into_par_iter())
     }
 
-    fn is<Data>(single: single!(Data), predicate: impl Fn(&Data) -> bool) -> (bool, single!(Data))
+    type IsStats = ();
+    fn is<Data>(
+        single: single!(Data), 
+        predicate: impl Fn(&Data) -> bool,
+        _stats: &Self::IsStats,
+    ) -> (bool, single!(Data))
     where
         Data: Send + Sync,
     {
         (predicate(&single), single)
     }
 
-    fn count<Data>(stream: stream!(Data)) -> single!(usize)
+    type CountStats = ();
+    fn count<Data>(
+        stream: stream!(Data),
+        _stats: &Self::CountStats,
+    ) -> single!(usize)
     where
         Data: Send + Sync,
     {
         stream.count()
     }
 
+    type FoldStats = ();
     fn fold<InData, Acc>(
         stream: stream!(InData),
         initial: Acc,
         fold_fn: impl Fn(Acc, InData) -> Acc,
+        _stats: &Self::FoldStats,
     ) -> single!(Acc)
     where
         InData: Send + Sync,
@@ -167,11 +190,13 @@ impl ParallelOps for Parallel {
         }
         acc
     }
-
+    
+    type CombineStats = ();
     fn combine<Data>(
         stream: stream!(Data),
         alternative: Data,
         combiner: impl Fn(Data, Data) -> Data + Send + Sync,
+        _stats: &Self::CombineStats,
     ) -> single!(Data)
     where
         Data: Send + Sync + Clone,
@@ -179,9 +204,11 @@ impl ParallelOps for Parallel {
         stream.reduce(|| alternative.clone(), combiner)
     }
 
+    type SortStats = ();
     fn sort<Data>(
         stream: stream!(Data),
         ordering: impl Fn(&Data, &Data) -> std::cmp::Ordering + Send + Sync,
+        _stats: &Self::SortStats,
     ) -> stream!(Data)
     where
         Data: Send + Sync,
@@ -191,7 +218,12 @@ impl ParallelOps for Parallel {
         data.into_par_iter()
     }
 
-    fn take<Data>(stream: stream!(Data), n: usize) -> stream!(Data)
+    type TakeStats = ();
+    fn take<Data>(
+        stream: stream!(Data), 
+        n: usize,
+        _stats: &Self::TakeStats,
+    ) -> stream!(Data)
     where
         Data: Send + Sync,
     {
@@ -200,9 +232,11 @@ impl ParallelOps for Parallel {
         values.into_par_iter()
     }
 
+    type GroupByStats = ();
     fn group_by<Key, Rest, Data>(
         stream: stream!(Data),
         split: impl Fn(Data) -> (Key, Rest),
+        _stats: &Self::GroupByStats,
     ) -> stream!((Key, stream!(Rest)))
     where
         Data: Send + Sync,
@@ -218,9 +252,11 @@ impl ParallelOps for Parallel {
         groups.into_par_iter().map(|(k, v)| (k, v.into_par_iter()))
     }
 
+    type CrossJoinStats = ();
     fn cross_join<LeftData, RightData>(
         left: stream!(LeftData),
         right: stream!(RightData),
+        _stats: &Self::CrossJoinStats,
     ) -> stream!((LeftData, RightData))
     where
         LeftData: Clone + Send + Sync,
@@ -234,11 +270,13 @@ impl ParallelOps for Parallel {
             .into_par_iter()
     }
 
+    type EquiJoinStats = ();
     fn equi_join<LeftData, RightData, Key>(
         left: stream!(LeftData),
         right: stream!(RightData),
         left_split: impl Fn(&LeftData) -> &Key + Send + Sync,
         right_split: impl Fn(&RightData) -> &Key + Send + Sync,
+        _stats: &Self::EquiJoinStats,
     ) -> stream!((LeftData, RightData))
     where
         Key: Eq + std::hash::Hash + Send + Sync,
@@ -289,10 +327,12 @@ impl ParallelOps for Parallel {
         }
     }
 
+    type PredJoinStats = ();
     fn predicate_join<LeftData, RightData>(
         left: stream!(LeftData),
         right: stream!(RightData),
         pred: impl Fn(&LeftData, &RightData) -> bool + Send + Sync,
+        _stats: &Self::PredJoinStats,
     ) -> stream!((LeftData, RightData))
     where
         LeftData: Clone + Send + Sync,
@@ -315,14 +355,23 @@ impl ParallelOps for Parallel {
             .into_par_iter()
     }
 
-    fn union<Data>(left: stream!(Data), right: stream!(Data)) -> stream!(Data)
+    type UnionStats = ();
+    fn union<Data>(
+        left: stream!(Data), 
+        right: stream!(Data),
+        _stats: &Self::UnionStats,
+    ) -> stream!(Data)
     where
         Data: Send + Sync,
     {
         left.chain(right)
     }
 
-    fn fork<Data>(stream: stream!(Data)) -> (stream!(Data), stream!(Data))
+    type ForkStats = ();
+    fn fork<Data>(
+        stream: stream!(Data),
+        _stats: &Self::ForkStats,
+    ) -> (stream!(Data), stream!(Data))
     where
         Data: Clone + Send + Sync,
     {
@@ -330,15 +379,21 @@ impl ParallelOps for Parallel {
         (left.into_par_iter(), right.into_par_iter())
     }
 
-    fn fork_single<Data>(single: single!(Data)) -> (single!(Data), single!(Data))
+    type ForkSingleStats = ();
+    fn fork_single<Data>(
+        single: single!(Data),
+        _stats: &Self::ForkSingleStats,
+    ) -> (single!(Data), single!(Data))
     where
         Data: Clone + Send + Sync,
     {
         (single.clone(), single)
     }
 
+    type SplitStats = ();
     fn split<LeftData, RightData>(
         stream: stream!((LeftData, RightData)),
+        _stats: &Self::SplitStats,
     ) -> (stream!(LeftData), stream!(RightData))
     where
         LeftData: Send + Sync,
