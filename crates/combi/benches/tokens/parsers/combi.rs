@@ -69,7 +69,7 @@ impl Parse<LargeGroups> for CombiParser {
                 ),
                 mapsuc(
                     recovgroup(Delimiter::Brace, many0(not(isempty()), r.clone())),
-                    |gs| LargeGroups::Groups(gs),
+                    LargeGroups::Groups,
                 ),
             )
         });

@@ -34,5 +34,5 @@ pub fn test() {
     let mut db = ds.db();
 
     let id = db.add_string("hello").string_id;
-    db.mutate_string(id, "cool").expect("correct reference").string_data;
+    db.mutate_string(id, "cool").expect("correct reference");
 }

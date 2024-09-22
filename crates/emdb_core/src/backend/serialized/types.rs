@@ -105,14 +105,14 @@ pub fn generate_scalar_type<'imm>(
 ) -> Tokens<Type> {
     match lp.get_scalar_type_conc(key) {
         plan::ScalarTypeConc::TableRef(tk) => {
-            let table_name = &lp.get_table(*tk).name;
+            let table_mod = namer.table_internal_name(lp, *tk);
             let SerializedNamer {
                 pulpit: pulpit::gen::namer::CodeNamer { type_key, .. },
                 mod_tables,
                 ..
             } = namer;
             quote! {
-                #mod_tables::#table_name::#type_key
+                #mod_tables::#table_mod::#type_key
             }
             .into()
         }

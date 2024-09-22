@@ -238,7 +238,7 @@ impl ChunkOps for Chunk {
 
     type IsStats = ();
     fn is<Data>(
-        single: single!(Data), 
+        single: single!(Data),
         predicate: impl Fn(&Data) -> bool,
         _stats: &Self::IsStats,
     ) -> (bool, single!(Data))
@@ -249,10 +249,7 @@ impl ChunkOps for Chunk {
     }
 
     type CountStats = ();
-    fn count<Data>(
-        stream: stream!(Data),
-        _stats: &Self::CountStats,
-    ) -> single!(usize)
+    fn count<Data>(stream: stream!(Data), _stats: &Self::CountStats) -> single!(usize)
     where
         Data: Send + Sync,
     {
@@ -315,11 +312,7 @@ impl ChunkOps for Chunk {
     }
 
     type TakeStats = ();
-    fn take<Data>(
-        stream: stream!(Data), 
-        n: usize,
-        _stats: &Self::TakeStats,
-    ) -> stream!(Data)
+    fn take<Data>(stream: stream!(Data), n: usize, _stats: &Self::TakeStats) -> stream!(Data)
     where
         Data: Send + Sync,
     {
@@ -463,7 +456,7 @@ impl ChunkOps for Chunk {
 
     type UnionStats = ();
     fn union<Data>(
-        mut left: stream!(Data), 
+        mut left: stream!(Data),
         right: stream!(Data),
         _stats: &Self::UnionStats,
     ) -> stream!(Data)
@@ -475,10 +468,7 @@ impl ChunkOps for Chunk {
     }
 
     type ForkStats = ();
-    fn fork<Data>(
-        stream: stream!(Data),
-        _stats: &Self::ForkStats,
-    ) -> (stream!(Data), stream!(Data))
+    fn fork<Data>(stream: stream!(Data), _stats: &Self::ForkStats) -> (stream!(Data), stream!(Data))
     where
         Data: Clone + Send + Sync,
     {
@@ -510,7 +500,8 @@ impl ChunkOps for Chunk {
             .into_par_iter()
             .map(|inner| inner.into_iter().collect::<(Vec<_>, Vec<_>)>())
             .collect::<Vec<_>>()
-            .into_iter().collect::<(Vec<_>, Vec<_>)>();
+            .into_iter()
+            .collect::<(Vec<_>, Vec<_>)>();
         (left.into(), right.into())
     }
 }

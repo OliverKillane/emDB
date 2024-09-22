@@ -152,7 +152,7 @@ impl ParallelOps for Parallel {
 
     type IsStats = ();
     fn is<Data>(
-        single: single!(Data), 
+        single: single!(Data),
         predicate: impl Fn(&Data) -> bool,
         _stats: &Self::IsStats,
     ) -> (bool, single!(Data))
@@ -163,10 +163,7 @@ impl ParallelOps for Parallel {
     }
 
     type CountStats = ();
-    fn count<Data>(
-        stream: stream!(Data),
-        _stats: &Self::CountStats,
-    ) -> single!(usize)
+    fn count<Data>(stream: stream!(Data), _stats: &Self::CountStats) -> single!(usize)
     where
         Data: Send + Sync,
     {
@@ -190,7 +187,7 @@ impl ParallelOps for Parallel {
         }
         acc
     }
-    
+
     type CombineStats = ();
     fn combine<Data>(
         stream: stream!(Data),
@@ -219,11 +216,7 @@ impl ParallelOps for Parallel {
     }
 
     type TakeStats = ();
-    fn take<Data>(
-        stream: stream!(Data), 
-        n: usize,
-        _stats: &Self::TakeStats,
-    ) -> stream!(Data)
+    fn take<Data>(stream: stream!(Data), n: usize, _stats: &Self::TakeStats) -> stream!(Data)
     where
         Data: Send + Sync,
     {
@@ -357,7 +350,7 @@ impl ParallelOps for Parallel {
 
     type UnionStats = ();
     fn union<Data>(
-        left: stream!(Data), 
+        left: stream!(Data),
         right: stream!(Data),
         _stats: &Self::UnionStats,
     ) -> stream!(Data)
@@ -368,10 +361,7 @@ impl ParallelOps for Parallel {
     }
 
     type ForkStats = ();
-    fn fork<Data>(
-        stream: stream!(Data),
-        _stats: &Self::ForkStats,
-    ) -> (stream!(Data), stream!(Data))
+    fn fork<Data>(stream: stream!(Data), _stats: &Self::ForkStats) -> (stream!(Data), stream!(Data))
     where
         Data: Clone + Send + Sync,
     {

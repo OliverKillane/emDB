@@ -12,7 +12,8 @@ pub struct AssocPullBlocks<ImmData, MutData, const BLOCK_SIZE: usize> {
 impl<ImmData, MutData, const BLOCK_SIZE: usize> Column
     for AssocPullBlocks<ImmData, MutData, BLOCK_SIZE>
 {
-    type WindowKind<'imm> = Window<'imm, Self>
+    type WindowKind<'imm>
+        = Window<'imm, Self>
     where
         Self: 'imm;
 

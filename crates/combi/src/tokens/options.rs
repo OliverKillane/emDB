@@ -386,7 +386,7 @@ mod tests {
     fn basic_parse() {
         let config_opts = (
             OptField::new("foo", || mapsuc(getident(), |_| true)),
-            (OptField::new("bar", || getident()), OptEnd),
+            (OptField::new("bar", getident), OptEnd),
         )
             .gen(':');
 

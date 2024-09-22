@@ -58,13 +58,13 @@ pub mod parallel;
 /// Operators make use of statistics, but need to be able to store this information at runtime.
 /// - Type associated with trait, and can be stored separately from operator invocations.
 ///
-/// *Why not just include `static` in each operator?*
+/// ### Why not just include `static` in each operator?
 /// - Rust statics are part of the module, they ignore monomorphisation -> one static for all filters? No
-/// *Why not use a static map (e.g. TypeMap)?*
+/// ### Why not use a static map (e.g. TypeMap)?
 /// - We want to pay no runtime cost for looking up & updating statistics. Just passing a reference for
 ///   direct access is simple & fast.
-/// 
-/// ### Interesting Reads
+///
+/// ## Interesting Reads
 /// - [Justin Jaffray: Push vs Pull](https://justinjaffray.com/query-engines-push-vs.-pull/)
 /// - [snowflake paper](https://info.snowflake.net/rs/252-RFO-227/images/Snowflake_SIGMOD.pdf)
 /// - [Push vs Pull-Based Loop Fusion in Query Engines](https://arxiv.org/pdf/1610.09166)
@@ -175,10 +175,7 @@ macro_rules! generate_minister_trait {
                 Data: Send + Sync;
 
             type CountStats: Sync + Default;
-            fn count<Data>(
-                stream: stream!(Data),
-                stats: &Self::CountStats,
-            ) -> single!(usize)
+            fn count<Data>(stream: stream!(Data), stats: &Self::CountStats) -> single!(usize)
             where
                 Data: Send + Sync;
 
@@ -214,7 +211,7 @@ macro_rules! generate_minister_trait {
 
             type TakeStats: Sync + Default;
             fn take<Data>(
-                stream: stream!(Data), 
+                stream: stream!(Data),
                 n: usize,
                 stats: &Self::TakeStats,
             ) -> stream!(Data)
@@ -268,7 +265,7 @@ macro_rules! generate_minister_trait {
 
             type UnionStats: Sync + Default;
             fn union<Data>(
-                left: stream!(Data), 
+                left: stream!(Data),
                 right: stream!(Data),
                 stats: &Self::UnionStats,
             ) -> stream!(Data)

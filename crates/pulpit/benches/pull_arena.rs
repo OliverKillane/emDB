@@ -1,6 +1,5 @@
 /// Compare the performance of generational arenas
 /// Here we compare insert, followed by sequential access.
-use divan;
 use pulpit::column::{
     Column, Data, Entry, PrimaryGenerationalArena, PrimaryRetain, PrimaryThunderDome,
     PrimaryWindow, PrimaryWindowPull,

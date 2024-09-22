@@ -15,7 +15,7 @@ fn recur_ident_parser(
             .map(|(id, recur)| {
                 Box::new(RecursiveIdent::Next {
                     id: id.to_string(),
-                    recur: recur,
+                    recur,
                 })
             })
             .or(punct('!').map(|_| Box::new(RecursiveIdent::Final)))
@@ -25,7 +25,7 @@ fn recur_ident_parser(
 impl Parse<RecursiveIdent> for ChumskyProc {
     fn parse(input: proc_macro2::TokenStream) -> RecursiveIdent {
         let parser = recur_ident_parser();
-        *(parser.parse(stream_from_tokens(input.into()))).unwrap()
+        *(parser.parse(stream_from_tokens(input))).unwrap()
     }
 }
 
@@ -39,7 +39,7 @@ fn long_parser() -> impl Parser<RustToken, LongSequence, Error = Simple<RustToke
 impl Parse<LongSequence> for ChumskyProc {
     fn parse(input: proc_macro2::TokenStream) -> LongSequence {
         long_parser()
-            .parse(stream_from_tokens(input.into()))
+            .parse(stream_from_tokens(input))
             .unwrap()
     }
 }
@@ -51,7 +51,7 @@ fn nothing_parser() -> impl Parser<RustToken, Nothing, Error = Simple<RustToken,
 impl Parse<Nothing> for ChumskyProc {
     fn parse(input: proc_macro2::TokenStream) -> Nothing {
         nothing_parser()
-            .parse(stream_from_tokens(input.into()))
+            .parse(stream_from_tokens(input))
             .unwrap()
     }
 }
@@ -86,7 +86,7 @@ fn large_group_parser() -> impl Parser<RustToken, LargeGroups, Error = Simple<Ru
 impl Parse<LargeGroups> for ChumskyProc {
     fn parse(input: proc_macro2::TokenStream) -> LargeGroups {
         large_group_parser()
-            .parse(stream_from_tokens(input.into()))
+            .parse(stream_from_tokens(input))
             .unwrap()
     }
 }

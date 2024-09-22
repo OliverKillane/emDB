@@ -22,6 +22,7 @@ impl Display for ProductCategory {
     }
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, Debug)]
 pub enum Currency {
     GBP,
@@ -50,6 +51,7 @@ fn exchange(btc_rate: f64, usd_rate: f64,price: u64, currency: Currency) -> u64 
 } 
 
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default)]
 struct Aggregate {
     clothes: usize,
     electronics: usize,
@@ -57,16 +59,6 @@ struct Aggregate {
     money_spent: u64,
 }
 
-impl Default for Aggregate {
-    fn default() -> Self {
-        Aggregate {
-            clothes: 0,
-            electronics: 0,
-            food: 0,
-            money_spent: 0,
-        }
-    }
-}
 
 emql!{
     impl my_db as Serialized {
@@ -96,7 +88,7 @@ emql!{
         unique(reference) as unique_customer_reference, 
         unique(address) as unique_customer_address,
         pred(name.len() > 2) as sensible_name, 
-        pred(address.len() > 0) as non_empty_address,
+        pred(!address.is_empty()) as non_empty_address,
     ]
 
     // Old customers, deleted but references kept for purchases

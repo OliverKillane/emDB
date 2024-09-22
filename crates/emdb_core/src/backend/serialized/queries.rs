@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::{collections::HashMap, iter::once};
 
 use pulpit::gen::namer::CodeNamer;
 use quote::quote;
@@ -6,7 +6,7 @@ use quote_debug::Tokens;
 use syn::{ExprBlock, Ident, ImplItemFn, ItemEnum, ItemImpl, ItemMod, Path};
 
 use crate::{
-    backend::interface::{namer::InterfaceNamer, InterfaceTrait}, plan, utils::misc::{PushMap, PushSet}
+    backend::interface::{namer::InterfaceNamer, InterfaceTrait}, plan, utils::{misc::PushMap, mut_scope::{Mutability, ScopeData, ScopeHandle}}
 };
 
 use super::{
@@ -49,8 +49,10 @@ struct CommitInfo {
 
 fn generate_commits<'imm>(
     lp: &'imm plan::Plan,
-    mutated_tables: HashSet<plan::ImmKey<'imm, plan::Table>>,
-    SerializedNamer {
+    mutated_tables: ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
+    namer: &SerializedNamer,
+) -> Option<CommitInfo> {
+    let SerializedNamer {
         pulpit:
             CodeNamer {
                 struct_window_method_commit,
@@ -58,15 +60,15 @@ fn generate_commits<'imm>(
                 ..
             },
         ..
-    }: &SerializedNamer,
-) -> Option<CommitInfo> {
+    } = namer;
+
     if mutated_tables.is_empty() {
         None
     } else {
         let (commits, aborts): (Vec<_>, Vec<_>) = mutated_tables
-            .iter()
-            .map(|key| {
-                let table_name = &lp.get_table(**key).name;
+            .mutabilities()
+            .map(|(key, _)| {
+                let table_name = namer.table_internal_name(lp, **key);
                 (
                     quote! {
                         self.#table_name.#struct_window_method_commit();
@@ -108,6 +110,7 @@ fn generate_query<'imm>(
         qy_lifetime,
         mod_queries,
         mod_queries_mod_query_enum_error,
+        struct_database_member_stats,
         ..
     } = namer;
 
@@ -121,29 +124,49 @@ fn generate_query<'imm>(
 
     let (params_use, params): (Vec<_>, Vec<_>) = context.params.iter().map(|(name, ty_key)| {
         let ty = generate_scalar_type(lp, &gen_info.get_types, *ty_key, namer);
-        (name, quote!(#name: #ty))
+        (quote!(#name), quote!(#name: #ty))
     }).unzip();
 
     let mut errors = HashMap::new();
-    let mut mutated_tables = HashSet::new();
 
-    let ContextGen { code, .. } = generate_application(
+    let mut query_scope_data = ScopeData::new();
+    let mut query_scope = query_scope_data.scope();
+
+    let ContextGen { code, scope, .. } = generate_application(
         lp,
         *ctx,
         &quote!(#mod_queries::#name::#mod_queries_mod_query_enum_error).into(),
         &mut PushMap::new(&mut errors),
-        &mut PushSet::new(&mut mutated_tables),
+        &mut query_scope,
         gen_info,
         namer,
         operator_impl,
         required_stats,
     );
 
-    let run_query = quote!((#code)(self, #(#params_use),* ));
+    // NOTE: This is the top level start to the query, just using the closure for 
+    //       the context generated
+    let toplevel_closure_args = {
+        once(
+            quote!(&self.#struct_database_member_stats)
+        ).chain(
+            scope.mutabilities().map(|(k, mutable)| {
+                let reference = match mutable {
+                    Mutability::Mut => quote!(&mut),
+                    Mutability::Imm => quote!(&),
+                };
+                let name = namer.table_internal_name(lp, **k);
+                quote!(#reference self.#name)
+            })
+        ).chain(
+            params_use
+        )
+    };
+    let run_query = quote!((#code)(#(#toplevel_closure_args),* ));
 
     match (
         generate_errors(errors, namer),
-        generate_commits(lp, mutated_tables, namer)
+        generate_commits(lp, scope, namer)
     ) {
         (None, None) => {
             QueryMod {

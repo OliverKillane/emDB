@@ -37,7 +37,7 @@ pub fn generate_tables<'imm>(
         .iter()
         .map(|(key, emdb_table)| {
             let pulpit_select = pulpit::gen::selector::SelectOperations {
-                name: emdb_table.name.clone(),
+                name: namer.table_internal_name(lp, key),
                 transactions: true,
                 deletions: false,
                 fields: emdb_table
@@ -186,25 +186,25 @@ pub fn generate_tables<'imm>(
 
     let (insert_can_error, table_defs): (HashMap<_, _>, Vec<_>) = gen_data.into_iter().unzip();
 
-    let table_names = lp
+    let table_mod_names = lp
         .tables
         .iter()
-        .map(|(_, table)| &table.name)
+        .map(|(k, _)| namer.table_internal_name(lp, k))
         .collect::<Vec<_>>();
 
-    let datastore_members = table_names
+    let datastore_members = table_mod_names
         .iter()
-        .map(|name| quote!(#name: #mod_tables::#name::#struct_table));
-    let datastore_members_new = table_names
+        .map(|mod_name| quote!(#mod_name: #mod_tables::#mod_name::#struct_table));
+    let datastore_members_new = table_mod_names
         .iter()
-        .map(|name| quote!(#name: #mod_tables::#name::#struct_table::new(1024)));
+        .map(|mod_name| quote!(#mod_name: #mod_tables::#mod_name::#struct_table::new(1024)));
 
-    let (database_members_window_stream, database_members_stream): (Vec<_>, Vec<_>) = table_names
+    let (database_members_window_stream, database_members_stream): (Vec<_>, Vec<_>) = table_mod_names
         .iter()
-        .map(|name| {
+        .map(|mod_name| {
             (
-                quote!(#name: self.#name.window()),
-                quote!(#name: #mod_tables::#name::#struct_window<#db_lifetime>),
+                quote!(#mod_name: self.#mod_name.window()),
+                quote!(#mod_name: #mod_tables::#mod_name::#struct_window<#db_lifetime>),
             )
         })
         .unzip();
@@ -239,9 +239,10 @@ pub fn generate_tables<'imm>(
             exposed_table_keys
                 .into_iter()
                 .map(|tablekey| {
-                    let name = &lp.get_table(*tablekey).name;
-                    let key_name = namer.interface.key_name(name);
-                    quote! { type #key_name = #mod_tables::#name::#type_key }
+                    let mod_name = namer.table_internal_name(lp, *tablekey);
+                    let table_name = &lp.get_table(*tablekey).name;
+                    let key_name = namer.interface.key_name(table_name);
+                    quote! { type #key_name = #mod_tables::#mod_name::#type_key }
                 })
                 .collect::<Vec<_>>(),
             quote!(type #trait_datastore_type_database<#db_lifetime> = #struct_database<#db_lifetime>;),

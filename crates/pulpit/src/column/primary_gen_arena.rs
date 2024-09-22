@@ -12,7 +12,8 @@ impl<ImmData, MutData> Keyable for PrimaryGenerationalArena<ImmData, MutData> {
 }
 
 impl<ImmData, MutData> Column for PrimaryGenerationalArena<ImmData, MutData> {
-    type WindowKind<'imm> = Window<'imm, PrimaryGenerationalArena<ImmData, MutData>>
+    type WindowKind<'imm>
+        = Window<'imm, PrimaryGenerationalArena<ImmData, MutData>>
     where
         Self: 'imm;
 

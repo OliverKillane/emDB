@@ -5,7 +5,9 @@ use quote_debug::Tokens;
 use syn::{Expr, ExprClosure, Ident, Lifetime, Path, Type};
 
 use crate::{
-    backend::interface::namer::InterfaceNamer, plan::{self, RecordConc}, utils::misc::{new_id, PushMap}
+    backend::interface::namer::InterfaceNamer,
+    plan::{self, RecordConc},
+    utils::misc::{new_id, PushMap},
 };
 use quote::{quote, ToTokens};
 
@@ -23,10 +25,10 @@ pub struct SerializedNamer {
     pub mod_queries_mod_query_enum_error: Ident,
     pub operator_error_parameter: Ident,
     pub interface: InterfaceNamer,
-    pub self_alias: Ident,
     pub struct_datastore_member_stats: Ident,
     pub struct_database_member_stats: Ident,
     pub struct_stats: Ident,
+    pub closure_stats_param: Ident,
 }
 
 impl SerializedNamer {
@@ -47,10 +49,10 @@ impl SerializedNamer {
             mod_queries_mod_query_enum_error: new_id("Error"),
             operator_error_parameter: new_id("err"),
             interface: InterfaceNamer::new(),
-            self_alias: new_id(&format!("{INTERNAL_FIELD_PREFIX}self")),
             struct_datastore_member_stats: new_id(&format!("{INTERNAL_FIELD_PREFIX}stats")),
             struct_database_member_stats: new_id(&format!("{INTERNAL_FIELD_PREFIX}stats")),
             struct_stats: new_id("Stats"),
+            closure_stats_param: new_id(&format!("{INTERNAL_FIELD_PREFIX}stats")),
         }
     }
 
@@ -115,9 +117,23 @@ impl SerializedNamer {
     }
 
     pub fn access_stat_member(&self, stats_ind: usize) -> Tokens<Expr> {
-        let Self {struct_database_member_stats, self_alias, ..} = self;
+        let Self {
+            closure_stats_param,
+            ..
+        } = self;
         let member = self.name_stat_member(stats_ind);
-        quote!( &#self_alias.#struct_database_member_stats.#member ).into()
+        quote!( &#closure_stats_param.#member ).into()
+    }
+
+    pub fn table_internal_name(&self, lp: &plan::Plan, key: plan::Key<plan::Table>) -> Ident {
+        // TODO: Separate internal names, currently we use the same name as the table, 
+        //       as we expose the module. This is not ideal (potential for name 
+        //       conflicts).
+        lp.get_table(key).name.clone()
+    }
+
+    pub fn table_param_name(&self, lp: &plan::Plan, key: plan::Key<plan::Table>) -> Ident {
+        new_id(&format!("internal_table_use_{}", lp.get_table(key).name))
     }
 }
 
@@ -135,7 +151,7 @@ pub fn dataflow_fields<'plan>(
     key: plan::Key<plan::DataFlow>,
     namer: &SerializedNamer,
 ) -> DataFlowNaming<'plan> {
-    // NOTE: Previously we included the type of the stream/single, however this 
+    // NOTE: Previously we included the type of the stream/single, however this
     //       prevented using streams of types that are `impl Trait`.
     let SerializedNamer {
         db_lifetime,
@@ -155,7 +171,7 @@ pub fn dataflow_fields<'plan>(
         stream: df_conn.with.stream,
         data_constructor: record_name.clone(),
         data_type: quote!(#record_name<#db_lifetime, #qy_lifetime>).into(),
-        record_type
+        record_type,
     }
 }
 
@@ -199,19 +215,31 @@ pub fn transfer_fields<'brw>(
         }))
 }
 
-pub fn expose_user_fields<'brw>(record: &'brw plan::RecordConc, namer: &'brw SerializedNamer) -> impl Iterator<Item=TokenStream> + 'brw {
+pub fn expose_user_fields<'brw>(
+    record: &'brw plan::RecordConc,
+    namer: &'brw SerializedNamer,
+) -> impl Iterator<Item = TokenStream> + 'brw {
     let phantomdata: &Ident = &namer.phantom_field;
-    record.fields.keys().map(|rf| {
-        let field_name = namer.transform_field_name(rf);
-        let alias = match rf {
-            plan::RecordField::User(id) => quote! {#id},
-            plan::RecordField::Internal(_) => quote! {_},
-        };
-        quote! {#field_name: #alias}
-    }).chain(once(quote! {#phantomdata: _}))
+    record
+        .fields
+        .keys()
+        .map(|rf| {
+            let field_name = namer.transform_field_name(rf);
+            let alias = match rf {
+                plan::RecordField::User(id) => quote! {#id},
+                plan::RecordField::Internal(_) => quote! {_},
+            };
+            quote! {#field_name: #alias}
+        })
+        .chain(once(quote! {#phantomdata: _}))
 }
 
-pub fn boolean_predicate(lp: &plan::Plan, predicate: &Expr, dataflow: plan::Key<plan::DataFlow>, namer: &SerializedNamer) -> Tokens<ExprClosure> {
+pub fn boolean_predicate(
+    lp: &plan::Plan,
+    predicate: &Expr,
+    dataflow: plan::Key<plan::DataFlow>,
+    namer: &SerializedNamer,
+) -> Tokens<ExprClosure> {
     let DataFlowNaming {
         data_constructor,
         data_type,

@@ -162,7 +162,7 @@ impl IterOps for Iter {
 
     type IsStats = ();
     fn is<Data>(
-        single: single!(Data), 
+        single: single!(Data),
         predicate: impl Fn(&Data) -> bool,
         _stats: &Self::IsStats,
     ) -> (bool, single!(Data))
@@ -173,10 +173,7 @@ impl IterOps for Iter {
     }
 
     type CountStats = ();
-    fn count<Data>(
-        stream: stream!(Data),
-        _stats: &Self::CountStats,
-    ) -> single!(usize)
+    fn count<Data>(stream: stream!(Data), _stats: &Self::CountStats) -> single!(usize)
     where
         Data: Send + Sync,
     {
@@ -225,11 +222,7 @@ impl IterOps for Iter {
     }
 
     type TakeStats = ();
-    fn take<Data>(
-        stream: stream!(Data), 
-        n: usize,
-        _stats: &Self::TakeStats,
-    ) -> stream!(Data)
+    fn take<Data>(stream: stream!(Data), n: usize, _stats: &Self::TakeStats) -> stream!(Data)
     where
         Data: Send + Sync,
     {
@@ -373,7 +366,7 @@ impl IterOps for Iter {
 
     type UnionStats = ();
     fn union<Data>(
-        left: stream!(Data), 
+        left: stream!(Data),
         right: stream!(Data),
         _stats: &Self::UnionStats,
     ) -> stream!(Data)
@@ -384,10 +377,7 @@ impl IterOps for Iter {
     }
 
     type ForkStats = ();
-    fn fork<Data>(
-        stream: stream!(Data),
-        _stats: &Self::ForkStats,
-    ) -> (stream!(Data), stream!(Data))
+    fn fork<Data>(stream: stream!(Data), _stats: &Self::ForkStats) -> (stream!(Data), stream!(Data))
     where
         Data: Clone + Send + Sync,
     {
