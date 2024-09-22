@@ -38,9 +38,7 @@ fn long_parser() -> impl Parser<RustToken, LongSequence, Error = Simple<RustToke
 
 impl Parse<LongSequence> for ChumskyProc {
     fn parse(input: proc_macro2::TokenStream) -> LongSequence {
-        long_parser()
-            .parse(stream_from_tokens(input))
-            .unwrap()
+        long_parser().parse(stream_from_tokens(input)).unwrap()
     }
 }
 
@@ -50,9 +48,7 @@ fn nothing_parser() -> impl Parser<RustToken, Nothing, Error = Simple<RustToken,
 
 impl Parse<Nothing> for ChumskyProc {
     fn parse(input: proc_macro2::TokenStream) -> Nothing {
-        nothing_parser()
-            .parse(stream_from_tokens(input))
-            .unwrap()
+        nothing_parser().parse(stream_from_tokens(input)).unwrap()
     }
 }
 

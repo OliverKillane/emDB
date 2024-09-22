@@ -10,7 +10,6 @@
 //!
 //! No allocations are performed in the iterator version.
 
-
 // #[global_allocator]
 // static ALLOC: divan::AllocProfiler = divan::AllocProfiler::system();
 
