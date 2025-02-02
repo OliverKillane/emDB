@@ -13,11 +13,13 @@ use super::{
 };
 
 /// Use syn to parse tokens collected to a parser
+#[inline]
 pub fn syntopunct<T: SynParse, End: TokenParser<bool>>(end: End) -> impl TokenParser<T> {
     syn(collectuntil(or(end, isempty())))
 }
 
 /// Parse a punct separated list
+#[inline]
 pub fn listsep<S, I: TokenParser<S> + Clone>(sep: char, item: I) -> impl TokenParser<Vec<S>> {
     choice(
         isempty(),
@@ -33,6 +35,7 @@ pub fn listsep<S, I: TokenParser<S> + Clone>(sep: char, item: I) -> impl TokenPa
     )
 }
 
+#[inline]
 pub fn listseptrailing<S, I: TokenParser<S>>(sep: char, item: I) -> impl TokenParser<Vec<S>> {
     many0(
         not(isempty()),

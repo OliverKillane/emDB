@@ -1,0 +1,16 @@
+# JUSTIFY: Commented flags, might be useful later
+# NOTE: Additional flags for helping with debugging inlining-related issues
+#        - Combi with high linining, but optimisation off results in *enormous* 
+#          stack frames, which can result in a stackoverflow within the macro.
+# 
+#        Solved by:
+#        - Aggressive inlining + optimisation (to eliminate much of the intermediates) 
+#          removes this issue
+#        - Switching to #[inline] so rustc does not aggressively inline [CHOSEN]
+#        - Setting the stack to be huge [env flag below]
+#        - Switching off inlining [build flags below]
+# [env]
+# RUST_MIN_STACK = "16777216" # Huge stac
+#
+# [build]
+# rustflags = ["-Cllvm-args=--inline-threshold=0", "-Cno-prepopulate-passes", "-Copt-level=0", "-Clto=off"]

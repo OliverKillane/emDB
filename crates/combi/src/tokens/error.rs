@@ -9,6 +9,7 @@ use crate::{
 
 use super::{TokenDiagnostic, TokenParser};
 
+#[inline]
 pub fn embelisherr<S, P: TokenParser<S>>(parser: P, msg: &'static str) -> impl TokenParser<S> {
     maperr(parser, move |mut e| {
         e.main = e.main.note(String::from(msg));
@@ -16,6 +17,7 @@ pub fn embelisherr<S, P: TokenParser<S>>(parser: P, msg: &'static str) -> impl T
     })
 }
 
+#[inline]
 pub fn expectederr<S, P: TokenParser<S>>(parser: P) -> impl TokenParser<S> {
     // TODO: find a way to build &'static str from trait.
     let msg = format!("Expected `{}`", Repr(&parser));
@@ -25,6 +27,7 @@ pub fn expectederr<S, P: TokenParser<S>>(parser: P) -> impl TokenParser<S> {
     })
 }
 
+#[inline]
 pub fn error<S1, S2, P: TokenParser<S1>>(
     parser: P,
     err_fn: impl Fn(S1) -> Diagnostic,

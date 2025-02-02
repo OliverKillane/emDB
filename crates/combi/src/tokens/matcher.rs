@@ -33,7 +33,7 @@ where
     type Inp = TokenIter;
     type Out = TokenIter;
 
-    #[inline(always)]
+    #[inline]
     fn comp(
         &self,
         mut input: Self::Inp,
