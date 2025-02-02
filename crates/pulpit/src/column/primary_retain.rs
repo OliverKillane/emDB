@@ -137,7 +137,8 @@ impl<ImmData, MutData, const BLOCK_SIZE: usize> Keyable
 impl<ImmData, MutData, const BLOCK_SIZE: usize> Column
     for PrimaryRetain<ImmData, MutData, BLOCK_SIZE>
 {
-    type WindowKind<'imm> = Window<'imm, PrimaryRetain<ImmData, MutData, BLOCK_SIZE>>
+    type WindowKind<'imm>
+        = Window<'imm, PrimaryRetain<ImmData, MutData, BLOCK_SIZE>>
     where
         Self: 'imm;
 

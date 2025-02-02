@@ -14,7 +14,10 @@ impl Keyable for PrimaryAppendAdapter {
 }
 
 impl Column for PrimaryAppendAdapter {
-    type WindowKind<'imm> = Window<'imm, PrimaryAppendAdapter> where Self: 'imm;
+    type WindowKind<'imm>
+        = Window<'imm, PrimaryAppendAdapter>
+    where
+        Self: 'imm;
 
     fn window(&mut self) -> Self::WindowKind<'_> {
         Window { inner: self }

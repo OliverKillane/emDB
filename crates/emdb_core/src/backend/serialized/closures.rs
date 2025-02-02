@@ -1,46 +1,66 @@
 //! generate the closures needed to use in the database, which capture parameters from the query.
-//!
-
 
 use crate::{
     plan,
-    utils::misc::{PushMap, PushSet},
+    utils::{
+        misc::PushMap,
+        mut_scope::{Mutability, ScopeHandle},
+    },
 };
-use quote::quote;
+use itertools::Itertools;
+use quote::{quote, ToTokens};
 use quote_debug::Tokens;
-use syn::{ExprClosure, Ident, Path};
+use syn::{ExprClosure, ExprTuple, Ident, Path};
 
-use super::{namer::{dataflow_fields, DataFlowNaming, SerializedNamer}, operators::OperatorImpl};
 use super::operators::OperatorGen;
 use super::tables::GeneratedInfo;
 use super::types::generate_scalar_type;
+use super::{
+    namer::{dataflow_fields, DataFlowNaming, SerializedNamer},
+    operators::OperatorImpl,
+    stats::RequiredStats,
+};
 
-pub struct ContextGen {
+pub struct ContextGen<'parent_scope, 'imm> {
     pub code: Tokens<ExprClosure>,
     pub can_error: bool,
-    pub mutates: bool,
+    pub scope: ScopeHandle<'parent_scope, plan::ImmKey<'imm, plan::Table>>,
 }
 
 /// Generate the code for a given context.
 /// - Includes a parameter for aliasing `self` (rather than the closure
 ///   borrowing `self`)
 #[allow(clippy::too_many_arguments)]
-pub fn generate_application<'imm, 'brw>(
+pub fn generate_application<'imm, 'brw, 'scope: 'brw>(
     lp: &'imm plan::Plan,
     ctx: plan::Key<plan::Context>,
     error_path: &Tokens<Path>,
-    errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-    mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+    errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+    parent_scope: &'brw mut ScopeHandle<'scope, plan::ImmKey<'imm, plan::Table>>,
     gen_info: &GeneratedInfo<'imm>,
     namer: &SerializedNamer,
     operator_impl: &OperatorImpl,
-) -> ContextGen {
+    required_stats: &mut RequiredStats,
+) -> ContextGen<'brw, 'imm> {
     let context = lp.get_context(ctx);
-    let SerializedNamer { self_alias, .. } = namer;
+    let SerializedNamer {
+        mod_tables,
+        db_lifetime,
+        pulpit:
+            pulpit::gen::namer::CodeNamer {
+                struct_window,
+                ..
+            },
+        closure_stats_param,
+        struct_stats,
+        ..
+    } = namer;
     let mut context_vals = Vec::new();
 
     let error_cnt = errors.count();
-    let mut_cnt = mutated_tables.count();
+
+    let mut scope = parent_scope.scope();
+    let scope_ref = &mut scope;
 
     let tokens = context
         .ordering
@@ -52,10 +72,11 @@ pub fn generate_application<'imm, 'brw>(
                 namer,
                 error_path,
                 errors,
-                mutated_tables,
+                scope_ref,
                 gen_info,
                 &mut context_vals,
                 operator_impl,
+                required_stats,
             )
         })
         .collect::<Vec<_>>();
@@ -63,8 +84,22 @@ pub fn generate_application<'imm, 'brw>(
     let (ids, vals): (Vec<_>, Vec<_>) = context_vals.into_iter().unzip();
 
     let can_error = errors.count() > error_cnt;
-    let mutates = mutated_tables.count() > mut_cnt;
-    
+
+    let tables = scope
+        .mutabilities()
+        .sorted_by_key(|(k, _)| k.arr_idx())
+        .map(|(t, mutable)| {
+            let mod_name = namer.table_internal_name(lp, **t);
+            let ty = quote!(#mod_tables::#mod_name::#struct_window<#db_lifetime>);
+            let usage_name = namer.table_param_name(lp, **t);
+            let reference = match mutable {
+                Mutability::Mut => quote!(&mut),
+                Mutability::Imm => quote!(&),
+            };
+            quote!(#usage_name: #reference #ty)
+        });
+
+    let stats = quote!(#closure_stats_param: &#struct_stats);
 
     let params = context.params.iter().map(|(id, ty)| {
         let ty = generate_scalar_type(lp, &gen_info.get_types, *ty, namer);
@@ -84,20 +119,14 @@ pub fn generate_application<'imm, 'brw>(
             quote!(#return_output)
         }
     } else if can_error {
-        quote! (Ok(()))
+        quote!(Ok(()))
     } else {
         quote!()
     };
 
-    let self_mut = if mutates {
-        quote! {mut}
-    } else {
-        quote! {}
-    };
-
     ContextGen {
         code: quote! {
-            |#self_alias: & #self_mut Self , #(#params,)* #(#inflows,)* | {
+            |#stats, #(#tables,)* #(#params,)* #(#inflows,)* | {
                 let ( #(#ids),* ) = ( #(#vals),* );
                 #(#tokens;)*
                 #ret_val
@@ -105,6 +134,22 @@ pub fn generate_application<'imm, 'brw>(
         }
         .into(),
         can_error,
-        mutates,
+        scope,
     }
+}
+
+pub fn generate_closure_usage<'imm>(
+    lp: &'imm plan::Plan,
+    namer: &SerializedNamer,
+    params: impl Iterator<Item=impl ToTokens>,
+    inflows: impl Iterator<Item=impl ToTokens>,
+    scope: &ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
+) -> Tokens<ExprTuple> {
+    let SerializedNamer { closure_stats_param, .. } = namer;
+    let tables = scope.mutabilities().map(|(k, _)| {
+        namer.table_param_name(lp, **k)
+    });
+    quote!{
+        (#closure_stats_param, #(#tables,)* #(#params,)* #(#inflows,)*)
+    }.into()
 }

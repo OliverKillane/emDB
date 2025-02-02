@@ -143,7 +143,10 @@ impl Keyable for PrimaryPullAdapter {
 }
 
 impl Column for PrimaryPullAdapter {
-    type WindowKind<'imm> =  Window<'imm, PrimaryPullAdapter> where Self: 'imm;
+    type WindowKind<'imm>
+        = Window<'imm, PrimaryPullAdapter>
+    where
+        Self: 'imm;
 
     fn new(size_hint: usize) -> Self {
         PrimaryPullAdapter {

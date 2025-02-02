@@ -1,10 +1,13 @@
+use super::namer::SerializedNamer;
+use crate::{
+    backend::interface::{namer::InterfaceNamer, public::exposed_keys, InterfaceTrait},
+    plan,
+};
+use pulpit::gen::selector::{SelectorImpl, TableSelectors};
 use quote::{quote, ToTokens};
 use quote_debug::Tokens;
 use std::collections::HashMap;
 use syn::{Ident, ItemImpl, ItemMod, ItemStruct, Type};
-use pulpit::gen::selector::{TableSelectors, SelectorImpl};
-use super::namer::SerializedNamer;
-use crate::{backend::interface::{namer::InterfaceNamer, InterfaceTrait, public::exposed_keys}, plan};
 
 pub struct GeneratedInfo<'imm> {
     pub get_types: HashMap<plan::Idx<'imm, plan::Table>, HashMap<Ident, Tokens<Type>>>,
@@ -21,14 +24,20 @@ pub struct TableWindow<'imm> {
 
 /// Generate the tokens for the tables, and the struct to hold them (in [`TableWindow`]).
 /// - Generates the tokens for the [`plan::ScalarType`]s of table fields assuming they are just [`plan::ScalarTypeConc::Rust`] tyes
-pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<InterfaceTrait>, namer: &SerializedNamer, selector: &TableSelectors, inlining: bool) -> TableWindow<'imm> {
+pub fn generate_tables<'imm>(
+    lp: &'imm plan::Plan,
+    interface_trait: &Option<InterfaceTrait>,
+    namer: &SerializedNamer,
+    selector: &TableSelectors,
+    inlining: bool,
+) -> TableWindow<'imm> {
     // get the constraints and fields of each table
     let mut pulpit_configs = lp
         .tables
         .iter()
         .map(|(key, emdb_table)| {
             let pulpit_select = pulpit::gen::selector::SelectOperations {
-                name: emdb_table.name.clone(),
+                name: namer.table_internal_name(lp, key),
                 transactions: true,
                 deletions: false,
                 fields: emdb_table
@@ -70,8 +79,17 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
                     })
                     .collect(),
                 limit: {
-                    if let Some(plan::Constraint { alias, cons: plan::Limit (expr)}) = &emdb_table.row_cons.limit {
-                        Some(pulpit::gen::limit::Limit { value: pulpit::gen::limit::LimitKind::ConstVal(expr.into_token_stream().into()), alias: alias.clone() })
+                    if let Some(plan::Constraint {
+                        alias,
+                        cons: plan::Limit(expr),
+                    }) = &emdb_table.row_cons.limit
+                    {
+                        Some(pulpit::gen::limit::Limit {
+                            value: pulpit::gen::limit::LimitKind::ConstVal(
+                                expr.into_token_stream().into(),
+                            ),
+                            alias: alias.clone(),
+                        })
                     } else {
                         None
                     }
@@ -104,13 +122,21 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
                     .get_mut(&plan::Idx::new(*table, lp))
                     .unwrap()
                     .deletions = true;
-            },
-            plan::Operator::DeRef(plan::DeRef{ table, named_type, ..}) => {
-                let deref_fields = lp.get_record_type_conc(*named_type).fields.keys().map(|rf| namer.transform_field_name(rf)).collect::<Vec<_>>();
+            }
+            plan::Operator::DeRef(plan::DeRef {
+                table, named_type, ..
+            }) => {
+                let deref_fields = lp
+                    .get_record_type_conc(*named_type)
+                    .fields
+                    .keys()
+                    .map(|rf| namer.transform_field_name(rf))
+                    .collect::<Vec<_>>();
                 pulpit_configs
                     .get_mut(&plan::Idx::new(*table, lp))
                     .unwrap()
-                    .gets.push(pulpit::gen::operations::get::Get {
+                    .gets
+                    .push(pulpit::gen::operations::get::Get {
                         fields: deref_fields,
                         alias: namer.pulpit_table_interaction(key),
                     });
@@ -131,6 +157,9 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
         struct_database,
         db_lifetime,
         mod_tables,
+        struct_stats,
+        struct_datastore_member_stats,
+        struct_database_member_stats,
         ..
     } = namer;
 
@@ -142,7 +171,14 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
                 (key, table_impl.op_get_types(pulpit_namer)),
                 (
                     (key, table_impl.insert_can_error()),
-                    table_impl.generate(pulpit_namer, if inlining { vec![pulpit::gen::table::AttrKinds::Inline] } else { vec![] }),
+                    table_impl.generate(
+                        pulpit_namer,
+                        if inlining {
+                            vec![pulpit::gen::table::AttrKinds::Inline]
+                        } else {
+                            vec![]
+                        },
+                    ),
                 ),
             )
         })
@@ -150,27 +186,39 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
 
     let (insert_can_error, table_defs): (HashMap<_, _>, Vec<_>) = gen_data.into_iter().unzip();
 
-    let table_names = lp
+    let table_mod_names = lp
         .tables
         .iter()
-        .map(|(_, table)| &table.name)
+        .map(|(k, _)| namer.table_internal_name(lp, k))
         .collect::<Vec<_>>();
 
-    let datastore_members = table_names
+    let datastore_members = table_mod_names
         .iter()
-        .map(|name| quote!(#name: #mod_tables::#name::#struct_table));
-    let datastore_members_new = table_names
+        .map(|mod_name| quote!(#mod_name: #mod_tables::#mod_name::#struct_table));
+    let datastore_members_new = table_mod_names
         .iter()
-        .map(|name| quote!(#name: #mod_tables::#name::#struct_table::new(1024)));
+        .map(|mod_name| quote!(#mod_name: #mod_tables::#mod_name::#struct_table::new(1024)));
 
-    let (database_members_window_stream, database_members_stream): (Vec<_>, Vec<_>) = table_names
+    let (database_members_window_stream, database_members_stream): (Vec<_>, Vec<_>) = table_mod_names
         .iter()
-        .map(|name| (quote!(#name: self.#name.window()), quote!(#name: #mod_tables::#name::#struct_window<#db_lifetime>))).unzip();
+        .map(|mod_name| {
+            (
+                quote!(#mod_name: self.#mod_name.window()),
+                quote!(#mod_name: #mod_tables::#mod_name::#struct_window<#db_lifetime>),
+            )
+        })
+        .unzip();
 
     let (database_members_window, database_members) = if database_members_stream.is_empty() {
-        (quote!(phantom: std::marker::PhantomData), quote!(phantom: std::marker::PhantomData<&#db_lifetime ()>))
+        (
+            quote!(phantom: std::marker::PhantomData,),
+            quote!(phantom: std::marker::PhantomData<&#db_lifetime ()>,),
+        )
     } else {
-        (quote!(#(#database_members_window_stream,)*),quote!(#(#database_members_stream,)*))
+        (
+            quote!(#(#database_members_window_stream,)*),
+            quote!(#(#database_members_stream,)*),
+        )
     };
 
     let InterfaceNamer {
@@ -181,23 +229,34 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
         ..
     } = &namer.interface;
 
-    let (impl_datastore, modifiers, key_defs, ds_assoc_db) = if let Some(InterfaceTrait { name }) = interface_trait {
+    let (impl_datastore, modifiers, key_defs, ds_assoc_db) = if let Some(InterfaceTrait { name }) =
+        interface_trait
+    {
         let exposed_table_keys = exposed_keys(lp);
-        (quote!{ super::#name::#trait_datastore for }, quote!(), exposed_table_keys.into_iter().map(|tablekey| {
-            let name = &lp.get_table(*tablekey).name;
-            let key_name = namer.interface.key_name(name);
-            quote! { type #key_name = #mod_tables::#name::#type_key }
-        }).collect::<Vec<_>>(), quote!(type #trait_datastore_type_database<#db_lifetime> = #struct_database<#db_lifetime>;))
+        (
+            quote! { super::#name::#trait_datastore for },
+            quote!(),
+            exposed_table_keys
+                .into_iter()
+                .map(|tablekey| {
+                    let mod_name = namer.table_internal_name(lp, *tablekey);
+                    let table_name = &lp.get_table(*tablekey).name;
+                    let key_name = namer.interface.key_name(table_name);
+                    quote! { type #key_name = #mod_tables::#mod_name::#type_key }
+                })
+                .collect::<Vec<_>>(),
+            quote!(type #trait_datastore_type_database<#db_lifetime> = #struct_database<#db_lifetime>;),
+        )
     } else {
         (quote!(), quote!(pub), Vec::new(), quote!())
     };
-
 
     TableWindow {
         table_defs,
         datastore: quote! {
             pub struct #struct_datastore {
                 #(#datastore_members,)*
+                #struct_datastore_member_stats: #struct_stats,
             }
         }
         .into(),
@@ -205,16 +264,18 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
             impl #impl_datastore #struct_datastore {
                 #ds_assoc_db
                 #(#key_defs;)*
-                
+
                 #modifiers fn #trait_datastore_method_new() -> Self {
                     Self {
                         #(#datastore_members_new,)*
+                        #struct_datastore_member_stats: #struct_stats::default(),
                     }
                 }
 
                 #modifiers fn #trait_datastore_method_db(&mut self) -> #struct_database<'_> {
                     #struct_database {
                         #database_members_window
+                        #struct_database_member_stats: &self.#struct_datastore_member_stats,        
                     }
                 }
             }
@@ -223,6 +284,7 @@ pub fn generate_tables<'imm>(lp: &'imm plan::Plan, interface_trait: &Option<Inte
         database: quote! {
             pub struct #struct_database<#db_lifetime> {
                 #database_members
+                #struct_database_member_stats: &#db_lifetime #struct_stats,
             }
         }
         .into(),

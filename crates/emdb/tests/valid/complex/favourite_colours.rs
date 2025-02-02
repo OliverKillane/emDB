@@ -1,7 +1,7 @@
 #![allow(unused_variables)]
 use emdb::macros::emql;
 
-#[allow(dead_code)]
+#[allow(dead_code, clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, Copy)]
 enum RGB {
     Red,

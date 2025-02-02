@@ -13,7 +13,8 @@ pub struct PrimaryThunderDomeTrans<ImmData, MutData> {
 }
 
 impl<ImmData, MutData> Column for PrimaryThunderDomeTrans<ImmData, MutData> {
-    type WindowKind<'imm> = Window<'imm, PrimaryThunderDomeTrans<ImmData, MutData>>
+    type WindowKind<'imm>
+        = Window<'imm, PrimaryThunderDomeTrans<ImmData, MutData>>
     where
         Self: 'imm;
 

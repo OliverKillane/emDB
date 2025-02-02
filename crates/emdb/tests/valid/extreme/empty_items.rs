@@ -1,3 +1,4 @@
+#![allow(clippy::eq_op)] // NOTE: silence warnings for 1 + 1 == 2
 use emdb::macros::emql;
 
 emql!{

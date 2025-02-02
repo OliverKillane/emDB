@@ -67,6 +67,18 @@ impl<'imm, T> std::ops::Deref for Idx<'imm, T> {
     }
 }
 
+impl<'imm, T> PartialOrd for Idx<'imm, T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<'imm, T> Ord for Idx<'imm, T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.arr_idx.cmp(&other.arr_idx)
+    }
+}
+
 /// A key with a lifetime binding to prevent mutation of the referenced plan.
 /// - Implements hash (unlike [`typed_generational_arena::Index`] (the generation count is not hashable))
 ///   TODO: contribute to [`typed_generational_arena::Index`] to fix this.
@@ -110,6 +122,18 @@ impl<'imm, T> std::ops::Deref for ImmKey<'imm, T> {
     type Target = Key<T>;
     fn deref(&self) -> &Self::Target {
         &self.key
+    }
+}
+
+impl<'imm, T> PartialOrd for ImmKey<'imm, T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<'imm, T> Ord for ImmKey<'imm, T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.key.arr_idx().cmp(&other.arr_idx())
     }
 }
 

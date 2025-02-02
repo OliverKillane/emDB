@@ -37,6 +37,7 @@ impl<S, E> CombiResult<S, E, E> {
 }
 
 /// The core trait for defining combinable computations
+///
 #[doc=include_str!("../docs/combi_trait.drawio.svg")]
 /// Provides an interface to run computations, and get a representation of them.
 #[cfg_attr(

@@ -9,7 +9,8 @@ impl<ImmData, MutData> Keyable for AssocAppVec<ImmData, MutData> {
 }
 
 impl<ImmData, MutData> Column for AssocAppVec<ImmData, MutData> {
-    type WindowKind<'imm> = Window<'imm, Self>
+    type WindowKind<'imm>
+        = Window<'imm, Self>
     where
         Self: 'imm;
 

@@ -1,22 +1,23 @@
 
+use std::iter::{empty, once};
+
 use quote::{quote, ToTokens};
 use quote_debug::Tokens;
 use syn::{Expr, Ident, Path, Stmt};
 
 use super::{
-    closures::ContextGen,
-    namer::{
+    closures::{generate_closure_usage, ContextGen}, namer::{
         boolean_predicate, dataflow_fields, expose_user_fields, new_error, transfer_fields,
         DataFlowNaming, SerializedNamer,
-    },
-    tables::GeneratedInfo,
-    types::generate_record_name,
+    }, stats::{RequiredStats, StatKind}, tables::GeneratedInfo, types::generate_record_name
 };
 use crate::{
     backend::serialized::closures::generate_application,
     plan::{self, operator_enum, FoldField},
-    utils::misc::{new_id, PushMap, PushSet},
+    utils::{misc::{new_id, PushMap}, mut_scope::ScopeHandle},
 };
+
+
 
 pub enum OperatorImpls {
     Basic,
@@ -63,17 +64,18 @@ pub trait OperatorGen {
     ///       generating traits that the serialized backend can implement.
     /// - Adds to the values required for the context.
     #[allow(unused_variables, clippy::too_many_arguments)]
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         error_path: &Tokens<Path>,
-        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         gen_info: &GeneratedInfo<'imm>,
         context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         op_impl: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt>;
 }
 
@@ -82,22 +84,22 @@ impl OperatorGen for plan::Operator {}
 
 // table access
 impl OperatorGen for plan::UniqueRef {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         error_path: &Tokens<Path>,
-        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             operator_error_parameter,
             mod_tables,
-            self_alias,
             pulpit:
                 pulpit::gen::namer::CodeNamer {
                     mod_unique,
@@ -121,10 +123,13 @@ impl OperatorGen for plan::UniqueRef {
 
         let unique_reference = namer.transform_field_name(&self.from);
         let new_field = namer.transform_field_name(&self.out);
+        
+        parent_scope.add_imm(plan::ImmKey::new(self.table, lp));
+        let table_param = namer.table_param_name(lp, self.table);
+        let table_mod = namer.table_internal_name(lp, self.table);
         let table = lp.get_table(self.table);
-        let table_name = &table.name;
 
-        let error_construct = new_error(self_key, error_path, Some(quote!(super::super::#mod_tables::#table_name::#mod_unique::#mod_unique_struct_notfound).into()), errors, namer);
+        let error_construct = new_error(self_key, error_path, Some(quote!(super::super::#mod_tables::#table_mod::#mod_unique::#mod_unique_struct_notfound).into()), errors, namer);
 
         // TODO: integrate this into the namer somehow?
         let unique_field_access = &table.columns[&self.field]
@@ -137,18 +142,20 @@ impl OperatorGen for plan::UniqueRef {
         let transfer_fields = transfer_fields(&input_holding_var, input_record_type, namer);
 
         let action = quote! {
-            let data = #self_alias.#table_name.#unique_field_access(&#input_holding_var.#unique_reference)?;
+            let data = #table_param.#unique_field_access(&#input_holding_var.#unique_reference)?;
             Ok(#data_constructor {
                 #new_field: data,
                 #(#transfer_fields,)*
             })
         };
 
-        let (map_kind, buffer, consume,  error_kind) = if stream {
-            (quote!(map), quote!(export_buffer), quote!(consume_buffer), quote!(error_stream))
+        let (map_stats, map_kind, buffer, consume,  error_kind) = if stream {
+            (StatKind::Map, quote!(map), quote!(export_buffer), quote!(consume_buffer), quote!(error_stream))
         } else {
-            (quote!(map_single),  quote!(export_single), quote!(consume_single), quote!(error_single))
+            (StatKind::MapSingle, quote!(map_single),  quote!(export_single), quote!(consume_single), quote!(error_single))
         };
+
+        let map_stats_access = namer.access_stat_member(required_stats.add_stat(map_stats));
 
         quote! {
             let #holding_var = {
@@ -156,7 +163,8 @@ impl OperatorGen for plan::UniqueRef {
                     #input_holding_var,
                     |#input_holding_var| {
                         #action
-                    }
+                    },
+                    #map_stats_access
                 )));
                 match #impl_alias::#error_kind(result) {
                     Ok(val) => val,
@@ -169,21 +177,21 @@ impl OperatorGen for plan::UniqueRef {
 }
 
 impl OperatorGen for plan::ScanRefs {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         _self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             phantom_field,
-            self_alias,
             pulpit:
                 pulpit::gen::namer::CodeNamer {
                     struct_window_method_scan_get,
@@ -191,24 +199,29 @@ impl OperatorGen for plan::ScanRefs {
                 },
             ..
         } = namer;
-        let table_name = &lp.get_table(self.table).name;
+
+        parent_scope.add_imm(plan::ImmKey::new(self.table, lp));
+        let table_param = namer.table_param_name(lp, self.table);
+
         let DataFlowNaming {
             holding_var,
             data_constructor,
             ..
         } = dataflow_fields(lp, self.output, namer);
         let out_ref_name = namer.transform_field_name(&self.out_ref);
+        let map_stats = namer.access_stat_member(required_stats.add_stat(StatKind::Map));
         quote! {
             let #holding_var = {
                 let stream_values = #impl_alias::consume_stream(
-                    #self_alias.#table_name.#struct_window_method_scan_get()
+                    #table_param.#struct_window_method_scan_get()
                     );
                 #impl_alias::map(
                     stream_values,
                     |value| #data_constructor {
                         #out_ref_name : value,
                         #phantom_field: std::marker::PhantomData
-                    }
+                    },
+                    #map_stats
                 )
             };
         }
@@ -216,21 +229,21 @@ impl OperatorGen for plan::ScanRefs {
     }
 }
 impl OperatorGen for plan::DeRef {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         error_path: &Tokens<Path>,
-        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             operator_error_parameter,
-            self_alias,
             ..
         } = namer;
         let DataFlowNaming {
@@ -245,7 +258,8 @@ impl OperatorGen for plan::DeRef {
             ..
         } = dataflow_fields(lp, self.output, namer);
 
-        let table_name = &lp.get_table(self.table).name;
+        parent_scope.add_imm(plan::ImmKey::new(self.table, lp));
+        let table_param = namer.table_param_name(lp, self.table);
         let deref_field = namer.transform_field_name(&self.reference);
         let new_field = namer.transform_field_name(&self.named);
         let error_variant = namer.operator_error_value_name(self_key);
@@ -261,11 +275,13 @@ impl OperatorGen for plan::DeRef {
         );
         let transfer_fields_input_append = transfer_fields(&input_holding, input_record, namer);
 
-        let (map_kind, buffer, consume, error_kind) = if stream {
-            (quote!(map),quote!(export_buffer), quote!(consume_buffer), quote!(error_stream))
+        let (map_stats, map_kind, buffer, consume, error_kind) = if stream {
+            (StatKind::Map, quote!(map),quote!(export_buffer), quote!(consume_buffer), quote!(error_stream))
         } else {
-            (quote!(map_single), quote!(export_single), quote!(consume_single), quote!(error_single))
+            (StatKind::MapSingle, quote!(map_single), quote!(export_single), quote!(consume_single), quote!(error_single))
         };
+
+        let map_stats_access = namer.access_stat_member(required_stats.add_stat(map_stats));
 
         if self.unchecked {
             quote!{
@@ -273,7 +289,7 @@ impl OperatorGen for plan::DeRef {
                     #impl_alias::#consume(#impl_alias::#buffer(#impl_alias::#map_kind(
                         #input_holding,
                         |#input_holding| {
-                            match #self_alias.#table_name.#get_op_name(#input_holding.#deref_field) {
+                            match #table_param.#get_op_name(#input_holding.#deref_field) {
                                 Ok(#get_value_id) => #data_type {
                                     #new_field: #inner_type {
                                         #(#transfer_fields_get_struct,)*
@@ -282,7 +298,8 @@ impl OperatorGen for plan::DeRef {
                                 },
                                 Err(_) => unreachable!("This is an unchecked dereference (used internally - e.g. generated by a use")
                             }
-                        }
+                        },
+                        #map_stats_access
                     )))
                 };
             }
@@ -293,7 +310,7 @@ impl OperatorGen for plan::DeRef {
                     let result = #impl_alias::#map_kind(
                         #input_holding,
                         |#input_holding| {
-                            match #self_alias.#table_name.#get_op_name(#input_holding.#deref_field) {
+                            match #table_param.#get_op_name(#input_holding.#deref_field) {
                                 Ok(#get_value_id) => Ok(#data_type {
                                     #new_field: #inner_type {
                                         #(#transfer_fields_get_struct,)*
@@ -302,7 +319,8 @@ impl OperatorGen for plan::DeRef {
                                 }),
                                 Err(_) => return Err( #error_path::#error_variant )
                             }
-                        }
+                        },
+                        #map_stats_access
                     );
                     match #impl_alias::#error_kind(result) {
                         Ok(val) => #impl_alias::#consume(#impl_alias::#buffer(val)),
@@ -322,24 +340,24 @@ impl OperatorGen for plan::Update {
     //          and hope the rust compiler removes redundant clones (e.g. value
     //          cloned for insert, but is never used after this)
     // For simplicity of implementation, I have chosen (2.)
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         error_path: &Tokens<Path>,
-        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let closure_val = namer.operator_closure_value_name(self_key);
         let SerializedNamer {
             mod_tables,
             operator_error_parameter,
             phantom_field,
-            self_alias,
             pulpit:
                 pulpit::gen::namer::CodeNamer {
                     mod_update,
@@ -389,7 +407,10 @@ impl OperatorGen for plan::Update {
         }
 
         let update_method = namer.pulpit_table_interaction(self_key);
-        let table_name = &lp.get_table(self.table).name;
+        parent_scope.add_mut(plan::ImmKey::new(self.table, lp));
+        let table_param = namer.table_param_name(lp, self.table);
+        let table_mod = namer.table_internal_name(lp, self.table);
+
         let key_member = namer.transform_field_name(&self.reference);
 
         let transfer_update_struct = self.mapping.keys().map(|name| {
@@ -401,31 +422,30 @@ impl OperatorGen for plan::Update {
             self_key,
             error_path,
             Some(quote!(
-                super::super::#mod_tables::#table_name::#mod_update::#update_method::#mod_update_enum_error
+                super::super::#mod_tables::#table_mod::#mod_update::#update_method::#mod_update_enum_error
             ).into()),
             errors,
             namer
         );
 
-        mutated_tables.push(plan::ImmKey::new(self.table, lp));
-
-        let (map_kind, buffer, consume, error_kind) = if stream {
-            (quote!(map_seq), quote!(export_buffer), quote!(consume_buffer), quote!(error_stream))
+        let (map_stats, map_kind, buffer, consume, error_kind) = if stream {
+            (StatKind::MapSeq, quote!(map_seq), quote!(export_buffer), quote!(consume_buffer), quote!(error_stream))
         } else {
-            (quote!(map_single), quote!(export_single), quote!(consume_single), quote!(error_single))
+            (StatKind::MapSingle, quote!(map_single), quote!(export_single), quote!(consume_single), quote!(error_single))
         };
 
+        let map_stats_access = namer.access_stat_member(required_stats.add_stat(map_stats));
         quote! {
             let #holding_var = {
                 let results = #impl_alias::#map_kind(
                     #input_holding,
                     |#input_holding| {
-                        // need to clone to avoid borrow issues
-                        // TODO: determine how closure clonign affects cloning of internals 
+                        // NOTE: need to clone to avoid borrow issues
+                        // TODO: determine how closure cloning affects cloning of internals 
                         let (update_struct, continue_struct) = #closure_val.clone()(#input_holding);
 
-                        match #self_alias.#table_name.#update_method(
-                            #mod_tables::#table_name::#mod_update::#update_method::#mod_update_struct_update {
+                        match #table_param.#update_method(
+                            #mod_tables::#table_mod::#mod_update::#update_method::#mod_update_struct_update {
                                 #(#transfer_update_struct,)*
                             },
                             continue_struct.#key_member
@@ -433,7 +453,8 @@ impl OperatorGen for plan::Update {
                             Ok(()) => Ok(continue_struct),
                             Err(#operator_error_parameter) => #error_construct,
                         }
-                    }
+                    },
+                    #map_stats_access
                 );
                 #impl_alias::#consume(#impl_alias::#buffer(#impl_alias::#error_kind(results)?))
             };
@@ -442,23 +463,23 @@ impl OperatorGen for plan::Update {
     }
 }
 impl OperatorGen for plan::Insert {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         error_path: &Tokens<Path>,
-        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         gen_info: &GeneratedInfo<'imm>,
         _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             mod_tables,
             operator_error_parameter,
             phantom_field,
-            self_alias,
             pulpit:
                 pulpit::gen::namer::CodeNamer {
                     mod_insert,
@@ -479,16 +500,19 @@ impl OperatorGen for plan::Insert {
             data_constructor,
             ..
         } = dataflow_fields(lp, self.output, namer);
-        let table_name = &lp.get_table(self.table).name;
+
+        parent_scope.add_mut(plan::ImmKey::new(self.table, lp));
+        let table_param = namer.table_param_name(lp, self.table);
+        let table_mod = namer.table_internal_name(lp, self.table);
         let ref_name = namer.transform_field_name(&self.out_ref);
 
-        mutated_tables.push(plan::ImmKey::new(self.table, lp));
-
-        let (map_kind, buffer, consume, error_kind) = if stream {
-            (quote!(map_seq), quote!(export_buffer), quote!(consume_buffer), quote!(error_stream))
+        let (map_stats, map_kind, buffer, consume, error_kind) = if stream {
+            (StatKind::Map, quote!(map_seq), quote!(export_buffer), quote!(consume_buffer), quote!(error_stream))
         } else {
-            (quote!(map_single), quote!(export_single), quote!(consume_single), quote!(error_single))
+            (StatKind::MapSeq, quote!(map_single), quote!(export_single), quote!(consume_single), quote!(error_single))
         };
+
+        let map_stats_access = namer.access_stat_member(required_stats.add_stat(map_stats));
 
         let insert_fields = record_type.fields.keys().map(|name| {
             let field_name = namer.transform_field_name(name);
@@ -496,19 +520,20 @@ impl OperatorGen for plan::Insert {
         });
 
         let results_internal = if gen_info.insert_can_error[&plan::Idx::new(self.table, lp)] {
-            let error_construct = new_error(self_key, error_path, Some(quote!(super::super::#mod_tables::#table_name::#mod_insert::#mod_insert_enum_error).into()), errors, namer);
+            let error_construct = new_error(self_key, error_path, Some(quote!(super::super::#mod_tables::#table_mod::#mod_insert::#mod_insert_enum_error).into()), errors, namer);
             quote! {
                 {
                     let result = #impl_alias::#map_kind(
                         #input_holding,
                         |#input_holding| {
                             Ok(#data_constructor {
-                                    #ref_name: #self_alias.#table_name.insert(#mod_tables::#table_name::#mod_insert::#mod_insert_struct_insert {
+                                    #ref_name: #table_param.insert(#mod_tables::#table_mod::#mod_insert::#mod_insert_struct_insert {
                                     #(#insert_fields,)*
                                 })?,
                                 #phantom_field: std::marker::PhantomData
                             })
-                        }
+                        },
+                        #map_stats_access
                     );
                     match #impl_alias::#error_kind(result) {
                         Ok(val) => val,
@@ -522,12 +547,13 @@ impl OperatorGen for plan::Insert {
                     #input_holding,
                     |#input_holding| {
                         #data_constructor {
-                            #ref_name: #self_alias.#table_name.insert(#mod_tables::#table_name::#mod_insert::#mod_insert_struct_insert {
+                            #ref_name: #table_param.insert(#mod_tables::#table_mod::#mod_insert::#mod_insert_struct_insert {
                                 #(#insert_fields,)*
                             }),
                             #phantom_field: std::marker::PhantomData
                         }
-                    }
+                    },
+                    #map_stats_access
                 )
             }
         };
@@ -539,22 +565,22 @@ impl OperatorGen for plan::Insert {
     }
 }
 impl OperatorGen for plan::Delete {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         error_path: &Tokens<Path>,
-        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             mod_tables,
             operator_error_parameter,
-            self_alias,
             pulpit:
                 pulpit::gen::namer::CodeNamer {
                     type_key_error,
@@ -573,20 +599,22 @@ impl OperatorGen for plan::Delete {
             ..
         } = dataflow_fields(lp, self.output, namer);
 
-        mutated_tables.push(plan::ImmKey::new(self.table, lp));
-
-        let (map_kind, buffer, consume, error_kind) = if stream {
-            (quote!(map_seq), quote!(export_buffer), quote!(consume_buffer), quote!(error_stream))
+        let (map_stats, map_kind, buffer, consume, error_kind) = if stream {
+            (StatKind::MapSeq, quote!(map_seq), quote!(export_buffer), quote!(consume_buffer), quote!(error_stream))
         } else {
-            (quote!(map_single), quote!(export_single), quote!(consume_single), quote!(error_single))
+            (StatKind::MapSingle, quote!(map_single), quote!(export_single), quote!(consume_single), quote!(error_single))
         };
 
-        let table_name = &lp.get_table(self.table).name;
+        let map_stats_access = namer.access_stat_member(required_stats.add_stat(map_stats));
+
+        parent_scope.add_mut(plan::ImmKey::new(self.table, lp));
+        let table_param = namer.table_param_name(lp, self.table);
+        let table_mod = namer.table_internal_name(lp, self.table);
         let key_member = namer.transform_field_name(&self.reference);
         let error_construct = new_error(
             self_key,
             error_path,
-            Some(quote!(super::super::#mod_tables::#table_name::#type_key_error).into()),
+            Some(quote!(super::super::#mod_tables::#table_mod::#type_key_error).into()),
             errors,
             namer,
         );
@@ -596,11 +624,12 @@ impl OperatorGen for plan::Delete {
                 let result = #impl_alias::#map_kind(
                     #input_holding,
                     |#input_holding| {
-                        match #self_alias.#table_name.#struct_window_method_delete(#input_holding.#key_member) {
+                        match #table_param.#struct_window_method_delete(#input_holding.#key_member) {
                             Ok(()) => Ok(#input_holding),
                             Err(#operator_error_parameter) => #error_construct,
                         }
-                    }
+                    },
+                    #map_stats_access
                 );
                 #impl_alias::#consume(#impl_alias::#buffer(#impl_alias::#error_kind(result)?))
             };
@@ -610,17 +639,18 @@ impl OperatorGen for plan::Delete {
 
 // Errors
 impl OperatorGen for plan::Assert {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         error_path: &Tokens<Path>,
-        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        _parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let DataFlowNaming {
             holding_var: input_holding,
@@ -641,17 +671,20 @@ impl OperatorGen for plan::Assert {
 
         let error_construct = new_error(self_key, error_path, None, errors, namer);
 
-        let all_kind = if stream {
-            quote!(all)
+        let (stats, all_kind) = if stream {
+            (StatKind::All, quote!(all))
         } else {
-            quote!(is)
+            (StatKind::Is, quote!(is))
         };
+
+        let stats_access = namer.access_stat_member(required_stats.add_stat(stats));
 
         quote! {
             let #holding_var = {
                 let (result, pass_on) = #impl_alias::#all_kind(
                     #input_holding,
-                    #closure_data
+                    #closure_data,
+                    #stats_access
                 )
                 if result {
                     pass_on
@@ -665,17 +698,18 @@ impl OperatorGen for plan::Assert {
 }
 
 impl OperatorGen for plan::Map {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        _parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             phantom_field,
@@ -716,33 +750,37 @@ impl OperatorGen for plan::Map {
             .into(),
         ));
 
-        let map_fn = if stream {
-            quote!(map)
+        let (map_stats, map_fn) = if stream {
+            (StatKind::Map, quote!(map))
         } else {
-            quote!(map_single)
+            (StatKind::MapSingle, quote!(map_single))
         };
+
+        let map_stats_access = namer.access_stat_member(required_stats.add_stat(map_stats));
 
         quote! {
             let #holding_var = #impl_alias::#map_fn(
                 #input_holding,
-                #closure_data
+                #closure_data,
+                #map_stats_access
             );
         }
         .into()
     }
 }
 impl OperatorGen for plan::Expand {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         _self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        _parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let DataFlowNaming {
             holding_var: input_holding,
@@ -754,35 +792,39 @@ impl OperatorGen for plan::Expand {
             ..
         } = dataflow_fields(lp, self.output, namer);
 
-        let map_fn = if stream {
-            quote!(map)
+        let (map_stats, map_fn) = if stream {
+            (StatKind::Map, quote!(map))
         } else {
-            quote!(map_single)
+            (StatKind::MapSingle, quote!(map_single))
         };
+
+        let map_stats_access = namer.access_stat_member(required_stats.add_stat(map_stats));
 
         let expand_field = namer.transform_field_name(&self.field);
 
         quote! {
             let #holding_var = #impl_alias::#map_fn(
                 #input_holding,
-                | #input_holding | #input_holding.#expand_field
+                | #input_holding | #input_holding.#expand_field,
+                #map_stats_access
             );
         }
         .into()
     }
 }
 impl OperatorGen for plan::Fold {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        _parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             phantom_field,
@@ -834,27 +876,30 @@ impl OperatorGen for plan::Fold {
         }
         .into()));
 
+        let fold_access_member = namer.access_stat_member(required_stats.add_stat(StatKind::Fold));
+
         quote! {
             let #holding_var = {
                 let (init, update) = #closure_value;
-                #impl_alias::fold(#input_holding, init, update)
+                #impl_alias::fold(#input_holding, init, update, #fold_access_member)
             };
         }
         .into()
     }
 }
 impl OperatorGen for plan::Filter {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        _parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let DataFlowNaming {
             holding_var: input_holding,
@@ -871,24 +916,27 @@ impl OperatorGen for plan::Filter {
             (boolean_predicate(lp, &self.predicate, self.input, namer).into_token_stream()).into(),
         ));
 
+        let filter_access_member = namer.access_stat_member(required_stats.add_stat(StatKind::Filter));
+
         quote!{
-            let #holding_var = #impl_alias::filter(#input_holding, #closure_value);
+            let #holding_var = #impl_alias::filter(#input_holding, #closure_value, #filter_access_member);
         }.into()
     }
 }
 
 impl OperatorGen for plan::Combine {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        _parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             phantom_field,
@@ -934,27 +982,30 @@ impl OperatorGen for plan::Combine {
             .into(),
         ));
 
+        let combine_access_member = namer.access_stat_member(required_stats.add_stat(StatKind::Combine));
+
         quote!{
             let #holding_var = {
                 let (alternative, update) = #closure_value;
-                #impl_alias::combine(#input_holding, alternative, update)   
+                #impl_alias::combine(#input_holding, alternative, update, #combine_access_member)   
             };
         }.into()
     }
 }
 
 impl OperatorGen for plan::Sort {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         _self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        _parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let DataFlowNaming {
             holding_var: input_holding,
@@ -984,26 +1035,29 @@ impl OperatorGen for plan::Sort {
             }
         });
 
+        let sort_access_member = namer.access_stat_member(required_stats.add_stat(StatKind::Sort));
+
         quote!{
             let #holding_var = #impl_alias::sort(#input_holding, |left, right| {
                 #(#comparisons)*
                 #order_equal
-            });
+            }, #sort_access_member);
         }.into()
     }
 }
 impl OperatorGen for plan::Take {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        _parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let DataFlowNaming {
             holding_var: input_holding,
@@ -1023,23 +1077,26 @@ impl OperatorGen for plan::Take {
             quote! { {let limit: usize = #take_expr; limit} }.into(),
         ));
 
+        let stats = namer.access_stat_member(required_stats.add_stat(StatKind::Take));
+
         quote!{
-            let #holding_var = #impl_alias::take(#input_holding, #closure_value);
+            let #holding_var = #impl_alias::take(#input_holding, #closure_value, #stats);
         }.into()
     }
 }
 impl OperatorGen for plan::Collect {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         _self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        _parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        _required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             phantom_field,
@@ -1059,11 +1116,13 @@ impl OperatorGen for plan::Collect {
         // NOTE: Dependent on the collect type being a vector
         //       - Dependency is also present in the `types::generate_scalar_type`
         //         method
+        //       - Buffer types for operator implementation must be converted into 
+        //         vectors
 
         quote!{
             let #holding_var = #impl_alias::consume_single(
                 #data_constructor {
-                    #field: #impl_alias::export_buffer(#input_holding),
+                    #field: #impl_alias::export_buffer(#input_holding).into(),
                     #phantom_field: std::marker::PhantomData
                 }
             );
@@ -1072,17 +1131,18 @@ impl OperatorGen for plan::Collect {
 }
 
 impl OperatorGen for plan::Count {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         _self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        _parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             phantom_field,
@@ -1099,14 +1159,18 @@ impl OperatorGen for plan::Count {
         } = dataflow_fields(lp, self.output, namer);
         let field = namer.transform_field_name(&self.out_field);
 
+        let map_access_member = namer.access_stat_member(required_stats.add_stat(StatKind::MapSingle));
+        let count_access_member = namer.access_stat_member(required_stats.add_stat(StatKind::Count));
+
         quote! {
             let #holding_var = #impl_alias::map_single(
-                #impl_alias::count(#input_holding),
+                #impl_alias::count(#input_holding, #count_access_member),
                 |count|
                 #data_constructor {
                     #field: count,
                     #phantom_field: std::marker::PhantomData
-                }
+                },
+                #map_access_member
             );
         }
         .into()
@@ -1114,17 +1178,18 @@ impl OperatorGen for plan::Count {
 }
 
 impl OperatorGen for plan::Join {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        _parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             phantom_field,
@@ -1152,9 +1217,11 @@ impl OperatorGen for plan::Join {
         let joined = match &self.join_kind {
             plan::JoinKind::Inner => match &self.match_kind {
                 plan::MatchKind::Cross => {
-                    quote! {#impl_alias::join_cross(#left_hold_var, #right_hold_var)}
+                    let cross_stats = namer.access_stat_member(required_stats.add_stat(StatKind::CrossJoin));
+                    quote! {#impl_alias::join_cross(#left_hold_var, #right_hold_var, #cross_stats)}
                 }
                 plan::MatchKind::Pred(predicate) => {
+                    let join_pred_stats = namer.access_stat_member(required_stats.add_stat(StatKind::PredJoin));
                     let join_pred = namer.operator_closure_value_name(self_key);
 
                     context_vals.push((
@@ -1167,22 +1234,25 @@ impl OperatorGen for plan::Join {
                         .into(),
                     ));
 
-                    quote! {#impl_alias::predicate_join(#left_hold_var, #right_hold_var, #join_pred)}
+                    quote! {#impl_alias::predicate_join(#left_hold_var, #right_hold_var, #join_pred, #join_pred_stats)}
                 }
                 plan::MatchKind::Equi {
                     left_field,
                     right_field,
                 } => {
+                    let join_equi_stats = namer.access_stat_member(required_stats.add_stat(StatKind::EquiJoin));
                     let left_select = namer.transform_field_name(left_field);
                     let right_select = namer.transform_field_name(right_field);
                     quote! {
                         {
-                            #impl_alias::equi_join(#left_hold_var, #right_hold_var, |left: &#data_left| &left.#left_select, |right: &#data_right| &right.#right_select)
+                            #impl_alias::equi_join(#left_hold_var, #right_hold_var, |left: &#data_left| &left.#left_select, |right: &#data_right| &right.#right_select, #join_equi_stats)
                         }
                     }
                 }
             },
         };
+
+        let map_stats = namer.access_stat_member(required_stats.add_stat(StatKind::Map));
         quote! {
             let #holding_var = #impl_alias::map(#joined, |(left, right): (#data_left, #data_right)| {
                 #data_constructor {
@@ -1190,23 +1260,24 @@ impl OperatorGen for plan::Join {
                     #right_field: right,
                     #phantom_field: std::marker::PhantomData
                 }
-            });
+            }, #map_stats);
         }
         .into()
     }
 }
 impl OperatorGen for plan::Fork {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         _self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        _parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let DataFlowNaming {
             holding_var: input_holding,
@@ -1218,15 +1289,17 @@ impl OperatorGen for plan::Fork {
             unreachable!("Cannot generate fork to no outputs")
         } else {
 
-            let fork_op = if stream {
-                quote!(fork)
+            let (fork_stat, fork_op) = if stream {
+                (StatKind::Fork, quote!(fork))
             } else {
-                quote!(fork_single)
+                (StatKind::ForkSingle, quote!(fork_single))
             };
 
+            
             let (mut other_outputs_names, mut other_outputs_fork): (Vec<_>, Vec<_>) = self.outputs.iter().map(|df_out| {
                 let DataFlowNaming { holding_var, .. } = dataflow_fields(lp, *df_out, namer);
-                (quote!(#holding_var), quote!(let (#holding_var, temp) = #impl_alias::#fork_op(temp)))
+                let fork_stat_member = namer.access_stat_member(required_stats.add_stat(fork_stat));
+                (quote!(#holding_var), quote!(let (#holding_var, temp) = #impl_alias::#fork_op(temp, #fork_stat_member)))
             }).unzip();
 
             // NOTE: we do not need the final fork, we can just use temp (even if temp 
@@ -1246,17 +1319,18 @@ impl OperatorGen for plan::Fork {
     }
 }
 impl OperatorGen for plan::Union {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         _self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        _parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let DataFlowNaming {
             holding_var,
@@ -1268,11 +1342,11 @@ impl OperatorGen for plan::Union {
             let mut inflows = self.inputs.iter();
             let first_input = inflows.next().unwrap();
             let first_holding_in = dataflow_fields(lp, *first_input, namer).holding_var;
-
             let body = inflows.fold(quote! {#first_holding_in}, |prev, df| {
                 let var = dataflow_fields(lp, *df, namer).holding_var;
+                let union_stats = namer.access_stat_member(required_stats.add_stat(StatKind::Union));
                 quote! {
-                    #impl_alias::union(#prev, #var)
+                    #impl_alias::union(#prev, #var, #union_stats)
                 }
             });
             quote! {
@@ -1283,17 +1357,18 @@ impl OperatorGen for plan::Union {
     }
 }
 impl OperatorGen for plan::Row {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        _parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         OperatorImpl { impl_alias, .. }: &OperatorImpl,
+        _required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let SerializedNamer {
             phantom_field,
@@ -1331,17 +1406,18 @@ impl OperatorGen for plan::Row {
 }
 
 impl OperatorGen for plan::Return {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        _parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         _operator_impl: &OperatorImpl,
+        _required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let DataFlowNaming {
             holding_var,
@@ -1352,17 +1428,18 @@ impl OperatorGen for plan::Return {
     }
 }
 impl OperatorGen for plan::Discard {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         _self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         _error_path: &Tokens<Path>,
-        _errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        _mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        _errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        _parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         _gen_info: &GeneratedInfo<'imm>,
         _context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         _operator_impl: &OperatorImpl,
+        _required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let DataFlowNaming { holding_var, .. } = dataflow_fields(lp, self.input, namer);
         quote! { let _ = #holding_var; }.into()
@@ -1371,17 +1448,18 @@ impl OperatorGen for plan::Discard {
 
 // contexts
 impl OperatorGen for plan::GroupBy {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         error_path: &Tokens<Path>,
-        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         gen_info: &GeneratedInfo<'imm>,
         context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         operator_impl: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         // scoping out the mutable tables and errors to determine how to generate return and mapping.
         let context_closure_var = namer.operator_closure_value_name(self_key);
@@ -1389,16 +1467,17 @@ impl OperatorGen for plan::GroupBy {
         let ContextGen {
             code,
             can_error,
-            mutates,
+            scope,
         } = generate_application(
             lp,
             self.inner_ctx,
             error_path,
             errors,
-            mutated_tables,
+            parent_scope,
             gen_info,
             namer,
             operator_impl,
+            required_stats,
         );
 
         context_vals.push((context_closure_var.clone(), code.into_token_stream().into()));
@@ -1407,7 +1486,6 @@ impl OperatorGen for plan::GroupBy {
 
         let SerializedNamer {
             phantom_field,
-            self_alias,
             ..
         } = namer;
         let DataFlowNaming {
@@ -1429,11 +1507,13 @@ impl OperatorGen for plan::GroupBy {
             quote!(#field_name: input.#field_name)
         });
 
-        let map_kind = if mutates {
-            quote!(map_seq)
+        let (map_stats, map_kind) = if scope.mutates() {
+            (StatKind::MapSeq, quote!(map_seq))
         } else {
-            quote!(map)
+            (StatKind::Map, quote!(map))
         };
+
+        let map_stats = namer.access_stat_member(required_stats.add_stat(map_stats));
 
         let final_result = if can_error {
             quote!(#impl_alias::error_stream(results)?)
@@ -1441,9 +1521,17 @@ impl OperatorGen for plan::GroupBy {
             quote!(results)
         };
 
-        // NOTE: Further opportunity to optimise here
+        // TODO: Further opportunity to optimise here
         //       - Allowing non-mutating, non-erroring to be computed inside the groupby?
         //       - No longer need to materialise output if we can stream through
+
+        let group_by_stats = namer.access_stat_member(required_stats.add_stat(StatKind::GroupBy));
+
+        let args = generate_closure_usage(lp, namer, 
+            once(quote!(grouping)),
+            once(quote!(inner_stream)),
+            &scope
+        );
 
         quote! {
             let #holding_var = {
@@ -1457,13 +1545,15 @@ impl OperatorGen for plan::GroupBy {
                                 #phantom_field: std::marker::PhantomData
                             }
                         )
-                    }
+                    },
+                    #group_by_stats
                 );
                 let results = #impl_alias::#map_kind(
                     grouped,
                     |(grouping, inner_stream)| {
-                        (#context_closure_var)(#self_alias, grouping, inner_stream)
-                    }
+                        (#context_closure_var)#args
+                    },
+                    #map_stats
                 );
                 #final_result
             };
@@ -1473,40 +1563,38 @@ impl OperatorGen for plan::GroupBy {
 }
 
 impl OperatorGen for plan::Lift {
-    fn apply<'imm, 'brw>(
+    fn apply<'imm>(
         &self,
         self_key: plan::Key<plan::Operator>,
         lp: &'imm plan::Plan,
         namer: &SerializedNamer,
         error_path: &Tokens<Path>,
-        errors: &mut PushMap<'brw, Ident, Option<Tokens<Path>>>,
-        mutated_tables: &mut PushSet<'brw, plan::ImmKey<'imm, plan::Table>>,
+        errors: &mut PushMap<'_, Ident, Option<Tokens<Path>>>,
+        parent_scope: &mut ScopeHandle<'_, plan::ImmKey<'imm, plan::Table>>,
         gen_info: &GeneratedInfo<'imm>,
         context_vals: &mut Vec<(Ident, Tokens<Expr>)>,
         operator_impl: &OperatorImpl,
+        required_stats: &mut RequiredStats,
     ) -> Tokens<Stmt> {
         let context_closure_var = namer.operator_closure_value_name(self_key);
         let OperatorImpl {impl_alias, ..} = operator_impl;
         let ContextGen {
             code,
             can_error,
-            mutates,
+            scope,
         } = generate_application(
             lp,
             self.inner_ctx,
             error_path,
             errors,
-            mutated_tables,
+            parent_scope,
             gen_info,
             namer,
             operator_impl,
+            required_stats,
         );
         context_vals.push((context_closure_var.clone(), code.into_token_stream().into()));
 
-        let SerializedNamer {
-            self_alias,
-            ..
-        } = namer;
         let DataFlowNaming {
             holding_var: input_holding,
             stream,
@@ -1517,15 +1605,17 @@ impl OperatorGen for plan::Lift {
             ..
         } = dataflow_fields(lp, self.output, namer);
 
-        let map_kind = if stream {
-            if mutates {
-                quote!(map_seq)
+        let (map_stats, map_kind) = if stream {
+            if scope.mutates() {
+                (StatKind::MapSeq, quote!(map_seq))
             } else {
-                quote!(map)
+                (StatKind::Map, quote!(map))
             }
         } else {
-            quote!(map_single)
+            (StatKind::MapSingle, quote!(map_single))
         };
+
+        let map_stats_member = namer.access_stat_member(required_stats.add_stat(map_stats));
 
         let final_result = if can_error {
             let error_map = if stream {
@@ -1540,20 +1630,28 @@ impl OperatorGen for plan::Lift {
 
         // NOTE: relies on the namer's mapping of operator names leaving user's
         //       field names the same.
-
-        let closure_args = lp
+        let closure_param_args = lp
             .get_context(self.inner_ctx)
             .params
             .iter()
             .map(|(id, _)| quote!(lifted.#id));
+
+        let args = generate_closure_usage(
+            lp,
+            namer,
+            closure_param_args,
+            empty::<Ident>(),
+            &scope,
+        );
 
         quote! {
             let #holding_var = {
                 let results = #impl_alias::#map_kind(
                     #input_holding,
                     |lifted| {
-                        (#context_closure_var)(#self_alias, #(#closure_args),*)
-                    }
+                        (#context_closure_var)#args
+                    },
+                    #map_stats_member
                 );
                 #final_result
             };

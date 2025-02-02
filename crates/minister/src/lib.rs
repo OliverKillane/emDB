@@ -54,7 +54,17 @@ pub mod parallel;
 /// - This is also discussed by [snowflake](https://info.snowflake.net/rs/252-RFO-227/images/Snowflake_SIGMOD.pdf)
 ///   as an advantage.
 ///
-/// ### Interesting Reads
+/// ## Statistics
+/// Operators make use of statistics, but need to be able to store this information at runtime.
+/// - Type associated with trait, and can be stored separately from operator invocations.
+///
+/// ### Why not just include `static` in each operator?
+/// - Rust statics are part of the module, they ignore monomorphisation -> one static for all filters? No
+/// ### Why not use a static map (e.g. TypeMap)?
+/// - We want to pay no runtime cost for looking up & updating statistics. Just passing a reference for
+///   direct access is simple & fast.
+///
+/// ## Interesting Reads
 /// - [Justin Jaffray: Push vs Pull](https://justinjaffray.com/query-engines-push-vs.-pull/)
 /// - [snowflake paper](https://info.snowflake.net/rs/252-RFO-227/images/Snowflake_SIGMOD.pdf)
 /// - [Push vs Pull-Based Loop Fusion in Query Engines](https://arxiv.org/pdf/1610.09166)
@@ -62,10 +72,21 @@ pub mod parallel;
 macro_rules! generate_minister_trait {
     ($trait_name:ident) => {
         pub trait $trait_name {
+            /// Streams can be lazy, and contain references to data that exists in a query body's
+            /// scope (e.g. by-reference captures within a closure used for mapping).
+            /// - We must execute operators to flow data between concrete, independent buffers.
+            /// - A concrete type (that can be easily named without additioonal use of macros)
+            ///   is required, hence we define as an associated type rather than as a macro
+            ///   `impl trait` as with streams and single. (Makes emDB work easier)
+            type Buffer<Data: Send + Sync>: IntoIterator<Item = Data>
+                + From<Vec<Data>>
+                + Send
+                + Sync;
+
             fn consume_stream<Data>(iter: impl Iterator<Item = Data>) -> stream!(Data)
             where
                 Data: Send + Sync;
-            fn consume_buffer<Data>(buff: Vec<Data>) -> stream!(Data)
+            fn consume_buffer<Data>(buff: Self::Buffer<Data>) -> stream!(Data)
             where
                 Data: Send + Sync;
             fn consume_single<Data>(data: Data) -> single!(Data)
@@ -75,7 +96,7 @@ macro_rules! generate_minister_trait {
             fn export_stream<Data>(stream: stream!(Data)) -> impl Iterator<Item = Data>
             where
                 Data: Send + Sync;
-            fn export_buffer<Data>(stream: stream!(Data)) -> Vec<Data>
+            fn export_buffer<Data>(stream: stream!(Data)) -> Self::Buffer<Data>
             where
                 Data: Send + Sync;
             fn export_single<Data>(single: single!(Data)) -> Data
@@ -96,134 +117,181 @@ macro_rules! generate_minister_trait {
                 Data: Send + Sync,
                 Error: Send + Sync;
 
+            type MapStats: Sync + Default;
             fn map<InData, OutData>(
                 stream: stream!(InData),
                 mapping: impl Fn(InData) -> OutData + Send + Sync,
+                stats: &Self::MapStats,
             ) -> stream!(OutData)
             where
                 InData: Send + Sync,
                 OutData: Send + Sync;
 
+            type MapSeqStats: Sync + Default;
             fn map_seq<InData, OutData>(
                 stream: stream!(InData),
                 mapping: impl FnMut(InData) -> OutData,
+                stats: &Self::MapSeqStats,
             ) -> stream!(OutData)
             where
                 InData: Send + Sync,
                 OutData: Send + Sync;
 
+            type MapSingleStats: Sync + Default;
             fn map_single<InData, OutData>(
                 single: single!(InData),
                 mapping: impl FnOnce(InData) -> OutData,
+                stats: &Self::MapSingleStats,
             ) -> single!(OutData)
             where
                 InData: Send + Sync,
                 OutData: Send + Sync;
 
+            type FilterStats: Sync + Default;
             fn filter<Data>(
                 stream: stream!(Data),
                 predicate: impl Fn(&Data) -> bool + Send + Sync,
+                stats: &Self::FilterStats,
             ) -> stream!(Data)
             where
                 Data: Send + Sync;
 
+            type AllStats: Sync + Default;
             fn all<Data>(
                 stream: stream!(Data),
                 predicate: impl Fn(&Data) -> bool + Send + Sync,
+                stats: &Self::AllStats,
             ) -> (bool, stream!(Data))
             where
                 Data: Send + Sync;
 
+            type IsStats: Sync + Default;
             fn is<Data>(
                 single: single!(Data),
                 predicate: impl Fn(&Data) -> bool,
+                stats: &Self::IsStats,
             ) -> (bool, single!(Data))
             where
                 Data: Send + Sync;
 
-            fn count<Data>(stream: stream!(Data)) -> single!(usize)
+            type CountStats: Sync + Default;
+            fn count<Data>(stream: stream!(Data), stats: &Self::CountStats) -> single!(usize)
             where
                 Data: Send + Sync;
 
+            type FoldStats: Sync + Default;
             fn fold<InData, Acc>(
                 stream: stream!(InData),
                 initial: Acc,
                 fold_fn: impl Fn(Acc, InData) -> Acc,
+                stats: &Self::FoldStats,
             ) -> single!(Acc)
             where
                 InData: Send + Sync,
                 Acc: Send + Sync;
 
+            type CombineStats: Sync + Default;
             fn combine<Data>(
                 stream: stream!(Data),
                 alternative: Data,
                 combiner: impl Fn(Data, Data) -> Data + Send + Sync,
+                stats: &Self::CombineStats,
             ) -> single!(Data)
             where
                 Data: Send + Sync + Clone;
 
+            type SortStats: Sync + Default;
             fn sort<Data>(
                 stream: stream!(Data),
                 ordering: impl Fn(&Data, &Data) -> std::cmp::Ordering + Send + Sync,
+                stats: &Self::SortStats,
             ) -> stream!(Data)
             where
                 Data: Send + Sync;
 
-            fn take<Data>(stream: stream!(Data), n: usize) -> stream!(Data)
+            type TakeStats: Sync + Default;
+            fn take<Data>(
+                stream: stream!(Data),
+                n: usize,
+                stats: &Self::TakeStats,
+            ) -> stream!(Data)
             where
                 Data: Send + Sync;
 
+            type GroupByStats: Sync + Default;
             fn group_by<Key, Rest, Data>(
                 stream: stream!(Data),
                 split: impl Fn(Data) -> (Key, Rest),
+                stats: &Self::GroupByStats,
             ) -> stream!((Key, stream!(Rest)))
             where
                 Data: Send + Sync,
                 Key: Eq + std::hash::Hash + Send + Sync,
                 Rest: Send + Sync;
 
+            type CrossJoinStats: Sync + Default;
             fn cross_join<LeftData, RightData>(
                 left: stream!(LeftData),
                 right: stream!(RightData),
+                stats: &Self::CrossJoinStats,
             ) -> stream!((LeftData, RightData))
             where
                 LeftData: Clone + Send + Sync,
                 RightData: Clone + Send + Sync;
 
+            type EquiJoinStats: Sync + Default;
             fn equi_join<LeftData, RightData, Key>(
                 left: stream!(LeftData),
                 right: stream!(RightData),
                 left_split: impl Fn(&LeftData) -> &Key + Send + Sync,
                 right_split: impl Fn(&RightData) -> &Key + Send + Sync,
+                stats: &Self::EquiJoinStats,
             ) -> stream!((LeftData, RightData))
             where
                 Key: Eq + std::hash::Hash + Send + Sync,
                 LeftData: Clone + Send + Sync,
                 RightData: Clone + Send + Sync;
 
+            type PredJoinStats: Sync + Default;
             fn predicate_join<LeftData, RightData>(
                 left: stream!(LeftData),
                 right: stream!(RightData),
                 pred: impl Fn(&LeftData, &RightData) -> bool + Send + Sync,
+                stats: &Self::PredJoinStats,
             ) -> stream!((LeftData, RightData))
             where
                 LeftData: Clone + Send + Sync,
                 RightData: Clone + Send + Sync;
 
-            fn union<Data>(left: stream!(Data), right: stream!(Data)) -> stream!(Data)
+            type UnionStats: Sync + Default;
+            fn union<Data>(
+                left: stream!(Data),
+                right: stream!(Data),
+                stats: &Self::UnionStats,
+            ) -> stream!(Data)
             where
                 Data: Send + Sync;
 
-            fn fork<Data>(stream: stream!(Data)) -> (stream!(Data), stream!(Data))
+            type ForkStats: Sync + Default;
+            fn fork<Data>(
+                stream: stream!(Data),
+                stats: &Self::UnionStats,
+            ) -> (stream!(Data), stream!(Data))
             where
                 Data: Clone + Send + Sync;
 
-            fn fork_single<Data>(single: single!(Data)) -> (single!(Data), single!(Data))
+            type ForkSingleStats: Sync + Default;
+            fn fork_single<Data>(
+                single: single!(Data),
+                stats: &Self::ForkSingleStats,
+            ) -> (single!(Data), single!(Data))
             where
                 Data: Clone + Send + Sync;
 
+            type SplitStats: Sync + Default;
             fn split<LeftData, RightData>(
                 stream: stream!((LeftData, RightData)),
+                stats: &Self::SplitStats,
             ) -> (stream!(LeftData), stream!(RightData))
             where
                 LeftData: Send + Sync,

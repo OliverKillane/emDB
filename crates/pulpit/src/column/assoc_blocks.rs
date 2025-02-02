@@ -10,7 +10,8 @@ pub struct AssocBlocks<ImmData, MutData, const BLOCK_SIZE: usize> {
 impl<ImmData, MutData, const BLOCK_SIZE: usize> Column
     for AssocBlocks<ImmData, MutData, BLOCK_SIZE>
 {
-    type WindowKind<'imm> = Window<'imm, AssocBlocks<ImmData, MutData, BLOCK_SIZE>>
+    type WindowKind<'imm>
+        = Window<'imm, AssocBlocks<ImmData, MutData, BLOCK_SIZE>>
     where
         Self: 'imm;
 

@@ -8,18 +8,26 @@
 //!   rules apply)
 
 use combi::{
-    core::{choice, mapsuc}, macros::choices, tokens::{
-        basic::{collectuntil, getident, gettoken, isempty, matchident, peekident, syn}, error::error, options::{OptEnd, OptField, OptParse}, TokenDiagnostic, TokenIter, TokenParser
-    }, Combi
+    core::{choice, mapsuc},
+    macros::choices,
+    tokens::{
+        basic::{collectuntil, getident, gettoken, isempty, matchident, peekident, syn},
+        error::error,
+        options::{OptEnd, OptField, OptParse},
+        TokenDiagnostic, TokenIter, TokenParser,
+    },
+    Combi,
 };
 use prettyplease::unparse;
 use proc_macro2::TokenStream;
 use proc_macro_error::{Diagnostic, Level};
+use pulpit::gen::selector::{
+    ColumnarSelector, CopySelector, MutabilitySelector, TableSelectors, ThunderdomeSelector,
+};
 use queries::QueriesInfo;
 use quote::quote;
 use std::{collections::LinkedList, fs::File, io::Write, path::Path};
 use syn::{parse2, File as SynFile, Ident, LitStr};
-use pulpit::gen::selector::{CopySelector, MutabilitySelector, TableSelectors, ThunderdomeSelector, ColumnarSelector};
 
 use super::{interface::InterfaceTrait, EMDBBackend};
 use crate::utils::{misc::singlelist, on_off::on_off};
@@ -31,6 +39,7 @@ mod operators;
 mod queries;
 mod tables;
 mod types;
+mod stats;
 
 pub struct Serialized {
     debug: Option<LitStr>,
@@ -50,7 +59,7 @@ fn operator_impl_parse() -> impl TokenParser<OperatorImpls> {
         peekident("Chunk") => mapsuc(matchident("Chunk"), |_| OperatorImpls::Chunk),
         otherwise => error(gettoken, |t| Diagnostic::spanned(t.span(), Level::Error, "Invalid Operator Choice".to_owned()))
     )
-} 
+}
 
 fn table_select_parse() -> impl TokenParser<TableSelectors> {
     choices! (
@@ -69,8 +78,9 @@ impl EMDBBackend for Serialized {
         backend_name: &syn::Ident,
         options: Option<proc_macro2::TokenStream>,
     ) -> Result<Self, std::collections::LinkedList<proc_macro_error::Diagnostic>> {
-        const DEFAULT_OP_IMPL: OperatorImpls = OperatorImpls::Iter;
-        const DEFAULT_TABLE_SELECTOR: TableSelectors = TableSelectors::MutabilitySelector(MutabilitySelector);
+        const DEFAULT_OP_IMPL: OperatorImpls = OperatorImpls::Parallel;
+        const DEFAULT_TABLE_SELECTOR: TableSelectors =
+            TableSelectors::MutabilitySelector(MutabilitySelector);
         if let Some(opts) = options {
             let parser = (
                 OptField::new("debug_file", || syn(collectuntil(isempty()))),
@@ -86,21 +96,35 @@ impl EMDBBackend for Serialized {
                                 OptField::new("aggressive_inlining", on_off),
                                 (
                                     OptField::new("op_impl", operator_impl_parse),
-                                    (
-                                        OptField::new("table_select", table_select_parse),
-                                        OptEnd
-                                    )
-                                )
-                            )
-                        )
+                                    (OptField::new("table_select", table_select_parse), OptEnd),
+                                ),
+                            ),
+                        ),
                     ),
                 ),
             )
                 .gen('=');
             let (_, res) = parser.comp(TokenIter::from(opts, backend_name.span()));
-            res.to_result()
-                .map_err(TokenDiagnostic::into_list)
-                .map(|(debug, (interface, (public, (ds_name, (inline_queries, (operator_impl, (table_selector, ())))))))| Serialized { debug, interface, public: public.unwrap_or(false), ds_name, aggressive_inlining: inline_queries.unwrap_or(false), operator_impl: operator_impl.unwrap_or(DEFAULT_OP_IMPL), table_selector: table_selector.unwrap_or(DEFAULT_TABLE_SELECTOR) })
+            res.to_result().map_err(TokenDiagnostic::into_list).map(
+                |(
+                    debug,
+                    (
+                        interface,
+                        (
+                            public,
+                            (ds_name, (inline_queries, (operator_impl, (table_selector, ())))),
+                        ),
+                    ),
+                )| Serialized {
+                    debug,
+                    interface,
+                    public: public.unwrap_or(false),
+                    ds_name,
+                    aggressive_inlining: inline_queries.unwrap_or(false),
+                    operator_impl: operator_impl.unwrap_or(DEFAULT_OP_IMPL),
+                    table_selector: table_selector.unwrap_or(DEFAULT_TABLE_SELECTOR),
+                },
+            )
         } else {
             Ok(Self {
                 debug: None,
@@ -131,27 +155,39 @@ impl EMDBBackend for Serialized {
             datastore_impl,
             database,
             table_generated_info,
-        } = tables::generate_tables(plan, &self.interface, &namer, &self.table_selector, self.aggressive_inlining);
+        } = tables::generate_tables(
+            plan,
+            &self.interface,
+            &namer,
+            &self.table_selector,
+            self.aggressive_inlining,
+        );
 
         let record_defs =
             types::generate_record_definitions(plan, &table_generated_info.get_types, &namer);
 
         let operator_impl = self.operator_impl.get_paths();
-        
+
         let QueriesInfo {
             query_mod,
             query_impls,
-        } = queries::generate_queries(plan, &table_generated_info, &self.interface, &namer, &operator_impl, self.aggressive_inlining);
+            required_stats,
+        } = queries::generate_queries(
+            plan,
+            &table_generated_info,
+            &self.interface,
+            &namer,
+            &operator_impl,
+            self.aggressive_inlining,
+        );
 
         let namer::SerializedNamer { mod_tables, .. } = &namer;
 
-        let public_tk = if self.public {
-            quote!(pub)
-        } else {
-            quote!()
-        };
-
-        let minister_trait = operator_impl.trait_path;  
+        let public_tk = if self.public { quote!(pub) } else { quote!() };
+        
+        let stats_struct = required_stats.generate_stats_struct(&namer, &operator_impl);
+        
+        let minister_trait = operator_impl.trait_path;
 
         let tks = quote! {
             #public_tk mod #impl_name {
@@ -159,7 +195,7 @@ impl EMDBBackend for Serialized {
                 #![allow(non_shorthand_field_patterns)] // current name field printing is `fielname: fieldname`
                 #![allow(unused_variables)]
                 #![allow(dead_code)]
-                
+
                 use #minister_trait; //TODO: remove and use better operator selection
                 pub mod #mod_tables {
                     #(#table_defs)*
@@ -170,6 +206,7 @@ impl EMDBBackend for Serialized {
                 #datastore_impl
                 #database
                 #query_impls
+                #stats_struct
             }
         };
 

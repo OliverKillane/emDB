@@ -5,7 +5,6 @@
 //! Here we check the actual cost of reference counting over borrowing for
 //! placement and read.
 
-use divan;
 use std::{ops::Deref, rc::Rc};
 type Contained = [u8; 100];
 
