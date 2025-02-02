@@ -158,7 +158,7 @@ fn extract_turbofish(gens: &Generics) -> Option<AngleBracketedGenericArguments> 
                     path: c.ident.clone().into(),
                 })));
             }
-        };
+        }
     }
 
     if args.is_empty() {

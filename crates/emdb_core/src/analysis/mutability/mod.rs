@@ -20,8 +20,7 @@ impl GetMuts for plan::Context {
     fn mutates(&self, lp: &plan::Plan) -> bool {
         self.ordering
             .iter()
-            .map(|k| lp.get_operator(*k).mutates(lp))
-            .any(|x| x)
+            .any(|k| lp.get_operator(*k).mutates(lp))
     }
 }
 

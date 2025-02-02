@@ -43,37 +43,37 @@ impl<'imm, T> From<(Key<T>, &'imm Plan)> for Idx<'imm, T> {
     }
 }
 
-impl<'imm, T> Clone for Idx<'imm, T> {
+impl<T> Clone for Idx<'_, T> {
     fn clone(&self) -> Self {
         *self
     }
 }
-impl<'imm, T> Copy for Idx<'imm, T> {}
-impl<'imm, T> PartialEq for Idx<'imm, T> {
+impl<T> Copy for Idx<'_, T> {}
+impl<T> PartialEq for Idx<'_, T> {
     fn eq(&self, other: &Self) -> bool {
         self.arr_idx == other.arr_idx
     }
 }
-impl<'imm, T> Eq for Idx<'imm, T> {}
-impl<'imm, T> std::hash::Hash for Idx<'imm, T> {
+impl<T> Eq for Idx<'_, T> {}
+impl<T> std::hash::Hash for Idx<'_, T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.arr_idx.hash(state)
     }
 }
-impl<'imm, T> std::ops::Deref for Idx<'imm, T> {
+impl<T> std::ops::Deref for Idx<'_, T> {
     type Target = usize;
     fn deref(&self) -> &Self::Target {
         &self.arr_idx
     }
 }
 
-impl<'imm, T> PartialOrd for Idx<'imm, T> {
+impl<T> PartialOrd for Idx<'_, T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<'imm, T> Ord for Idx<'imm, T> {
+impl<T> Ord for Idx<'_, T> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.arr_idx.cmp(&other.arr_idx)
     }
@@ -101,37 +101,37 @@ impl<'imm, T> From<(Key<T>, &'imm Plan)> for ImmKey<'imm, T> {
     }
 }
 
-impl<'imm, T> Clone for ImmKey<'imm, T> {
+impl<T> Clone for ImmKey<'_, T> {
     fn clone(&self) -> Self {
         *self
     }
 }
-impl<'imm, T> Copy for ImmKey<'imm, T> {}
-impl<'imm, T> PartialEq for ImmKey<'imm, T> {
+impl<T> Copy for ImmKey<'_, T> {}
+impl<T> PartialEq for ImmKey<'_, T> {
     fn eq(&self, other: &Self) -> bool {
         self.key == other.key
     }
 }
-impl<'imm, T> Eq for ImmKey<'imm, T> {}
-impl<'imm, T> std::hash::Hash for ImmKey<'imm, T> {
+impl<T> Eq for ImmKey<'_, T> {}
+impl<T> std::hash::Hash for ImmKey<'_, T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.key.arr_idx().hash(state)
     }
 }
-impl<'imm, T> std::ops::Deref for ImmKey<'imm, T> {
+impl<T> std::ops::Deref for ImmKey<'_, T> {
     type Target = Key<T>;
     fn deref(&self) -> &Self::Target {
         &self.key
     }
 }
 
-impl<'imm, T> PartialOrd for ImmKey<'imm, T> {
+impl<T> PartialOrd for ImmKey<'_, T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<'imm, T> Ord for ImmKey<'imm, T> {
+impl<T> Ord for ImmKey<'_, T> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.key.arr_idx().cmp(&other.arr_idx())
     }

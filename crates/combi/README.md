@@ -46,3 +46,10 @@ tokens              fastest       │ slowest       │ median        │ mean  
 ## Potential Improvements
 - [ ] parse `seq(recovgroup(P1), P2)` in parallel (tree based data structure is naturally parallel) as `treepar(P1, P2)`, need to get around issues with TokenStream being `!Send` and `!Sync`
 - [ ] Optimise the `recursive` parser to remove heap allocation
+
+## Inlining
+When aggressively inlining, but not optimising, stack frames can get huge.
+ - This can result in stackoverflows during compilation (as the proc macro is run after being dynamically linked with rustc).
+ - [scripts/extra.gdb](./scripts/extra.gdb) has some additional helpers for debugging this
+ - Can also set relevant flags in [../.argo/config.toml](./../.cargo/config.toml)
+ 

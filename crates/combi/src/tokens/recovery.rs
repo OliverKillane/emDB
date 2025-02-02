@@ -55,6 +55,7 @@ where
     type Inp = (TokenDiagnostic, TokenIter);
     type Out = TokenIter;
 
+    #[inline]
     fn comp(
         &self,
         (mut err, mut input): Self::Inp,

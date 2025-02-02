@@ -54,7 +54,7 @@ impl<K: Hash + Eq, V> PushMap<K, V> for PushMapConc<K, V> {
     }
 }
 
-impl<'brw, K: Hash + Eq, V, PM: PushMap<K, V>> PushMap<K, V> for RefMap<'brw, K, V, PM> {
+impl<K: Hash + Eq, V, PM: PushMap<K, V>> PushMap<K, V> for RefMap<'_, K, V, PM> {
     fn scope(&mut self) -> impl PushMap<K, V> + '_ {
         RefMap {
             map: self,
@@ -119,7 +119,7 @@ impl<K: Hash + Eq> PushSet<K> for PushSetConc<K> {
     }
 }
 
-impl<'brw, K: Hash + Eq, PS: PushSet<K>> PushSet<K> for RefSet<'brw, K, PS> {
+impl<K: Hash + Eq, PS: PushSet<K>> PushSet<K> for RefSet<'_, K, PS> {
     fn scope(&mut self) -> impl PushSet<K> + '_ {
         RefSet {
             set: self,

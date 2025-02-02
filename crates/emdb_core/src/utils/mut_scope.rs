@@ -107,7 +107,7 @@ fn add_imm<Key: Eq + Hash>(muts: &mut HashMap<Key, Mutability>, key: Key) -> boo
     }
 }
 
-impl<'parent, Key> ScopeHandle<'parent, Key>
+impl<Key> ScopeHandle<'_, Key>
 where
     Key: Eq + Hash + Clone + Ord,
 {
@@ -161,7 +161,7 @@ where
     }
 }
 
-impl<'parent, Key> Drop for ScopeHandle<'parent, Key> {
+impl<Key> Drop for ScopeHandle<'_, Key> {
     // INV: we rely on the borrow used for child-scope ensuring drops are called from the lowest
     //      scope, upwards. Hence we can just pop the end of the vector as we ascend.
     fn drop(&mut self) {

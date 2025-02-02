@@ -24,6 +24,7 @@ where
     type Inp = O;
     type Out = O;
 
+    #[inline]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         let (p1_out, p1_res) = self.0.comp(input);
         match p1_res {
@@ -75,6 +76,7 @@ where
     type Inp = P::Inp;
     type Out = P::Out;
 
+    #[inline]
     fn comp(&self, input: Self::Inp) -> (Self::Out, CombiResult<Self::Suc, Self::Con, Self::Err>) {
         let (p_out, p_res) = self.0.comp(input);
         (

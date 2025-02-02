@@ -120,7 +120,7 @@ where
         get
     }
 
-    fn scan_brw<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
+    fn scan_brw(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + '_ {
         self.scan_get()
     }
 

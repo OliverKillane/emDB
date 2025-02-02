@@ -60,8 +60,8 @@ pub trait OperatorGen {
     /// - Needs to update the set of mutated tables
     /// - Adds to the available errors
     ///   NOTE: the behaviour of 'mutates' needs to be the same as for
-    ///       [`crate::analysis::mutability`] as that analysis is used for
-    ///       generating traits that the serialized backend can implement.
+    ///   [`crate::analysis::mutability`] as that analysis is used for
+    ///   generating traits that the serialized backend can implement.
     /// - Adds to the values required for the context.
     #[allow(unused_variables, clippy::too_many_arguments)]
     fn apply<'imm>(

@@ -9,6 +9,7 @@ use crate::{
 /// ```text
 /// S P S P S P ... S <- false
 /// ```
+#[inline]
 pub fn many0<O, SP, IP>(
     s: SP,
     p: IP,
@@ -26,6 +27,7 @@ where
 /// ```text
 /// P S P S P S P ... S <- false
 /// ```
+#[inline]
 pub fn many1<O, SP, IP>(
     sep: SP,
     item: IP,
