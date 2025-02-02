@@ -27,7 +27,7 @@ enumtrait = { path = "../enumtrait" }
 pulpit_gen = { path = "../pulpit_gen" }
 pulpit_macro = { path = "../pulpit_macro" }
 assume = "0.5.0"
-rustc-hash = "1.1.0"
+rustc-hash = "2.1.0"
 
 [dev-dependencies]
 divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }
