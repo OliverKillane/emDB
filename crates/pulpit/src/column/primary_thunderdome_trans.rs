@@ -101,7 +101,7 @@ where
     }
 
     #[inline(always)]
-    fn scan_brw<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
+    fn scan_brw(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + '_ {
         self.inner.arena.iter().map(|(i, _)| i)
     }
 

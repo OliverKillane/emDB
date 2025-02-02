@@ -222,7 +222,7 @@ pub struct Data<ImmData, MutData> {
     pub mut_data: MutData,
 }
 
-impl<'brw, ImmData, MutData: Clone> Data<ImmData, &'brw MutData> {
+impl<ImmData, MutData: Clone> Data<ImmData, &MutData> {
     pub fn extract(self) -> Data<ImmData, MutData> {
         Data {
             imm_data: self.imm_data,
@@ -289,7 +289,7 @@ pub trait PrimaryWindow<'imm, ImmData, MutData> {
     /// Get an iterator over the current indices, guarenteed to be valid for `'brw`
     /// - For [`PrimaryWindowPull`] this prevents the table being modified
     /// - For [`PrimaryWindowApp`] the implementation can be optimised, given no deletions can occur.
-    fn scan_brw<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw;
+    fn scan_brw(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + '_;
 
     /// Get an iterator over the current indices, that does not keep a borrow of the window.
     /// - Typically collects indices from [`PrimaryWindow::scan_brw`].

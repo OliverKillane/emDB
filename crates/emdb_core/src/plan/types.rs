@@ -356,7 +356,7 @@ impl Display for RecordField {
     }
 }
 
-impl<'a, 'b> Display for With<'a, &'b Key<RecordType>> {
+impl Display for With<'_, &Key<RecordType>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{{")?;
         for (field, ty) in &self
@@ -380,7 +380,7 @@ impl<'a, 'b> Display for With<'a, &'b Key<RecordType>> {
     }
 }
 
-impl<'a, 'b> Display for With<'a, &'b Key<ScalarType>> {
+impl Display for With<'_, &Key<ScalarType>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let conc_t = self
             .plan
@@ -420,7 +420,7 @@ impl<'a, 'b> Display for With<'a, &'b Key<ScalarType>> {
     }
 }
 
-impl<'a, 'b> Display for With<'a, &'b Data> {
+impl Display for With<'_, &Data> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

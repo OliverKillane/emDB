@@ -209,7 +209,7 @@ impl<'imm> PrimaryWindow<'imm, (), ()> for Window<'imm, PrimaryPullAdapter> {
     fn conv_get(_: Self::ImmGet) {}
 
     #[inline(always)]
-    fn scan_brw<'brw>(&'brw self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + 'brw {
+    fn scan_brw(&self) -> impl Iterator<Item = <Self::Col as Keyable>::Key> + '_ {
         self.inner.gen.scan()
     }
 
