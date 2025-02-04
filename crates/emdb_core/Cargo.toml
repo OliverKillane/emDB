@@ -22,7 +22,7 @@ typed-arena = "2.0.2"
 typed-generational-arena = "0.2"
 proc-macro2 = { version = "1.0" }
 proc-macro-error = "1.0.4"
-quote = "1.0.33"
+quote = "1.0.38"
 rand = "0.9"
 combi = { path = "../combi" }
 enumtrait = { path = "../enumtrait" }
