@@ -17,7 +17,7 @@ proc-macro = true
 
 [dependencies]
 prettyplease = "0.2"
-syn = { version = "2.0.45", features = ["full", "extra-traits"] }
+syn = { version = "2.0.87", features = ["full", "extra-traits"] }
 typed-arena = "2.0.2"
 typed-generational-arena = "0.2"
 proc-macro2 = { version = "1.0" }

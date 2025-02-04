@@ -125,7 +125,7 @@ dependencies = [
  "proc-macro2 1.0.83",
  "quote 1.0.36",
  "rustc_version",
- "syn 2.0.65",
+ "syn 2.0.87",
 ]
 
 [[package]]
@@ -178,7 +178,7 @@ checksum = "62d671cc41a825ebabc75757b62d3d168c577f9149b2d49ece1dad1f72119d25"
 dependencies = [
  "proc-macro2 1.0.83",
  "quote 1.0.36",
- "syn 2.0.65",
+ "syn 2.0.87",
 ]
 
 [[package]]
@@ -202,7 +202,7 @@ source = "git+https://github.com/OliverKillane/divan.git?branch=enh%2Ffile-outpu
 dependencies = [
  "proc-macro2 1.0.83",
  "quote 1.0.36",
- "syn 2.0.65",
+ "syn 2.0.87",
 ]
 
 [[package]]
@@ -243,7 +243,7 @@ dependencies = [
  "quote 1.0.36",
  "quote_debug",
  "rand",
- "syn 2.0.65",
+ "syn 2.0.87",
  "typed-arena",
  "typed-generational-arena",
 ]
@@ -258,7 +258,7 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2 1.0.83",
  "quote 1.0.36",
- "syn 2.0.65",
+ "syn 2.0.87",
  "trybuild",
 ]
 
@@ -392,7 +392,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5ac2cf0f2e4f42b49f5ffd07dae8d746508ef7526c13940e5f524012ae6c6550"
 dependencies = [
  "proc-macro2 1.0.83",
- "syn 2.0.65",
+ "syn 2.0.87",
 ]
 
 [[package]]
@@ -461,7 +461,7 @@ dependencies = [
  "pulpit_macro",
  "quote 1.0.36",
  "rustc-hash",
- "syn 2.0.65",
+ "syn 2.0.87",
  "thunderdome",
  "trybuild",
  "typed-generational-arena",
@@ -481,7 +481,7 @@ dependencies = [
  "proc-macro2 1.0.83",
  "quote 1.0.36",
  "quote_debug",
- "syn 2.0.65",
+ "syn 2.0.87",
  "trybuild",
 ]
 
@@ -495,7 +495,7 @@ dependencies = [
  "proc-macro2 1.0.83",
  "pulpit_gen",
  "quote 1.0.36",
- "syn 2.0.65",
+ "syn 2.0.87",
  "trybuild",
 ]
 
@@ -523,7 +523,7 @@ version = "0.1.0"
 dependencies = [
  "proc-macro2 1.0.83",
  "quote 1.0.36",
- "syn 2.0.65",
+ "syn 2.0.87",
 ]
 
 [[package]]
@@ -640,7 +640,7 @@ checksum = "856f046b9400cee3c8c94ed572ecdb752444c24528c035cd35882aad6f492bcb"
 dependencies = [
  "proc-macro2 1.0.83",
  "quote 1.0.36",
- "syn 2.0.65",
+ "syn 2.0.87",
 ]
 
 [[package]]
@@ -699,9 +699,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.65"
+version = "2.0.87"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2863d96a84c6439701d7a38f9de935ec562c8832cc55d1dde0f513b52fad106"
+checksum = "25aa4ce346d03a6dcd68dd8b4010bcb74e54e62c90c573f394c46eae99aba32d"
 dependencies = [
  "proc-macro2 1.0.83",
  "quote 1.0.36",
@@ -1041,7 +1041,7 @@ checksum = "9ce1b18ccd8e73a9321186f97e46f9f04b778851177567b1975109d26a08d2a6"
 dependencies = [
  "proc-macro2 1.0.83",
  "quote 1.0.36",
- "syn 2.0.65",
+ "syn 2.0.87",
 ]
 
 [[package]]
@@ -1052,5 +1052,5 @@ checksum = "d3931cb58c62c13adec22e38686b559c86a30565e16ad6e8510a337cedc611e1"
 dependencies = [
  "proc-macro2 1.0.83",
  "quote 1.0.36",
- "syn 2.0.65",
+ "syn 2.0.87",
 ]
