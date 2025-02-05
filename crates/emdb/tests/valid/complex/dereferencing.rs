@@ -1,8 +1,14 @@
 #![allow(unused_variables)]
 use emdb::macros::emql;
+use derefs::{Datastore, Database};
 
 emql! {
-    impl my_db as Serialized;
+    impl derefs as Interface{
+        pub = on,
+    };
+    impl my_db as Serialized{
+        interface = derefs,
+    };
 
     table cool {
         name: String,

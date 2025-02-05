@@ -160,6 +160,29 @@ fn get_a_vals<V: Access<usize, usize>>(bencher: divan::Bencher) {
         for i in 0..ITERS {
             divan::black_box_drop(v.get_a(i));
         }
+        for i in 0..ITERS {
+            divan::black_box_drop(v.get_b(i));
+        }
+
+    });
+    divan::black_box_drop(v)
+}
+
+#[divan::bench(
+    name="Comparing putting a value performance of tuple vs decomp",
+    types=[Tuple<usize,usize>, Decomp<usize,usize>],
+)]
+fn put_vals<V: Access<usize, usize>>(bencher: divan::Bencher) {
+    const ITERS: usize = 10000000;
+    let mut v = V::new(ITERS);
+    for i in 0..ITERS {
+        v.append((i, i));
+    }
+    bencher.bench_local(|| {
+        for i in 0..ITERS {
+            divan::black_box_drop(v.put(i, (i, i)));
+        }
+
     });
     divan::black_box_drop(v)
 }

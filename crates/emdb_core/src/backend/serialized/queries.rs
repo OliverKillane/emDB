@@ -62,7 +62,7 @@ fn generate_commits<'imm>(
         ..
     } = namer;
 
-    if mutated_tables.is_empty() {
+    if !mutated_tables.mutates() {
         None
     } else {
         let (commits, aborts): (Vec<_>, Vec<_>) = mutated_tables

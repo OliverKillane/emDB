@@ -26,7 +26,7 @@ impl Parse<RecursiveIdent> for HandRolled {
 
 impl Parse<LongSequence> for HandRolled {
     fn parse(input: TokenStream) -> LongSequence {
-        let mut tkiter = input.into_iter();
+        let tkiter = input.into_iter();
         let mut ids = Vec::new();
         for tk in tkiter {
             if let TokenTree::Ident(id) = tk {
