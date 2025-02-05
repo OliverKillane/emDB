@@ -18,5 +18,5 @@ pulpit = { path = "../pulpit" }
 minister = { path = "../minister" }
 
 [dev-dependencies]
-trybuild = "1.0.91"
-glob = "0.3.1"
+trybuild = "1.0.103"
+glob = "0.3.2"

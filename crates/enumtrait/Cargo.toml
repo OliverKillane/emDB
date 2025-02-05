@@ -18,14 +18,14 @@ proc-macro = true
 [dependencies]
 proc-macro2 = "1.0"
 proc-macro-error = "1.0.4"
-syn = { version = "2.0.45", features = ["full", "extra-traits"] }
+syn = { version = "2.0.98", features = ["full", "extra-traits"] }
 quote = "1.0.38"
 combi = { path = "../combi" }
 
 [dev-dependencies]
 divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }
-trybuild = "1.0.91"
-glob = "0.3.1"
+trybuild = "1.0.103"
+glob = "0.3.2"
 
 [[bench]]
 name = "call_cost"
