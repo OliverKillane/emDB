@@ -4,6 +4,10 @@ updates:
     directory: "crates/"
     schedule:
       interval: "weekly"
+    groups:
+      cargo-dependencies:
+        patterns:
+          - "*"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

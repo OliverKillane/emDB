@@ -1,5 +1,6 @@
 #![allow(unused_variables)]
 use emdb::macros::emql;
+use favs::{Datastore, Database};
 
 #[allow(dead_code, clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, Copy)]
@@ -10,7 +11,12 @@ enum RGB {
 }
 
 emql! {
-    impl my_db as Serialized;
+    impl favs as Interface{
+        pub = on,
+    };
+    impl my_db as Serialized{
+        interface = favs, 
+    };
 
     table people {
         name: String,

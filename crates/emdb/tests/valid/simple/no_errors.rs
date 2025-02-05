@@ -4,14 +4,14 @@ emql!{
     impl my_db as Serialized;
 
     table data {
-        foo: String,
+        data_foo: String,
         bing: usize,
         bar: (&'static str, bool),
     }
 
-    query new_data(foo: &str, bing: usize, bar_0: bool) {
+    query new_data(data_foo: &str, bing: usize, bar_0: bool) {
         row(
-            foo: String = String::from(foo),
+            data_foo: String = String::from(data_foo),
             bing: usize = bing,
             bar: (&'static str, bool) = (if bar_0 { "bar" } else { "baz" }, bar_0)
         )

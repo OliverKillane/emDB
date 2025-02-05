@@ -7,3 +7,4 @@ pub mod userdetails;
 pub mod sales_analytics;
 pub mod data_logs;
 pub mod thesis_example;
+pub mod copy_string;

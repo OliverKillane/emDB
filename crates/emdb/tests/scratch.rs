@@ -6,39 +6,46 @@
 //! - Saving this file should re-run the emql macro, to generate outputs.
 use emdb::macros::emql;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum LogLevel {
-    Error,
-    Warning,
-    Info,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy)]
-enum RGB {
-    Red,
-    Blue,
-    Green,
-}
-
 emql! {
-    // impl code_display as PlanViz{
-    //     path = "emdb/tests/debug/code.dot",
-    //     types = off,
-    //     ctx = on,
-    //     control = on,
-    // };
-    impl my_db as Serialized {
-        // debug_file = "emdb/tests/code.rs",
-        // op_impl = Parallel,
-        // table_select = Thunderdome,
+    impl copy_string as Interface{
+        pub = on,
+    };
+    impl code_display as PlanViz{
+        path = "emdb/tests/debug/code.dot",
+        types = off,
+        ctx = on,
+        control = on,
+    };
+    impl my_db as Serialized{
+        debug_file = "emdb/tests/debug/code.rs",
+        interface = copy_string,
+        pub = on,
+        ds_name = EmDBRefIgnore,
+        aggressive_inlining = on,
+        op_impl = Iter,
     };
 
+    table values {
+        unused_string: String,
+    }
 
+    // query add_string(unused_string: String) {
+    //     row(
+    //         unused_string: String = unused_string,
+    //     ) ~> insert(values as ref value_id);
+    // }
+
+    query count_values() {
+        use values as ();
+            // // |> map(unrelated_value: () = ())
+            // // |> count(count)
+            // |> collect(foos)
+            // ~> return;
+    }
 }
 
 fn main() {
     // use my_interface::Datastore;
-    let mut ds = my_db::Datastore::new();
-    let db = ds.db();
+    // let mut ds = my_db::Datastore::new();
+    // let db = ds.db();
 }

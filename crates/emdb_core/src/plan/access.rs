@@ -86,6 +86,14 @@ pub struct ImmKey<'imm, T> {
     key: Key<T>,
     plan_holder: &'imm (),
 }
+
+impl<T> std::fmt::Debug for ImmKey<'_, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let arr_index = self.key.arr_idx();
+        write!(f, "ImmKey {{ index: {arr_index} }}")
+    }
+}
+
 impl<'imm, T> ImmKey<'imm, T> {
     pub fn new(key: Key<T>, plan: &'imm Plan) -> Self {
         Self {
