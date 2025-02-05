@@ -368,7 +368,7 @@ impl<O, P: TokenParser<O>, R: OptParse, F: Fn() -> P, D: Fn() -> O> OptParse
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
-    
+
     use crate::tokens::basic::matchident;
 
     use super::*;

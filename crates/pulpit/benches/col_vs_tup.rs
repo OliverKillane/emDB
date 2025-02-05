@@ -163,7 +163,6 @@ fn get_a_vals<V: Access<usize, usize>>(bencher: divan::Bencher) {
         for i in 0..ITERS {
             divan::black_box_drop(v.get_b(i));
         }
-
     });
     divan::black_box_drop(v)
 }
@@ -182,7 +181,6 @@ fn put_vals<V: Access<usize, usize>>(bencher: divan::Bencher) {
         for i in 0..ITERS {
             divan::black_box_drop(v.put(i, (i, i)));
         }
-
     });
     divan::black_box_drop(v)
 }
