@@ -1,6 +1,6 @@
 //! combis for better errors
 
-use proc_macro_error::Diagnostic;
+use proc_macro_error2::Diagnostic;
 
 use crate::{
     core::{mapall, maperr},

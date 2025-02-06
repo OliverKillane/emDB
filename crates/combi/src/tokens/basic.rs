@@ -9,7 +9,7 @@ use crate::{
 };
 use derive_where::derive_where;
 use proc_macro2::{Delimiter, Ident, Literal, Punct, Span, TokenStream, TokenTree};
-use proc_macro_error::{Diagnostic, Level};
+use proc_macro_error2::{Diagnostic, Level};
 use syn::{parse::Parse as SynParse, spanned::Spanned};
 
 #[derive(Clone, Debug)]
@@ -38,7 +38,7 @@ impl Combi for GetIdent {
                 input,
                 CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(
                     tt.span(),
-                    proc_macro_error::Level::Error,
+                    proc_macro_error2::Level::Error,
                     format!("Expected identifier, found {}", tt),
                 ))),
             ),
@@ -48,7 +48,7 @@ impl Combi for GetIdent {
                     input,
                     CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(
                         span,
-                        proc_macro_error::Level::Error,
+                        proc_macro_error2::Level::Error,
                         String::from("Expected identifier, found nothing"),
                     ))),
                 )
@@ -92,7 +92,7 @@ impl Combi for MatchIdent {
                         input,
                         CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(
                             i.span(),
-                            proc_macro_error::Level::Error,
+                            proc_macro_error2::Level::Error,
                             format!("Expected identifier {}, found {}", self.text, i),
                         ))),
                     )
@@ -102,7 +102,7 @@ impl Combi for MatchIdent {
                 input,
                 CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(
                     tt.span(),
-                    proc_macro_error::Level::Error,
+                    proc_macro_error2::Level::Error,
                     format!("Expected identifier {}, found {}", self.text, tt),
                 ))),
             ),
@@ -112,7 +112,7 @@ impl Combi for MatchIdent {
                     input,
                     CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(
                         span,
-                        proc_macro_error::Level::Error,
+                        proc_macro_error2::Level::Error,
                         format!("Expected identifier {}, found nothing", self.text),
                     ))),
                 )
@@ -185,7 +185,7 @@ impl Combi for GetPunct {
                 input,
                 CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(
                     tt.span(),
-                    proc_macro_error::Level::Error,
+                    proc_macro_error2::Level::Error,
                     format!("Expected punct, found {}", tt),
                 ))),
             ),
@@ -195,7 +195,7 @@ impl Combi for GetPunct {
                     input,
                     CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(
                         span,
-                        proc_macro_error::Level::Error,
+                        proc_macro_error2::Level::Error,
                         String::from("Expected punct, found nothing"),
                     ))),
                 )
@@ -235,7 +235,7 @@ impl Combi for matchpunct {
                         input,
                         CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(
                             p.span(),
-                            proc_macro_error::Level::Error,
+                            proc_macro_error2::Level::Error,
                             format!("Expected punct {}, found {}", self.0, p),
                         ))),
                     )
@@ -245,7 +245,7 @@ impl Combi for matchpunct {
                 input,
                 CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(
                     tt.span(),
-                    proc_macro_error::Level::Error,
+                    proc_macro_error2::Level::Error,
                     format!("Expected punct {}, found {}", self.0, tt),
                 ))),
             ),
@@ -255,7 +255,7 @@ impl Combi for matchpunct {
                     input,
                     CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(
                         span,
-                        proc_macro_error::Level::Error,
+                        proc_macro_error2::Level::Error,
                         format!("Expected punct {}, found nothing", self.0),
                     ))),
                 )
@@ -327,7 +327,7 @@ impl Combi for GetLiteral {
                 input,
                 CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(
                     tt.span(),
-                    proc_macro_error::Level::Error,
+                    proc_macro_error2::Level::Error,
                     format!("Expected literal, found {}", tt),
                 ))),
             ),
@@ -337,7 +337,7 @@ impl Combi for GetLiteral {
                     input,
                     CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(
                         span,
-                        proc_macro_error::Level::Error,
+                        proc_macro_error2::Level::Error,
                         String::from("Expected literal, found nothing"),
                     ))),
                 )
@@ -564,7 +564,7 @@ where
                     None => {
                         let err = TokenDiagnostic::from(Diagnostic::spanned(
                             input.last_span().unwrap_or_else(Span::call_site),
-                            proc_macro_error::Level::Error,
+                            proc_macro_error2::Level::Error,
                             String::from("Unexpected end of input"),
                         ));
                         break (input, CombiResult::Err(err));
@@ -708,7 +708,7 @@ impl Combi for gettoken {
                 input,
                 CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(
                     span,
-                    proc_macro_error::Level::Error,
+                    proc_macro_error2::Level::Error,
                     String::from("Expected token, found nothing"),
                 ))),
             )
@@ -751,7 +751,7 @@ impl Combi for terminal {
                 (),
                 CombiResult::Err(TokenDiagnostic::from(Diagnostic::spanned(
                     big_span,
-                    proc_macro_error::Level::Error,
+                    proc_macro_error2::Level::Error,
                     String::from("Expected end of input"),
                 ))),
             )

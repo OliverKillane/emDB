@@ -9,7 +9,7 @@ use combi::{
     Combi,
 };
 use proc_macro2::{Ident, Span, TokenStream};
-use proc_macro_error::Diagnostic;
+use proc_macro_error2::Diagnostic;
 use quote::quote;
 use std::collections::LinkedList;
 

@@ -20,7 +20,7 @@ use combi::{
 };
 use prettyplease::unparse;
 use proc_macro2::TokenStream;
-use proc_macro_error::{Diagnostic, Level};
+use proc_macro_error2::{Diagnostic, Level};
 use pulpit::gen::selector::{
     ColumnarSelector, CopySelector, MutabilitySelector, TableSelectors, ThunderdomeSelector,
 };
@@ -77,7 +77,7 @@ impl EMDBBackend for Serialized {
     fn parse_options(
         backend_name: &syn::Ident,
         options: Option<proc_macro2::TokenStream>,
-    ) -> Result<Self, std::collections::LinkedList<proc_macro_error::Diagnostic>> {
+    ) -> Result<Self, std::collections::LinkedList<proc_macro_error2::Diagnostic>> {
         const DEFAULT_OP_IMPL: OperatorImpls = OperatorImpls::Parallel;
         const DEFAULT_TABLE_SELECTOR: TableSelectors =
             TableSelectors::MutabilitySelector(MutabilitySelector);
@@ -142,7 +142,7 @@ impl EMDBBackend for Serialized {
         self,
         impl_name: syn::Ident,
         plan: &crate::plan::Plan,
-    ) -> Result<proc_macro2::TokenStream, std::collections::LinkedList<proc_macro_error::Diagnostic>>
+    ) -> Result<proc_macro2::TokenStream, std::collections::LinkedList<proc_macro_error2::Diagnostic>>
     {
         let mut namer = namer::SerializedNamer::new();
         if let Some(name) = self.ds_name {

@@ -3,7 +3,7 @@
 //! - 1-token of lookahead provided by [TokenIter::peek_next]
 
 use proc_macro2::{token_stream::IntoIter, Span, TokenStream, TokenTree};
-use proc_macro_error::Diagnostic;
+use proc_macro_error2::Diagnostic;
 use std::collections::LinkedList;
 
 use crate::{Combi, CombiCon, CombiErr};

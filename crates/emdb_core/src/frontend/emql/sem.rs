@@ -19,7 +19,7 @@ use crate::{
     plan::{self, ConcRef, ScalarTypeConc},
 };
 use proc_macro2::{Ident, Span};
-use proc_macro_error::Diagnostic;
+use proc_macro_error2::Diagnostic;
 use std::collections::{HashMap, HashSet, LinkedList};
 
 /// The return value of a [`Context`], including the [`ReturnVal::span`] for multiple

@@ -1,7 +1,7 @@
 use std::collections::LinkedList;
 
 use proc_macro2::{Delimiter, Group, Ident, TokenStream, TokenTree};
-use proc_macro_error::{Diagnostic, Level};
+use proc_macro_error2::{Diagnostic, Level};
 use quote::{quote, ToTokens};
 use syn::parse2;
 

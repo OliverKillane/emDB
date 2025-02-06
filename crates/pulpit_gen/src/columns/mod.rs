@@ -5,7 +5,7 @@ use crate::{
     namer::CodeNamer,
 };
 use proc_macro2::{Span, TokenStream};
-use proc_macro_error::{Diagnostic, Level};
+use proc_macro_error2::{Diagnostic, Level};
 use quote::quote;
 use quote_debug::Tokens;
 use syn::{Ident, ItemFn, ItemStruct, Type};

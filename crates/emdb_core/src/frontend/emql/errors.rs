@@ -6,7 +6,7 @@ use super::sem::VarState;
 use crate::plan::{self, Key, Plan, RecordType, ScalarType, Table, With};
 use itertools::Itertools;
 use proc_macro2::{Ident, Span};
-use proc_macro_error::{Diagnostic, Level};
+use proc_macro_error2::{Diagnostic, Level};
 use std::collections::HashMap;
 use syn::Type;
 

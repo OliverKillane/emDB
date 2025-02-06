@@ -13,8 +13,8 @@
 //! ## Correct Design
 //! To save dev time: just `get` the value (cringe but easy).
 
-use rustc_hash::FxHashMap;
-use std::hash::{BuildHasherDefault, Hash};
+use rustc_hash::{FxBuildHasher, FxHashMap};
+use std::hash::Hash;
 #[derive(Debug)]
 pub struct MissingUniqueValue;
 #[derive(Debug)]
@@ -29,7 +29,7 @@ pub struct Unique<Field, Key> {
 impl<Field: Eq + Hash + Clone, Key: Copy + Eq> Unique<Field, Key> {
     pub fn new(size_hint: usize) -> Self {
         Self {
-            mapping: FxHashMap::with_capacity_and_hasher(size_hint, BuildHasherDefault::default()),
+            mapping: FxHashMap::with_capacity_and_hasher(size_hint, FxBuildHasher),
         }
     }
 
