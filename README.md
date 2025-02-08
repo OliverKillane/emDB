@@ -10,9 +10,27 @@ This project is an experiment and while functional, it is not fully tested & the
 ### [`./bench` → Benchmarks against other systems](./bench)
 ### [`./book` → The emDB book](./book) [→ hosted here](https://oliverkillane.github.io/emDB/)
 ### [`./papers` → Academic works developed alongside this project](./papers/)
+### [`./scripts` → Helper scripts](./scripts/)
 
 ## Documentation
 Can be found in the [book site](https://oliverkillane.github.io/emDB/), and built documentation from [`./crates`](./crates/).
 
 ## Contributions
 This project is currently closed to code contributions as it is part of marked work.
+
+### How to Develop
+On any linux/bsd/mac/windows simply build as a normal cargo project.
+```bash
+cd crates
+cargo test
+```
+
+On linux an additional helper scripts [scripts/setup.sh](./scripts/setup.sh) will add git hooks, install extra tooling.
+```bash
+./scripts/setup.sh
+```
+
+Python is used for some helper scripts used in the [thesis paper](./papers/oliverkillane_fyp/). If you have cargo, you can get relevant python versions through uv.
+```bash
+cargo install --git https://github.com/astral-sh/uv uv
+```
