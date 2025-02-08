@@ -5,7 +5,7 @@
 
 use proc_macro::TokenStream as CompilerTokenStream;
 use proc_macro2::TokenStream;
-use proc_macro_error::{proc_macro_error, Diagnostic};
+use proc_macro_error2::{proc_macro_error, Diagnostic};
 
 mod gen_match;
 mod impl_trait;

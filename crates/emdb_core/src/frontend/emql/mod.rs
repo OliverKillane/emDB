@@ -152,7 +152,7 @@ use std::collections::LinkedList;
 
 use crate::{frontend::Frontend, plan};
 use proc_macro2::TokenStream;
-use proc_macro_error::Diagnostic;
+use proc_macro_error2::Diagnostic;
 
 pub struct Emql;
 

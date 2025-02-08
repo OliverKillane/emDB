@@ -1,5 +1,4 @@
-use rustc_hash::FxHashMap;
-use std::hash::BuildHasherDefault;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 macro_rules! single {
     ($data:ty) => {
         $data
@@ -240,7 +239,7 @@ impl IterOps for Iter {
         Key: Eq + std::hash::Hash + Send + Sync,
         Rest: Send + Sync,
     {
-        let mut groups = FxHashMap::with_hasher(BuildHasherDefault::default());
+        let mut groups = FxHashMap::with_hasher(FxBuildHasher);
         for data in stream {
             let (k, r) = split(data);
             groups.entry(k).or_insert_with(Vec::new).push(r);
@@ -285,8 +284,7 @@ impl IterOps for Iter {
         match (left.size_hint().1, right.size_hint().1) {
             (Some(left_size), Some(right_size)) if left_size < right_size => {
                 let mut results = Vec::with_capacity(left_size * right_size);
-                let mut lefts =
-                    FxHashMap::with_capacity_and_hasher(left_size, BuildHasherDefault::default());
+                let mut lefts = FxHashMap::with_capacity_and_hasher(left_size, FxBuildHasher);
                 let left = left.collect::<Vec<_>>();
                 for l in &left {
                     lefts.entry(left_split(l)).or_insert_with(Vec::new).push(l);
@@ -302,10 +300,8 @@ impl IterOps for Iter {
             }
             (left_size, right_size) => {
                 let mut results = Vec::with_capacity(get_size(left_size, right_size));
-                let mut rights = FxHashMap::with_capacity_and_hasher(
-                    get_side_size(right_size),
-                    BuildHasherDefault::default(),
-                );
+                let mut rights =
+                    FxHashMap::with_capacity_and_hasher(get_side_size(right_size), FxBuildHasher);
                 let right = right.collect::<Vec<_>>();
                 for r in &right {
                     rights

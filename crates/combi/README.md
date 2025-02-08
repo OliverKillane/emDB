@@ -16,7 +16,7 @@ This was build as part of the [emDB project](./../emdb).
 ## Included Specialisations
 ### Tokens
 Parser combinators for tokenstreams, allowing LL(1) grammars (recursive descent, no backtracking).
-- Produce compiler diagnostics using [`proc_macro_error`]
+- Produce compiler diagnostics using [`proc_macro_error2`]
 - Can recover from failures easily, with custom recovery logic
 
 It is implemented simply (explicit peeking for lookahead, explitit recovery), and is intended to be as close to zero-cost over a comparably features hand-rolled parser.

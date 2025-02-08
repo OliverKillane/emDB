@@ -14,7 +14,7 @@ license-file.workspace = true
 
 [dependencies]
 rayon = "1.10.0"
-rustc-hash = "1.1.0"
+rustc-hash = "2.1.1"
 
 [dev-dependencies]
 divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }

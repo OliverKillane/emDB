@@ -5,7 +5,7 @@
 use crate::{plan, utils::misc::singlelist};
 
 use proc_macro2::{Ident, TokenStream};
-use proc_macro_error::{Diagnostic, Level};
+use proc_macro_error2::{Diagnostic, Level};
 use std::collections::{HashMap, LinkedList};
 
 pub trait EMDBBackend: Sized {

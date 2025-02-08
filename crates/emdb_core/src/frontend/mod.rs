@@ -3,7 +3,7 @@
 //! ## What is a frontend?
 //! A parser that takes tokens, and generated an [`plan::Plan`] and [`backend::Targets`].
 //!
-//! ## [Diagnostics API](proc_macro_error::Diagnostic)
+//! ## [Diagnostics API](proc_macro_error2::Diagnostic)
 //! Used to generate errors to be emitted by the rust compiler.
 //! - Allows use of the unstable diagnostics API on stable with more limited
 //!   errors produced
@@ -20,7 +20,7 @@ use crate::plan;
 pub use emql::Emql;
 
 use proc_macro2::TokenStream;
-use proc_macro_error::Diagnostic;
+use proc_macro_error2::Diagnostic;
 
 pub struct Diagnostics {
     errs: Vec<Diagnostic>,

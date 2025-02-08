@@ -51,7 +51,7 @@ mod macros {
     }
 }
 
-#[proc_macro_error::proc_macro_error]
+#[proc_macro_error2::proc_macro_error]
 #[proc_macro]
 pub fn emql(tk: proc_macro::TokenStream) -> proc_macro::TokenStream {
     crate::macros::make_impl::<crate::frontend::Emql>(tk.into()).into()

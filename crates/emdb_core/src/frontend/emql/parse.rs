@@ -34,7 +34,7 @@ use combi::{
     Combi,
 };
 use proc_macro2::{Delimiter, Ident, Span, TokenStream};
-use proc_macro_error::{Diagnostic, Level};
+use proc_macro_error2::{Diagnostic, Level};
 use std::collections::LinkedList;
 use syn::{Expr, Type};
 

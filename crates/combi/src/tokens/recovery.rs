@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use super::{TokenDiagnostic, TokenIter};
 use crate::{Combi, CombiResult, Repr};
 use derive_where::derive_where;
-use proc_macro_error::{DiagnosticExt, SpanRange};
+use proc_macro_error2::{DiagnosticExt, SpanRange};
 
 /// Recover until the parser succeeds with true
 pub fn until<P, T>(parser: P) -> Until<P, T>

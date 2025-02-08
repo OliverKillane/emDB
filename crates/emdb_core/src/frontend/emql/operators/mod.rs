@@ -39,7 +39,7 @@ use combi::{
     },
 };
 use proc_macro2::{Delimiter, Ident, Span};
-use proc_macro_error::{Diagnostic, Level};
+use proc_macro_error2::{Diagnostic, Level};
 use std::{
     collections::{HashMap, LinkedList},
     fmt::Debug,

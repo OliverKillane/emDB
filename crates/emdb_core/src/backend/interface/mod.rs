@@ -30,7 +30,7 @@ impl super::EMDBBackend for Interface {
     fn parse_options(
         backend_name: &Ident,
         options: Option<proc_macro2::TokenStream>,
-    ) -> Result<Self, std::collections::LinkedList<proc_macro_error::Diagnostic>> {
+    ) -> Result<Self, std::collections::LinkedList<proc_macro_error2::Diagnostic>> {
         fn get_traits() -> impl TokenParser<Vec<TokenStream>> {
             recovgroup(
                 Delimiter::Brace,
@@ -69,7 +69,7 @@ impl super::EMDBBackend for Interface {
         self,
         impl_name: Ident,
         plan: &plan::Plan,
-    ) -> Result<proc_macro2::TokenStream, std::collections::LinkedList<proc_macro_error::Diagnostic>>
+    ) -> Result<proc_macro2::TokenStream, std::collections::LinkedList<proc_macro_error2::Diagnostic>>
     {
         let interface_namer = InterfaceNamer::new();
         let InterfaceNamer {

@@ -3,7 +3,7 @@
 //! TODO: matching macros to make use of `matches!()``
 use crate::{Combi, CombiResult};
 use proc_macro2::TokenTree;
-use proc_macro_error::{Diagnostic, Level};
+use proc_macro_error2::{Diagnostic, Level};
 
 use super::{TokenDiagnostic, TokenIter};
 

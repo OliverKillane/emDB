@@ -1,7 +1,8 @@
 error: Provided variants should be a single identifier of the type.
+
+         = help: Try `enum Invalid1 { .. Bing, .. }`
+
  --> tests/invalid/quick_enum/struct_variant.rs:3:9
   |
 3 |     Bing{ cool: i32 }
   |         ^^^^^^^^^^^^^
-  |
-  = help: Try `enum Invalid1 { .. Bing, .. }`
