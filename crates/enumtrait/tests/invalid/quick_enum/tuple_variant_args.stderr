@@ -1,7 +1,8 @@
 error: Provided variants should be a single identifier of the type.
+
+         = help: Try `enum Invalid1 { .. Bing(<type>), .. }`
+
  --> tests/invalid/quick_enum/tuple_variant_args.rs:3:10
   |
 3 |     Bing(i32, i32)
   |          ^^^^^^^^
-  |
-  = help: Try `enum Invalid1 { .. Bing(<type>), .. }`
