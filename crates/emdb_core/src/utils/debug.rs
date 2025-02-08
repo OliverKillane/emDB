@@ -5,7 +5,7 @@ use std::backtrace::Backtrace;
 
 /// Emit a warning with the specified debug message.
 ///  - Will de displayed with the span of the entire macro invocation.
-///  - Requires
+///  - Requires a backtrace (set in crates/.cargo/config.toml)
 pub fn debug(msg: String) {
     let bt = Backtrace::capture();
     Diagnostic::spanned(

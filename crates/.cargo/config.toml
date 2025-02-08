@@ -18,3 +18,9 @@
 [env]
 # For allowing `emdb_core::utils::debug` to display backtraces
 RUST_BACKTRACE = "1"
+
+[build]
+rustflags = ["-Dwarnings"]
+
+[term]
+color = 'always'
