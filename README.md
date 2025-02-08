@@ -9,7 +9,7 @@ This project is an experiment and while functional, it is not fully tested & the
 ### [`./crates` → Contains the libraries developed for this project](./crates)
 ### [`./bench` → Benchmarks against other systems](./bench)
 ### [`./book` → The emDB book](./book) [→ hosted here](https://oliverkillane.github.io/emDB/)
-### [`./papers` → Academic works developed alongside this project](./papers/)
+### [`./projects` → Projects within emDB (including the thesis this emDB was for)](./projects/)
 ### [`./scripts` → Helper scripts](./scripts/)
 
 ## Documentation
