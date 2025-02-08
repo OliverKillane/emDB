@@ -2,11 +2,9 @@ name: CI for Pull Requests
 
 on:
   push:
+    branches:
+        - main
   pull_request:
-
-env: 
-  CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-Dwarnings"
 
 jobs:
   crates_ci:
@@ -16,6 +14,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
         with:
+          # JUSTIFY: Caching based on installed packages (including git and 
+          #          installed tools).
+          #           - Hashing based on OS (for compatibility)
+          #           - Cargo.lock (for dependency changes)
           path: |
             ~/.cargo/bin/
             ~/.cargo/registry/index/
@@ -23,8 +25,16 @@ jobs:
             ~/.cargo/git/db/
             crates/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: run tests
-        run: cargo test
+      - uses: cargo-bins/cargo-binstall@main
+      # JUSTIFY: Prebuilt binaries instead of compiling from scratch
+      #           - Faster install for nextest
+      #           - disabled telemetry (is anonymous & limited to package install popularity, but 
+      #             unecessary) (see readme: https://github.com/cargo-bins/cargo-binstall)
+      - name: Install nextest
+        run: cargo binstall cargo-nextest --only-signed --disable-telemetry --no-confirm
+        working-directory: crates
+      - name: Run nextest tests
+        run: cargo nextest run
         working-directory: crates
       - name: run doc build
         run: cargo doc --document-private-items
