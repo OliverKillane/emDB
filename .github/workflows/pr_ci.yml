@@ -25,8 +25,16 @@ jobs:
             ~/.cargo/git/db/
             crates/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: run tests
-        run: cargo test
+      - uses: cargo-bins/cargo-binstall@main
+      # JUSTIFY: Prebuilt binaries instead of compiling from scratch
+      #           - Faster install for nextest
+      #           - disabled telemetry (is anonymous & limited to package install popularity, but 
+      #             unecessary) (see readme: https://github.com/cargo-bins/cargo-binstall)
+      - name: Install nextest
+        run: cargo binstall cargo-nextest --only-signed --disable-telemetry --no-confirm
+        working-directory: crates
+      - name: Run nextest tests
+        run: cargo nextest run
         working-directory: crates
       - name: run doc build
         run: cargo doc --document-private-items

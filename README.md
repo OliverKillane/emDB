@@ -28,6 +28,8 @@ cargo test
 On linux an additional helper scripts [scripts/setup.sh](./scripts/setup.sh) will add git hooks, install extra tooling.
 ```bash
 ./scripts/setup.sh
+cd crates
+cargo nextest run
 ```
 
 Python is used for some helper scripts used in the [thesis paper](./papers/oliverkillane_fyp/). If you have cargo, you can get relevant python versions through uv.
