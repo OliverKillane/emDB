@@ -15,9 +15,6 @@ This project is an experiment and while functional, it is not fully tested & the
 ## Documentation
 Can be found in the [book site](https://oliverkillane.github.io/emDB/), and built documentation from [`./crates`](./crates/).
 
-## Contributions
-This project is currently closed to code contributions as it is part of marked work.
-
 ### How to Develop
 On any linux/bsd/mac/windows simply build as a normal cargo project.
 ```bash
