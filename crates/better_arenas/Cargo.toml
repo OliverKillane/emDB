@@ -1,0 +1,10 @@
+[package]
+name = "rcarena"
+version = "0.1.0"
+edition = "2024"
+homepage.workspace = true
+repository.workspace = true
+license-file.workspace = true
+
+[dependencies]
+smallvec = "1.14"
