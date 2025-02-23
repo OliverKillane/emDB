@@ -1,6 +1,5 @@
 use std::mem::{self, ManuallyDrop, MaybeUninit};
 
-
 trait DropWith {
     type Arg;
     fn drop_with(self, arg: Self::Arg);
@@ -8,7 +7,7 @@ trait DropWith {
 
 struct DropWithWrapper<D: DropWith>(MaybeUninit<D>);
 
-impl <D: DropWith> DropWithWrapper<D> {
+impl<D: DropWith> DropWithWrapper<D> {
     pub fn new(data: D) -> Self {
         Self(MaybeUninit::new(data))
     }
@@ -16,21 +15,18 @@ impl <D: DropWith> DropWithWrapper<D> {
     fn drop_with(self, arg: <D as DropWith>::Arg) {
         unsafe {
             // JUSTIFY: copy inner into `drop_with` destructor
-            //           - We use mem::forget to prevent drop being called, so cannot call twice. 
+            //           - We use mem::forget to prevent drop being called, so cannot call twice.
             self.0.assume_init_read().drop_with(arg);
         }
         mem::forget(self);
     }
 }
 
-impl <D: DropWith> Drop for DropWithWrapper<D> {
+impl<D: DropWith> Drop for DropWithWrapper<D> {
     fn drop(&mut self) {
-        const {
-            panic!("Attempted to drop undroppable type")
-        }
+        const { panic!("Attempted to drop undroppable type") }
     }
 }
-
 
 trait RcArena<Data> {
     type Index;
@@ -44,5 +40,3 @@ trait RcArena<Data> {
     fn inc(&self, idx: &Self::Index) -> Self::Index;
     fn dec(&self, idx: Self::Index);
 }
-
-

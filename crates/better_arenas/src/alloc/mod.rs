@@ -1,13 +1,17 @@
 //! ## Interface Agnostic Data Structures for [super::arenas].
 
-use crate::ints::IdxInt;
+use crate::utils::idx::IdxInt;
 
+pub mod amort;
 pub mod blocks;
 pub mod contig;
-pub mod amort;
+
+pub trait AllocSelect {
+    type Impl<Idx: IdxInt, Data>: AllocImpl<Idx, Data>;
+}
 
 /// A simple interface for data structures holding values, with keys chosen by the structure.
-pub trait Slots<Idx: IdxInt, Data> {
+pub trait AllocImpl<Idx: IdxInt, Data> {
     type Cfg;
     fn new(cfg: Self::Cfg) -> Self;
     fn insert(&mut self, d: Data) -> Option<Idx>;

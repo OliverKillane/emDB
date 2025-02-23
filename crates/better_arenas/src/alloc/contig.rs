@@ -1,23 +1,29 @@
 use std::marker::PhantomData;
 
-use crate::ints::IdxInt;
+use crate::utils::idx::IdxInt;
 
-use super::Slots;
+use super::{AllocImpl, AllocSelect};
 
-struct Cfg<Idx: IdxInt> {
-    preallocate_to: Idx,
+pub struct ContigCfg<Idx: IdxInt> {
+    pub preallocate_to: Idx,
 }
 
 /// A continugous allocation of slots.
 ///  - Backed by a vector.
 ///  - Copies entire vector on resizes that require
-struct Contig<Idx: IdxInt, Data> {
+pub struct ContigImpl<Idx: IdxInt, Data> {
     data: Vec<Data>,
     _phantom: PhantomData<Idx>,
 }
 
-impl<Idx: IdxInt, Data> Slots<Idx, Data> for Contig<Idx, Data> {
-    type Cfg = Cfg<Idx>;
+pub struct Contig;
+
+impl AllocSelect for Contig {
+    type Impl<Idx: IdxInt, Data> = ContigImpl<Idx, Data>;
+}
+
+impl<Idx: IdxInt, Data> AllocImpl<Idx, Data> for ContigImpl<Idx, Data> {
+    type Cfg = ContigCfg<Idx>;
 
     fn new(cfg: Self::Cfg) -> Self {
         Self {
@@ -38,14 +44,10 @@ impl<Idx: IdxInt, Data> Slots<Idx, Data> for Contig<Idx, Data> {
     }
 
     unsafe fn read(&self, idx: Idx) -> &Data {
-        unsafe {
-            self.data.get_unchecked(idx.offset())
-        }
+        unsafe { self.data.get_unchecked(idx.offset()) }
     }
 
     unsafe fn write(&mut self, idx: Idx) -> &mut Data {
-        unsafe {
-            self.data.get_unchecked_mut(idx.offset())
-        }
+        unsafe { self.data.get_unchecked_mut(idx.offset()) }
     }
 }

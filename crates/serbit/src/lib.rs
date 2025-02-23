@@ -1,17 +1,15 @@
 //! ## Serbit
 //! Basic idea:
 //!  - A compiler to generate parser implementations for bit-specific protocols
-//! 
+//!
 //! What do we need:
 //!  - Ability to read & write
 //!  - Ability to define data types of arbitrary size (e.g. bits)
 //!  - Ability to hook into the backend, and use for other projects.
-//! 
+//!
 //! Goals
-//!  - To allow emdb to store data on disk, send over network, savouring every 
+//!  - To allow emdb to store data on disk, send over network, savouring every
 //!    last bit.
-
-
 
 /*
 
@@ -25,7 +23,7 @@ we can also put assertions on the data (e.g. on alignment, on size)
 
  - Each stage takes some inputs, can then define how to parse.
  - Stages can have dependencies on previous
- - stages can have 
+ - stages can have
 
 struct || {
     member1: u8,
@@ -69,8 +67,6 @@ stage: args, Vec<steps>. step: if, for, until, stage[args], properties
 read or write, reference.
 */
 
-
-
 /*
 Struct{
     mem: Vec<FixedStage>
@@ -100,4 +96,3 @@ FixedCase{
 },
 */
 mod ir;
-

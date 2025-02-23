@@ -1,21 +1,21 @@
-use super::Slots;
-use crate::ints::IdxInt;
+use super::{AllocSelect, AllocImpl};
+use crate::utils::idx::IdxInt;
 use smallvec::SmallVec;
 use std::{marker::PhantomData, mem::MaybeUninit};
 
-struct Cfg<Idx: IdxInt> {
+pub struct Cfg<Idx: IdxInt> {
     preallocate_to: Idx,
 }
 
 /// Allocating slots in blocks.
-///  - No reacllocation on extension.
+///  - No reallocation on extension.
 ///  - Each block is the same size.
-struct Blocks<Idx: IdxInt, Data, const BLOCK_SIZE: usize> {
+pub struct BlocksImpl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> {
     data: SmallVec<[Box<[MaybeUninit<Data>; BLOCK_SIZE]>; 4]>,
     last_idx: Option<Idx>,
     _phantom: PhantomData<Idx>,
 }
-impl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> Blocks<Idx, Data, BLOCK_SIZE> {
+impl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> BlocksImpl<Idx, Data, BLOCK_SIZE> {
     fn idx_convert(idx: Idx) -> (usize, usize) {
         let block_idx = idx.offset() / BLOCK_SIZE;
         let inner_idx = idx.offset() % BLOCK_SIZE;
@@ -27,8 +27,14 @@ impl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> Blocks<Idx, Data, BLOCK_SIZE> {
     }
 }
 
-impl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> Slots<Idx, Data>
-    for Blocks<Idx, Data, BLOCK_SIZE>
+pub struct Blocks<const BLOCK_SIZE: usize>;
+
+impl<const BLOCK_SIZE: usize> AllocSelect for Blocks<BLOCK_SIZE> {
+    type Impl<Idx: IdxInt, Data> = BlocksImpl<Idx, Data, BLOCK_SIZE>;
+}
+
+impl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> AllocImpl<Idx, Data>
+    for BlocksImpl<Idx, Data, BLOCK_SIZE>
 {
     type Cfg = Cfg<Idx>;
 

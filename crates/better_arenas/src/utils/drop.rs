@@ -1,4 +1,7 @@
-use std::mem::{ManuallyDrop, forget};
+use std::{
+    mem::{ManuallyDrop, forget},
+    ops::Deref,
+};
 
 pub trait CanDropWith<Arg> {
     fn drop(self, arg: Arg);
@@ -7,15 +10,15 @@ pub trait CanDropWith<Arg> {
 /// Allows objects to define their own drop that takes additional arguments.
 ///  - If [drop] is called outside of a panick, it will panic.
 ///  - [CanDropWith] must be implemented for the types that can be used to drop.
-/// 
+///
 /// ### Why not a compile time panic on drop?
-/// This would be ideal, however in const contexts, we cannot determine if we 
-/// are in a unwind (panic) context. Hence if any panic anywhere is possible 
-/// for the lifetime of such an object, it will fail compilation. 
-/// 
-/// This includes functions such as [ManuallyDrop::take], which is needed in 
+/// This would be ideal, however in const contexts, we cannot determine if we
+/// are in a unwind (panic) context. Hence if any panic anywhere is possible
+/// for the lifetime of such an object, it will fail compilation.
+///
+/// This includes functions such as [ManuallyDrop::take], which is needed in
 /// [DropWith] internally.
-/// 
+///
 /// ### Examples
 /// ```
 /// use rcarena::drop::{CanDropWith, DropWith};
@@ -52,9 +55,7 @@ impl<D> DropWith<D> {
     pub fn new(data: D) -> Self {
         Self(ManuallyDrop::new(data))
     }
-}
 
-impl<D> DropWith<D> {
     pub fn drop<Arg>(mut self, arg: Arg)
     where
         D: CanDropWith<Arg>,
@@ -68,6 +69,14 @@ impl<D> DropWith<D> {
     }
 }
 
+impl<D> Deref for DropWith<D> {
+    type Target = D;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl<D> Drop for DropWith<D> {
     fn drop(&mut self) {
         if !std::thread::panicking() {
@@ -75,7 +84,6 @@ impl<D> Drop for DropWith<D> {
             //           - Adding a const panic causes failures at compile time
             //             anywhere we might unwind. This causes issues when
             //             trying [ManuallyDrop::take], which can panic.
-            //           -
             //           Hence we settle for second best, a panic at runtime.
             panic!(
                 "Attempted to drop undroppable type: {}",
@@ -84,7 +92,7 @@ impl<D> Drop for DropWith<D> {
         } else {
             // JUSTIFY: Dropping in panic.
             //           - Want to clean up resources in case of panic.
-            //           - Reduce additional noise
+            //           - Reduce additional noise.
             unsafe {
                 ManuallyDrop::drop(&mut self.0);
             }
