@@ -16,4 +16,3 @@ impl<F: FnOnce()> Drop for Defer<F> {
         }
     }
 }
-

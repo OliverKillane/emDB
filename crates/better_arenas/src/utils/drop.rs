@@ -49,6 +49,7 @@ pub trait CanDropWith<Arg> {
 /// # }
 /// let foo = DropWith::new(Foo { data: 42 });
 /// ```
+#[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DropWith<D>(ManuallyDrop<D>);
 
 impl<D> DropWith<D> {
@@ -85,6 +86,7 @@ impl<D> Drop for DropWith<D> {
             //             anywhere we might unwind. This causes issues when
             //             trying [ManuallyDrop::take], which can panic.
             //           Hence we settle for second best, a panic at runtime.
+            //            - Has the additional benefit of producing a backtrace
             panic!(
                 "Attempted to drop undroppable type: {}",
                 std::any::type_name::<D>()

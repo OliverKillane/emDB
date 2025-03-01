@@ -1,4 +1,4 @@
-use super::{AllocSelect, AllocImpl};
+use super::{AllocImpl, AllocSelect};
 use crate::utils::idx::IdxInt;
 use smallvec::SmallVec;
 use std::{marker::PhantomData, mem::MaybeUninit};
@@ -40,7 +40,7 @@ impl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> AllocImpl<Idx, Data>
 
     fn new(cfg: Self::Cfg) -> Self {
         let blocks = cfg.preallocate_to.offset() / BLOCK_SIZE;
-        let mut data = SmallVec::with_capacity(blocks as usize);
+        let mut data = SmallVec::with_capacity(blocks);
         for _ in 0..blocks {
             data.push(Self::new_block());
         }
@@ -71,12 +71,12 @@ impl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> AllocImpl<Idx, Data>
 
         if let Some(last_idx) = maybe_last_idx {
             if last_idx == Idx::MAX {
-                return None;
+                None
             } else {
                 Some(insert(last_idx.inc()))
             }
         } else {
-            Some(insert(Idx::MIN))
+            Some(insert(Idx::ZERO))
         }
     }
 

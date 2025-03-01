@@ -2,8 +2,14 @@
 name = "serbit"
 version = "0.1.0"
 edition = "2024"
-homepage.workspace = true
+
+readme = "README.md"
+description = "A library for high performance, bit specific, serialization & deserialization"
+keywords = ["parsing", "compiler", "performance"]
+categories = ["compilers", "proc-macros"]
+
 repository.workspace = true
+homepage.workspace = true
 license-file.workspace = true
 
 [dependencies]

@@ -1,19 +1,22 @@
 // JUSTIFY: For consistency in the unsigned type names
 #![allow(non_camel_case_types)]
 
-pub trait IdxInt: Copy + std::fmt::Debug + Eq {
+use std::{fmt::Debug, hash::Hash};
+
+pub trait IdxInt: Copy + Debug + Hash + Eq  {
     const MAX: Self;
-    const MIN: Self;
+    const ZERO: Self;
     fn offset(self) -> usize;
     fn from_offset(offset: usize) -> Option<Self>;
     fn inc(&self) -> Self;
+    fn dec(&self) -> Self;
 }
 
 macro_rules! impl_std_types {
     ($t:ty) => {
         impl IdxInt for $t {
             const MAX: Self = <$t>::MAX;
-            const MIN: Self = <$t>::MIN;
+            const ZERO: Self = 0;
             fn offset(self) -> usize {
                 self as usize
             }
@@ -26,6 +29,9 @@ macro_rules! impl_std_types {
             }
             fn inc(&self) -> Self {
                 self + 1
+            }
+            fn dec(&self) -> Self {
+                self - 1
             }
         }
     };

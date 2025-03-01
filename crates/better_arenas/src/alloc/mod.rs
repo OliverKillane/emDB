@@ -2,7 +2,6 @@
 
 use crate::utils::idx::IdxInt;
 
-pub mod amort;
 pub mod blocks;
 pub mod contig;
 
@@ -15,6 +14,12 @@ pub trait AllocImpl<Idx: IdxInt, Data> {
     type Cfg;
     fn new(cfg: Self::Cfg) -> Self;
     fn insert(&mut self, d: Data) -> Option<Idx>;
+
+    /// # Safety
+    /// The index must have been allocated by [AllocImpl::insert]
     unsafe fn read(&self, idx: Idx) -> &Data;
+
+    /// # Safety
+    /// The index must have been allocated by [AllocImpl::insert]
     unsafe fn write(&mut self, idx: Idx) -> &mut Data;
 }

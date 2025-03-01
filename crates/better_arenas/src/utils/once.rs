@@ -16,6 +16,8 @@ impl<T> Once<T> {
         }
     }
 
+    /// # Safety
+    /// Must only be called once.
     #[named]
     pub unsafe fn get_once(&mut self) -> T {
         #[cfg(debug_assertions)]

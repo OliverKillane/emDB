@@ -1,5 +1,5 @@
 use super::{
-    common::{Cfg, Key, ValOrFree}, Arena, WriteArena
+    common::{Cfg, Key, ValOrFree}, Arena, CopyKeyArena, WriteArena
 };
 use crate::{
     alloc::{AllocImpl, AllocSelect},
@@ -7,17 +7,20 @@ use crate::{
 };
 use std::{marker::PhantomData, mem::ManuallyDrop};
 
-struct Own<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken> {
-    slots: Alloc::Impl<Idx, ValOrFree<Idx, Data>>,
+pub struct Strong<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> {
+    slots: Alloc::Impl<Idx, ValOrFree<Idx, (Data, RefCount)>>,
     next_free: Option<Idx>,
     _phantom: PhantomData<Id>,
 }
 
-impl<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken> Arena<Data>
-    for Own<Idx, Data, Alloc, Id>
+impl<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> Arena<Data>
+    for Strong<Idx, Data, Alloc, Id, RefCount>
 {
     type Cfg = Cfg<
-        <Alloc::Impl<Idx, ValOrFree<Idx, Data>> as AllocImpl<Idx, ValOrFree<Idx, Data>>>::Cfg,
+        <Alloc::Impl<Idx, ValOrFree<Idx, (Data, RefCount)>> as AllocImpl<
+            Idx,
+            ValOrFree<Idx, (Data, RefCount)>,
+        >>::Cfg,
         Id,
     >;
     type Key = Key<Idx, Id>;
@@ -36,13 +39,13 @@ impl<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken> Arena<Data>
                 let slot = self.slots.write(idx);
                 self.next_free = *slot.next_free;
                 ManuallyDrop::drop(&mut slot.next_free);
-                slot.data = ManuallyDrop::new(data);
+                slot.data = ManuallyDrop::new((data, RefCount::ZERO));
             }
             Some(Key::new(idx))
         } else {
             self.slots
                 .insert(ValOrFree {
-                    data: ManuallyDrop::new(data),
+                    data: ManuallyDrop::new((data, RefCount::ZERO)),
                 })
                 .map(Key::new)
         }
@@ -58,22 +61,24 @@ impl<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken> Arena<Data>
         // JUSTIFY: No check on union.
         //           - Keys cannot be copied, and deletion takes ownership of a key
         //          Hence this key must have been from an insert, and cannot have been deleted.
-        unsafe { &self.slots.read(key.0.idx).data }
+        unsafe { &self.slots.read(key.0.idx).data.0 }
     }
 
     fn delete(&mut self, key: Self::Key) {
         unsafe {
-            let value = self.slots.write(key.0.idx);
-            ManuallyDrop::drop(&mut value.data);
-            value.next_free = ManuallyDrop::new(self.next_free);
+            let entry = self.slots.write(key.0.idx);
+            entry.data.1 = entry.data.1.dec();
+            if entry.data.1 == RefCount::ZERO {
+                ManuallyDrop::drop(&mut entry.data);
+                entry.next_free = ManuallyDrop::new(self.next_free);
+                self.next_free = Some(key.0.idx);
+            }
         }
-        self.next_free = Some(key.0.idx);
-        key.0.drop(());
     }
 }
 
-impl<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken> WriteArena<Data>
-    for Own<Idx, Data, Alloc, Id>
+impl<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> WriteArena<Data>
+    for Strong<Idx, Data, Alloc, Id, RefCount>
 {
     fn write(&mut self, key: &Self::Key) -> &mut Data {
         // JUSTIFY: No bounds check on lookup of the key.
@@ -85,6 +90,22 @@ impl<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken> WriteArena<Data>
         // JUSTIFY: No check on union.
         //           - Keys cannot be copied, and deletion takes ownership of a key
         //          Hence this key must have been from an insert, and cannot have been deleted.
-        unsafe { &mut self.slots.write(key.0.idx).data }
+        unsafe { &mut self.slots.write(key.0.idx).data.0 }
+    }
+}
+
+impl<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> CopyKeyArena<Data>
+    for Strong<Idx, Data, Alloc, Id, RefCount>
+{
+    fn copy_key(&mut self, key: &<Self as Arena<Data>>::Key) -> Option<<Self as Arena<Data>>::Key> {
+        unsafe {
+            let entry = &mut self.slots.write(key.0.idx).data;
+            if entry.1 != RefCount::MAX {
+                entry.1 = entry.1.inc();
+                Some(Key::new(key.0.idx))
+            } else {
+                None
+            }
+        }
     }
 }
