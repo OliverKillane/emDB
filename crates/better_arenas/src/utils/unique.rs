@@ -18,19 +18,18 @@ unsafe impl<C: FnOnce() + 'static> UniqueToken for UniqueClosure<C> {}
 ///  - The input closure is run once the first time it's type is provided.
 ///
 /// ```
-/// # use better_arenas::utils::unique2::unique;
+/// # use better_arenas::prelude::*;
 /// let unique = unique(||{});
 /// ```
 ///
 /// If the type of the closure is used more than once, this will panic.
 /// ```should_panic
-/// # use better_arenas::utils::unique2::unique;
+/// # use better_arenas::prelude::*;
 /// fn same(){}
 ///
 /// let unique_1 = unique(same);
 /// let unique_2 = unique(same);
 /// ```
-///
 ///
 /// Internally usage of types is checked with a [VecSet] of [TypeId], so
 /// creating a unique type does have some overhead.
@@ -68,14 +67,14 @@ pub fn unique<C: FnOnce() + 'static>(closure: C) -> impl UniqueToken {
     unique_inner(closure)
 }
 
-/// Creates a unique token unsafely.
+/// Creates a unique token without any runtime check.
 ///  - Does not check the closure type is already used.
 ///
 /// [unique] does not have zero overhead
 ///
 /// # Safety
 /// The user needs to ensure this function is only called once per closure type.
-pub unsafe fn unsafe_unique<C: FnOnce() + 'static>(closure: C) -> impl UniqueToken {
+pub unsafe fn unique_unchecked<C: FnOnce() + 'static>(closure: C) -> impl UniqueToken {
     #[cfg(debug_assertions)]
     {
         // JUSTIFY: Use checked implementation when running debug

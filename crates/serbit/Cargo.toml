@@ -13,3 +13,6 @@ homepage.workspace = true
 license-file.workspace = true
 
 [dependencies]
+better_arenas = { path = "../better_arenas" }
+quote_debug = { path = "../quote_debug" }
+enumtrait = { path = "../enumtrait" }

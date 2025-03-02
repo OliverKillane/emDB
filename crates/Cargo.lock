@@ -641,6 +641,11 @@ checksum = "92d43fe69e652f3df9bdc2b85b2854a0825b86e4fb76bc44d945137d053639ca"
 [[package]]
 name = "serbit"
 version = "0.1.0"
+dependencies = [
+ "better_arenas",
+ "enumtrait",
+ "quote_debug",
+]
 
 [[package]]
 name = "serde"

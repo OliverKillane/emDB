@@ -3,8 +3,8 @@ use crate::utils::idx::IdxInt;
 use smallvec::SmallVec;
 use std::{marker::PhantomData, mem::MaybeUninit};
 
-pub struct Cfg<Idx: IdxInt> {
-    preallocate_to: Idx,
+pub struct BlocksConfig<Idx: IdxInt> {
+    pub preallocate_to: Idx,
 }
 
 /// Allocating slots in blocks.
@@ -36,7 +36,7 @@ impl<const BLOCK_SIZE: usize> AllocSelect for Blocks<BLOCK_SIZE> {
 impl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> AllocImpl<Idx, Data>
     for BlocksImpl<Idx, Data, BLOCK_SIZE>
 {
-    type Cfg = Cfg<Idx>;
+    type Cfg = BlocksConfig<Idx>;
 
     fn new(cfg: Self::Cfg) -> Self {
         let blocks = cfg.preallocate_to.offset() / BLOCK_SIZE;
@@ -98,5 +98,9 @@ impl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> AllocImpl<Idx, Data>
                 .get_unchecked_mut(inner)
                 .assume_init_mut()
         }
+    }
+
+    fn len(&self) -> usize {
+        self.last_idx.map_or(0, |idx| idx.offset() + 1)
     }
 }

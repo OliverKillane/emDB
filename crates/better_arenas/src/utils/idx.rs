@@ -3,7 +3,7 @@
 
 use std::{fmt::Debug, hash::Hash};
 
-pub trait IdxInt: Copy + Debug + Hash + Eq  {
+pub trait IdxInt: Copy + Debug + Hash + Eq + Ord {
     const MAX: Self;
     const ZERO: Self;
     fn offset(self) -> usize;

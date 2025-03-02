@@ -21,7 +21,7 @@ pub trait CanDropWith<Arg> {
 ///
 /// ### Examples
 /// ```
-/// use rcarena::drop::{CanDropWith, DropWith};
+/// use better_arenas::utils::drop::{CanDropWith, DropWith};
 ///
 /// struct Foo {
 ///     data: u32,
@@ -38,7 +38,7 @@ pub trait CanDropWith<Arg> {
 /// ```
 /// When not dropping, we get a runtime panic
 /// ```should_panic
-/// # use rcarena::drop::{CanDropWith, DropWith};
+/// # use better_arenas::utils::drop::{CanDropWith, DropWith};
 /// # struct Foo {
 /// #     data: u32,
 /// # }

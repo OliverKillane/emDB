@@ -22,4 +22,9 @@ pub trait AllocImpl<Idx: IdxInt, Data> {
     /// # Safety
     /// The index must have been allocated by [AllocImpl::insert]
     unsafe fn write(&mut self, idx: Idx) -> &mut Data;
+
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }

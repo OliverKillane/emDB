@@ -95,4 +95,4 @@ FixedCase{
     otherwise: Option<(Ident, FixedStage)>,
 },
 */
-mod ir;
+pub mod ir;

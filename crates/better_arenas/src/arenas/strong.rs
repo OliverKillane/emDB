@@ -1,5 +1,6 @@
 use super::{
-    common::{Cfg, Key, ValOrFree}, Arena, CopyKeyArena, WriteArena
+    Arena, CopyKeyArena, DeleteArena, IterArena, Store, WriteArena,
+    common::{self, Key, ValOrFree},
 };
 use crate::{
     alloc::{AllocImpl, AllocSelect},
@@ -7,19 +8,37 @@ use crate::{
 };
 use std::{marker::PhantomData, mem::ManuallyDrop};
 
-pub struct Strong<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> {
-    slots: Alloc::Impl<Idx, ValOrFree<Idx, (Data, RefCount)>>,
+pub struct Strong<Idx: IdxInt, S: Store, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> {
+    // JUSTIFY: Complex type
+    //          Splitting this into a type alias would not make it simpler.
+    #[allow(clippy::type_complexity)]
+    slots: Alloc::Impl<
+        Idx,
+        ValOrFree<
+            Idx,
+            (
+                S::Data<<Strong<Idx, S, Alloc, Id, RefCount> as Arena<S>>::Key>,
+                RefCount,
+            ),
+        >,
+    >,
     next_free: Option<Idx>,
+    len: usize,
     _phantom: PhantomData<Id>,
 }
 
-impl<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> Arena<Data>
-    for Strong<Idx, Data, Alloc, Id, RefCount>
+pub struct StrongConfig<AllocCfg, Id: UniqueToken> {
+    pub unique: Id,
+    pub alloc: AllocCfg,
+}
+
+impl<Idx: IdxInt, S: Store, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> Arena<S>
+    for Strong<Idx, S, Alloc, Id, RefCount>
 {
-    type Cfg = Cfg<
-        <Alloc::Impl<Idx, ValOrFree<Idx, (Data, RefCount)>> as AllocImpl<
+    type Cfg = StrongConfig<
+        <Alloc::Impl<Idx, ValOrFree<Idx, (S::Data<Self::Key>, RefCount)>> as AllocImpl<
             Idx,
-            ValOrFree<Idx, (Data, RefCount)>,
+            ValOrFree<Idx, (S::Data<Self::Key>, RefCount)>,
         >>::Cfg,
         Id,
     >;
@@ -29,11 +48,12 @@ impl<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> A
         Self {
             slots: Alloc::Impl::new(alloc),
             next_free: None,
+            len: 0,
             _phantom: PhantomData,
         }
     }
 
-    fn insert(&mut self, data: Data) -> Option<Self::Key> {
+    fn insert(&mut self, data: S::Data<Self::Key>) -> Option<Self::Key> {
         if let Some(idx) = self.next_free {
             unsafe {
                 let slot = self.slots.write(idx);
@@ -41,17 +61,19 @@ impl<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> A
                 ManuallyDrop::drop(&mut slot.next_free);
                 slot.data = ManuallyDrop::new((data, RefCount::ZERO));
             }
+            self.len += 1;
+            Some(Key::new(idx))
+        } else if let Some(idx) = self.slots.insert(ValOrFree {
+            data: ManuallyDrop::new((data, RefCount::ZERO)),
+        }) {
+            self.len += 1;
             Some(Key::new(idx))
         } else {
-            self.slots
-                .insert(ValOrFree {
-                    data: ManuallyDrop::new((data, RefCount::ZERO)),
-                })
-                .map(Key::new)
+            None
         }
     }
 
-    fn read(&self, key: &Self::Key) -> &Data {
+    fn read(&self, key: &Self::Key) -> &S::Data<Self::Key> {
         // JUSTIFY: No bounds check on lookup of the key.
         //           - Keys can only be created from this module
         //           - Keys cannot be copied
@@ -64,6 +86,14 @@ impl<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> A
         unsafe { &self.slots.read(key.0.idx).data.0 }
     }
 
+    fn len(&self) -> usize {
+        self.len
+    }
+}
+
+impl<Idx: IdxInt, S: Store, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> DeleteArena<S>
+    for Strong<Idx, S, Alloc, Id, RefCount>
+{
     fn delete(&mut self, key: Self::Key) {
         unsafe {
             let entry = self.slots.write(key.0.idx);
@@ -72,15 +102,16 @@ impl<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> A
                 ManuallyDrop::drop(&mut entry.data);
                 entry.next_free = ManuallyDrop::new(self.next_free);
                 self.next_free = Some(key.0.idx);
+                self.len -= 1;
             }
         }
     }
 }
 
-impl<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> WriteArena<Data>
-    for Strong<Idx, Data, Alloc, Id, RefCount>
+impl<Idx: IdxInt, S: Store, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> WriteArena<S>
+    for Strong<Idx, S, Alloc, Id, RefCount>
 {
-    fn write(&mut self, key: &Self::Key) -> &mut Data {
+    fn write(&mut self, key: &Self::Key) -> &mut S::Data<Self::Key> {
         // JUSTIFY: No bounds check on lookup of the key.
         //           - Keys can only be created from this module
         //           - Keys cannot be copied
@@ -94,10 +125,10 @@ impl<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> W
     }
 }
 
-impl<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> CopyKeyArena<Data>
-    for Strong<Idx, Data, Alloc, Id, RefCount>
+impl<Idx: IdxInt, S: Store, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> CopyKeyArena<S>
+    for Strong<Idx, S, Alloc, Id, RefCount>
 {
-    fn copy_key(&mut self, key: &<Self as Arena<Data>>::Key) -> Option<<Self as Arena<Data>>::Key> {
+    fn copy_key(&mut self, key: &<Self as Arena<S>>::Key) -> Option<<Self as Arena<S>>::Key> {
         unsafe {
             let entry = &mut self.slots.write(key.0.idx).data;
             if entry.1 != RefCount::MAX {
@@ -107,5 +138,16 @@ impl<Idx: IdxInt, Data, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> C
                 None
             }
         }
+    }
+}
+
+impl<Idx: IdxInt, S: Store, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> IterArena<S>
+    for Strong<Idx, S, Alloc, Id, RefCount>
+{
+    fn iter<'a>(&'a self) -> impl Iterator<Item = &'a <S as Store>::Data<Self::Key>> + 'a
+    where
+        <S as Store>::Data<<Self as Arena<S>>::Key>: 'a,
+    {
+        common::Iter::new(&self.slots, self.next_free, self.len()).map(|(data, _)| data)
     }
 }

@@ -21,7 +21,7 @@ To solve this we need the following invariant:
  - If I have an key, the allocation cannot be deleted.
 
 We gain this for an `Own` arena by making indices non-copyable, uniquely typed per instance of the arena, and consumed on deletion.
- - Hence If `.delete(..)` is called with a key, it must exist, and will be unreachable once passed in as an argument.
+ - Hence If [`prelude::DeleteArena::delete`] is called with a key, it must exist, and will be unreachable once passed in as an argument.
 
 Likewise with reference counting, we can get the invariant that the number of keys is the same as the allocation's reference count, by requiring a mutable reference to the arena to copy a key.
 

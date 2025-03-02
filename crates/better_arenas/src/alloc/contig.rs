@@ -4,7 +4,7 @@ use crate::utils::idx::IdxInt;
 
 use super::{AllocImpl, AllocSelect};
 
-pub struct ContigCfg<Idx: IdxInt> {
+pub struct ContigConfig<Idx: IdxInt> {
     pub preallocate_to: Idx,
 }
 
@@ -23,7 +23,7 @@ impl AllocSelect for Contig {
 }
 
 impl<Idx: IdxInt, Data> AllocImpl<Idx, Data> for ContigImpl<Idx, Data> {
-    type Cfg = ContigCfg<Idx>;
+    type Cfg = ContigConfig<Idx>;
 
     fn new(cfg: Self::Cfg) -> Self {
         Self {
@@ -49,5 +49,9 @@ impl<Idx: IdxInt, Data> AllocImpl<Idx, Data> for ContigImpl<Idx, Data> {
 
     unsafe fn write(&mut self, idx: Idx) -> &mut Data {
         unsafe { self.data.get_unchecked_mut(idx.offset()) }
+    }
+
+    fn len(&self) -> usize {
+        self.data.len()
     }
 }
