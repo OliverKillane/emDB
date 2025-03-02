@@ -1,5 +1,5 @@
 use super::{
-    Arena, CopyKeyArena, DeleteArena, IterArena, Store, WriteArena,
+    Arena, CopyKeyArena, DeleteArena, Store, WriteArena,
     common::{self, Key, ValOrFree},
 };
 use crate::{
@@ -89,6 +89,13 @@ impl<Idx: IdxInt, S: Store, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxIn
     fn len(&self) -> usize {
         self.len
     }
+
+    fn iter<'a>(&'a self) -> impl Iterator<Item = &'a <S as Store>::Data<Self::Key>> + 'a
+    where
+        <S as Store>::Data<<Self as Arena<S>>::Key>: 'a,
+    {
+        common::Iter::new(&self.slots, self.next_free, self.len()).map(|(data, _)| data)
+    }
 }
 
 impl<Idx: IdxInt, S: Store, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> DeleteArena<S>
@@ -138,16 +145,5 @@ impl<Idx: IdxInt, S: Store, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxIn
                 None
             }
         }
-    }
-}
-
-impl<Idx: IdxInt, S: Store, Alloc: AllocSelect, Id: UniqueToken, RefCount: IdxInt> IterArena<S>
-    for Strong<Idx, S, Alloc, Id, RefCount>
-{
-    fn iter<'a>(&'a self) -> impl Iterator<Item = &'a <S as Store>::Data<Self::Key>> + 'a
-    where
-        <S as Store>::Data<<Self as Arena<S>>::Key>: 'a,
-    {
-        common::Iter::new(&self.slots, self.next_free, self.len()).map(|(data, _)| data)
     }
 }

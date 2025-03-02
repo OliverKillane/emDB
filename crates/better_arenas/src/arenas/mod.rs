@@ -91,6 +91,26 @@ pub trait Arena<S: Store> {
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    // JUSTIFY: Not owning, or mutable iteration
+    //           - Arenas can define their own semantics for keys, hence an owning
+    //             `into_iter` would require users to [std::mem::forget] or never
+    //             drop their keys.
+    //           - Having a guarentee that owning a key for [own::Own] is exclusive
+    //             ownership (no mutation) is useful.
+
+    /// Iteration over references to all values.
+    /// ```
+    /// use better_arenas::prelude::*;
+    /// struct ExampleData(i32);
+    ///
+    /// fn iter_over_arena(a: &impl IterArena<Plain<ExampleData>>) -> impl Iterator<Item = &i32> {
+    ///     a.iter().map(|ExampleData(x)| x)
+    /// }
+    /// ```
+    fn iter<'a>(&'a self) -> impl Iterator<Item = &'a S::Data<Self::Key>> + 'a
+    where
+        <S as Store>::Data<<Self as Arena<S>>::Key>: 'a;
 }
 
 /// An arena supporting deletion of keys.
@@ -108,27 +128,13 @@ pub trait CopyKeyArena<S: Store>: Arena<S> {
     fn copy_key(&mut self, key: &<Self as Arena<S>>::Key) -> Option<<Self as Arena<S>>::Key>;
 }
 
-// JUSTIFY: Not owning, or mutable iteration
-//           - Arenas can define their own semantics for keys, hence an owning
-//             `into_iter` would require users to [std::mem::forget] or never
-//             drop their keys.
-//           - Having a guarentee that owning a key for [own::Own] is exclusive
-//             ownership (no mutation) is useful.
-
-/// An arena allowing iteration over references to all values.
-///
-/// ```
-/// use better_arenas::prelude::*;
-/// struct ExampleData(i32);
-///
-/// fn iter_over_arena(a: &impl IterArena<Plain<ExampleData>>) -> impl Iterator<Item = &i32> {
-///     a.iter().map(|ExampleData(x)| x)
-/// }
-/// ```
-pub trait IterArena<S: Store>: Arena<S> {
-    fn iter<'a>(&'a self) -> impl Iterator<Item = &'a S::Data<Self::Key>> + 'a
-    where
-        <S as Store>::Data<<Self as Arena<S>>::Key>: 'a;
+/// Transform all members of an arena, consuming the arena, but leaving the keys as valid.
+// TODO: Implement this trait, with in-place specialisation
+pub trait TransformArena<O: Store, N: Store>: Arena<O> {
+    fn transform(
+        self,
+        f: impl Fn(O::Data<Self::Key>) -> N::Data<Self::Key>,
+    ) -> impl Arena<N, Key = Self::Key>;
 }
 
 mod common {

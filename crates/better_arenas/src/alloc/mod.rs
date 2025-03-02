@@ -13,6 +13,10 @@ pub trait AllocSelect {
 pub trait AllocImpl<Idx: IdxInt, Data> {
     type Cfg;
     fn new(cfg: Self::Cfg) -> Self;
+
+    /// # Safety
+    /// Must be deterministic, each next index is an increment, starting from [IdxInt::ZERO]
+    ///  - This is relied upon by the [crate::prelude::TransformArena] implementation.
     fn insert(&mut self, d: Data) -> Option<Idx>;
 
     /// # Safety

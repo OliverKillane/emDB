@@ -1,5 +1,5 @@
 use super::{
-    Arena, DeleteArena, IterArena, Store, WriteArena,
+    Arena, DeleteArena, Store, WriteArena,
     common::{self, Key, ValOrFree},
 };
 use crate::{
@@ -145,6 +145,13 @@ impl<Idx: IdxInt, S: Store, Alloc: AllocSelect, Id: UniqueToken> Arena<S>
     fn len(&self) -> usize {
         self.len
     }
+
+    fn iter<'a>(&'a self) -> impl Iterator<Item = &'a <S as Store>::Data<Self::Key>> + 'a
+    where
+        <S as Store>::Data<<Self as Arena<S>>::Key>: 'a,
+    {
+        common::Iter::new(&self.slots, self.next_free, self.len())
+    }
 }
 
 impl<Idx: IdxInt, S: Store, Alloc: AllocSelect, Id: UniqueToken> DeleteArena<S>
@@ -176,16 +183,5 @@ impl<Idx: IdxInt, S: Store, Alloc: AllocSelect, Id: UniqueToken> WriteArena<S>
         //           - Keys cannot be copied, and deletion takes ownership of a key
         //          Hence this key must have been from an insert, and cannot have been deleted.
         unsafe { &mut self.slots.write(key.0.idx).data }
-    }
-}
-
-impl<Idx: IdxInt, S: Store, Alloc: AllocSelect, Id: UniqueToken> IterArena<S>
-    for Own<Idx, S, Alloc, Id>
-{
-    fn iter<'a>(&'a self) -> impl Iterator<Item = &'a <S as Store>::Data<Self::Key>> + 'a
-    where
-        <S as Store>::Data<<Self as Arena<S>>::Key>: 'a,
-    {
-        common::Iter::new(&self.slots, self.next_free, self.len())
     }
 }
