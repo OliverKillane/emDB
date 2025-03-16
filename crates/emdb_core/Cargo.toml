@@ -1,6 +1,6 @@
 [package]
 name = "emdb_core"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 
 readme = "README.md"
@@ -24,9 +24,9 @@ proc-macro2 = { version = "1.0" }
 proc-macro-error2 = "2.0.1"
 quote = "1.0.38"
 rand = "0.9"
-combi = { path = "../combi" }
-enumtrait = { path = "../enumtrait" }
 dot = "0.1.4"
 itertools = "0.14.0"
-pulpit = { path = "../pulpit" }
-quote_debug = { path = "../quote_debug" }
+combi = { version="^1.0", path = "../combi" }
+enumtrait = { version="^1.0", path = "../enumtrait" }
+pulpit = { version="^1.0", path = "../pulpit" }
+quote_debug = { version="^1.0", path = "../quote_debug" }

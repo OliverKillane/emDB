@@ -428,7 +428,7 @@ checksum = "4b82cf0babdbd58558212896d1a4272303a57bdb245c2bf1147185fb45640e70"
 
 [[package]]
 name = "combi"
-version = "0.2.0"
+version = "1.0.2"
 dependencies = [
  "derive-where",
  "proc-macro-error2",
@@ -619,7 +619,7 @@ dependencies = [
 
 [[package]]
 name = "emdb_core"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "combi",
  "dot",
@@ -639,7 +639,7 @@ dependencies = [
 
 [[package]]
 name = "enumtrait"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "combi",
  "proc-macro-error2",
@@ -976,7 +976,7 @@ checksum = "6c8640c5d730cb13ebd907d8d04b52f55ac9a2eec55b440c8892f40d56c76c1d"
 
 [[package]]
 name = "minister"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "rayon",
  "rustc-hash",
@@ -1193,7 +1193,7 @@ dependencies = [
 
 [[package]]
 name = "pulpit"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "assume",
  "combi",
@@ -1211,7 +1211,7 @@ dependencies = [
 
 [[package]]
 name = "pulpit_gen"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "bimap",
  "combi",
@@ -1225,7 +1225,7 @@ dependencies = [
 
 [[package]]
 name = "pulpit_macro"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "proc-macro-error2",
  "proc-macro2 1.0.93",
@@ -1254,7 +1254,7 @@ dependencies = [
 
 [[package]]
 name = "quote_debug"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "proc-macro2 1.0.93",
  "quote 1.0.38",

@@ -1,6 +1,6 @@
 [package]
 name = "pulpit_gen"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 
 readme = "README.md"
@@ -17,8 +17,8 @@ proc-macro2 = "1.0"
 syn = { version = "2.0.98", features = ["full", "extra-traits"] }
 quote = "1.0.38"
 bimap = "0.6.3"
-enumtrait = { path = "../enumtrait" }
-quote_debug = { path = "../quote_debug" }
+enumtrait = { version = "^1.0", path = "../enumtrait" }
+quote_debug = { version =  "^1.0", path = "../quote_debug" }
 proc-macro-error2 = "2.0.1"
 combi = { path = "../combi" }
 

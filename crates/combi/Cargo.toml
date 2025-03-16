@@ -1,9 +1,8 @@
 [package]
 name = "combi"
-version = "0.2.0"
+version = "1.0.2"
 edition = "2021"
 build = "build.rs"
-
 readme = "README.md"
 description = "A combinators library with an included rust token parsing implementation"
 keywords = ["parser", "combinator", "parsing"]

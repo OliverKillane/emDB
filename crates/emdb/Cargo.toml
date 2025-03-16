@@ -13,9 +13,9 @@ homepage.workspace = true
 license-file.workspace = true
 
 [dependencies]
-emdb_core = { path = "../emdb_core" }
-pulpit = { path = "../pulpit" }
-minister = { path = "../minister" }
+emdb_core = { version = "^1.0", path = "../emdb_core" }
+pulpit = { version = "^1.0", path = "../pulpit" }
+minister = { version = "^1.0", path = "../minister" }
 
 [dev-dependencies]
 trybuild = "1.0.103"
