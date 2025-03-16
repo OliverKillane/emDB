@@ -1,0 +1,34 @@
+//! ## Interface Agnostic Data Structures for [super::arenas].
+
+use crate::utils::idx::IdxInt;
+
+pub mod blocks;
+pub mod contig;
+
+pub trait AllocSelect {
+    type Impl<Idx: IdxInt, Data>: AllocImpl<Idx, Data>;
+}
+
+/// A simple interface for data structures holding values, with keys chosen by the structure.
+pub trait AllocImpl<Idx: IdxInt, Data> {
+    type Cfg;
+    fn new(cfg: Self::Cfg) -> Self;
+
+    /// # Safety
+    /// Must be deterministic, each next index is an increment, starting from [IdxInt::ZERO]
+    ///  - This is relied upon by the [crate::prelude::TransformArena] implementation.
+    fn insert(&mut self, d: Data) -> Option<Idx>;
+
+    /// # Safety
+    /// The index must have been allocated by [AllocImpl::insert]
+    unsafe fn read(&self, idx: Idx) -> &Data;
+
+    /// # Safety
+    /// The index must have been allocated by [AllocImpl::insert]
+    unsafe fn write(&mut self, idx: Idx) -> &mut Data;
+
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}

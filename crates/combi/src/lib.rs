@@ -4,7 +4,6 @@
 // TODO: Add further verification to ensure
 #![warn(clippy::style)]
 #![warn(clippy::perf)]
-#![warn(clippy::cargo)]
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::panic)]
 

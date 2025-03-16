@@ -1,0 +1,19 @@
+[package]
+name = "better_arenas"
+version = "0.1.0"
+edition = "2024"
+
+readme = "README.md"
+description = "A library for high performance arenas"
+keywords = ["arena", "allocator", "performance"]
+categories = ["data-structures"]
+
+repository.workspace = true
+homepage.workspace = true
+license-file.workspace = true
+
+[dependencies]
+smallvec = "1.14"
+function_name = "0.3"
+vec-collections = "0.4"
+derive-where = "1.2"
