@@ -5,8 +5,10 @@ use crate::{
 use better_arenas::arenas::Arena;
 use std::fmt::Debug;
 
-pub fn debug<Extra: ExtraData, Alias: Debug>(plan: &super::ir::Plan<Extra, impl Arenas<Extra>>)
+pub fn debug<Extra, Alias>(plan: &super::ir::Plan<Extra, impl Arenas<Extra>>)
 where
+    Extra: ExtraData,
+    Alias: Debug,
     Extra::Item: Has<Alias>,
 {
     // TODO: Example for iterating over the arena, but we want to go further
@@ -24,6 +26,17 @@ where
                 plan::Primitive::Bit(bit) => todo!(),
                 plan::Primitive::Integer(integer) => todo!(),
             },
+        }
+    }
+
+    for entry in plan.stages.iter() {
+        match &entry.data {
+            plan::Stage::Item(item) => {
+                let item2 = plan.items.read(item);
+            }
+            plan::Stage::Repeat(repeat) => todo!(),
+            plan::Stage::Until(until) => todo!(),
+            plan::Stage::Seq(seq) => todo!(),
         }
     }
 }

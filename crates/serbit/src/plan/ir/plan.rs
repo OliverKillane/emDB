@@ -1,3 +1,4 @@
+use smallvec::SmallVec;
 use std::num::NonZero;
 
 pub struct Bit;
@@ -20,7 +21,7 @@ pub enum Primitive {
 
 pub struct Array<ItemKey, IntKey> {
     pub count: IntKey,
-    pub stage: ItemKey,
+    pub item: ItemKey,
 }
 
 pub struct Case<ItemKey, BoolKey> {
@@ -29,13 +30,21 @@ pub struct Case<ItemKey, BoolKey> {
 }
 
 pub struct Choice<ItemKey, BoolKey> {
-    pub cases: Vec<Case<ItemKey, BoolKey>>,
+    pub cases: SmallVec<[Case<ItemKey, BoolKey>; 2]>,
     pub otherwise: ItemKey,
 }
 
 pub struct Tuple<ItemKey> {
-    pub items: Vec<ItemKey>, // SmallVec of indices
+    pub items: SmallVec<[ItemKey; 11]>,
 }
+
+// JUSTIFY: Using 32 bytes as a maximum size (4 * u64)
+//           - Want to keep nodes small, part of an enum, so only max size matters
+//           - Increasing the in-place capacity of the smallvecs, until hitting this limit
+const _: () = assert!(std::mem::size_of::<Tuple<u16>>() == 32);
+const _: () = assert!(std::mem::size_of::<Choice<u16, u16>>() == 32);
+const _: () = assert!(std::mem::size_of::<Array<u16, u16>>() == 4);
+const _: () = assert!(std::mem::size_of::<Primitive>() == 2);
 
 #[enumtrait::quick_enum]
 #[enumtrait::quick_from]
@@ -58,13 +67,17 @@ pub struct Repeat<StageKey, IntKey> {
 }
 
 pub struct Seq<StageKey> {
-    pub stages: Vec<StageKey>,
+    pub stages: SmallVec<[StageKey; 8]>,
 }
 
-#[enumtrait::quick_from]
+// TODO: Determine more optimal size, versus heap allocation tradeoff
+const _: () = assert!(std::mem::size_of::<Repeat<u16, u16>>() == 4);
+const _: () = assert!(std::mem::size_of::<Until<u16, u16>>() == 4);
+const _: () = assert!(std::mem::size_of::<Seq<u16>>() == 32);
+
 #[enumtrait::store(pub item_stage)]
-pub enum Stage<ItemKey, StageKey, IntKey, BoolKey> {
-    Item(Item<ItemKey, IntKey, BoolKey>),
+pub enum Stage<StageKey, ItemKey, IntKey, BoolKey> {
+    Item(ItemKey),
     Repeat(Repeat<StageKey, IntKey>),
     Until(Until<StageKey, BoolKey>),
     Seq(Seq<StageKey>),

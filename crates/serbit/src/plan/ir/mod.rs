@@ -11,8 +11,8 @@ pub mod plan;
 pub struct Plan<Extra: ExtraData, Data: Arenas<Extra>> {
     pub stages: Data::Stages,
     pub items: Data::Items,
-    pub int_exprs: Data::Ints,
-    pub bool_exprs: Data::Bools,
+    pub ints: Data::Ints,
+    pub bools: Data::Bools,
     _phantom: PhantomData<Data>,
 }
 

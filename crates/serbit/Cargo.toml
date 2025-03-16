@@ -16,3 +16,4 @@ license-file.workspace = true
 better_arenas = { path = "../better_arenas" }
 quote_debug = { path = "../quote_debug" }
 enumtrait = { path = "../enumtrait" }
+smallvec = "1.14"

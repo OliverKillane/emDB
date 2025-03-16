@@ -645,6 +645,7 @@ dependencies = [
  "better_arenas",
  "enumtrait",
  "quote_debug",
+ "smallvec",
 ]
 
 [[package]]
