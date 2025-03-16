@@ -1,6 +1,6 @@
 [package]
 name = "quote_debug"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 
 readme = "README.md"
@@ -16,5 +16,3 @@ license-file.workspace = true
 proc-macro2 = "1.0"
 syn = { version = "2.0.98", features = ["full"] }
 quote = "1.0.38"
-
-

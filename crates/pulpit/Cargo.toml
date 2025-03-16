@@ -1,6 +1,6 @@
 [package]
 name = "pulpit"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 
 readme = "README.md"
@@ -20,12 +20,12 @@ proc-macro2 = "1.0"
 proc-macro-error2 = "2.0.1"
 syn = { version = "2.0.98", features = ["full", "extra-traits"] }
 quote = "1.0.38"
-combi = { path = "../combi" }
+combi = { version = "^1.0", path = "../combi" }
 typed-generational-arena = "0.2"
 thunderdome = "0.6.1"
-enumtrait = { path = "../enumtrait" }
-pulpit_gen = { path = "../pulpit_gen" }
-pulpit_macro = { path = "../pulpit_macro" }
+enumtrait = { version = "^1.0", path = "../enumtrait" }
+pulpit_gen = { version = "^1.0", path = "../pulpit_gen" }
+pulpit_macro = { version = "^1.0", path = "../pulpit_macro" }
 assume = "0.5.0"
 rustc-hash = "2.1.1"
 

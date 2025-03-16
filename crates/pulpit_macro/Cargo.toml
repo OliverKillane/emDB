@@ -1,6 +1,6 @@
 [package]
 name = "pulpit_macro"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 
 readme = "README.md"
@@ -19,7 +19,7 @@ proc-macro = true
 proc-macro2 = "1.0"
 syn = { version = "2.0.98", features = ["full", "extra-traits"] }
 quote = "1.0.38"
-pulpit_gen = { path = "../pulpit_gen" }
+pulpit_gen = { version = "^1.0", path = "../pulpit_gen" }
 proc-macro-error2 = "2.0.1"
 
 [dev-dependencies]
