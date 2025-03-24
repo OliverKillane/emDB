@@ -28,7 +28,7 @@ syn = { version = "2.0.98", features = [
 [dev-dependencies]
 divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }
 chumsky-proc = { git = "https://github.com/OliverKillane/chumsky-proc.git", branch = "mitigation/avoiding-cargo-examples-bug" }
-chumsky = "0.9.3"
+chumsky = "0.10.0"
 
 [features]
 # To enable better diagnostics 
