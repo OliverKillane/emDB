@@ -1,9 +1,14 @@
-//! ## Interface Agnostic Data Structures for [super::arenas].
+//! ## Allocators
+//! Allowing [super::arenas] to allocate slots with easily configurable allocators.
+//!  - Custom, or structures using the global allocator.
 
-use crate::utils::idx::IdxInt;
+use crate::key::IdxInt;
 
-pub mod blocks;
-pub mod contig;
+mod blocks;
+mod contig;
+
+pub use blocks::*;
+pub use contig::*;
 
 pub trait AllocSelect {
     type Impl<Idx: IdxInt, Data>: AllocImpl<Idx, Data>;
@@ -11,13 +16,18 @@ pub trait AllocSelect {
 
 /// A simple interface for data structures holding values, with keys chosen by the structure.
 pub trait AllocImpl<Idx: IdxInt, Data> {
-    type Cfg;
-    fn new(cfg: Self::Cfg) -> Self;
+    fn new(preallocate_to: Idx) -> Self;
 
     /// # Safety
     /// Must be deterministic, each next index is an increment, starting from [IdxInt::ZERO]
     ///  - This is relied upon by the [crate::prelude::TransformArena] implementation.
-    fn insert(&mut self, d: Data) -> Option<Idx>;
+    fn append(&mut self, d: Data) -> Option<Idx>;
+
+    /// Provide the next key to allocate.
+    ///
+    /// # Safety
+    /// Must match exactly the next key produced by insert
+    fn next(&self) -> Option<Idx>;
 
     /// # Safety
     /// The index must have been allocated by [AllocImpl::insert]

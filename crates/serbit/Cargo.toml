@@ -13,7 +13,10 @@ homepage.workspace = true
 license-file.workspace = true
 
 [dependencies]
-better_arenas = { path = "../better_arenas" }
+smart_arenas = { path = "../smart_arenas" }
 quote_debug = { path = "../quote_debug" }
 enumtrait = { path = "../enumtrait" }
 smallvec = "1.14"
+num-bigint = "0.4"
+proc-macro2 = { version = "1.0" }
+combi = { path = "../combi" }

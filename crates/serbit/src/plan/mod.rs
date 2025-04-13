@@ -1,2 +1,2 @@
-pub mod debug;
 pub mod ir;
+pub mod pass;

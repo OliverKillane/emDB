@@ -1,5 +1,5 @@
 use super::{AllocImpl, AllocSelect};
-use crate::utils::idx::IdxInt;
+use crate::key::IdxInt;
 use smallvec::SmallVec;
 use std::{marker::PhantomData, mem::MaybeUninit};
 
@@ -36,10 +36,8 @@ impl<const BLOCK_SIZE: usize> AllocSelect for Blocks<BLOCK_SIZE> {
 impl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> AllocImpl<Idx, Data>
     for BlocksImpl<Idx, Data, BLOCK_SIZE>
 {
-    type Cfg = BlocksConfig<Idx>;
-
-    fn new(cfg: Self::Cfg) -> Self {
-        let blocks = cfg.preallocate_to.offset() / BLOCK_SIZE;
+    fn new(preallocate_to: Idx) -> Self {
+        let blocks = preallocate_to.offset() / BLOCK_SIZE;
         let mut data = SmallVec::with_capacity(blocks);
         for _ in 0..blocks {
             data.push(Self::new_block());
@@ -51,9 +49,8 @@ impl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> AllocImpl<Idx, Data>
         }
     }
 
-    fn insert(&mut self, d: Data) -> Option<Idx> {
-        let maybe_last_idx = self.last_idx;
-        let insert = |new_idx| {
+    fn append(&mut self, d: Data) -> Option<Idx> {
+        if let Some(new_idx) = self.next() {
             let (block, inner) = Self::idx_convert(new_idx);
             debug_assert!(block <= self.data.len());
             if block == self.data.len() {
@@ -66,17 +63,21 @@ impl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> AllocImpl<Idx, Data>
                     .write(d);
             }
             self.last_idx = Some(new_idx);
-            new_idx
-        };
+            Some(new_idx)
+        } else {
+            None
+        }
+    }
 
-        if let Some(last_idx) = maybe_last_idx {
+    fn next(&self) -> Option<Idx> {
+        if let Some(last_idx) = self.last_idx {
             if last_idx == Idx::MAX {
                 None
             } else {
-                Some(insert(last_idx.inc()))
+                Some(last_idx.inc())
             }
         } else {
-            Some(insert(Idx::ZERO))
+            Some(Idx::ZERO)
         }
     }
 

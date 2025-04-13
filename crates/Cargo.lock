@@ -34,19 +34,9 @@ checksum = "5d6f9ca11400f14ef046700eb6401c706c587871303453a5e7586efb82340c3d"
 
 [[package]]
 name = "autocfg"
-version = "1.2.0"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1fdabc7756949593fe60f30ec81974b613357de856987752631dea1e3394c80"
-
-[[package]]
-name = "better_arenas"
-version = "0.1.0"
-dependencies = [
- "derive-where",
- "function_name",
- "smallvec",
- "vec-collections",
-]
+checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "bimap"
@@ -400,6 +390,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db1b4163932b207be6e3a06412aed4d84cca40dc087419f231b3a38cba2ca8e9"
 
 [[package]]
+name = "num-bigint"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5e44f723f1133c9deac646763579fdb3ac745e418f2a7af9cd0c431da1f20b9"
+dependencies = [
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-integer"
+version = "0.1.46"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7969661fd2958a5cb096e56c8e1ad0444ac2bbcd0061bd28660485a44879858f"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -642,10 +651,13 @@ checksum = "92d43fe69e652f3df9bdc2b85b2854a0825b86e4fb76bc44d945137d053639ca"
 name = "serbit"
 version = "0.1.0"
 dependencies = [
- "better_arenas",
+ "combi",
  "enumtrait",
+ "num-bigint",
+ "proc-macro2",
  "quote_debug",
  "smallvec",
+ "smart_arenas",
 ]
 
 [[package]]
@@ -693,6 +705,16 @@ name = "smallvec"
 version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fcf8323ef1faaee30a44a340193b1ac6814fd9b7b4e88e9d4519a3e4abe1cfd"
+
+[[package]]
+name = "smart_arenas"
+version = "0.1.0"
+dependencies = [
+ "derive-where",
+ "function_name",
+ "smallvec",
+ "vec-collections",
+]
 
 [[package]]
 name = "sorted-iter"

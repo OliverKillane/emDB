@@ -1,12 +1,8 @@
 use std::marker::PhantomData;
 
-use crate::utils::idx::IdxInt;
+use crate::key::IdxInt;
 
 use super::{AllocImpl, AllocSelect};
-
-pub struct ContigConfig<Idx: IdxInt> {
-    pub preallocate_to: Idx,
-}
 
 /// A continugous allocation of slots.
 ///  - Backed by a vector.
@@ -23,20 +19,25 @@ impl AllocSelect for Contig {
 }
 
 impl<Idx: IdxInt, Data> AllocImpl<Idx, Data> for ContigImpl<Idx, Data> {
-    type Cfg = ContigConfig<Idx>;
-
-    fn new(cfg: Self::Cfg) -> Self {
+    fn new(preallocate_to: Idx) -> Self {
         Self {
-            data: Vec::with_capacity(cfg.preallocate_to.offset()),
+            data: Vec::with_capacity(preallocate_to.offset()),
             _phantom: PhantomData,
         }
     }
 
-    fn insert(&mut self, d: Data) -> Option<Idx> {
+    fn append(&mut self, d: Data) -> Option<Idx> {
+        let idx = self.next();
+        if idx.is_some() {
+            self.data.push(d);
+        }
+        idx
+    }
+
+    fn next(&self) -> Option<Idx> {
         if <Idx as IdxInt>::MAX.offset() == self.data.len() {
             None
         } else {
-            self.data.push(d);
             // JUSTIFY: We never insert above the maximum size of the index,
             //          so this conversion cannot fail.
             Some(Idx::from_offset(self.data.len() - 1).unwrap())
