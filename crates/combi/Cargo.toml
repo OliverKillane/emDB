@@ -16,7 +16,7 @@ license-file.workspace = true
 rustc_version = "0.4"
 
 [dependencies]
-derive-where = "1.2.7"
+derive-where = "1.3.0"
 proc-macro2 = { version = "1.0"}
 proc-macro-error2 = "2.0.1"
 quote = { version = "1.0.38"}
@@ -28,7 +28,7 @@ syn = { version = "2.0.98", features = [
 [dev-dependencies]
 divan = { git = "https://github.com/OliverKillane/divan.git", branch = "enh/file-output" }
 chumsky-proc = { git = "https://github.com/OliverKillane/chumsky-proc.git", branch = "mitigation/avoiding-cargo-examples-bug" }
-chumsky = "0.9.3"
+chumsky = "0.10.1"
 
 [features]
 # To enable better diagnostics 
