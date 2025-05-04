@@ -11,6 +11,19 @@ pub struct Share<Key: KeyTrait, Alloc: AllocSelect, RefCount: IdxInt, Data> {
     len: usize,
 }
 
+impl<Key: KeyTrait, Alloc: AllocSelect, RefCount: IdxInt, Data> Drop
+    for Share<Key, Alloc, RefCount, Data>
+{
+    fn drop(&mut self) {
+        if !self.is_empty() {
+            panic!("Some values are still in the arena, meaning a leak has occured")
+        }
+        unsafe {
+            Key::relinquish();
+        }
+    }
+}
+
 impl<Key: KeyTrait, Alloc: AllocSelect, RefCount: IdxInt, Data> Arena
     for Share<Key, Alloc, RefCount, Data>
 {

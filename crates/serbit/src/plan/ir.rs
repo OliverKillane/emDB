@@ -78,6 +78,9 @@ pub struct Integer {
 
 pub struct Byte;
 
+#[enumtrait::quick_enum]
+#[enumtrait::quick_from]
+#[enumtrait::store(pub item_primitive)]
 pub enum Primitive {
     Byte,
     Bit,

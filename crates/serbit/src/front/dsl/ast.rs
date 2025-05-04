@@ -1,12 +1,15 @@
 use proc_macro2::Ident;
 
-struct Item;
+struct Bool;
+struct Int;
+
+struct Item {}
 struct Expr;
 
-enum Stage {
+pub enum Stage {
     Single(Item),
-    Repeat { count: Expr, seq: Box<Seq> },
-    Until { expr: Expr, seq: Box<Seq> },
+    Repeat { count: Int, seq: Box<Seq> },
+    Until { expr: Bool, seq: Box<Seq> },
 }
 
 struct Seq {

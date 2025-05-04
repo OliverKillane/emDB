@@ -37,6 +37,8 @@ impl<Unique: 'static, Idx: IdxInt> Drop for Key<Unique, Idx> {
     }
 }
 
+static USED_GUARDS: LazyLock<Mutex<VecSet<[std::any::TypeId; 10]>>> =
+    LazyLock::new(|| Mutex::new(VecSet::empty()));
 pub trait KeyTrait {
     type Unique: 'static;
     type Idx: IdxInt;
@@ -45,9 +47,7 @@ pub trait KeyTrait {
     fn to_idx(&self) -> Self::Idx;
     fn dispose(self);
     fn guard() {
-        static USED: LazyLock<Mutex<VecSet<[std::any::TypeId; 10]>>> =
-            LazyLock::new(|| Mutex::new(VecSet::empty()));
-        let mut l = USED.lock().unwrap();
+        let mut l = USED_GUARDS.lock().unwrap();
         let id = std::any::TypeId::of::<Self::Unique>();
         if l.contains(&id) {
             panic!(
@@ -56,6 +56,20 @@ pub trait KeyTrait {
             );
         } else {
             l.insert(id);
+        }
+    }
+
+    /// # Safety
+    /// Should only be called once there is a guarentee that no keys exist for the guard.
+    ///  - Enforced by the arena that uses it.
+    unsafe fn relinquish() {
+        let mut l = USED_GUARDS.lock().unwrap();
+        let id = std::any::TypeId::of::<Self::Unique>();
+        if !l.remove(&id) {
+            panic!(
+                "Cannot relinquish guard if guard was never taken for {}",
+                std::any::type_name::<Self::Unique>()
+            );
         }
     }
 }

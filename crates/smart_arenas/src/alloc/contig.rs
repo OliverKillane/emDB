@@ -40,7 +40,7 @@ impl<Idx: IdxInt, Data> AllocImpl<Idx, Data> for ContigImpl<Idx, Data> {
         } else {
             // JUSTIFY: We never insert above the maximum size of the index,
             //          so this conversion cannot fail.
-            Some(Idx::from_offset(self.data.len() - 1).unwrap())
+            Some(Idx::from_offset(self.data.len()).unwrap())
         }
     }
 

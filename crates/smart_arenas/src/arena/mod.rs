@@ -155,3 +155,30 @@ mod common {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        alloc,
+        arena::{self, Arena, DeleteArena},
+        key,
+    };
+    #[test]
+    fn foo() {
+        struct Tag;
+        type Key = key::Key<Tag, u16>;
+        {
+            let mut arena: arena::Own<Key, alloc::Contig, usize> = arena::Own::new(0);
+            let out = arena.insert(12).unwrap();
+            assert_eq!(arena.read(&out), &12);
+            arena.delete(out);
+        }
+
+        {
+            let mut arena2: arena::Own<Key, alloc::Contig, usize> = arena::Own::new(0);
+            let out = arena2.insert(15).unwrap();
+            assert_eq!(arena2.read(&out), &12);
+            arena2.delete(out);
+        }
+    }
+}

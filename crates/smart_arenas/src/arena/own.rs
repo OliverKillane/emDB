@@ -11,6 +11,17 @@ pub struct Own<Key: KeyTrait, Alloc: AllocSelect, Data> {
     len: usize,
 }
 
+impl<Key: KeyTrait, Alloc: AllocSelect, Data> Drop for Own<Key, Alloc, Data> {
+    fn drop(&mut self) {
+        if !self.is_empty() {
+            panic!("Some values are still in the arena, meaning a leak has occured")
+        }
+        unsafe {
+            Key::relinquish();
+        }
+    }
+}
+
 impl<Key: KeyTrait, Alloc: AllocSelect, Data> Arena for Own<Key, Alloc, Data> {
     type Key = Key;
     type Data = Data;
