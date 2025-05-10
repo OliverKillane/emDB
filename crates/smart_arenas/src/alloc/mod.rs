@@ -2,7 +2,7 @@
 //! Allowing [super::arenas] to allocate slots with easily configurable allocators.
 //!  - Custom, or structures using the global allocator.
 
-use crate::key::IdxInt;
+use crate::id::index::{Index, WidestIndex};
 
 mod blocks;
 mod contig;
@@ -11,11 +11,11 @@ pub use blocks::*;
 pub use contig::*;
 
 pub trait AllocSelect {
-    type Impl<Idx: IdxInt, Data>: AllocImpl<Idx, Data>;
+    type Impl<Idx: Index, Data>: AllocImpl<Idx, Data>;
 }
 
 /// A simple interface for data structures holding values, with keys chosen by the structure.
-pub trait AllocImpl<Idx: IdxInt, Data> {
+pub trait AllocImpl<Idx: Index, Data> {
     fn new(preallocate_to: Idx) -> Self;
 
     /// # Safety
@@ -37,8 +37,8 @@ pub trait AllocImpl<Idx: IdxInt, Data> {
     /// The index must have been allocated by [AllocImpl::insert]
     unsafe fn write(&mut self, idx: Idx) -> &mut Data;
 
-    fn len(&self) -> usize;
+    fn exclusive_index_upper_bound(&self) -> WidestIndex;
     fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.exclusive_index_upper_bound() == 0
     }
 }

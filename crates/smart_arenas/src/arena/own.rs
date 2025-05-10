@@ -1,28 +1,27 @@
 use super::{Arena, DeleteArena, WriteArena, common};
 use crate::{
     alloc::{AllocImpl, AllocSelect},
-    key::{KeyTrait, WeakKey},
+    id::{
+        index::Index,
+        key::{KeyTrait, WeakKey},
+        token::Token,
+    },
 };
+use roaring::RoaringBitmap;
 use std::mem::ManuallyDrop;
 
-pub struct Own<Key: KeyTrait, Alloc: AllocSelect, Data> {
+/// ## Unique Ownership Arena
+/// The equivalent of [Box] for arenas.
+///  - Only one key per value, keys cannot be copied.
+pub struct Own<'id, Key: KeyTrait<'id>, Alloc: AllocSelect, Data> {
     slots: Alloc::Impl<Key::Idx, common::ValOrFree<Key::Idx, Data>>,
     next_free: Option<Key::Idx>,
+    deleted_slots: RoaringBitmap,
     len: usize,
+    _token: Token<'id>,
 }
 
-impl<Key: KeyTrait, Alloc: AllocSelect, Data> Drop for Own<Key, Alloc, Data> {
-    fn drop(&mut self) {
-        if !self.is_empty() {
-            panic!("Some values are still in the arena, meaning a leak has occured")
-        }
-        unsafe {
-            Key::relinquish();
-        }
-    }
-}
-
-impl<Key: KeyTrait, Alloc: AllocSelect, Data> Arena for Own<Key, Alloc, Data> {
+impl<'id, Key: KeyTrait<'id>, Alloc: AllocSelect, Data> Arena<'id> for Own<'id, Key, Alloc, Data> {
     type Key = Key;
     type Data = Data;
     type Read<'a>
@@ -30,12 +29,13 @@ impl<Key: KeyTrait, Alloc: AllocSelect, Data> Arena for Own<Key, Alloc, Data> {
     where
         Self: 'a;
 
-    fn new(preallocate_to: <Self::Key as KeyTrait>::Idx) -> Self {
-        Self::Key::guard();
+    fn new(preallocate_to: <Self::Key as KeyTrait<'id>>::Idx, token: Token<'id>) -> Self {
         Self {
             slots: Alloc::Impl::new(preallocate_to),
             next_free: None,
             len: 0,
+            deleted_slots: RoaringBitmap::new(),
+            _token: token,
         }
     }
 
@@ -47,17 +47,19 @@ impl<Key: KeyTrait, Alloc: AllocSelect, Data> Arena for Own<Key, Alloc, Data> {
                 ManuallyDrop::drop(&mut slot.next_free);
                 slot.data = ManuallyDrop::new(data);
             }
-            self.len += 1;
             Some((idx, true))
         } else if let Some(idx) = self.slots.append(common::ValOrFree {
             data: ManuallyDrop::new(data),
         }) {
-            self.len += 1;
             Some((idx, false))
         } else {
             None
         }
-        .map(|(idx, reused)| unsafe { (Key::to_key(idx), reused) })
+        .map(|(idx, reused)| {
+            self.len += 1;
+            let _ = self.deleted_slots.remove(idx.offset());
+            unsafe { (Key::to_key(idx), reused) }
+        })
     }
 
     fn read(&self, key: &Self::Key) -> Self::Read<'_> {
@@ -70,6 +72,7 @@ impl<Key: KeyTrait, Alloc: AllocSelect, Data> Arena for Own<Key, Alloc, Data> {
         // JUSTIFY: No check on union.
         //           - Keys cannot be copied, and deletion takes ownership of a key
         //          Hence this key must have been from an insert, and cannot have been deleted.
+        debug_assert!(!self.deleted_slots.contains(key.to_idx().offset()));
         unsafe { &self.slots.read(key.to_idx()).data }
     }
 
@@ -77,12 +80,19 @@ impl<Key: KeyTrait, Alloc: AllocSelect, Data> Arena for Own<Key, Alloc, Data> {
         self.len
     }
 
-    fn iter<'a>(&'a self) -> impl Iterator<Item = (WeakKey<'a, Self::Key>, Self::Read<'a>)> {
-        common::Iter::new(&self.slots, self.next_free, self.len())
+    fn iter_with_weak_key<'a>(
+        &'a self,
+    ) -> impl Iterator<Item = (WeakKey<'id, 'a, Self::Key>, Self::Read<'a>)> + 'a {
+        OwnIter {
+            arena: self,
+            current: Key::Idx::ZERO,
+        }
     }
 }
 
-impl<Key: KeyTrait, Alloc: AllocSelect, Data> DeleteArena for Own<Key, Alloc, Data> {
+impl<'id, Key: KeyTrait<'id>, Alloc: AllocSelect, Data> DeleteArena<'id>
+    for Own<'id, Key, Alloc, Data>
+{
     fn delete_return_dropped(&mut self, key: Self::Key) -> bool {
         unsafe {
             let value = self.slots.write(key.to_idx());
@@ -90,13 +100,15 @@ impl<Key: KeyTrait, Alloc: AllocSelect, Data> DeleteArena for Own<Key, Alloc, Da
             value.next_free = ManuallyDrop::new(self.next_free);
         }
         self.next_free = Some(key.to_idx());
-        key.dispose();
+        self.deleted_slots.insert(key.to_idx().offset());
         self.len -= 1;
         true
     }
 }
 
-impl<Key: KeyTrait, Alloc: AllocSelect, Data> WriteArena for Own<Key, Alloc, Data> {
+impl<'id, Key: KeyTrait<'id>, Alloc: AllocSelect, Data> WriteArena<'id>
+    for Own<'id, Key, Alloc, Data>
+{
     type Write<'a>
         = &'a mut Data
     where
@@ -112,5 +124,49 @@ impl<Key: KeyTrait, Alloc: AllocSelect, Data> WriteArena for Own<Key, Alloc, Dat
         //           - Keys cannot be copied, and deletion takes ownership of a key
         //          Hence this key must have been from an insert, and cannot have been deleted.
         unsafe { &mut self.slots.write(key.to_idx()).data }
+    }
+}
+
+impl<'id, Key: KeyTrait<'id>, Alloc: AllocSelect, Data> Drop for Own<'id, Key, Alloc, Data> {
+    fn drop(&mut self) {
+        for idx in 0..self.slots.exclusive_index_upper_bound() {
+            if !self.deleted_slots.contains(idx) {
+                unsafe {
+                    ManuallyDrop::drop(
+                        &mut self.slots.write(Key::Idx::from_offset(idx).unwrap()).data,
+                    )
+                }
+            }
+        }
+    }
+}
+
+struct OwnIter<'id, 'brw, Key: KeyTrait<'id>, Alloc: AllocSelect, Data> {
+    arena: &'brw Own<'id, Key, Alloc, Data>,
+    current: Key::Idx,
+}
+
+impl<'id, 'brw, Key: KeyTrait<'id>, Alloc: AllocSelect, Data> Iterator
+    for OwnIter<'id, 'brw, Key, Alloc, Data>
+{
+    type Item = (WeakKey<'id, 'brw, Key>, &'brw Data);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // JUSTIFY: Checking deleted slots first
+        //           - if deleted, then the slot was allocated, so was present
+        //           - no access before the exclusive upper bound check
+        while self.arena.deleted_slots.contains(self.current.offset()) {
+            self.current = self.current.inc();
+        }
+        if self.current.offset() >= self.arena.slots.exclusive_index_upper_bound() {
+            None
+        } else {
+            unsafe {
+                let data = self.arena.read(&Key::to_key(self.current));
+                let weak_key = WeakKey::to_key(self.current);
+                self.current = self.current.inc();
+                Some((weak_key, data))
+            }
+        }
     }
 }

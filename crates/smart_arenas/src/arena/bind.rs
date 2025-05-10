@@ -1,31 +1,27 @@
-//! # Binding arenas to additional allocators
-//! Used for decomposed storage, the arena generates keys, the allocator generates the rest.
-
-// keys as part of the arena
-// taking the unique type
-// only instantiated once
-// KeyGuard
-
-// has a trait including size Key<Unique, Size>
-// Key<Unique, Size>::get_guard() -> the thing
-// Then pass to the arena
-// The use -> data can contain the key type
-
 use std::mem::MaybeUninit;
 
 use crate::{
     alloc::{AllocImpl, AllocSelect},
-    key::{KeyTrait, WeakKey},
+    id::{
+        key::{KeyTrait, WeakKey},
+        token::Token,
+    },
 };
 
 use super::{Arena, CopyKeyArena, DeleteArena, WriteArena};
 
-pub struct Bind<AData, Primary: Arena, Assoc: AllocSelect> {
+/// ## Columnar Storage for Arenas / 'Struct of Arrays'
+/// An arena combinator that allows associating additional data in separate allocators with an arena type.
+///  - The arena type determines the smart behaviour (e.g [crate::arena::Own] or [crate::arena::Share])
+///  - No additional bounds/access checks are required for the associated column.
+pub struct Bind<'id, AData, Primary: Arena<'id>, Assoc: AllocSelect> {
     primary: Primary,
-    assoc: Assoc::Impl<<Primary::Key as KeyTrait>::Idx, MaybeUninit<AData>>,
+    assoc: Assoc::Impl<<Primary::Key as KeyTrait<'id>>::Idx, MaybeUninit<AData>>,
 }
 
-impl<AData, Primary: Arena, Assoc: AllocSelect> Arena for Bind<AData, Primary, Assoc> {
+impl<'id, AData, Primary: Arena<'id>, Assoc: AllocSelect> Arena<'id>
+    for Bind<'id, AData, Primary, Assoc>
+{
     type Key = Primary::Key;
     type Data = (Primary::Data, AData);
     type Read<'a>
@@ -33,9 +29,9 @@ impl<AData, Primary: Arena, Assoc: AllocSelect> Arena for Bind<AData, Primary, A
     where
         Self: 'a;
 
-    fn new(preallocate_to: <Self::Key as KeyTrait>::Idx) -> Self {
+    fn new(preallocate_to: <Self::Key as KeyTrait<'id>>::Idx, token: Token<'id>) -> Self {
         Self {
-            primary: Primary::new(preallocate_to),
+            primary: Primary::new(preallocate_to, token),
             assoc: Assoc::Impl::new(preallocate_to),
         }
     }
@@ -65,15 +61,19 @@ impl<AData, Primary: Arena, Assoc: AllocSelect> Arena for Bind<AData, Primary, A
         self.primary.len()
     }
 
-    fn iter<'a>(&'a self) -> impl Iterator<Item = (WeakKey<'a, Self::Key>, Self::Read<'a>)> + 'a {
-        self.primary.iter().map(|(wk, pdata)| {
-            let adata = unsafe { self.assoc.read(wk.brw().to_idx()).assume_init_ref() };
+    fn iter_with_weak_key<'a>(
+        &'a self,
+    ) -> impl Iterator<Item = (WeakKey<'id, 'a, Self::Key>, Self::Read<'a>)> + 'a {
+        self.primary.iter_with_weak_key().map(|(wk, pdata)| {
+            let adata = unsafe { self.assoc.read(wk.to_idx()).assume_init_ref() };
             (wk, (pdata, adata))
         })
     }
 }
 
-impl<AData, Primary: DeleteArena, Assoc: AllocSelect> DeleteArena for Bind<AData, Primary, Assoc> {
+impl<'id, AData, Primary: DeleteArena<'id>, Assoc: AllocSelect> DeleteArena<'id>
+    for Bind<'id, AData, Primary, Assoc>
+{
     fn delete_return_dropped(&mut self, key: Self::Key) -> bool {
         let idx = key.to_idx();
         let dropped = self.primary.delete_return_dropped(key);
@@ -86,7 +86,9 @@ impl<AData, Primary: DeleteArena, Assoc: AllocSelect> DeleteArena for Bind<AData
     }
 }
 
-impl<AData, Primary: WriteArena, Assoc: AllocSelect> WriteArena for Bind<AData, Primary, Assoc> {
+impl<'id, AData, Primary: WriteArena<'id>, Assoc: AllocSelect> WriteArena<'id>
+    for Bind<'id, AData, Primary, Assoc>
+{
     type Write<'a>
         = (Primary::Write<'a>, &'a mut AData)
     where
@@ -100,10 +102,10 @@ impl<AData, Primary: WriteArena, Assoc: AllocSelect> WriteArena for Bind<AData, 
     }
 }
 
-impl<AData, Primary: CopyKeyArena, Assoc: AllocSelect> CopyKeyArena
-    for Bind<AData, Primary, Assoc>
+impl<'id, AData, Primary: CopyKeyArena<'id>, Assoc: AllocSelect> CopyKeyArena<'id>
+    for Bind<'id, AData, Primary, Assoc>
 {
-    fn copy_key(&mut self, key: &<Self as Arena>::Key) -> Option<<Self as Arena>::Key> {
+    fn copy_key(&mut self, key: &<Self as Arena<'id>>::Key) -> Option<<Self as Arena<'id>>::Key> {
         self.primary.copy_key(key)
     }
 }

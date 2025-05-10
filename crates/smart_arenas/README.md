@@ -1,38 +1,32 @@
-# Better Arenas
+# Smart Arenas
 ## What is this?
-A library of fast arena types, with different ownership models.
- - Arena implementation abstracted as an allocator.
- - Different ownership semantics used to improve performance.
+A library of arena fast data structures, with ownership semantics similar to start pointers.
 
-Traditional arenas such as [typed generational area](https://gitlab.com/tekne/typed-generational-arena) do not have optimally low overhead compared with raw pointer use as:
- - Large index types (while smaller indices are supported, a generation count must also be included to solve the [ABA problem](https://en.wikipedia.org/wiki/ABA_problem))
- - Bounds checks (on both access to the backing data structure, and checks on the given slot containing a value)
- - Unintentional leaks when indicies are dropped & the allocation is unreachable, but the arena does not drop the value.
+## Why?
+Building complex data structures (e.g. graphs), with many (potentially mutable) references in safe rust is awkward, and generally falls into two approches.
 
-Here we attempt to solve the [ABA problem](https://en.wikipedia.org/wiki/ABA_problem), and improve upon the above mentioned issues, using panicking drops & unique tags for indices.
+ - `Rc<RefCell<T>>`, using runtime checks to prove safety & can panic, prevents leaking & access always gives `&mut T`/`&T` unconditionally.
+ - Generational arenas, using runtime checks for the ABA problem (also requires generation count in the key) & for precense on every access, but providing safety at compile time & potentially more performant (/application dependent) memory layout
 
-## Structure
-![](./docs/layers.drawio.svg)
+In either case, we give something up at runtime.
 
-The arena layer can implement custom semantics for indicies (e.g. reference counting), unique types for instances of the arena, to then use it optimisation (e.g. removing bounds checks).
+With smart arenas we aim to move these checks to compile time, for arena data structures.
 
-### Solving the ABA Problem without generation counts
-To solve this we need the following invariant:
- - If I have an key, the allocation cannot be deleted.
+## How to solve the ABA problem at compile time?
+To solve this we need 2 guarentees:
+1. if a key exists, it's corresponding value exists in the arena
+2. it is not possible to use a key, and another *instance* of an arena
 
-We gain this for an `Own` arena by making indices non-copyable, uniquely typed per instance of the arena, and consumed on deletion.
- - Hence If [`prelude::DeleteArena::delete`] is called with a key, it must exist, and will be unreachable once passed in as an argument.
+To achieve (1.) requires making keys non-copyable.
+ - any key copy needs to entier be impossible (an `Own` arena / similar to `Box`), or have a reference count (a `Shared` arena / similar to `Rc`/`Arc`)
 
-Likewise with reference counting, we can get the invariant that the number of keys is the same as the allocation's reference count, by requiring a mutable reference to the arena to copy a key.
+To achieve (2.) requires passing a type to both the key, that can *only* be used by a specific instance of the arena.
 
-### Unique Types
-We can use pass an onbject containing an `FnOnce` closure to the arena, and base the key type from this to give all keys of an arena this type.
+We can do this with a type map - if more than one arena is instantiated with a token type, then panic. However this introduced runtime overhead, and makes unit testing hard (requires a static map).
 
-However this `FnOnce` closure can be re-created with the same anonymous type.
- - Hence we enforce it is only used by one arena at a time, by including a captured static `AtomicBool`, which is checked on arena construction, and unset on arena destruction.
+So instead we use lifetimes as an identity, attached to a non-copyable token.
+ - By passing the lifetime using a non-copyable token to the arena, inside a closure, we enforce only a single instance can have this `'id` lifetime
+ - By making the key, token and arena invariant in this lifetime we enforce that these identities must exactly match. 
 
-### Key Types
-Keys can be implemented as small as `u8`, allowing reference counted or owned arenas, with very small keys.
-
-### Owned Keys
-Keys are not copyable.
+## Contributions
+Use of identifier lifetimes was popularised by [GhostCell](https://plv.mpi-sws.org/rustbelt/ghostcell/). In fact, this is almost identical to the `BrandedVec` from the [ghostcell paper](https://plv.mpi-sws.org/rustbelt/ghostcell/paper.pdf).

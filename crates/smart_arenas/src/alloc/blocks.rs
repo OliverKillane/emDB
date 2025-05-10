@@ -1,24 +1,37 @@
 use super::{AllocImpl, AllocSelect};
-use crate::key::IdxInt;
+use crate::id::index::{Index, WidestIndex};
 use smallvec::SmallVec;
 use std::{marker::PhantomData, mem::MaybeUninit};
 
-pub struct BlocksConfig<Idx: IdxInt> {
+pub struct BlocksConfig<Idx: Index> {
     pub preallocate_to: Idx,
 }
 
 /// Allocating slots in blocks.
 ///  - No reallocation on extension.
 ///  - Each block is the same size.
-pub struct BlocksImpl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> {
+///
+/// INV: `BLOCK_SIZE > 0`
+pub struct BlocksImpl<Idx: Index, Data, const BLOCK_SIZE: usize> {
     data: SmallVec<[Box<[MaybeUninit<Data>; BLOCK_SIZE]>; 4]>,
     last_idx: Option<Idx>,
     _phantom: PhantomData<Idx>,
 }
-impl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> BlocksImpl<Idx, Data, BLOCK_SIZE> {
+impl<Idx: Index, Data, const BLOCK_SIZE: usize> BlocksImpl<Idx, Data, BLOCK_SIZE> {
     fn idx_convert(idx: Idx) -> (usize, usize) {
-        let block_idx = idx.offset() / BLOCK_SIZE;
-        let inner_idx = idx.offset() % BLOCK_SIZE;
+        const {
+            assert!(BLOCK_SIZE != 0);
+        }
+
+        let offset = idx.offset() as usize;
+        let (block_idx, inner_idx) = if const { BLOCK_SIZE.is_power_of_two() } {
+            (
+                offset >> BLOCK_SIZE.trailing_zeros(),
+                offset & (BLOCK_SIZE - 1),
+            )
+        } else {
+            (offset / BLOCK_SIZE, offset % BLOCK_SIZE)
+        };
         (block_idx, inner_idx)
     }
 
@@ -30,14 +43,14 @@ impl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> BlocksImpl<Idx, Data, BLOCK_SIZ
 pub struct Blocks<const BLOCK_SIZE: usize>;
 
 impl<const BLOCK_SIZE: usize> AllocSelect for Blocks<BLOCK_SIZE> {
-    type Impl<Idx: IdxInt, Data> = BlocksImpl<Idx, Data, BLOCK_SIZE>;
+    type Impl<Idx: Index, Data> = BlocksImpl<Idx, Data, BLOCK_SIZE>;
 }
 
-impl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> AllocImpl<Idx, Data>
+impl<Idx: Index, Data, const BLOCK_SIZE: usize> AllocImpl<Idx, Data>
     for BlocksImpl<Idx, Data, BLOCK_SIZE>
 {
     fn new(preallocate_to: Idx) -> Self {
-        let blocks = preallocate_to.offset() / BLOCK_SIZE;
+        let blocks = (preallocate_to.offset() as usize) / BLOCK_SIZE;
         let mut data = SmallVec::with_capacity(blocks);
         for _ in 0..blocks {
             data.push(Self::new_block());
@@ -101,7 +114,7 @@ impl<Idx: IdxInt, Data, const BLOCK_SIZE: usize> AllocImpl<Idx, Data>
         }
     }
 
-    fn len(&self) -> usize {
+    fn exclusive_index_upper_bound(&self) -> WidestIndex {
         self.last_idx.map_or(0, |idx| idx.offset() + 1)
     }
 }

@@ -1,13 +1,13 @@
 use std::marker::PhantomData;
 
-use crate::key::IdxInt;
+use crate::id::index::{Index, WidestIndex};
 
 use super::{AllocImpl, AllocSelect};
 
 /// A continugous allocation of slots.
 ///  - Backed by a vector.
 ///  - Copies entire vector on resizes that require
-pub struct ContigImpl<Idx: IdxInt, Data> {
+pub struct ContigImpl<Idx: Index, Data> {
     data: Vec<Data>,
     _phantom: PhantomData<Idx>,
 }
@@ -15,13 +15,13 @@ pub struct ContigImpl<Idx: IdxInt, Data> {
 pub struct Contig;
 
 impl AllocSelect for Contig {
-    type Impl<Idx: IdxInt, Data> = ContigImpl<Idx, Data>;
+    type Impl<Idx: Index, Data> = ContigImpl<Idx, Data>;
 }
 
-impl<Idx: IdxInt, Data> AllocImpl<Idx, Data> for ContigImpl<Idx, Data> {
+impl<Idx: Index, Data> AllocImpl<Idx, Data> for ContigImpl<Idx, Data> {
     fn new(preallocate_to: Idx) -> Self {
         Self {
-            data: Vec::with_capacity(preallocate_to.offset()),
+            data: Vec::with_capacity(preallocate_to.offset() as usize),
             _phantom: PhantomData,
         }
     }
@@ -35,24 +35,28 @@ impl<Idx: IdxInt, Data> AllocImpl<Idx, Data> for ContigImpl<Idx, Data> {
     }
 
     fn next(&self) -> Option<Idx> {
-        if <Idx as IdxInt>::MAX.offset() == self.data.len() {
+        if <Idx as Index>::MAX.offset() as usize == self.data.len() {
             None
         } else {
-            // JUSTIFY: We never insert above the maximum size of the index,
-            //          so this conversion cannot fail.
-            Some(Idx::from_offset(self.data.len()).unwrap())
+            // JUSTIFY: Casting usize to u32
+            //           - We cannot insert over the max offset, so we will never have a length
+            //             larger than `u32::MAX`
+            // JUSTIFY: Unwrapping the result
+            //           - We only extend length when allocating, so this index was allocated, so it
+            //             must be valid for the index type
+            Some(Idx::from_offset(self.data.len() as u32).unwrap())
         }
     }
 
     unsafe fn read(&self, idx: Idx) -> &Data {
-        unsafe { self.data.get_unchecked(idx.offset()) }
+        unsafe { self.data.get_unchecked(idx.offset() as usize) }
     }
 
     unsafe fn write(&mut self, idx: Idx) -> &mut Data {
-        unsafe { self.data.get_unchecked_mut(idx.offset()) }
+        unsafe { self.data.get_unchecked_mut(idx.offset() as usize) }
     }
 
-    fn len(&self) -> usize {
-        self.data.len()
+    fn exclusive_index_upper_bound(&self) -> WidestIndex {
+        self.data.len() as WidestIndex
     }
 }
