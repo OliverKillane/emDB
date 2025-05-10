@@ -35,11 +35,11 @@ impl<'id, Key: KeyTrait<'id>, Alloc: AllocSelect, Data> Arena<'id> for App<'id, 
     fn insert_return_reuse(&mut self, data: Self::Data) -> Option<(Self::Key, bool)> {
         self.slots
             .append(data)
-            .map(|idx| (unsafe { Self::Key::to_key(idx) }, false))
+            .map(|idx| (unsafe { Self::Key::from_idx(idx) }, false))
     }
 
     fn read(&self, key: &Self::Key) -> Self::Read<'_> {
-        unsafe { &self.slots.read(key.to_idx()) }
+        unsafe { self.slots.read(key.to_idx()) }
     }
 
     fn len(&self) -> usize {
@@ -53,7 +53,7 @@ impl<'id, Key: KeyTrait<'id>, Alloc: AllocSelect, Data> Arena<'id> for App<'id, 
         (0..self.len()).map(|offset| {
             let idx = Key::Idx::from_offset(offset as WidestIndex).unwrap();
             unsafe {
-                let weak_key = WeakKey::to_key(idx);
+                let weak_key = WeakKey::from_idx(idx);
                 let data = self.slots.read(idx);
                 (weak_key, data)
             }
@@ -78,15 +78,15 @@ impl<'id, Key: KeyTrait<'id>, Alloc: AllocSelect, Data> CopyKeyArena<'id>
     for App<'id, Key, Alloc, Data>
 {
     fn copy_key(&mut self, key: &<Self as Arena<'id>>::Key) -> Option<<Self as Arena<'id>>::Key> {
-        Some(unsafe { Self::Key::to_key(key.to_idx()) })
+        Some(unsafe { Self::Key::from_idx(key.to_idx()) })
     }
 }
 
 impl<'id, Key: KeyTrait<'id>, Alloc: AllocSelect, Data> IterKeyArena<'id>
     for App<'id, Key, Alloc, Data>
 {
-    fn iter_with_key<'a>(&'a self) -> impl Iterator<Item = (Self::Key, Self::Read<'a>)> + 'a {
+    fn iter_with_key(&self) -> impl Iterator<Item = (Self::Key, Self::Read<'_>)> + '_ {
         self.iter_with_weak_key()
-            .map(|(weak_key, data)| (unsafe { Self::Key::to_key(weak_key.to_idx()) }, data))
+            .map(|(weak_key, data)| (unsafe { Self::Key::from_idx(weak_key.to_idx()) }, data))
     }
 }

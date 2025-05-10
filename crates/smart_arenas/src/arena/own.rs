@@ -48,17 +48,17 @@ impl<'id, Key: KeyTrait<'id>, Alloc: AllocSelect, Data> Arena<'id> for Own<'id, 
                 slot.data = ManuallyDrop::new(data);
             }
             Some((idx, true))
-        } else if let Some(idx) = self.slots.append(common::ValOrFree {
-            data: ManuallyDrop::new(data),
-        }) {
-            Some((idx, false))
         } else {
-            None
+            self.slots
+                .append(common::ValOrFree {
+                    data: ManuallyDrop::new(data),
+                })
+                .map(|idx| (idx, false))
         }
         .map(|(idx, reused)| {
             self.len += 1;
             let _ = self.deleted_slots.remove(idx.offset());
-            unsafe { (Key::to_key(idx), reused) }
+            unsafe { (Key::from_idx(idx), reused) }
         })
     }
 
@@ -162,8 +162,8 @@ impl<'id, 'brw, Key: KeyTrait<'id>, Alloc: AllocSelect, Data> Iterator
             None
         } else {
             unsafe {
-                let data = self.arena.read(&Key::to_key(self.current));
-                let weak_key = WeakKey::to_key(self.current);
+                let data = self.arena.read(&Key::from_idx(self.current));
+                let weak_key = WeakKey::from_idx(self.current);
                 self.current = self.current.inc();
                 Some((weak_key, data))
             }

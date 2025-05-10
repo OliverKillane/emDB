@@ -1,9 +1,7 @@
-//! Main TODO: Use lifetimes for tags instead of types & typemap
-//!  - keep compile time
-//!  - allow unit tests to run properly
-//!  - allow leaking?
 #![doc = include_str!("../README.md")]
 //!
+//! ## Examples of Compile-time Protection
+//! Cannot reuse the same token for multiple arenas.
 //! ```compile_fail,E0382
 //! # use smart_arenas::prelude::*;
 //! context(|tk1| {
@@ -13,6 +11,8 @@
 //!     })
 //! });
 //! ```
+//!
+//! Cannot return tokens for use in other contexts.
 //! ```compile_fail
 //! # use smart_arenas::prelude::*;
 //! let tk1 = context(|tk1| {
@@ -20,6 +20,7 @@
 //! });
 //! ```
 //!
+//! Cannot use a key for one arena, on another (even with the same data type, key index size & allocator).
 //! ```compile_fail,E0521
 //! # use smart_arenas::prelude::*;
 //! context(|tk1| {
@@ -34,6 +35,8 @@
 //! });
 //! ```
 //!
+//! While a function may use parameters that type check (here two arenas with the same type), it is
+//! impossible to construct arguments for this function.
 //! ```compile_fail,E0521
 //! # use smart_arenas::prelude::*;
 //! fn access<'id>(
@@ -65,4 +68,5 @@ pub mod prelude {
     pub use crate::id::index::*;
     pub use crate::id::key::*;
     pub use crate::id::token::*;
+    pub use crate::multiple_context;
 }

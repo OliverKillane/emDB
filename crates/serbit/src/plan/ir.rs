@@ -1,27 +1,29 @@
+use std::num::NonZero;
+
 use num_bigint::BigInt;
 use smallvec::SmallVec;
-use smart_arenas::{alloc, arena};
-use std::{num::NonZero, ops::RangeInclusive};
+use smart_arenas::prelude::*;
 
-pub struct Plan<N: Naming> {
-    pub msgs: arena::Share<keys::Msg, alloc::Contig, u16, Assigned<N, Msg>>,
-    pub seqs: arena::Own<keys::Seq, alloc::Contig, Seq>,
-    pub stages: arena::Own<keys::Stage, alloc::Contig, Stage>,
-    pub items: arena::Share<keys::Item, alloc::Contig, u16, Assigned<N, Item>>,
-    pub bools: arena::Own<keys::Bool, alloc::Contig, Spanned<N, Bool>>,
-    pub ints: arena::Own<keys::Int, alloc::Contig, Spanned<N, Int>>,
+mod keys {
+    use smart_arenas::prelude::Key;
+
+    pub type Bool<'id> = Key<'id, u32>;
+    pub type Int<'id> = Key<'id, u32>;
+    pub type Item<'id> = Key<'id, u32>;
+    pub type Stage<'id> = Key<'id, u16>;
+    pub type Seq<'id> = Key<'id, u16>;
+    pub type Msg<'id> = Key<'id, u8>;
 }
 
-pub mod keys {
-    use smart_arenas::define_keys;
-    define_keys! {
-        Item => u16,
-        Stage => u16,
-        Bool => u16,
-        Int => u16,
-        Seq => u16,
-        Msg => u16,
-    }
+// Unfinished, want to make less repetitive.
+pub struct Plan<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, N: Naming> {
+    pub msgs: Share<'msgs, keys::Msg<'msgs>, Contig, u16, Assigned<N, Msg<'seqs>>>,
+    pub seqs: Own<'seqs, keys::Seq<'seqs>, Contig, Seq<'stages>>,
+    pub stages: Own<'stages, keys::Stage<'stages>, Contig, Stage<'items, 'seqs, 'bools>>,
+    pub items:
+        Share<'items, keys::Item<'items>, Contig, u16, Assigned<N, Item<'ints, 'items, 'bools>>>,
+    pub bools: Own<'bools, keys::Bool<'bools>, Contig, Spanned<N, Bool<'bools, 'ints>>>,
+    pub ints: Own<'ints, keys::Int<'ints>, Contig, Spanned<N, Int<'ints, 'bools, 'items>>>,
 }
 
 pub trait Naming {
@@ -39,17 +41,23 @@ pub struct Spanned<N: Naming, Data> {
     pub data: Data,
 }
 
+pub struct Integer {
+    pub signed: bool,
+    // Only supporting up to 256bit integers
+    pub bits: NonZero<u8>,
+}
+
 pub enum MathBinOp {
     Subtract,
     Multiply,
     Add,
 }
 
-pub enum Int {
+pub enum Int<'ints, 'bools, 'items> {
     Const { value: BigInt, kind: Integer }, // TODO(oliverkillane): BigInt heap allocates (vector, switch to smallvec?)
-    Bin(MathBinOp, keys::Int, keys::Int),
-    Ref(keys::Item),
-    Choice(keys::Bool, keys::Int, keys::Int),
+    Bin(MathBinOp, keys::Int<'ints>, keys::Int<'ints>),
+    Ref(keys::Item<'items>),
+    Choice(keys::Bool<'bools>, keys::Int<'ints>, keys::Int<'ints>),
 }
 
 pub enum LogicalBinOp {
@@ -62,104 +70,104 @@ pub enum ArithBinOp {
     Gt,
 }
 
-pub enum Bool {
+pub enum Bool<'bools, 'ints> {
     Const(bool),
-    Not(keys::Bool),
-    Logic(LogicalBinOp, keys::Bool, keys::Bool),
-    Arith(ArithBinOp, keys::Int, keys::Int),
+    Not(keys::Bool<'bools>),
+    Logic(LogicalBinOp, keys::Bool<'bools>, keys::Bool<'bools>),
+    Arith(ArithBinOp, keys::Int<'ints>, keys::Int<'ints>),
 }
 
-pub struct Bit;
-pub struct Integer {
-    pub signed: bool,
-    // Only supporting up to 256bit integers
-    pub bits: NonZero<u8>,
-}
-
-pub struct Byte;
-
-#[enumtrait::quick_enum]
-#[enumtrait::quick_from]
-#[enumtrait::store(pub item_primitive)]
 pub enum Primitive {
-    Byte,
     Bit,
-    Integer,
+    Byte,
+    Integer(Integer),
 }
 
-pub struct Array {
-    pub count: keys::Int,
-    pub item: keys::Item,
+pub struct Case<'items, 'bools> {
+    pub condition: keys::Bool<'bools>,
+    pub data: keys::Item<'items>,
 }
 
-pub struct Case {
-    pub condition: keys::Bool,
-    pub data: keys::Item,
+pub enum Item<'ints, 'items, 'bools> {
+    Array {
+        count: keys::Int<'ints>,
+        item: keys::Item<'items>,
+    },
+    Choice {
+        cases: SmallVec<[Case<'items, 'bools>; 2]>,
+        otherwise: keys::Item<'items>,
+    },
+    Tuple {
+        items: SmallVec<[keys::Item<'items>; 11]>,
+    },
+    Primitive(Primitive),
 }
 
-pub struct Choice {
-    pub cases: SmallVec<[Case; 2]>,
-    pub otherwise: keys::Item,
+pub enum Stage<'items, 'seqs, 'bools> {
+    Single(keys::Item<'items>),
+    Repeat {
+        count: keys::Item<'items>,
+        seq: keys::Seq<'seqs>,
+    },
+    Until {
+        expr: keys::Bool<'bools>,
+        seq: keys::Seq<'seqs>,
+    },
 }
 
-pub struct Tuple {
-    pub items: SmallVec<[keys::Item; 11]>,
+pub struct Seq<'stages> {
+    pub stages: SmallVec<[keys::Stage<'stages>; 8]>,
 }
 
-#[enumtrait::quick_enum]
-#[enumtrait::quick_from]
-#[enumtrait::store(pub item_enum)]
-pub enum Item {
-    Array,
-    Choice,
-    Tuple,
-    Primitive,
+pub struct Msg<'seqs> {
+    pub seq: keys::Seq<'seqs>,
 }
 
-pub struct Until {
-    pub expr: keys::Bool,
-    pub seq: keys::Seq,
-}
-
-pub struct Repeat {
-    pub count: keys::Item,
-    pub seq: keys::Seq,
-}
-
-pub struct Single {
-    pub item: keys::Item,
-}
-
-#[enumtrait::quick_enum]
-#[enumtrait::quick_from]
-#[enumtrait::store(pub item_stage)]
-pub enum Stage {
-    Single,
-    Repeat,
-    Until,
-}
-
-pub struct Seq {
-    pub stages: SmallVec<[keys::Stage; 8]>,
-}
-
-pub struct Msg {
-    pub seq: keys::Seq,
-}
-
-impl Integer {
-    pub fn range(&self) -> RangeInclusive<BigInt> {
-        let bits = self.bits.get();
-        if self.signed {
-            // min = -2^(bits-1), max = 2^(bits-1) - 1
-            let half = bits - 1;
-            let max = (BigInt::from(1) << half) - 1u32;
-            let min = -(&max + 1u32);
-            min..=max
-        } else {
-            // min = 0, max = 2^bits - 1
-            let max = (BigInt::from(1) << bits) - 1u32;
-            BigInt::ZERO..=max
+impl<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, N: Naming>
+    Plan<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, N>
+{
+    pub fn new(
+        token_msgs: Token<'msgs>,
+        token_seqs: Token<'seqs>,
+        token_stages: Token<'stages>,
+        token_items: Token<'items>,
+        token_bools: Token<'bools>,
+        token_ints: Token<'ints>,
+    ) -> Self {
+        Self {
+            msgs: Share::new(0, token_msgs),
+            seqs: Own::new(0, token_seqs),
+            stages: Own::new(0, token_stages),
+            items: Share::new(0, token_items),
+            bools: Own::new(0, token_bools),
+            ints: Own::new(0, token_ints),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use smart_arenas::prelude::*;
+
+    #[test]
+    fn test_basic() {
+        multiple_context!(
+            token_msgs,
+            token_seqs,
+            token_stages,
+            token_items,
+            token_bools,
+            token_ints => {
+                // let plan = Plan::new(
+                //     token_msgs,
+                //     token_seqs,
+                //     token_stages,
+                //     token_items,
+                //     token_bools,
+                //     token_ints
+                // );
+            }
+        );
     }
 }

@@ -53,7 +53,7 @@ impl<'id, AData, Primary: Arena<'id>, Assoc: AllocSelect> Arena<'id>
 
     fn read(&self, key: &Self::Key) -> Self::Read<'_> {
         (self.primary.read(key), unsafe {
-            &self.assoc.read(key.to_idx()).assume_init_ref()
+            self.assoc.read(key.to_idx()).assume_init_ref()
         })
     }
 

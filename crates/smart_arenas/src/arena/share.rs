@@ -72,7 +72,7 @@ impl<'id, Key: KeyTrait<'id>, Alloc: AllocSelect, RefCount: Index, Data> Arena<'
         }
         .map(|(idx, reused)| {
             self.len += 1;
-            unsafe { (Key::to_key(idx), reused) }
+            unsafe { (Key::from_idx(idx), reused) }
         })
     }
 
@@ -163,7 +163,7 @@ impl<'id, Key: KeyTrait<'id>, Alloc: AllocSelect, RefCount: Index, Data> CopyKey
             let entry = self.refcount_slots.write(key.to_idx());
             if *entry != RefCount::MAX {
                 *entry = entry.inc();
-                Some(Key::to_key(key.to_idx()))
+                Some(Key::from_idx(key.to_idx()))
             } else {
                 None
             }
@@ -201,8 +201,8 @@ impl<'id, 'brw, Key: KeyTrait<'id>, Alloc: AllocSelect, RefCount: Index, Data> I
                 break None;
             } else if unsafe { self.arena.refcount_slots.read(self.current) } != &RefCount::ZERO {
                 unsafe {
-                    let data = self.arena.read(&Key::to_key(self.current));
-                    let weak_key = WeakKey::to_key(self.current);
+                    let data = self.arena.read(&Key::from_idx(self.current));
+                    let weak_key = WeakKey::from_idx(self.current);
                     self.current = self.current.inc();
                     break Some((weak_key, data));
                 }

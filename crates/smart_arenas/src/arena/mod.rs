@@ -38,7 +38,7 @@ pub trait Arena<'id> {
         self.len() == 0
     }
 
-    fn iter<'a>(&'a self) -> impl Iterator<Item = Self::Read<'a>> + 'a {
+    fn iter(&self) -> impl Iterator<Item = Self::Read<'_>> + '_ {
         self.iter_with_weak_key().map(|(_, data)| data)
     }
 
@@ -78,7 +78,7 @@ pub trait TransformArena<'id, InputData, OutputData>: Arena<'id, Data = InputDat
 }
 
 pub trait IterKeyArena<'id>: Arena<'id> {
-    fn iter_with_key<'a>(&'a self) -> impl Iterator<Item = (Self::Key, Self::Read<'a>)> + 'a;
+    fn iter_with_key(&self) -> impl Iterator<Item = (Self::Key, Self::Read<'_>)> + '_;
 }
 
 mod common {
@@ -88,16 +88,5 @@ mod common {
     pub union ValOrFree<Idx: Index, Data> {
         pub data: ManuallyDrop<Data>,
         pub next_free: ManuallyDrop<Option<Idx>>,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    enum Command {
-        Insert,
-        Delete,
-        Write,
     }
 }
