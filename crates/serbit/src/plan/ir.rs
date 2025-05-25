@@ -15,8 +15,7 @@ mod keys {
     pub type Msg<'id> = Key<'id, u8>;
 }
 
-// Unfinished, want to make less repetitive.
-pub struct Plan<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, N: Naming> {
+pub struct Plan<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, N: Namer> {
     pub msgs: Share<'msgs, keys::Msg<'msgs>, Contig, u16, Assigned<N, Msg<'seqs>>>,
     pub seqs: Own<'seqs, keys::Seq<'seqs>, Contig, Seq<'stages>>,
     pub stages: Own<'stages, keys::Stage<'stages>, Contig, Stage<'items, 'seqs, 'bools>>,
@@ -26,17 +25,17 @@ pub struct Plan<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, N: Naming> {
     pub ints: Own<'ints, keys::Int<'ints>, Contig, Spanned<N, Int<'ints, 'bools, 'items>>>,
 }
 
-pub trait Naming {
+pub trait Namer {
     type Span;
     type Ident;
 }
 
-pub struct Assigned<N: Naming, Data> {
+pub struct Assigned<N: Namer, Data> {
     pub name: N::Ident,
     pub spanned_data: Spanned<N, Data>,
 }
 
-pub struct Spanned<N: Naming, Data> {
+pub struct Spanned<N: Namer, Data> {
     pub span: N::Span,
     pub data: Data,
 }
@@ -77,15 +76,16 @@ pub enum Bool<'bools, 'ints> {
     Arith(ArithBinOp, keys::Int<'ints>, keys::Int<'ints>),
 }
 
+// TODO: More primitives for ascii character
 pub enum Primitive {
     Bit,
     Byte,
     Integer(Integer),
 }
 
-pub struct Case<'items, 'bools> {
+pub struct Case<'bools, To> {
     pub condition: keys::Bool<'bools>,
-    pub data: keys::Item<'items>,
+    pub to: To,
 }
 
 pub enum Item<'ints, 'items, 'bools> {
@@ -93,8 +93,10 @@ pub enum Item<'ints, 'items, 'bools> {
         count: keys::Int<'ints>,
         item: keys::Item<'items>,
     },
-    Choice {
-        cases: SmallVec<[Case<'items, 'bools>; 2]>,
+
+    /// SEM: All cases must be the same size
+    Union {
+        cases: SmallVec<[Case<'bools, keys::Item<'items>>; 2]>,
         otherwise: keys::Item<'items>,
     },
     Tuple {
@@ -109,9 +111,14 @@ pub enum Stage<'items, 'seqs, 'bools> {
         count: keys::Item<'items>,
         seq: keys::Seq<'seqs>,
     },
+    Choice {
+        cases: SmallVec<[Case<'bools, keys::Seq<'seqs>>; 2]>,
+        otherwise: keys::Item<'items>,
+    },
     Until {
         expr: keys::Bool<'bools>,
         seq: keys::Seq<'seqs>,
+        include_end: bool,
     },
 }
 
@@ -123,7 +130,7 @@ pub struct Msg<'seqs> {
     pub seq: keys::Seq<'seqs>,
 }
 
-impl<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, N: Naming>
+impl<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, N: Namer>
     Plan<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, N>
 {
     pub fn new(

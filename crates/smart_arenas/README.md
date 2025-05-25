@@ -30,3 +30,7 @@ So instead we use lifetimes as an identity, attached to a non-copyable token.
 
 ## Contributions
 Use of identifier lifetimes was popularised by [GhostCell](https://plv.mpi-sws.org/rustbelt/ghostcell/). In fact, this is almost identical to the `BrandedVec` from the [ghostcell paper](https://plv.mpi-sws.org/rustbelt/ghostcell/paper.pdf).
+
+## Potential Improvements
+Add implementations for transformed iterators
+ - allow re-using allocations

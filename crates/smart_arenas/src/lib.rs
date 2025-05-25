@@ -61,6 +61,7 @@
 pub mod alloc;
 pub mod arena;
 pub mod id;
+pub mod utils;
 
 pub mod prelude {
     pub use crate::alloc::*;
@@ -68,5 +69,6 @@ pub mod prelude {
     pub use crate::id::index::*;
     pub use crate::id::key::*;
     pub use crate::id::token::*;
+    pub use crate::utils::*;
     pub use crate::multiple_context;
 }
