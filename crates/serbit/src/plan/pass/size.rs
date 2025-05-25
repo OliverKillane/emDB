@@ -11,7 +11,7 @@ use smart_arenas::prelude::*;
 type ExprBitsKey<'id> = Key<'id, u16>;
 
 enum ExprBits<'sizeexpr> {
-    Repeated{
+    Repeated {
         known_times: Option<usize>,
         expr: ExprBitsKey<'sizeexpr>,
     },

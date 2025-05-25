@@ -5,7 +5,7 @@ pub struct KeyWith<'brw, 'id, A: Arena<'id>> {
     pub arena: &'brw A,
 }
 
-impl <'brw, 'id, A: Arena<'id>> KeyWith<'brw, 'id, A> {
+impl<'brw, 'id, A: Arena<'id>> KeyWith<'brw, 'id, A> {
     pub fn new(key: A::Key, arena: &'brw A) -> Self {
         Self { key, arena }
     }

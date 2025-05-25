@@ -69,6 +69,6 @@ pub mod prelude {
     pub use crate::id::index::*;
     pub use crate::id::key::*;
     pub use crate::id::token::*;
-    pub use crate::utils::*;
     pub use crate::multiple_context;
+    pub use crate::utils::*;
 }

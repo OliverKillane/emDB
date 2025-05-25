@@ -93,11 +93,9 @@
 // reader needs context
 //  - for the next, and for the previous
 
-
 // Reader<Item>
 // Reader<Series> // implements next, so has a context type
 // */
-
 // /*
 // fn foo(read: Reader<impl Cursot, MyStruct>) {
 //     let y: Reader<_, MyStruct2> = read.x();
@@ -105,7 +103,6 @@
 //     my_3.z();
 // }
 // */
-
 // // Item {}
 // // Stage
 // // Seq
@@ -117,17 +114,15 @@
 //  - reader/modifier
 //  - to value / from value
 
-// Seq -> 
-//  - 
+// Seq ->
+//  -
 
 // Stage
 //  - implements next
 //  - creates items with context
 //  */
-
 // fn stage_foo() {
 //     let begin = todo!();
-
 
 //     let stage_1 = begin.start();
 //     let (item, stage_2) = stage_1.next();
@@ -139,21 +134,16 @@
 
 //     // single value
 //     // repeat by n (previous stage)
-//     // repeat until sentinel condition (e.g. strings) - 
-
+//     // repeat until sentinel condition (e.g. strings) -
 
 //     do {
 //         end: bit,
 //         val: u7,
 //     } until (!bit) include;
 
-
 //     // so a string is
 //     do {
 //         char: ascii,
 //     } until (ascii = '\0');
 
-
 // }
-
-

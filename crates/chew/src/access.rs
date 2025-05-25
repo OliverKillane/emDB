@@ -1,64 +1,64 @@
-use crate::truth::{Bool, Truth};
+use std::marker::PhantomData;
 
-// JUSTIFY: type alias instead of a new type
-//           - to allow usage in const parameters
-pub type Bits = usize;
-pub type Bytes = usize;
+use crate::{data::Data, utils::size::Bits};
 
-pub trait Access {
-    const SIZE: Bits;
+pub trait CompTime {
+    type Data: Data;
+    const OFFSET: Bits;
+    const INDEX: usize;
+}
+
+pub trait RunTime {
+    type Data: Data;
     fn offset(&self) -> Bits;
     fn index(&self) -> usize;
 }
 
-pub unsafe trait Check<B: Bound> {}
+impl<C: CompTime> RunTime for C {
+    type Data = C::Data;
 
-pub struct BoundConst<const SIZE: Bits>;
+    fn offset(&self) -> Bits {
+        C::OFFSET
+    }
 
-unsafe impl<const SIZE: Bits> Bound for BoundConst<SIZE> {
-    const SIZE: Bits = SIZE;
+    fn index(&self) -> usize {
+        C::INDEX
+    }
 }
 
-pub unsafe trait Bound {
-    const SIZE: Bits;
-}
+pub struct CompTimeAll<D: Data, const OFFSET: Bits, const INDEX: usize>(PhantomData<D>);
 
-pub struct AccessConst<const SIZE: Bits, const OFFSET: Bits, const INDEX: usize>;
-
-unsafe impl<B: Bound, const SIZE: Bits, const OFFSET: Bits, const INDEX: usize> Check<B>
-    for AccessConst<SIZE, OFFSET, INDEX>
+impl<D: Data, const OFFSET: Bits, const INDEX: usize> CompTime for CompTimeAll<D, OFFSET, INDEX>
 where
-    Bool<{ OFFSET + SIZE * (INDEX + 1) < B::SIZE }>: Truth,
+    D: Data,
 {
+    type Data = D;
+    const OFFSET: Bits = OFFSET;
+    const INDEX: usize = INDEX;
 }
 
-pub struct AccessIndex<const SIZE: Bits, const OFFSET: Bits> {
-    pub index: usize,
-}
-pub struct AccessOffset<const SIZE: Bits, const INDEX: usize> {
-    pub offset: Bits,
-}
-pub struct AccessRuntime<const SIZE: Bits> {
-    pub offset: Bits,
+pub struct CompTimeOffset<D: Data, const OFFSET: Bits> {
+    _phantom: PhantomData<D>,
     pub index: usize,
 }
 
-impl<const SIZE: Bits, const OFFSET: Bits, const INDEX: usize> Access
-    for AccessConst<SIZE, OFFSET, INDEX>
+impl<D: Data, const OFFSET: Bits> CompTimeOffset<D, OFFSET>
+where
+    D: Data,
 {
-    const SIZE: Bits = SIZE;
-
-    fn offset(&self) -> Bits {
-        OFFSET
-    }
-
-    fn index(&self) -> usize {
-        INDEX
+    pub fn new(index: usize) -> Self {
+        Self {
+            _phantom: PhantomData,
+            index,
+        }
     }
 }
 
-impl<const SIZE: Bits, const OFFSET: Bits> Access for AccessIndex<SIZE, OFFSET> {
-    const SIZE: Bits = SIZE;
+impl<D: Data, const OFFSET: Bits> RunTime for CompTimeOffset<D, OFFSET>
+where
+    D: Data,
+{
+    type Data = D;
 
     fn offset(&self) -> Bits {
         OFFSET
@@ -69,8 +69,28 @@ impl<const SIZE: Bits, const OFFSET: Bits> Access for AccessIndex<SIZE, OFFSET> 
     }
 }
 
-impl<const SIZE: Bits, const INDEX: usize> Access for AccessOffset<SIZE, INDEX> {
-    const SIZE: Bits = SIZE;
+pub struct CompTimeIndex<D: Data, const INDEX: usize> {
+    _phantom: PhantomData<D>,
+    pub offset: Bits,
+}
+
+impl<D: Data, const INDEX: usize> CompTimeIndex<D, INDEX>
+where
+    D: Data,
+{
+    pub fn new(offset: Bits) -> Self {
+        Self {
+            _phantom: PhantomData,
+            offset,
+        }
+    }
+}
+
+impl<D: Data, const INDEX: usize> RunTime for CompTimeIndex<D, INDEX>
+where
+    D: Data,
+{
+    type Data = D;
 
     fn offset(&self) -> Bits {
         self.offset
@@ -78,17 +98,5 @@ impl<const SIZE: Bits, const INDEX: usize> Access for AccessOffset<SIZE, INDEX> 
 
     fn index(&self) -> usize {
         INDEX
-    }
-}
-
-impl<const SIZE: Bits> Access for AccessRuntime<SIZE> {
-    const SIZE: Bits = SIZE;
-
-    fn offset(&self) -> Bits {
-        self.offset
-    }
-
-    fn index(&self) -> usize {
-        self.index
     }
 }
