@@ -1,0 +1,10 @@
+[package]
+name = "arbints"
+version = "0.1.0"
+edition = "2024"
+homepage.workspace = true
+repository.workspace = true
+license-file.workspace = true
+
+[dependencies]
+arbints_macros = { path = "../arbints_macros" }

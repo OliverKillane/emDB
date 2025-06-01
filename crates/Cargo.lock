@@ -27,6 +27,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "038dfcf04a5feb68e9c60b21c9625a54c2c0616e79b72b0fd87075a056ae1d1b"
 
 [[package]]
+name = "arbints"
+version = "0.1.0"
+dependencies = [
+ "arbints_macros",
+]
+
+[[package]]
+name = "arbints_macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro-error2",
+ "proc-macro2",
+ "quote",
+ "quote_debug",
+ "syn",
+]
+
+[[package]]
 name = "assume"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -679,6 +697,7 @@ version = "0.1.0"
 dependencies = [
  "combi",
  "enumtrait",
+ "indexmap",
  "num-bigint",
  "proc-macro2",
  "quote_debug",

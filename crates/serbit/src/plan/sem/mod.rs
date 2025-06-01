@@ -11,6 +11,6 @@ trait Semantic {
     type Error: Into<SemError>;
 
     fn analyse<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints>(
-        plan: ir::Plan<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, impl ir::Naming>,
+        plan: &ir::Plan<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, impl ir::Naming>,
     ) -> Result<(), Vec<Self::Error>>;
 }

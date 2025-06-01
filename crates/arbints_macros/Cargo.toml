@@ -1,0 +1,22 @@
+[package]
+name = "arbints_macros"
+version = "0.1.0"
+edition = "2024"
+
+description = "A crate for generating the types in arbints"
+keywords = ["integer"]
+categories = ["data"]
+
+homepage.workspace = true
+repository.workspace = true
+license-file.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0"
+quote = "1.0.38"
+syn = "2.0.98"
+proc-macro-error2 = "2.0.1"
+quote_debug = { path = "../quote_debug" }

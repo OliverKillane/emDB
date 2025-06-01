@@ -97,6 +97,5 @@ FixedCase{
 */
 
 pub mod back;
-pub mod front;
 pub mod plan;
 pub mod utils;

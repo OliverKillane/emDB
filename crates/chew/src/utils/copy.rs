@@ -1,11 +1,12 @@
-/// TODO: explain MSB first byte ordering
+
 use super::{
     masks::byte_mask_upper,
     size::{Bits, bytes},
     truth::{Bool, Truth},
 };
 
-// TODO: document the byte ordering
+
+/// A buffer of bits 
 pub struct RawBits<const SIZE: Bits>([u8; bytes(SIZE)])
 where
     [(); bytes(SIZE)]:;
