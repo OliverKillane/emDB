@@ -28,9 +28,12 @@ pub trait Arena<'id> {
 
     fn new(preallocate_to: <Self::Key as KeyTrait<'id>>::Idx, token: Token<'id>) -> Self;
     fn insert_return_reuse(&mut self, data: Self::Data) -> Option<(Self::Key, bool)>;
+    
+    #[must_use]
     fn insert(&mut self, data: Self::Data) -> Option<Self::Key> {
         self.insert_return_reuse(data).map(|(k, _)| k)
     }
+
     fn read(&self, key: &Self::Key) -> Self::Read<'_>;
 
     fn len(&self) -> usize;
@@ -66,6 +69,10 @@ pub trait WriteArena<'id>: Arena<'id> {
 /// An arena that allows keys to be copied.
 pub trait CopyKeyArena<'id>: Arena<'id> {
     fn copy_key(&mut self, key: &<Self as Arena<'id>>::Key) -> Option<<Self as Arena<'id>>::Key>;
+}
+
+pub trait CopyKeyImmArena<'id>: Arena<'id> {
+    fn copy_key(&self, key: &<Self as Arena<'id>>::Key) -> <Self as Arena<'id>>::Key;
 }
 
 /// Transform all members of an arena, consuming the arena, but leaving the keys as valid.

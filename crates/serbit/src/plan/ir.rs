@@ -1,11 +1,14 @@
-use std::{marker::PhantomData, num::NonZero};
+use std::{hash::Hash, marker::PhantomData, num::NonZero};
 
 use indexmap::IndexSet;
 use num_bigint::BigInt;
+use quote_debug::Tokens;
 use smallvec::SmallVec;
 use smart_arenas::prelude::*;
 
-mod keys {
+use crate::utils::options::Options;
+
+pub mod keys {
     use smart_arenas::prelude::Key;
 
     pub type Bool<'id> = Key<'id, u32>;
@@ -15,28 +18,73 @@ mod keys {
     pub type Stage<'id> = Key<'id, u16>;
     pub type Seq<'id> = Key<'id, u16>;
     pub type Msg<'id> = Key<'id, u8>;
+
+    #[derive(PartialEq, Eq, Hash)]
+    pub enum Object<'msgs, 'seqs, 'stages, 'items, 'ints, 'bools, 'consts> {
+        Msg(Msg<'msgs>),
+        Seq(Seq<'seqs>),
+        Stage(Stage<'stages>),
+        Item(Item<'items>),
+        Int(Int<'ints>),
+        Bool(Bool<'bools>),
+        Const(Const<'consts>),
+    }
 }
+
+
+/*
+
+Differentiate between context, and type
+
+item -> owned
+type -> shared + has a ctx argument set
+
+Type just has Ctx {
+    usages of ctx
+}
+
+Item has ctx mapping {
+    smallvec<
+        ctx index -> value
+    >
+    type index
+}
+
+*/
 
 pub struct Plan<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, 'consts, N: Namer> {
     pub msgs: Share<'msgs, keys::Msg<'msgs>, Contig, u16, Assigned<N, Msg<'seqs>>>,
     pub seqs: Own<'seqs, keys::Seq<'seqs>, Contig, Seq<'stages>>,
     pub stages: Own<'stages, keys::Stage<'stages>, Contig, Stage<'items, 'seqs, 'bools>>,
-    pub items:
-        Share<'items, keys::Item<'items>, Contig, u16, Assigned<N, Item<'ints, 'items, 'bools, N>>>,
-    pub bools: Own<'bools, keys::Bool<'bools>, Contig, Spanned<N, Bool<'bools, 'ints>>>,
-    pub ints: Own<'ints, keys::Int<'ints>, Contig, Spanned<N, Int<'ints, 'bools, 'items>>>,
+    pub items: App<'items, keys::Item<'items>, Contig, Assigned<N, Item<'ints, 'items, N>>>,
+    pub bools: App<'bools, keys::Bool<'bools>, Contig, Spanned<N, Bool<'bools, 'ints>>>,
+    pub ints: App<'ints, keys::Int<'ints>, Contig, Spanned<N, Int<'ints, 'bools, 'items>>>,
     pub consts: Share<'consts, keys::Const<'consts>, Contig, u16, Assigned<N, Constant>>,
     pub namer: N,
 }
 
-pub trait Namer {
-    type Span;
-    type Ident;
+pub trait Namer: std::fmt::Debug + Eq {
+    /// A span, representing a location in the source
+    type Span: From<Self::Ident> + Clone + std::fmt::Debug;
+
+    /// A raw name (no span)
+    type Name: Eq + Hash + From<Self::Ident> + Clone + std::fmt::Debug;
+
+    /// An identifier, which includes a span
+    type Ident: Eq + Hash + Clone;
+}
+
+// TODO: Documentation generation
+pub struct Doced<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, 'consts, N: Namer, Data> {
+    pub generate: Option<
+        Box<dyn Fn(&Plan<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, 'consts, N>) -> String>,
+    >,
+    pub data: Data,
 }
 
 pub struct Assigned<N: Namer, Data> {
-    pub name: N::Ident,
-    pub spanned_data: Spanned<N, Data>,
+    pub ident: N::Ident,
+    pub data: Spanned<N, Data>,
 }
 
 pub struct Spanned<N: Namer, Data> {
@@ -134,15 +182,10 @@ pub struct Constant {
     pub value: Primitive<ConstAssoc>,
 }
 
-pub enum Item<'ints, 'items, 'bools, N: Namer> {
+pub enum Item<'ints, 'items, N: Namer> {
     Array {
         count: keys::Int<'ints>,
         item: keys::Item<'items>,
-    },
-    /// SEM: All cases must be the same size
-    Union {
-        cases: SmallVec<[Case<'bools, keys::Item<'items>>; 2]>,
-        otherwise: keys::Item<'items>,
     },
     Tuple {
         items: SmallVec<[keys::Item<'items>; 11]>,
@@ -157,8 +200,8 @@ pub enum Stage<'items, 'seqs, 'bools> {
         seq: keys::Seq<'seqs>,
     },
     Choice {
-        cases: SmallVec<[Case<'bools, keys::Seq<'seqs>>; 2]>,
-        otherwise: keys::Item<'items>,
+        cases: Options<Case<'bools, keys::Seq<'seqs>>>,
+        otherwise: Option<keys::Item<'items>>,
     },
     Until {
         expr: keys::Bool<'bools>,
@@ -173,62 +216,4 @@ pub struct Seq<'stages> {
 
 pub struct Msg<'seqs> {
     pub seq: keys::Seq<'seqs>,
-}
-
-impl<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, 'consts, N: Namer>
-    Plan<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, 'consts, N>
-{
-    pub fn new(
-        token_msgs: Token<'msgs>,
-        token_seqs: Token<'seqs>,
-        token_stages: Token<'stages>,
-        token_items: Token<'items>,
-        token_bools: Token<'bools>,
-        token_ints: Token<'ints>,
-        token_consts: Token<'consts>,
-        namer: N,
-    ) -> Self {
-        Self {
-            msgs: Share::new(0, token_msgs),
-            seqs: Own::new(0, token_seqs),
-            stages: Own::new(0, token_stages),
-            items: Share::new(0, token_items),
-            bools: Own::new(0, token_bools),
-            ints: Own::new(0, token_ints),
-            consts: Share::new(0, token_consts),
-            namer,
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    struct TestNamer;
-
-    impl Namer for TestNamer {
-        type Span = usize;
-        type Ident = &'static str;
-    }
-
-    use super::*;
-
-    #[test]
-    fn test_basic() {
-        multiple_context!(
-            token_msgs,
-            token_seqs,
-            token_stages,
-            token_items,
-            token_bools,
-            token_ints,
-            token_consts => {
-                let mut plan = Plan::new(
-                    token_msgs, token_seqs, token_stages, token_items, token_bools, token_ints, token_consts, TestNamer);
-
-                plan.consts.insert(
-                    Assigned { name: "foo", spanned_data: Spanned { span: 0, data: Constant { value: Primitive::Bit(true) } }, }
-                );
-            }
-        );
-    }
 }

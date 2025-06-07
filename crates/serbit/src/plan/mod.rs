@@ -1,6 +1,8 @@
 pub mod ir;
 pub mod namer;
 pub mod pass;
+pub mod sem;
+pub mod helpers;
 
 /*
 Supporting bit-specific sizes is hard

@@ -20,6 +20,7 @@ pub unsafe trait KeyTrait<'id> {
     fn to_idx(&self) -> Self::Idx;
 }
 
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Key<'id, Idx: Index> {
     idx: Idx,
     _phantom: PhantomInvariantLifetime<'id>,

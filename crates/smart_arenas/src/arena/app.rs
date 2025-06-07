@@ -8,7 +8,7 @@ use crate::{
     },
 };
 
-use super::{CopyKeyArena, IterKeyArena, WriteArena};
+use super::{CopyKeyArena, CopyKeyImmArena, IterKeyArena, WriteArena};
 
 /// ## An Append only arena
 ///  - No support for deletions, all values remain in the map until the arena is deallocated
@@ -74,11 +74,11 @@ impl<'id, Key: KeyTrait<'id>, Alloc: AllocSelect, Data> WriteArena<'id>
     }
 }
 
-impl<'id, Key: KeyTrait<'id>, Alloc: AllocSelect, Data> CopyKeyArena<'id>
+impl<'id, Key: KeyTrait<'id>, Alloc: AllocSelect, Data> CopyKeyImmArena<'id>
     for App<'id, Key, Alloc, Data>
 {
-    fn copy_key(&mut self, key: &<Self as Arena<'id>>::Key) -> Option<<Self as Arena<'id>>::Key> {
-        Some(unsafe { Self::Key::from_idx(key.to_idx()) })
+    fn copy_key(&self, key: &<Self as Arena<'id>>::Key) -> <Self as Arena<'id>>::Key {
+        unsafe { Self::Key::from_idx(key.to_idx()) }
     }
 }
 
