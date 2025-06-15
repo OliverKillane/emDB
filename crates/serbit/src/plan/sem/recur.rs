@@ -3,7 +3,7 @@
 use super::*;
 use crate::plan::ir;
 
-struct Recur;
+pub struct Recur;
 
 pub enum PathNode<'items, 'ints, 'bools> {
     Item(ir::keys::Item<'items>),

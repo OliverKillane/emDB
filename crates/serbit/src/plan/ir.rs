@@ -33,7 +33,6 @@ pub mod keys {
 
 
 /*
-
 Differentiate between context, and type
 
 item -> owned
@@ -43,19 +42,68 @@ Type just has Ctx {
     usages of ctx
 }
 
-Item has ctx mapping {
-    smallvec<
-        ctx index -> value
-    >
-    type index
+Type {
+    Contains Ctx in expressions
+    -> use
 }
 
+Message, Seq contains 
+
+For a type
+type contains array with size
+
+For a stage
+if, while conditions depend on previous
+
+dependencies
+ - in a type - only ctx
+ - in a stage, we need the item identifier + the internal identifier
+
+type includes nullvalue / optional or value
+
+type (ctx) {
+    x: thingy(ctx.foo),
+    y: thingy(ctx.bar)
+}
+
+For a stage:
+ - item is a function of item(ctx0: outer_ctx23) -> (itemctx)
+ - each item adds to context, context grows
+ - type has typepath, which expresses the choice / traversal of the path
+ - each stage gives info
+
+Primitive()
+Tuple(index)
+Array(index)
+Choice(
+    if (
+        itemctx: Blagh
+    )
+)
+
+Traverse: check set of available items
+Traverse: check the items paths are valid
+
+Item is a ctx in, all out
+
+msgs, 
+stages, 
+items, A special usage of a stage
+types, take in ctx, make use of ctx
+
+type {
+    tuple: (
+        Usage(ctxbind) => type
+    )
+    Reference does ctxbind
+}
+CtxBool
+Expr
 */
 
-pub struct Plan<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, 'consts, N: Namer> {
-    pub msgs: Share<'msgs, keys::Msg<'msgs>, Contig, u16, Assigned<N, Msg<'seqs>>>,
-    pub seqs: Own<'seqs, keys::Seq<'seqs>, Contig, Seq<'stages>>,
-    pub stages: Own<'stages, keys::Stage<'stages>, Contig, Stage<'items, 'seqs, 'bools>>,
+pub struct Plan<'msgs, 'stages, 'items, 'bools, 'ints, 'consts, N: Namer> {
+    pub msgs: Share<'msgs, keys::Msg<'msgs>, Contig, u16, Assigned<N, Msg<'stages>>>,
+    pub stages: Own<'stages, keys::Stage<'stages>, Contig, Stage<'items, 'stages, 'bools>>,
     pub items: App<'items, keys::Item<'items>, Contig, Assigned<N, Item<'ints, 'items, N>>>,
     pub bools: App<'bools, keys::Bool<'bools>, Contig, Spanned<N, Bool<'bools, 'ints>>>,
     pub ints: App<'ints, keys::Int<'ints>, Contig, Spanned<N, Int<'ints, 'bools, 'items>>>,
@@ -75,9 +123,9 @@ pub trait Namer: std::fmt::Debug + Eq {
 }
 
 // TODO: Documentation generation
-pub struct Doced<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, 'consts, N: Namer, Data> {
+pub struct Doced<'msgs, 'stages, 'items, 'bools, 'ints, 'consts, N: Namer, Data> {
     pub generate: Option<
-        Box<dyn Fn(&Plan<'msgs, 'seqs, 'stages, 'items, 'bools, 'ints, 'consts, N>) -> String>,
+        Box<dyn Fn(&Plan<'msgs, 'stages, 'items, 'bools, 'ints, 'consts, N>) -> String>,
     >,
     pub data: Data,
 }
@@ -193,27 +241,26 @@ pub enum Item<'ints, 'items, N: Namer> {
     Primitive(Primitive<ConstraintAssoc<N>>),
 }
 
-pub enum Stage<'items, 'seqs, 'bools> {
+pub enum Stage<'items, 'stages, 'bools> {
     Single(keys::Item<'items>),
     Repeat {
         count: keys::Item<'items>,
-        seq: keys::Seq<'seqs>,
+        stage: keys::Stage<'stages>,
     },
     Choice {
-        cases: Options<Case<'bools, keys::Seq<'seqs>>>,
+        cases: Options<Case<'bools, keys::Stage<'stages>>>,
         otherwise: Option<keys::Item<'items>>,
     },
     Until {
         expr: keys::Bool<'bools>,
-        seq: keys::Seq<'seqs>,
+        stage: keys::Stage<'stages>,
         include_end: bool,
     },
+    Series {
+        stages: SmallVec<[keys::Stage<'stages>; 8]>
+    }
 }
 
-pub struct Seq<'stages> {
-    pub stages: SmallVec<[keys::Stage<'stages>; 8]>,
-}
-
-pub struct Msg<'seqs> {
-    pub seq: keys::Seq<'seqs>,
+pub struct Msg<'stages> {
+    pub stage: keys::Stage<'stages>,
 }
