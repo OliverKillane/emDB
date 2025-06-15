@@ -1,6 +1,6 @@
 use std::{hash::Hash};
 
-pub trait Namer: std::fmt::Debug + Eq {
+pub trait Namer: std::fmt::Debug + Eq + 'static {
     /// A span, representing a location in the source
     type Span: From<Self::Ident> + Clone + std::fmt::Debug;
 

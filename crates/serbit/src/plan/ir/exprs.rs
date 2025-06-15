@@ -1,4 +1,4 @@
-use crate::plan::ir2::primitives::AnyInteger;
+use crate::plan::ir::primitives::AnyInteger;
 
 #[derive(Debug)]
 pub enum IntBinOp {
@@ -8,19 +8,19 @@ pub enum IntBinOp {
 }
 
 #[derive(Debug)]
-pub enum IntExpr<Ctx> {
+pub enum SizeExpr<Ctx> {
     Ctx(Ctx),
     Const(AnyInteger),
-    Neg(Box<IntExpr<Ctx>>),
+    Neg(Box<SizeExpr<Ctx>>),
     BinOp {
         op: IntBinOp,
-        left: Box<IntExpr<Ctx>>,
-        right: Box<IntExpr<Ctx>>,
+        left: Box<SizeExpr<Ctx>>,
+        right: Box<SizeExpr<Ctx>>,
     },
     If {
         cond: Box<BoolExpr<Ctx>>,
-        then: Box<IntExpr<Ctx>>,
-        otherwise: Box<IntExpr<Ctx>>,
+        then: Box<SizeExpr<Ctx>>,
+        otherwise: Box<SizeExpr<Ctx>>,
     },
 }
 

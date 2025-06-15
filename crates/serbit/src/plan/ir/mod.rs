@@ -23,29 +23,29 @@ pub mod arenas {
         Share<'id, keys::Const<'id>, Contig, u8, Assigned<N, PrimitiveValue<N>>>;
     pub type Datas<'id, N: Namer> =
         Share<'id, keys::Datas<'id>, Contig, u8, Assigned<N, datas::DataType<'id, N>>>;
-    pub type Stages<'id, 'data_types, N: Namer> =
-        Own<'id, keys::Stages<'id>, Contig, Assigned<N, stages::Stage<'data_types, 'id, N>>>;
+    pub type Stages<'id, 'datas, N: Namer> =
+        Own<'id, keys::Stages<'id>, Contig, Assigned<N, stages::Stage<'datas, 'id, N>>>;
 }
 
-pub struct Plan<'consts, 'data_types, 'msg_stages, N: namer::Namer> {
+pub struct Plan<'consts, 'datas, 'stages, N: Namer> {
     pub consts: arenas::Consts<'consts, N>,
-    pub datas: arenas::Datas<'data_types, N>,
-    pub stages: arenas::Stages<'msg_stages, 'data_types, N>,
+    pub datas: arenas::Datas<'datas, N>,
+    pub stages: arenas::Stages<'stages, 'datas, N>,
+    pub messages: Vec<Assigned<N, keys::Stages<'stages>>>,
     pub namer: N,
 }
 
 pub mod utils {
-    use crate::plan::ir2::namer::{Assigned, Namer};
+    use super::*;
 
     #[derive(Debug)]
     pub struct Cases<N: Namer, E, C> {
-        pub cases: Vec<Case<N, E, C>>,
+        pub cases: Vec<Assigned<N, Case<E, C>>>,
         pub otherwise: Option<Assigned<N, C>>,
     }
 
     #[derive(Debug)]
-    pub struct Case<N: Namer, E, C> {
-        pub ident: N::Ident,
+    pub struct Case<E, C> {
         pub expr: E,
         pub case: C,
     }

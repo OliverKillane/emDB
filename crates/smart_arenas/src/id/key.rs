@@ -44,7 +44,7 @@ unsafe impl<'id, Idx: Index> KeyTrait<'id> for Key<'id, Idx> {
 }
 
 pub struct WeakKey<'id, 'brw, Key: KeyTrait<'id>> {
-    idx: Key::Idx,
+    key: Key,
     _phantom_id: PhantomInvariantLifetime<'id>,
     _phantom_brw: PhantomCovariantLifetime<'brw>,
 }
@@ -54,13 +54,20 @@ impl<'id, Key: KeyTrait<'id>> WeakKey<'id, '_, Key> {
     /// Only used from within arenas, and only where a key copy does not break any arena internal invariants.
     pub unsafe fn from_idx(idx: Key::Idx) -> Self {
         Self {
-            idx,
+            key: unsafe  { Key::from_idx(idx) },
             _phantom_id: PhantomInvariantLifetime::new(),
             _phantom_brw: PhantomCovariantLifetime::new(),
         }
     }
 
     pub fn to_idx(&self) -> Key::Idx {
-        self.idx
+        self.key.to_idx()
+    }
+
+    /// Used to get a borrow of a key, when [crate::arena::Arena::iter_with_weak_key] is used over an arena.
+    ///  - The weak key can only last as long as the immutable borrow for iterating on the arena
+    ///  - Convenient when accessing through the arena, rather than the key (stored somewhere else).
+    pub fn key<'brw>(&'brw self) -> &'brw Key {
+        &self.key
     }
 }

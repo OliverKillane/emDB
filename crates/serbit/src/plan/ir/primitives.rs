@@ -1,4 +1,4 @@
-use crate::plan::ir2::namer::Namer;
+use crate::plan::ir::namer::Namer;
 use std::{collections::HashMap, num::NonZero};
 
 pub struct Bits(NonZero<u8>);
